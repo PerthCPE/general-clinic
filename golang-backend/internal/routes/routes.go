@@ -17,19 +17,19 @@ func SetUpRoutes(r *gin.Engine) {
 	api.Use(middleware.AuthRequired())
 	
 	registrarRoutes := api.Group("/registrar")
-	// check role
-	registrarRoutes.Use(middleware.RoleRequired("registrar")) 
+	// role check
+	registrarRoutes.Use(middleware.RoleRequired("registrar"))
 	{
-		registrarRoutes.POST("/patients", func(c *gin.Context) {
-			// Mock up for waiting func, (c * gin.Context) is just universal mailbox
-			c.JSON(200, gin.H{"message": "Registrar registered a patient successfully"})
-			}) 
-		}
+		registrarRoutes.POST("/patient", controllers.RegisterPatient)
+		// add patient registeration feature
+		registrarRoutes.GET("/patients/search/:national_id", controllers.SearchPatient)
+		// add patient search feature
+	}
 		
 		
 	nurseRoutes := api.Group("/nurse")
 	nurseRoutes.Use(middleware.RoleRequired("nurse"))
-	// check role
+	// role check
 	{
 		nurseRoutes.POST("/vitals", func(c *gin.Context) {
 			// Mock up for waiting func, (c * gin.Context) is just universal mailbox
@@ -38,7 +38,7 @@ func SetUpRoutes(r *gin.Engine) {
 	}
 
 	queueRoutes := api.Group("/queue")
-	// check role
+	// role check 
 	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse"))
 	{
 		queueRoutes.GET("/list", func(c *gin.Context) {
