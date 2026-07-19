@@ -1,0 +1,49 @@
+package routes
+
+import (
+	"clinic-backend/internal/controllers"
+	"clinic-backend/internal/middleware"
+	"github.com/gin-gonic/gin"
+)
+
+// API Routes Auth And Set Up Role 
+func SetUpRoutes(r *gin.Engine) {
+	// ส่งข้อมูลเพื่อ login และเช็ค role
+	r.POST("/login", controllers.Login)
+
+	// create group for inherit
+	api := r.Group("api")
+	// check jwt bearer token และแจก role
+	api.Use(middleware.AuthRequired())
+	
+	registrarRoutes := api.Group("/registrar")
+	// check role
+	registrarRoutes.Use(middleware.RoleRequired("registrar")) 
+	{
+		registrarRoutes.POST("/patients", func(c *gin.Context) {
+			// Mock up for waiting func, (c * gin.Context) is just universal mailbox
+			c.JSON(200, gin.H{"message": "Registrar registered a patient successfully"})
+			}) 
+		}
+		
+		
+	nurseRoutes := api.Group("/nurse")
+	nurseRoutes.Use(middleware.RoleRequired("nurse"))
+	// check role
+	{
+		nurseRoutes.POST("/vitals", func(c *gin.Context) {
+			// Mock up for waiting func, (c * gin.Context) is just universal mailbox
+			c.JSON(200, gin.H{"message": "Nurse recoreded vitals successfully"})
+		}) 
+	}
+
+	queueRoutes := api.Group("/queue")
+	// check role
+	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse"))
+	{
+		queueRoutes.GET("/list", func(c *gin.Context) {
+			// Mock up for waiting func, (c * gin.Context) is just universal mailbox
+			c.JSON(200, gin.H{"message": "Retrieved queue list"})
+		})
+	}	
+}

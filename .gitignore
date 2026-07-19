@@ -1,0 +1,11 @@
+golang-backend/.env
+golang-backend/golang-backend
+golang-backend/*.exe
+
+react-frontend/node_modules/
+react-frontend/dist/
+react-frontend/.env
+react-frontend/.env.local
+
+.DS_Store
+Thumbs.db
