@@ -24,6 +24,10 @@ func SetUpRoutes(r *gin.Engine) {
 		// add patient registeration feature
 		registrarRoutes.GET("/patients/search/:national_id", controllers.SearchPatient)
 		// add patient search feature
+		registrarRoutes.GET("/eligibility/check/:national_id", controllers.CheckExternalEligibility)
+		// add eligibility check feature (U2)
+		registrarRoutes.POST("/eligibility/save", controllers.SavePatientEligibility)
+		// add eligibility save feature (U2)
 	}
 		
 		
