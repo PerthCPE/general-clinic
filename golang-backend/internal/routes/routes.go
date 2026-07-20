@@ -20,7 +20,7 @@ func SetUpRoutes(r *gin.Engine) {
 	// role check
 	registrarRoutes.Use(middleware.RoleRequired("registrar"))
 	{
-		registrarRoutes.POST("/patient", controllers.RegisterPatient)
+		registrarRoutes.POST("/patients", controllers.RegisterPatient)
 		// add patient registeration feature
 		registrarRoutes.GET("/patients/search/:national_id", controllers.SearchPatient)
 		// add patient search feature
