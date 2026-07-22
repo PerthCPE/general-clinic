@@ -40,6 +40,8 @@ func ConnectDB() {
 		&models.Patient{},
 		&models.MedicalEligibility{},
 		&models.VisitRecord{},
+		&models.Queue{},
+		&models.Screening{},
 	)
 
 	// if error founded, notice

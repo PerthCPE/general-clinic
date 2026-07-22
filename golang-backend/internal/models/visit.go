@@ -5,21 +5,15 @@ import "time"
 type VisitRecord struct {
 	ID				uint		`gorm:"primaryKey" json:"id"`
 	PatientID		uint		`gorm:"not null" json:"patient_id"`
-	QueueNumber		string		`gorm:"not null" json:"queue"`
-	Status			string		`gorm:"not null" json:"status"`
-	TriageLevel		string		`json:"triage_level"`
-	Weight			float64		`json:"weight"`
-	Height			float64		`json:"height"`
-	BMI				float64		`json:"bmi"`
-	SystolicBP		int			`json:"systolic_bp"`
-	DiastolicBP		int			`json:"diastolic_bp"`
-	HeartRate		int			`json:"heart_rate"`
-	Temperature		float64		`json:"temperature"`
-	ChiefComplaint	string		`json:"chief_complaint"`
-	Allergies		string		`json:"allergies"`
-	MedicalHistory	string		`json:"medical_history"`
+	DoctorID		uint		`json:"doctor_id"`
+	VisitDate		time.Time	`json:"visit_date"`
 	CreatedAt		time.Time	`json:"created_at"` 
 	UpdatedAt		time.Time	`json:"updated_at"` 
 
+	Doctor			User		`gorm:"foreignKey:DoctorID" json:"user"`
 	Patient			Patient		`gorm:"foreignKey:PatientID" json:"patient"`
 }
+
+// ค่าที่ต้องวัดแยกไป table คัดกรอง 
+// แยกตารางคิว
+// เช็คสิทธิ์ พนักงานสามารถสร้างข้อมูลสิทธิ์ แก้ไขได้ คือทำ mock up ตรวจสอบเหมือนเดิม แต่ต้องมีคนไปทำ ui บันทึกเอง table เดียวกัน
