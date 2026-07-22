@@ -78,9 +78,9 @@ func SavePatientEligibility(c *gin.Context) {
 	
 	var existingEligibility models.MedicalEligibility
 	result := config.DB.Where("patient_id = ?", req.PatientID).First(&existingEligibility)
-	// 6. แก้ไขลอจิกแบ่งบล็อกอัปเดต / บันทึกใหม่ ให้ถูกต้อง
+	
 	if result.Error == nil {
-		// ถ้ามีอยู่แล้ว ➡️ อัปเดตข้อมูล
+		
 		existingEligibility.SchemeType = req.SchemeType
 		existingEligibility.CoverageDetails = req.CoverageDetails
 		existingEligibility.VerifiedAt = time.Now()
@@ -89,11 +89,11 @@ func SavePatientEligibility(c *gin.Context) {
 			return
 		}
 	} else {
-		// ถ้ายังไม่มี ➡️ บันทึกตัวใหม่
+		
 		newEligibility := models.MedicalEligibility{
-			PatientID:       req.PatientID,   // 5. แก้ไขสะกดคำเป็น PatientID
+			PatientID:       req.PatientID,   
 			SchemeType:      req.SchemeType,
-			CoverageDetails: req.CoverageDetails, // แก้ไข: ให้บันทึกค่ารายละเอียดสิทธิ์จริง
+			CoverageDetails: req.CoverageDetails, 
 			VerifiedAt:      time.Now(),
 		}
 		if err := config.DB.Create(&newEligibility).Error; err != nil {
