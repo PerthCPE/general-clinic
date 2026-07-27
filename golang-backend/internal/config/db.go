@@ -42,6 +42,8 @@ func ConnectDB() {
 		&models.VisitRecord{},
 		&models.Queue{},
 		&models.Screening{},
+		&models.Medicine{},
+		&models.Billing{},
 	)
 
 	// if error founded, notice
