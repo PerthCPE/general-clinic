@@ -6,6 +6,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,7 +15,7 @@ func CheckExternalEligibility(c *gin.Context) {
 	nationalID := c.Param("national_id")
 
 	// national id len check
-	if len(nationalID) != 13 {	
+	if len(nationalID) != 13 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "เลขบัตรประชาชนต้องมี 13 หลักเท่านั้น"})
 		return
 	}
@@ -32,35 +33,34 @@ func CheckExternalEligibility(c *gin.Context) {
 	schemeType := "จ่ายเงินด้วยตนเอง"
 	details := "ชำระเงินเต็มจำนวนตามใบเสร็จ"
 
-	if lastDigit % 3 == 0 {
+	if lastDigit%3 == 0 {
 		schemeType = "บัตรทอง (สปสช.)"
 		details = "ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชีและค่าบริการพิเศษ"
-	} else if lastDigit % 3 == 1 {
+	} else if lastDigit%3 == 1 {
 		schemeType = "ประกันสังคม"
 		details = "ครอบคลุมสิทธิ์ตามโรงพยาบาลคู่สัญญา ค่าบริการส่วนเกินคนไข้ชำระเอง"
-	} else if lastDigit % 3 == 2 {
+	} else if lastDigit%3 == 2 {
 		schemeType = "ประกันสุขภาพเอกชน"
 		details = "ครอบคลุมค่ารักษาพยาบาลไม่เกิน 5,000 บาท/ครั้ง ส่วนเกินเบิกตามเงื่อนไขกรมธรรม์"
 	}
 
 	// send json object to show mock up on frontend
 	c.JSON(http.StatusOK, gin.H{
-		"patient_id":			patient.ID,
-		"fullname":				patient.FullName,
-		"national_id":			patient.NationalID,
-		"scheme_type":			schemeType,
-		"coverage_details":		details,
-		"verified_at":			time.Now(),
+		"patient_id":       patient.ID,
+		"fullname":         patient.FullName,
+		"national_id":      patient.NationalID,
+		"scheme_type":      schemeType,
+		"coverage_details": details,
+		"verified_at":      time.Now(),
 	})
 }
 
 // Eligibility Struct Req
 type SaveEligibilityReq struct {
-	PatientID			uint		`json:"patient_id" binding:"required"`
-	SchemeType			string		`json:"scheme_type" binding:"required"`
-	CoverageDetails		string		`json:"coverage_details"`
+	PatientID       uint   `json:"patient_id" binding:"required"`
+	SchemeType      string `json:"scheme_type" binding:"required"`
+	CoverageDetails string `json:"coverage_details"`
 }
-
 
 func SavePatientEligibility(c *gin.Context) {
 	var req SaveEligibilityReq
@@ -75,12 +75,12 @@ func SavePatientEligibility(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบคนไข้ในระบบ"})
 		return
 	}
-	
+
 	var existingEligibility models.MedicalEligibility
 	result := config.DB.Where("patient_id = ?", req.PatientID).First(&existingEligibility)
-	
+
 	if result.Error == nil {
-		
+
 		existingEligibility.SchemeType = req.SchemeType
 		existingEligibility.CoverageDetails = req.CoverageDetails
 		existingEligibility.VerifiedAt = time.Now()
@@ -89,11 +89,11 @@ func SavePatientEligibility(c *gin.Context) {
 			return
 		}
 	} else {
-		
+
 		newEligibility := models.MedicalEligibility{
-			PatientID:       req.PatientID,   
+			PatientID:       &req.PatientID,
 			SchemeType:      req.SchemeType,
-			CoverageDetails: req.CoverageDetails, 
+			CoverageDetails: req.CoverageDetails,
 			VerifiedAt:      time.Now(),
 		}
 		if err := config.DB.Create(&newEligibility).Error; err != nil {
@@ -103,4 +103,3 @@ func SavePatientEligibility(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "บันทึกและยืนยันสิทธิ์การรักษาเรียบร้อยแล้ว"})
 }
-
