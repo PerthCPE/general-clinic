@@ -5,23 +5,24 @@ import (
 	"log"
 
 	"clinic-backend/internal/models"
+
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // define global db for handler/controller
-var	DB *gorm.DB
+var DB *gorm.DB
 
 func ConnectDB() {
 	// ประกอบ Data from AppConfig
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=Asia/Bangkok",
-			AppConfig.DBHost,	
-			AppConfig.DBUser,	
-			AppConfig.DBPassword,	
-			AppConfig.DBName,	
-			AppConfig.DBPort,
-			AppConfig.DBSSLMode,	
+		AppConfig.DBHost,
+		AppConfig.DBUser,
+		AppConfig.DBPassword,
+		AppConfig.DBName,
+		AppConfig.DBPort,
+		AppConfig.DBSSLMode,
 	)
 
 	// gorm connect to db
@@ -42,6 +43,15 @@ func ConnectDB() {
 		&models.VisitRecord{},
 		&models.Queue{},
 		&models.Screening{},
+		&models.QueueDisplayDoctor{},
+		&models.VisitTimeLog{},
+		&models.MedicalSocialHistory{},
+		&models.ClinicalNote{},
+		&models.Diagnosis{},
+		&models.Prescription{},
+		&models.LabImagingOrder{},
+		&models.ReferralCounseling{},
+		&models.FollowupAppointment{},
 	)
 
 	// if error founded, notice
