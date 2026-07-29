@@ -1,0 +1,9 @@
+/* ===== Body (Main Content) ===== */
+.body-content {
+  margin-left: 240px;  /* offset for sidebar width */
+  margin-top: 60px;    /* offset for topbar height */
+  min-height: calc(100vh - 60px);
+  background: #f8fafc;
+  padding: 24px;
+  box-sizing: border-box;
+}
