@@ -2,13 +2,14 @@ import './Sidebar.css';
 import homeIcon from '../../assets/home.svg' ;// ใช้ import homeIcon from '../../assets/home.svg'
 import A1 from '../../assets/A1.svg';
 import A2 from '../../assets/A2.svg';
+import logoclinic from "../../assets/logiclinic.svg";
 
 function Sidebar() {
   return (
     <aside className="sidebar">
       {/* Logo */}
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">🏥</div>
+        <div className="sidebar-logo-icon"><img src={logoclinic} alt="Clinic Logo" /></div>
         <span className="sidebar-logo-text">Clinic MS</span>
       </div>
 
