@@ -150,3 +150,46 @@
   justify-content: center;
   font-size: 18px;
 }
+
+
+/* ==========================================
+    Dark Mode ของ Topbar
+   ========================================== */
+body.dark-mode .topbar {
+  background: #0f172a;
+  border-bottom: 2px solid #1e293b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ช่องค้นหาใน Dark Mode */
+body.dark-mode .topbar-search {
+  background: #1e293b;
+}
+
+body.dark-mode .topbar-search-input {
+  color: #f8fafc;
+}
+
+body.dark-mode .topbar-search-input::placeholder {
+  color: #64748b;
+}
+
+/* ปุ่มไอคอนแจ้งเตือนใน Dark Mode */
+body.dark-mode .topbar-icon-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #ffffff;
+}
+
+body.dark-mode .topbar-icon-btn:hover {
+  background: #334155;
+}
+
+/* ข้อความชื่อผู้ใช้ใน Dark Mode */
+body.dark-mode .topbar-user-name {
+  color: #f8fafc;
+}
+
+body.dark-mode .topbar-user-role {
+  color: #94a3b8;
+}

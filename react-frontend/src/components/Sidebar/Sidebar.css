@@ -3,7 +3,8 @@
   width: 240px;
   min-width: 240px;
   height: 100vh;
-  background: linear-gradient(180deg, #0f2027 0%, #1a3a4a 50%, #0f2027 100%);
+  /* BG Sidebar */
+  background: linear-gradient(180deg, #0f2027 0%, #1a3a4a 50%, #0f2027 100%);/* ตอนนี้เฟสสี*/
   display: flex;
   flex-direction: column;
   padding: 24px 16px;
@@ -13,6 +14,11 @@
   left: 0;
   z-index: 100;
   overflow-y: auto;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+}
+/* โหมด dark */
+.sidebar.dark {
+  background: linear-gradient(180deg, #111827 0%, #1f2937 50%, #111827 100%);
 }
 
 /* Logo */
@@ -35,6 +41,12 @@
   font-size: 20px;
 }
 
+.sidebar-logo-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .sidebar-logo-text {
   font-size: 20px;
   font-weight: 700;
@@ -50,7 +62,9 @@
   flex: 1;
 }
 
-.sidebar-nav-item {
+/* ปรับ Font ขนาด... */
+
+.sidebar-nav-item { 
   display: flex;
   align-items: center;
   gap: 12px;
@@ -58,25 +72,41 @@
   border-radius: 10px;
   color: #94a3b8;
   text-decoration: none;
-  font-size: 15px;
+  font-size: 16px; /*  ขนาด Font*/
   font-weight: 500;
   transition: all 0.2s ease;
 }
-
+/*  hover ตอนลอยยังไม่กด เวลาเอาเมาสไปชี้ */
 .sidebar-nav-item:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
 }
 
+/* รายการที่ถูกเลือกตอนนี้อนู่หน้าไหนแสดงขอบ */
 .sidebar-nav-item.active {
   background: rgba(45, 212, 168, 0.15);
+  /* background: rgba(198, 196, 196, 0.15); */
   color: #2dd4a8;
+  font-weight: 900; /*ตัวหนา*/ 
+
+  border-left: 5px solid #2dd4a8; /* แถบสีเขียวหนา 5px */
+  overflow: hidden;                /* ตัดมุมแถบสีเขียวให้โค้งตามปุ่ม */
+  
+
 }
 
 .sidebar-nav-icon {
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 24px;
-  text-align: center;
+  height: 24px;
+}
+
+.sidebar-nav-icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
 /* Bottom section */
@@ -84,6 +114,7 @@
   margin-top: auto;
   display: flex;
   flex-direction: column;
+  /* align-items: center; */
   gap: 16px;
   padding: 16px 8px 0;
   border-top: 1px dashed rgba(255, 255, 255, 0.15);
@@ -95,7 +126,8 @@
   gap: 8px;
 }
 
-.mode-label {
+.mode-label,
+.mode-label-single {
   display: flex;
   flex-direction: column;
   align-items: center;

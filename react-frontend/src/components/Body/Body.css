@@ -1,9 +1,18 @@
-/* ===== Body (Main Content) ===== */
+/* ===== Body (โหมดปกติ / Light Mode) ===== */
 .body-content {
-  margin-left: 240px;  /* offset for sidebar width */
-  margin-top: 60px;    /* offset for topbar height */
+  margin-left: 240px;  
+  margin-top: 60px;    
   min-height: calc(100vh - 60px);
-  background: #f8fafc;
+
+  background: #f8fafc; /* สีพื้นหลังสว่าง */
+  color: #1e293b;
   padding: 24px;
   box-sizing: border-box;
+  transition: background 0.3s ease, color 0.3s ease; /* ทำให้สีค่อยๆ เปลี่ยนแบบนุ่มนวล */
+}
+
+/* ===== เมื่อเป็น Dark Mode ===== */
+body.dark-mode .body-content {
+  background: #0f172a; /* สีพื้นหลังเข้ม */
+  color: #f1f5f9;      /* สีตัวอักษรสว่าง */
 }
