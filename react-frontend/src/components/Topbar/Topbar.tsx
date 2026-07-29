@@ -1,6 +1,12 @@
 import './Topbar.css';
+import notify_nothave from '../../assets/notify_nothave.svg';
+import notify_have from '../../assets/notify_haves.svg';
+import { useState } from 'react';
+
+
 
 function Topbar() {
+    const [hasNotification, setHasNotification] = useState(false);  //บุญสร้างให้มี state  
   return (
     <header className="topbar">
       {/* Left: Brand label */}
@@ -24,9 +30,18 @@ function Topbar() {
         <button className="topbar-chat-btn">
           💬 Chat Block
         </button>
+
+        {/*=============================== Notifications ===============================*/}
+
         <button className="topbar-icon-btn" aria-label="Notifications">
-          🔔
-        </button>
+      <img 
+        src={hasNotification ? notify_have : notify_nothave} 
+        alt="notification" 
+        width="20" 
+        height="20" 
+      />
+    </button>
+        {/*=============================== Notifications ===============================*/}
         <div className="topbar-user">
           <div className="topbar-user-info">
             <span className="topbar-user-name">Dr.Bunkham Y.</span>
@@ -36,7 +51,9 @@ function Topbar() {
         </div>
       </div>
     </header>
+    
   );
+  
 }
 
 export default Topbar;
