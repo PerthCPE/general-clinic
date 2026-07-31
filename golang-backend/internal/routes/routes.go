@@ -35,10 +35,8 @@ func SetUpRoutes(r *gin.Engine) {
 	nurseRoutes.Use(middleware.RoleRequired("nurse"))
 	// role check
 	{
-		nurseRoutes.POST("/vitals", func(c *gin.Context) {
-			// Mock up for waiting func, (c * gin.Context) is just universal mailbox
-			c.JSON(200, gin.H{"message": "Nurse recoreded vitals successfully"})
-		}) 
+		nurseRoutes.POST("/vitals", controllers.RecordVitalsAndTriage)
+		nurseRoutes.GET("/vitals/history/:patient_id", controllers.GetScreeningHistory)
 	}
 
 	queueRoutes := api.Group("/queue")

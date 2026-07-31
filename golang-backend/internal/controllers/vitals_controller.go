@@ -57,19 +57,30 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		return
 	}
 
+	// ดึง ID ของพยาบาลจาก Token JWT Context
+	var nurseID uint
+	if val, exists := c.Get("userID"); exists {
+		if idFloat, ok := val.(float64); ok {
+			nurseID = uint(idFloat)
+		} else if idUint, ok := val.(uint); ok {
+			nurseID = idUint
+		}
+	}
+
 	newScreening := models.Screening{
-		ChiefComplaint: req.ChiefComplaint,
-		Weight:         req.Weight,
-		Height:         req.Height,
-		Temperature:    req.Temperature,
-		SystolicBP:     req.SystolicBP,
-		DiastolicBP:    req.DiastolicBP,
-		HeartRate:      req.HeartRate,
-		Allergies:      req.Allergies,
-		MedicalHistory: req.MedicalHistory,
-		BMI:	BMI,
-		TriageLevel: triageLevel,
-		VisitID: newVisitRecord.ID,
+		ChiefComplaint:   req.ChiefComplaint,
+		Weight:           req.Weight,
+		Height:           req.Height,
+		Temperature:      req.Temperature,
+		SystolicBP:       req.SystolicBP,
+		DiastolicBP:      req.DiastolicBP,
+		HeartRate:        req.HeartRate,
+		Allergies:        req.Allergies,
+		MedicalHistory:   req.MedicalHistory,
+		BMI:              BMI,
+		TriageLevel:      triageLevel,
+		VisitID:          newVisitRecord.ID,
+		ScreenedByUserID: nurseID, // ผูกกับ ID ของพยาบาลผู้ทำการตรวจ
 	}
 
 	if err := config.DB.Create(&newScreening).Error; err != nil {
@@ -90,11 +101,31 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		return
 	}
 
-
 	c.JSON(http.StatusCreated, gin.H{
 		"message":      "บันทึกข้อมูลการคัดกรองและส่งต่อคิวเรียบร้อยแล้ว",
 		"bmi":          BMI,
 		"triage_level": triageLevel,
 	})
+}
 
+// GetScreeningHistory - ดึงประวัติการคัดกรองย้อนหลังของผู้ป่วย
+func GetScreeningHistory(c *gin.Context) {
+	patientID := c.Param("patient_id")
+
+	var screenings []models.Screening
+	err := config.DB.Joins("JOIN visit_records ON visit_records.id = screenings.visit_id").
+		Where("visit_records.patient_id = ?", patientID).
+		Preload("ScreenedBy").
+		Order("screenings.created_at desc").
+		Find(&screenings).Error
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถดึงประวัติการคัดกรองได้"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"patient_id": patientID,
+		"history":    screenings,
+	})
 }
