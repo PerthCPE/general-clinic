@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// บิล/ใบเสร็จรับเงิน (db)
+// บิล/ใบเสร็จรับเงิน (db) (1) ตารางบุญ
 type Billing struct {
 	ID                      uint      `gorm:"primaryKey" json:"id"`                       //อันนี้เป็น primary key ของตาราง Billing
 	VisitID                 uint      `gorm:"not null" json:"visit_id"`                   //อันนี้เป็น foreign key ที่เชื่อมกับตาราง VisitRecord
