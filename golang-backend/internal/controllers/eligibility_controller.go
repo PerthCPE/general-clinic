@@ -91,7 +91,7 @@ func SavePatientEligibility(c *gin.Context) {
 	} else {
 		
 		newEligibility := models.MedicalEligibility{
-			PatientID:       req.PatientID,   
+			PatientID:       &req.PatientID,   
 			SchemeType:      req.SchemeType,
 			CoverageDetails: req.CoverageDetails, 
 			VerifiedAt:      time.Now(),
