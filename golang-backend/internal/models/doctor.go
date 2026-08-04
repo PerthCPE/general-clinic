@@ -4,7 +4,7 @@ import "time"
 
 // ข้อมูลแพทย์ (db) เชื่อมกับ User ผ่าน UserID
 type Doctor struct {
-	ID            uint      `gorm:"primaryKey" json:"id"`
+	DoctorID      uint      `gorm:"primaryKey" json:"doctor_id"`
 	UserID        uint      `gorm:"uniqueIndex;not null" json:"user_id"`
 	FullName      string    `gorm:"not null" json:"full_name"`
 	LicenseNumber string    `gorm:"uniqueIndex" json:"license_number"`
@@ -13,6 +13,4 @@ type Doctor struct {
 	Email         string    `json:"email"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
-
-	User User `gorm:"foreignKey:UserID" json:"user"`
 }

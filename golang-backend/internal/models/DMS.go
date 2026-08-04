@@ -3,11 +3,10 @@ package models
 import "time"
 
 type Document struct {
-	ID             uint      `gorm:"primaryKey" json:"id"`
+	DocID          uint      `gorm:"primaryKey" json:"doc_id"`
 	ExternalDocRef string    `json:"external_doc_ref"`
 	SenderName     string    `json:"sender_name"`
 	Subject        string    `gorm:"not null" json:"subject"`
-	ReceivedDate   time.Time `json:"received_date"`
 	FileURL        string    `json:"file_url"`
 	CreatedBy      uint      `json:"created_by"`
 	CreatedAt      time.Time `json:"created_at"`
@@ -17,7 +16,7 @@ type Document struct {
 }
 
 type DocumentForward struct {
-	ID             uint       `gorm:"primaryKey" json:"id"`
+	DocForwardID   uint       `gorm:"primaryKey" json:"doc_forward_id"`
 	DocID          uint       `gorm:"not null" json:"doc_id"`
 	ForwardedTo    uint       `gorm:"not null" json:"forwarded_to"`
 	Status         string     `json:"status"` // Pending, Acknowledged
@@ -30,7 +29,7 @@ type DocumentForward struct {
 }
 
 type DoctorSchedule struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
+	ScheduleID     uint      `gorm:"primaryKey" json:"schedule_id"`
 	DoctorID  uint      `gorm:"not null" json:"doctor_id"`
 	WorkDate  time.Time `json:"work_date"`
 	ShiftType string    `json:"shift_type"` // Morning, Afternoon
@@ -44,7 +43,7 @@ type DoctorSchedule struct {
 }
 
 type LeaveRequest struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`
+	LeaveRequestID uint      `gorm:"primaryKey" json:"leave_request_id"`
 	DoctorID   uint      `gorm:"not null" json:"doctor_id"`
 	LeaveDate  time.Time `json:"leave_date"`
 	Reason     string    `json:"reason"`
@@ -58,7 +57,7 @@ type LeaveRequest struct {
 }
 
 type ShiftSwapRequest struct {
-	ID             uint      `gorm:"primaryKey" json:"id"`
+	ShiftSwapID    uint      `gorm:"primaryKey" json:"shift_swap_id"`
 	RequesterID    uint      `gorm:"not null" json:"requester_id"`
 	ReceiverID     uint      `gorm:"not null" json:"receiver_id"`
 	OriginalShift  uint      `gorm:"not null" json:"original_shift"`
@@ -72,4 +71,4 @@ type ShiftSwapRequest struct {
 	Receiver          User           `gorm:"foreignKey:ReceiverID" json:"receiver"`
 	OriginalShiftData DoctorSchedule `gorm:"foreignKey:OriginalShift" json:"original_shift_data"`
 	TargetShiftData   DoctorSchedule `gorm:"foreignKey:TargetShift" json:"target_shift_data"`
-}
+}
