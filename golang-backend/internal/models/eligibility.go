@@ -12,5 +12,5 @@ type MedicalEligibility struct {
 	VerifiedAt      time.Time `json:"verified_at"`
 
 	Patient Patient `gorm:"foreignKey:PatientID" json:"patient"`
-	User    User    `gorm:"foreignKey:UserID" json:"user"`     // ดึงข้อมูลพนักงานมาโชว์คู่กับสิทธิ์ได้
+	User    User    `gorm:"foreignKey:UserID" json:"user"` // ดึงข้อมูลพนักงานมาโชว์คู่กับสิทธิ์ได้
 }

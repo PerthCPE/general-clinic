@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// รายการจ่ายยาให้ผู้ป่วย (db)
+// รายการจ่ายยาให้ผู้ป่วย (db) (2) ตารางบุญ
 type Dispensing struct {
 	ID           uint      `gorm:"primaryKey" json:"id"` //คือรหัสประจำตัวของรายการจ่ายยา
 	VisitID      uint      `gorm:"not null" json:"visit_id"`

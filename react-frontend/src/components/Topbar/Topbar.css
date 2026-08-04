@@ -1,0 +1,195 @@
+/* ===== Topbar ===== */
+.topbar {
+  height: 60px;
+  min-height: 60px;
+  background: #ffffff;
+  border-bottom: 2px solid #cccdce; /* เส้นใต้ */
+  display: flex;  
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  box-sizing: border-box;
+  position: fixed;
+  top: 0;
+  left: 240px;
+  right: 0;
+  z-index: 99;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+
+  
+}
+
+/* Brand */
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-brand-icon {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #0f2027, #1a3a4a);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.topbar-brand-text {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f2027;
+}
+
+/* Search */
+.topbar-search {
+  display: flex;
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 8px 16px;
+  gap: 8px;
+  flex: 0 1 420px;
+}
+
+.topbar-search-icon {
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+.topbar-search-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  color: #334155;
+  width: 100%;
+}
+
+.topbar-search-input::placeholder {
+  color: #94a3b8;
+}
+
+/* Actions */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.topbar-chat-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #0f2027, #1a3a4a);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.topbar-chat-btn:hover {
+  opacity: 0.85;
+}
+
+.topbar-icon-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: background 0.2s;
+}
+
+.topbar-icon-btn:hover {
+  background: #f1f5f9;
+}
+
+/* User */
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.topbar-user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.topbar-user-role {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.topbar-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+
+/* ==========================================
+    Dark Mode ของ Topbar
+   ========================================== */
+body.dark-mode .topbar {
+  background: #0f172a;
+  border-bottom: 2px solid #1e293b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* ช่องค้นหาใน Dark Mode */
+body.dark-mode .topbar-search {
+  background: #1e293b;
+}
+
+body.dark-mode .topbar-search-input {
+  color: #f8fafc;
+}
+
+body.dark-mode .topbar-search-input::placeholder {
+  color: #64748b;
+}
+
+/* ปุ่มไอคอนแจ้งเตือนใน Dark Mode */
+body.dark-mode .topbar-icon-btn {
+  background: #1e293b;
+  border-color: #334155;
+  color: #ffffff;
+}
+
+body.dark-mode .topbar-icon-btn:hover {
+  background: #334155;
+}
+
+/* ข้อความชื่อผู้ใช้ใน Dark Mode */
+body.dark-mode .topbar-user-name {
+  color: #f8fafc;
+}
+
+body.dark-mode .topbar-user-role {
+  color: #94a3b8;
+}
