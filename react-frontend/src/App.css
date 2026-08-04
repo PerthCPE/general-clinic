@@ -1,9 +1,7 @@
-/* ===== App Layout ===== */
+/* ===== App Layout - Frame 1920x1080 ===== */
 .app-layout {
+  position: relative;
   width: 100%;
   min-height: 100vh;
-}
-/* เปลี่ยนสีพื้นหลังทั้งหน้าจอเมื่อติด Dark Mode */
-body.dark-mode {
-  background-color: #0f172a; /* สีมืดเดียวกับ body-content */
+  background: #F8FAFC;
 }

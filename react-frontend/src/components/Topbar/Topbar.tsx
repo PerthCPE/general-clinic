@@ -1,59 +1,114 @@
 import './Topbar.css';
-import notify_nothave from '../../assets/notify_nothave.svg';
-import notify_have from '../../assets/notify_haves.svg';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
+interface TopbarProps {
+  isSidebarOpen: boolean;
+  onToggleSidebar: () => void;
+}
 
+function Topbar({ isSidebarOpen, onToggleSidebar }: TopbarProps) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-function Topbar() {
-    const [hasNotification, setHasNotification] = useState(false);  //บุญสร้างให้มี state  
+  // ปิด dropdown เมื่อคลิกที่อื่นบนหน้าจอ
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const toggleDropdown = () => {
+    setIsDropdownOpen((prev) => !prev);
+  };
+
   return (
-    <header className="topbar">
-      {/* Left: Brand label */}
-      {/* <div className="topbar-brand">
-        <div className="topbar-brand-icon">🏥</div>
-        <span className="topbar-brand-text">Clinic MS</span>
-      </div> */}
+    <header className={`top-nav-header ${isSidebarOpen ? 'topbar-with-sidebar' : 'topbar-full'}`}>
 
-      {/* Center: Search */}
-      <div className="topbar-search">
-        <span className="topbar-search-icon">🔍</span>
-        <input
-          type="text"
-          className="topbar-search-input"
-          placeholder="Search patients, records..."
-        />
+      {/* ปุ่มวงกลมสีเขียว - แสดงเมื่อ Sidebar ปิด */}
+      {!isSidebarOpen && (
+        <button className="topbar-menu-toggle" onClick={onToggleSidebar} aria-label="Open Sidebar">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+      )}
+
+      {/* Group 82 - Search */}
+      <div className="search-container">
+        <div className="search-icon">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+        <input className="search-input" type="text" placeholder="Search" />
       </div>
 
-      {/* Right: Actions */}
-      <div className="topbar-actions">
-        <button className="topbar-chat-btn">
-          💬 Chat Block
+      {/* Group 84 - Actions */}
+      <div className="actions-group">
+        {/* Notice icon */}
+        <button className="notice-btn" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M13.73 21a2 2 0 01-3.46 0" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span className="notice-badge" />
         </button>
 
-        {/*=============================== Notifications ===============================*/}
-
-        <button className="topbar-icon-btn" aria-label="Notifications">
-      <img 
-        src={hasNotification ? notify_have : notify_nothave} 
-        alt="notification" 
-        width="20" 
-        height="20" 
-      />
-    </button>
-        {/*=============================== Notifications ===============================*/}
-        <div className="topbar-user">
-          <div className="topbar-user-info">
-            <span className="topbar-user-name">Dr.Bunkham Y.</span>
-            <span className="topbar-user-role">Pharmacist</span>
+        {/* Profile with Dropdown */}
+        <div className="profile-container" ref={dropdownRef}>
+          <div className="profile-wrap" onClick={toggleDropdown} role="button" tabIndex={0}>
+            <div className="avatar-circle">
+              <div className="avatar-bg">
+                <svg viewBox="0 0 24 24" fill="#323C40" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+              </div>
+            </div>
+            <div className="user-text">
+              <span className="user-name">Dr. Anong S.</span>
+              <span className="user-role">General Practitioner</span>
+            </div>
+            <div className={`dropdown-arrow ${isDropdownOpen ? 'open' : ''}`}>
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
           </div>
-          <div className="topbar-avatar">👨‍⚕️</div>
+
+          {/* Dropdown Menu */}
+          {isDropdownOpen && (
+            <div className="profile-dropdown-menu">
+              <button
+                className="dropdown-menu-item dropdown-item-1"
+                onClick={() => {
+                  console.log('ตั้งค่าโปรไฟล์');
+                  setIsDropdownOpen(false);
+                }}
+              >
+                ตั้งค่าโปรไฟล์
+              </button>
+              <button
+                className="dropdown-menu-item dropdown-item-2"
+                onClick={() => {
+                  console.log('ออกจากระบบ');
+                  setIsDropdownOpen(false);
+                }}
+              >
+                ออกจากระบบ
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
     </header>
-    
   );
-  
 }
 
 export default Topbar;

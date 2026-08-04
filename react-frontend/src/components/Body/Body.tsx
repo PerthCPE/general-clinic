@@ -1,11 +1,13 @@
 import './Body.css';
 
-function Body() {
-  return (
-    <main className="body-content">
-      {/* เนื้อหาหลัก - ยังว่างอยู่ รอเพิ่มเนื้อหาภายหลัง */}
+interface BodyProps {
+  isSidebarOpen: boolean;
+}
 
-      
+function Body({ isSidebarOpen }: BodyProps) {
+  return (
+    <main className={`body-content ${isSidebarOpen ? 'body-with-sidebar' : 'body-full'}`}>
+      {/* เนื้อหาหลัก - รอเพิ่มเนื้อหาภายหลัง */}
     </main>
   );
 }
