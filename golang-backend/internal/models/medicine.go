@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// ข้อมูลคลังยา (db)
+// ข้อมูลคลังยา (db) (3) ตารางบุญ
 type Medicine struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`                      //คือรหัสประจำตัวของยาในฐานข้อมูล
 	MedicineCode  string    `gorm:"uniqueIndex;not null" json:"medicine_code"` //คือรหัสเฉพาะของยา

@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// ข้อมูลแพทย์ (db) เชื่อมกับ User ผ่าน UserID
+// ข้อมูลแพทย์ (db) เชื่อมกับ User ผ่าน UserID (4) ตารางบุญ
 type Doctor struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
 	UserID        uint      `gorm:"uniqueIndex;not null" json:"user_id"`
