@@ -6,7 +6,7 @@
   color: #1e293b;
   padding: 24px;
   box-sizing: border-box;
-  transition: margin-left 0.3s ease;
+  transition: margin-left 0.3s ease, background-color 0.5s ease, color 0.5s ease;
 }
 
 /* Sidebar เปิด → Body เว้นซ้าย 256px */
@@ -17,4 +17,10 @@
 /* Sidebar ปิด → Body เต็มจอ */
 .body-content.body-full {
   margin-left: 0px;
+}
+
+/* ===== Dark Mode ===== */
+body.dark-mode .body-content {
+  background: #232323 ;
+  color: #E2E8F0;
 }
