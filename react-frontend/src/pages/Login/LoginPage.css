@@ -1,0 +1,309 @@
+/* ===== Login Page ===== */
+.login-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #F0F4F8 0%, #E2E8F0 100%);
+  transition: background 0.5s ease;
+}
+
+.login-box {
+  max-width: 540px;
+  width: 100%;
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 40px 36px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid #E2E8F0;
+  transition: background-color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+}
+
+/* Header & Logo */
+.login-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.login-logo-icon {
+  width: 52px;
+  height: 52px;
+  background: linear-gradient(135deg, #0F2027 0%, #1A3A4A 100%);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  box-shadow: 0 4px 12px rgba(15, 32, 39, 0.25);
+}
+
+.login-logo-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.login-clinic-name {
+  font-family: 'Inter', sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 6px 0;
+  transition: color 0.5s ease;
+}
+
+.login-tagline {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #64748B;
+  margin: 0;
+  transition: color 0.5s ease;
+}
+
+/* Quick Roles */
+.login-quick-section {
+  margin-bottom: 24px;
+}
+
+.login-section-label {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 12px;
+  text-align: center;
+  transition: color 0.5s ease;
+}
+
+.quick-roles-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.quick-role-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.quick-role-card:hover {
+  transform: translateY(-2px);
+  border-color: #3B82F6;
+  background: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.12);
+}
+
+.quick-role-card:active {
+  transform: scale(0.98);
+}
+
+.role-avatar-badge {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.role-card-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.role-card-name {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1E293B;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.5s ease;
+}
+
+.role-card-role {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #64748B;
+  transition: color 0.5s ease;
+}
+
+.role-card-code {
+  font-family: monospace;
+  font-size: 10px;
+  color: #2563EB;
+  font-weight: 600;
+}
+
+/* Divider */
+.login-divider {
+  display: flex;
+  align-items: center;
+  margin: 20px 0;
+  color: #94A3B8;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #E2E8F0;
+  transition: border-color 0.5s ease;
+}
+
+.login-divider span {
+  padding: 0 12px;
+}
+
+/* Form */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-error-msg {
+  background: #FEE2E2;
+  color: #DC2626;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  border-left: 3px solid #DC2626;
+}
+
+.login-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login-form-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  transition: color 0.5s ease;
+}
+
+.login-form-input {
+  height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #1E293B;
+  background: #FFFFFF;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, background-color 0.5s ease, color 0.5s ease, box-shadow 0.2s ease;
+}
+
+.login-form-input:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.login-submit-btn {
+  height: 46px;
+  margin-top: 6px;
+  background: linear-gradient(135deg, #2563EB, #1D4ED8);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.login-submit-btn:hover {
+  opacity: 0.94;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+}
+
+.login-submit-btn:active {
+  transform: scale(0.98);
+}
+
+/* ===== Dark Mode ===== */
+body.dark-mode .login-container {
+  background: linear-gradient(135deg, #0B0F19 0%, #121212 100%);
+}
+
+body.dark-mode .login-box {
+  background: #1E1E1E;
+  border-color: #2D2D2D;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-mode .login-clinic-name {
+  color: #FFFFFF;
+}
+
+body.dark-mode .login-tagline {
+  color: #A0A0A0;
+}
+
+body.dark-mode .login-section-label {
+  color: #A0A0A0;
+}
+
+body.dark-mode .quick-role-card {
+  background: #272727;
+  border-color: #333333;
+}
+
+body.dark-mode .quick-role-card:hover {
+  background: #2D2D2D;
+  border-color: #3B82F6;
+}
+
+body.dark-mode .role-card-name {
+  color: #F1F5F9;
+}
+
+body.dark-mode .role-card-role {
+  color: #A0A0A0;
+}
+
+body.dark-mode .login-divider {
+  color: #64748B;
+}
+
+body.dark-mode .login-divider::before,
+body.dark-mode .login-divider::after {
+  border-bottom-color: #2D2D2D;
+}
+
+body.dark-mode .login-form-label {
+  color: #A0A0A0;
+}
+
+body.dark-mode .login-form-input {
+  background: #272727;
+  border-color: #3A3A3A;
+  color: #E2E8F0;
+}

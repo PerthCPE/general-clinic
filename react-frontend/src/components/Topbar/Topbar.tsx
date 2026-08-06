@@ -1,5 +1,6 @@
 import './Topbar.css';
 import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -9,6 +10,7 @@ interface TopbarProps {
 }
 
 function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: TopbarProps) {
+  const { currentUser, logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +43,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
         </button>
       )}
 
-      {/* Group 82 - Search */}
+      {/* Search Bar */}
       <div className="search-container">
         <div className="search-icon">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -51,7 +53,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
         <input className="search-input" type="text" placeholder="Search" />
       </div>
 
-      {/* Group 84 - Actions */}
+      {/* Actions Group (Notifications + Profile) */}
       <div className="actions-group">
         {/* Notice icon */}
         <button className="notice-btn" aria-label="Notifications">
@@ -66,15 +68,22 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
         <div className="profile-container" ref={dropdownRef}>
           <div className="profile-wrap" onClick={toggleDropdown} role="button" tabIndex={0}>
             <div className="avatar-circle">
-              <div className="avatar-bg">
-                <svg viewBox="0 0 24 24" fill="#323C40" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                </svg>
+              <div
+                className="avatar-bg"
+                style={{ backgroundColor: currentUser?.avatarColor || '#2563EB' }}
+              >
+                {currentUser?.avatarText ? (
+                  <span className="avatar-text">{currentUser.avatarText}</span>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="#FFFFFF" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                  </svg>
+                )}
               </div>
             </div>
             <div className="user-text">
-              <span className="user-name">Dr. Anong S.</span>
-              <span className="user-role">General Practitioner</span>
+              <span className="user-name">{currentUser?.fullName || 'ผู้ใช้งาน'}</span>
+              <span className="user-role">{currentUser?.roleTitleTh || 'เจ้าหน้าที่'}</span>
             </div>
             <div className={`dropdown-arrow ${isDropdownOpen ? 'open' : ''}`}>
               <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -86,18 +95,18 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
           {/* Dropdown Menu */}
           {isDropdownOpen && (
             <div className="profile-dropdown-menu">
-              {/* 1. ตั้งค่าโปรไฟล์ */}
+              {/* 1. ตั้งค่าโปรไฟล์ผู้ใช้ (No emoji) */}
               <button
                 className="dropdown-menu-item dropdown-item-1"
                 onClick={() => {
-                  console.log('ตั้งค่าโปรไฟล์');
+                  console.log('ตั้งค่าโปรไฟล์ผู้ใช้');
                   setIsDropdownOpen(false);
                 }}
               >
-                ตั้งค่าโปรไฟล์
+                ตั้งค่าโปรไฟล์ผู้ใช้
               </button>
 
-              {/* 2. ปุ่มสลับธีม */}
+              {/* 2. สลับธีม */}
               <button
                 className="dropdown-menu-item dropdown-item-2 theme-toggle-btn"
                 onClick={() => {
@@ -120,11 +129,11 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
                 </span>
               </button>
 
-              {/* 3. ออกจากระบบ */}
+              {/* 3. ออกจากระบบ (Text align center, no emoji) */}
               <button
-                className="dropdown-menu-item dropdown-item-3"
+                className="dropdown-menu-item dropdown-item-3 dropdown-logout-btn"
                 onClick={() => {
-                  console.log('ออกจากระบบ');
+                  logout();
                   setIsDropdownOpen(false);
                 }}
               >
