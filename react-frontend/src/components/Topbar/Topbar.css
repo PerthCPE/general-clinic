@@ -1,195 +1,504 @@
-/* ===== Topbar ===== */
-.topbar {
-  height: 60px;
-  min-height: 60px;
-  background: #ffffff;
-  border-bottom: 2px solid #cccdce; /* เส้นใต้ */
-  display: flex;  
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  box-sizing: border-box;
+/* ===== Top Nav Sticky ===== */
+
+.top-nav-header {
   position: fixed;
-  top: 0;
-  left: 240px;
-  right: 0;
+  top: 0px;
+  right: 0px;
+  height: 80px;
+  background: #FFFFFF;
+  box-shadow: 0px -4px 20px rgba(0, 0, 0, 0.25);
   z-index: 99;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-
-  
-}
-
-/* Brand */
-.topbar-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  padding: 0 40px;
+  transition: left 0.3s ease, background-color 0.5s ease, box-shadow 0.5s ease;
 }
 
-.topbar-brand-icon {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, #0f2027, #1a3a4a);
-  border-radius: 8px;
+/* Sidebar เปิด → Topbar เริ่มหลัง Sidebar */
+.top-nav-header.topbar-with-sidebar {
+  left: 256px;
+}
+
+/* Sidebar ปิด → Topbar เต็มจอ */
+.top-nav-header.topbar-full {
+  left: 0px;
+}
+
+/* ===== ปุ่มวงกลมสีเขียว (แสดงเมื่อ Sidebar ปิด) ===== */
+.topbar-menu-toggle {
+  width: 40px;
+  height: 40px;
+  background: #24D282;
+  border-radius: 50%;
   display: flex;
-  align-items: center;
   justify-content: center;
-  font-size: 16px;
-}
-
-.topbar-brand-text {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0f2027;
-}
-
-/* Search */
-.topbar-search {
-  display: flex;
   align-items: center;
-  background: #f1f5f9;
-  border-radius: 8px;
-  padding: 8px 16px;
-  gap: 8px;
-  flex: 0 1 420px;
-}
-
-.topbar-search-icon {
-  font-size: 14px;
-  opacity: 0.5;
-}
-
-.topbar-search-input {
   border: none;
-  background: transparent;
-  outline: none;
-  font-size: 14px;
-  color: #334155;
-  width: 100%;
-}
-
-.topbar-search-input::placeholder {
-  color: #94a3b8;
-}
-
-/* Actions */
-.topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.topbar-chat-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #0f2027, #1a3a4a);
-  color: #ffffff;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
   cursor: pointer;
+  color: #FFFFFF;
+  flex-shrink: 0;
+  margin-right: 20px;
   transition: opacity 0.2s;
 }
 
-.topbar-chat-btn:hover {
+.topbar-menu-toggle:hover {
   opacity: 0.85;
 }
 
-.topbar-icon-btn {
+.topbar-menu-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ===== Search Container ===== */
+.search-container {
+  flex: 1;
+  max-width: 848px;
+  height: 42px;
+  background: #F0F4F8;
+  border-radius: 35px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  margin-right: auto;
+  transition: background-color 0.5s ease;
+}
+
+.search-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.search-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.search-icon path {
+  stroke: #90A1B9;
+  stroke-width: 2px;
+  fill: none;
+  transition: stroke 0.5s ease;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 24px;
+  color: #334155;
+  transition: color 0.5s ease;
+}
+
+.search-input::placeholder {
+  color: #90A1B9;
+  transition: color 0.5s ease;
+}
+
+/* ===== Group 84 - Actions ===== */
+.actions-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: 40px;
+}
+
+/* ===== Notice icon ===== */
+.notice-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 36px;
-  border: 1px solid #e2e8f0;
+  border-radius: 26843500px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.notice-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.notice-btn path {
+  stroke: #45556C;
+  stroke-width: 1.66667px;
+  fill: none;
+  transition: stroke 0.5s ease;
+}
+
+/* Red Badge */
+.notice-badge {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  right: 6px;
+  top: 6px;
+  background: #FB2C36;
+  border-radius: 26843500px;
+  box-shadow: 0px 0px 0px 2px #FFFFFF;
+  z-index: 1;
+  transition: box-shadow 0.5s ease;
+}
+
+/* ===== Profile Container & Wrap ===== */
+.profile-container {
+  position: relative;
+}
+
+.profile-wrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 4px 8px;
+  gap: 11.8px;
+  cursor: pointer;
+  user-select: none;
   border-radius: 8px;
-  background: #ffffff;
+  transition: background-color 0.2s ease;
+}
+
+.profile-wrap:hover {
+  background-color: #F8FAFC;
+}
+
+.avatar-circle {
+  box-sizing: border-box;
+  width: 40.4px;
+  height: 40.4px;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  border-radius: 26843500px;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+  transition: background-color 0.5s ease, border-color 0.5s ease;
+}
+
+.avatar-bg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  background: #DBEAFE;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.5s ease;
+}
+
+.avatar-bg svg {
+  width: 24px;
+  height: 24px;
+  margin-top: 4px;
+  transition: fill 0.5s ease;
+}
+
+.user-text {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  width: 108.55px;
+  height: 35.5px;
+}
+
+.user-name {
+  font-family: 'Segoe UI';
+  font-style: normal;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 18px;
+  color: #1D293D;
+  transition: color 0.5s ease;
+}
+
+.user-role {
+  font-family: 'Segoe UI';
+  font-style: normal;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 18px;
+  color: #62748E;
+  transition: color 0.5s ease;
+}
+
+.dropdown-arrow {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.dropdown-arrow svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dropdown-arrow path {
+  stroke: #90A1B9;
+  stroke-width: 1.33333px;
+  fill: none;
+  transition: stroke 0.5s ease;
+}
+
+/* ===== Dropdown Menu Container ===== */
+.profile-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 20px);
+  right: 0;
+  width: 190px;
+  background: #FFFFFF;
+  border-radius: 8px;
+  box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.08), 0px 2px 6px rgba(0, 0, 0, 0.04);
+  border: 1px solid #E2E8F0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  z-index: 1000;
+  animation: dropdownMenuReveal 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: top right;
+  transition: background-color 0.5s ease, border-color 0.5s ease;
+}
+
+@keyframes dropdownMenuReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ===== Dropdown Menu Items ===== */
+.dropdown-menu-item {
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  font-family: 'Inter', sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 20px;
+  color: #1E293B;
+  text-align: center;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  transition: background 0.2s;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+  box-sizing: border-box;
 }
 
-.topbar-icon-btn:hover {
-  background: #f1f5f9;
+.dropdown-menu-item:not(:last-child) {
+  border-bottom: 1px solid #F1F5F9;
 }
 
-/* User */
-.topbar-user {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.dropdown-menu-item:hover {
+  background-color: #F8FAFC;
+  color: #0F172A;
 }
 
-.topbar-user-info {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
+.dropdown-menu-item:active {
+  transform: scale(0.98);
 }
 
-.topbar-user-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1e293b;
-}
-
-.topbar-user-role {
-  font-size: 11px;
-  color: #64748b;
-}
-
-.topbar-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: #e2e8f0;
+/* ===== Theme Toggle Button ===== */
+.theme-toggle-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  gap: 8px;
+  text-align: center;
+}
+
+.theme-toggle-text {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.theme-toggle-icon-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.theme-icon {
+  width: 18px;
+  height: 18px;
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+}
+
+.theme-icon.icon-sun {
+  animation: sunSpin 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.theme-icon.icon-moon {
+  animation: moonRise 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sunSpin {
+  0% {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+@keyframes moonRise {
+  0% {
+    opacity: 0;
+    transform: rotate(90deg) scale(0.5);
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+/* ===== Smooth Staggered Animation for Each Item ===== */
+.dropdown-item-1 {
+  animation: smoothItemCascade 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.04s both;
+}
+
+.dropdown-item-2 {
+  animation: smoothItemCascade 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+
+.dropdown-item-3 {
+  animation: smoothItemCascade 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.20s both;
+}
+
+@keyframes smoothItemCascade {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 
-/* ==========================================
-    Dark Mode ของ Topbar
-   ========================================== */
-body.dark-mode .topbar {
-  background: #0f172a;
-  border-bottom: 2px solid #1e293b;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+/* ================================================================
+   ===== DARK MODE STYLES (ตอนเปิดโหมดมืด) =====
+   ================================================================ */
+
+/* Topbar - Dark (ลอยเด่นด้วยสี #1E1E1E และเงา) */
+body.dark-mode .top-nav-header {
+  background: #1E1E1E  ;
+  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
+  border-bottom: 1px solid #2D2D2D;
 }
 
-/* ช่องค้นหาใน Dark Mode */
-body.dark-mode .topbar-search {
-  background: #1e293b;
+/* Search bar - Dark (#2D2D2D เพื่อให้ตัดกับ Header และกลมกลืนสบายตา) */
+body.dark-mode .search-container {
+  background: #2b2b2b;
 }
 
-body.dark-mode .topbar-search-input {
-  color: #f8fafc;
+body.dark-mode .search-icon path {
+  stroke: #cacaca;
 }
 
-body.dark-mode .topbar-search-input::placeholder {
-  color: #64748b;
+body.dark-mode .search-input {
+  color: #E2E8F0;
 }
 
-/* ปุ่มไอคอนแจ้งเตือนใน Dark Mode */
-body.dark-mode .topbar-icon-btn {
-  background: #1e293b;
-  border-color: #334155;
-  color: #ffffff;
+body.dark-mode .search-input::placeholder {
+  color: #777777;
 }
 
-body.dark-mode .topbar-icon-btn:hover {
-  background: #334155;
+/* Notice icon - Dark */
+body.dark-mode .notice-btn path {
+  stroke: #d9d9d9;
 }
 
-/* ข้อความชื่อผู้ใช้ใน Dark Mode */
-body.dark-mode .topbar-user-name {
-  color: #f8fafc;
+body.dark-mode .notice-badge {
+  box-shadow: 0px 0px 0px 2px #1E1E1E;
 }
 
-body.dark-mode .topbar-user-role {
-  color: #94a3b8;
+/* Avatar - Dark */
+body.dark-mode .avatar-circle {
+  background: #2D2D2D;
+  border-color: #444444;
+}
+
+body.dark-mode .avatar-bg {
+  background: #444444;
+}
+
+body.dark-mode .avatar-bg svg {
+  fill: #CCCCCC;
+}
+
+/* User text - Dark */
+body.dark-mode .user-name {
+  color: #FFFFFF;
+}
+
+body.dark-mode .user-role {
+  color: #A0A0A0;
+}
+
+/* Dropdown arrow - Dark */
+body.dark-mode .dropdown-arrow path {
+  stroke: #777777;
+}
+
+/* Profile wrap hover - Dark */
+body.dark-mode .profile-wrap:hover {
+  background-color: #2D2D2D;
+}
+
+/* Dropdown Menu - Dark (#242424 เพื่อให้ลอยขึ้นอีกระดับ) */
+body.dark-mode .profile-dropdown-menu {
+  background: #242424;
+  border-color: #2D2D2D;
+  box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+body.dark-mode .dropdown-menu-item {
+  color: #E2E8F0;
+}
+
+body.dark-mode .dropdown-menu-item:not(:last-child) {
+  border-bottom-color: #2D2D2D;
+}
+
+body.dark-mode .dropdown-menu-item:hover {
+  background-color: #2D2D2D;
+  color: #FFFFFF;
+}
+
+body.dark-mode .topbar-menu-toggle {
+  background: #FFFFFF;
+  color: #272E35;
 }
