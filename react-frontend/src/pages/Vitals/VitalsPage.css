@@ -1,0 +1,2209 @@
+/* ================================================================
+   ===== GENERAL CLINIC — SCREENING & VITALS STYLES (VitalsPage.css)
+   ================================================================ */
+
+.vitals-page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ================================================================
+   ===== 1. TOAST NOTIFICATION =====
+   ================================================================ */
+.vitals-toast-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
+  border: 1px solid #10B981;
+  color: #065F46;
+  padding: 14px 20px;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.2);
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #10B981;
+  color: #FFFFFF;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.toast-text {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.toast-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: #065F46;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
+/* ================================================================
+   ===== 2. HEADER BANNER =====
+   ================================================================ */
+.vitals-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #FFFFFF;
+  padding: 20px 24px;
+  border-radius: 16px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  margin-top: 100px;
+}
+
+.vitals-title-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.vitals-title-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+
+.vitals-main-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0F172A;
+  line-height: 1.3;
+}
+
+.vitals-main-subtitle {
+  margin: 2px 0 0 0;
+  font-size: 13px;
+  color: #64748B;
+}
+
+.vitals-header-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vitals-role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nurse-dot {
+  width: 8px;
+  height: 8px;
+  background: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.vitals-user-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: #F8FAFC;
+  color: #334155;
+  border: 1px solid #E2E8F0;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ================================================================
+   ===== 3. TOP QUEUE SELECTOR CARD =====
+   ================================================================ */
+.vitals-queue-selector-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.queue-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.queue-selector-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F172A;
+  cursor: pointer;
+}
+
+.selector-icon {
+  font-size: 18px;
+}
+
+.queue-waiting-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: #EFF6FF;
+  color: #2563EB;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.queue-selector-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* ================================================================
+   ===== SEARCHABLE COMBOBOX DROPDOWN =====
+   ================================================================ */
+.queue-searchable-combobox {
+  position: relative;
+  width: 100%;
+  z-index: 40;
+}
+
+.combobox-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 14px;
+  background: #F8FAFC;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 12px;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.combobox-input-wrap:focus-within {
+  background: #FFFFFF;
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.combobox-search-icon {
+  display: flex;
+  align-items: center;
+  color: #10B981;
+  font-size: 18px;
+}
+
+.combobox-input {
+  flex: 1;
+  height: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0F172A;
+  font-family: 'Inter', sans-serif;
+}
+
+.combobox-input::placeholder {
+  color: #94A3B8;
+  font-size: 13.5px;
+}
+
+.combobox-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: #E2E8F0;
+  color: #475569;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.combobox-clear-btn:hover {
+  background: #CBD5E1;
+  color: #0F172A;
+}
+
+.combobox-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  padding: 4px;
+  color: #64748B;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.15s ease;
+}
+
+.combobox-toggle-btn.open {
+  transform: rotate(180deg);
+  color: #10B981;
+}
+
+/* Combobox Dropdown Menu */
+.combobox-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 14px;
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.14), 0 4px 12px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  animation: slideDownCombobox 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 100;
+}
+
+@keyframes slideDownCombobox {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.combobox-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #F8FAFC;
+  border-bottom: 1px solid #E2E8F0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748B;
+}
+
+.search-hint {
+  color: #10B981;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.combobox-options-list {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.combobox-option-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #F1F5F9;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.combobox-option-item:last-child {
+  border-bottom: none;
+}
+
+.combobox-option-item:hover {
+  background: #F8FAFC;
+}
+
+.combobox-option-item.selected {
+  background: #ECFDF5;
+  border-left: 4px solid #10B981;
+}
+
+.option-item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.option-queue-badge {
+  padding: 4px 10px;
+  background: #EFF6FF;
+  color: #2563EB;
+  border: 1px solid #BFDBFE;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.option-patient-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.option-patient-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.option-patient-meta {
+  font-size: 12px;
+  color: #64748B;
+}
+
+.option-item-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.option-arrival-time {
+  font-size: 12px;
+  color: #94A3B8;
+  font-weight: 500;
+}
+
+.option-selected-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: #10B981;
+  color: #FFFFFF;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.option-select-action {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: #F1F5F9;
+  color: #475569;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+.combobox-option-item:hover .option-select-action {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+.combobox-empty-item {
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: #64748B;
+}
+
+/* Patient Identity Strip */
+.patient-identity-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #F8FAFC;
+  border: 1px dashed #CBD5E1;
+  border-radius: 10px;
+  padding: 12px 18px;
+  flex-wrap: wrap;
+  animation: fadeIn 0.25s ease;
+}
+
+.patient-strip-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+}
+
+.strip-label {
+  color: #64748B;
+  font-weight: 500;
+}
+
+.strip-val {
+  color: #0F172A;
+  font-weight: 600;
+}
+
+.strip-val.hn-val {
+  color: #2563EB;
+  background: #EFF6FF;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.strip-val.name-val {
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.strip-val.scheme-val {
+  color: #059669;
+  background: #ECFDF5;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.patient-strip-divider {
+  color: #CBD5E1;
+  font-size: 14px;
+}
+
+.patient-strip-empty {
+  background: #F8FAFC;
+  border: 1px dashed #CBD5E1;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 13px;
+  color: #64748B;
+  text-align: center;
+}
+
+/* ================================================================
+   ===== 4. MAIN TWO-COLUMN LAYOUT =====
+   ================================================================ */
+.vitals-main-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .vitals-main-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Common Card Styles */
+.vitals-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.vitals-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  cursor: pointer;
+  user-select: none;
+  background: #FFFFFF;
+  transition: background 0.2s ease;
+}
+
+.vitals-card-header:hover {
+  background: #F8FAFC;
+}
+
+.vitals-header-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.vitals-header-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+.vitals-header-icon-box.green-box {
+  background: #ECFDF5;
+  color: #10B981;
+}
+
+.vitals-header-icon-box.purple-box {
+  background: #F3E8FF;
+  color: #9333EA;
+}
+
+.vitals-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.vitals-card-subtitle {
+  margin: 2px 0 0 0;
+  font-size: 12.5px;
+  color: #64748B;
+}
+
+.vitals-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vitals-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vitals-status-pill.green-pill {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+.vitals-status-pill.yellow-pill {
+  background: #FEF3C7;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  background: #10B981;
+  border-radius: 50%;
+}
+
+.vitals-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  padding: 4px;
+  color: #94A3B8;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease;
+}
+
+.vitals-card-toggle.open {
+  transform: rotate(180deg);
+}
+
+.vitals-card-body {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0 24px;
+}
+
+.vitals-card-body.expanded {
+  max-height: 2000px;
+  padding: 20px 24px 28px;
+}
+
+/* ================================================================
+   ===== 5. FORM LAYOUT & INPUT STYLES =====
+   ================================================================ */
+.vitals-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.vitals-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vitals-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+.vitals-section-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  background: #10B981;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 50%;
+}
+
+.vitals-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1E293B;
+}
+
+.vitals-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.vitals-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 768px) {
+  .vitals-grid-3,
+  .vitals-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vitals-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vitals-form-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.text-required {
+  color: #EF4444;
+}
+
+.clinical-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.badge-high-fever,
+.badge-crisis {
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FCA5A5;
+}
+
+.badge-fever,
+.badge-warning {
+  background: #FEF3C7;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+.badge-info {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.badge-allergy-alert {
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #F87171;
+}
+
+.vitals-input-suffix-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.vitals-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 46px 0 14px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #0F172A;
+  background: #FFFFFF;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s ease;
+}
+
+.vitals-input:focus {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.vitals-input.input-danger {
+  border-color: #EF4444;
+  background: #FEF2F2;
+}
+
+.vitals-input.input-warning {
+  border-color: #F59E0B;
+  background: #FFFBEB;
+}
+
+.vitals-input.input-allergy {
+  border-color: #F87171;
+  background: #FEF2F2;
+  font-weight: 600;
+  color: #DC2626;
+}
+
+.vitals-input-suffix {
+  position: absolute;
+  right: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94A3B8;
+  pointer-events: none;
+}
+
+.vitals-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #0F172A;
+  background: #FFFFFF;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s ease;
+  resize: vertical;
+}
+
+.vitals-textarea:focus {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.vitals-select {
+  width: 100%;
+  height: 42px;
+  padding: 0 14px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #0F172A;
+  background: #F8FAFC;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vitals-select:focus {
+  border-color: #10B981;
+  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.vitals-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #E2E8F0;
+}
+
+.vitals-btn-submit {
+  flex: 1;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  transition: all 0.2s ease;
+}
+
+.vitals-btn-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+}
+
+.vitals-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vitals-btn-reset {
+  height: 44px;
+  padding: 0 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #F1F5F9;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.vitals-btn-reset:hover:not(:disabled) {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+/* ================================================================
+   ===== 6. RIGHT COLUMN WIDGETS =====
+   ================================================================ */
+.vitals-grid-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.vitals-widget-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  padding: 18px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.vitals-widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.vitals-widget-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vitals-widget-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.vitals-widget-icon-box.blue-box {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.vitals-widget-icon-box.green-box {
+  background: #ECFDF5;
+  color: #10B981;
+}
+
+.vitals-widget-icon-box.purple-box {
+  background: #F3E8FF;
+  color: #9333EA;
+}
+
+.vitals-widget-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.vitals-widget-subtitle {
+  margin: 1px 0 0 0;
+  font-size: 11.5px;
+  color: #64748B;
+}
+
+.vitals-count-badge {
+  padding: 3px 8px;
+  background: #ECFDF5;
+  color: #059669;
+  border-radius: 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.vitals-count-badge.purple-count {
+  background: #F3E8FF;
+  color: #9333EA;
+}
+
+/* BMI Widget Body */
+.bmi-display-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bmi-number-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bmi-big-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.bmi-num {
+  font-size: 32px;
+  font-weight: 800;
+  color: #0F172A;
+  letter-spacing: -0.5px;
+}
+
+.bmi-unit {
+  font-size: 13px;
+  color: #64748B;
+  font-weight: 600;
+}
+
+.bmi-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.bmi-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.bmi-badge-underweight {
+  background: #E0F2FE;
+  color: #0284C7;
+}
+.bmi-badge-underweight .bmi-status-dot {
+  background: #0284C7;
+}
+
+.bmi-badge-normal {
+  background: #D1FAE5;
+  color: #059669;
+}
+.bmi-badge-normal .bmi-status-dot {
+  background: #10B981;
+}
+
+.bmi-badge-overweight {
+  background: #FEF3C7;
+  color: #D97706;
+}
+.bmi-badge-overweight .bmi-status-dot {
+  background: #F59E0B;
+}
+
+.bmi-badge-obese1 {
+  background: #FFEDD5;
+  color: #EA580C;
+}
+.bmi-badge-obese1 .bmi-status-dot {
+  background: #F97316;
+}
+
+.bmi-badge-obese2 {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+.bmi-badge-obese2 .bmi-status-dot {
+  background: #EF4444;
+}
+
+/* BMI Scale Bar */
+.bmi-scale-bar-wrap {
+  position: relative;
+  margin-top: 6px;
+}
+
+.bmi-scale-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.scale-seg {
+  height: 100%;
+}
+.seg-underweight { width: 20%; background: #38BDF8; }
+.seg-normal { width: 28%; background: #34D399; }
+.seg-overweight { width: 14%; background: #FBBF24; }
+.seg-obese1 { width: 22%; background: #FB923C; }
+.seg-obese2 { width: 16%; background: #F87171; }
+
+.bmi-scale-pointer {
+  position: absolute;
+  top: -6px;
+  transform: translateX(-50%);
+  transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.pointer-needle {
+  width: 4px;
+  height: 22px;
+  background: #0F172A;
+  border: 1.5px solid #FFFFFF;
+  border-radius: 3px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.bmi-scale-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: #94A3B8;
+  font-weight: 600;
+  padding: 0 2px;
+}
+
+.bmi-info-footer {
+  font-size: 11.5px;
+  color: #64748B;
+  background: #F8FAFC;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-top: 4px;
+}
+
+.bmi-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 16px 10px;
+  gap: 8px;
+}
+
+.bmi-empty-icon {
+  font-size: 28px;
+}
+
+.bmi-empty-text {
+  margin: 0;
+  font-size: 12.5px;
+  color: #64748B;
+}
+
+.bmi-preview-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #F1F5F9;
+  color: #94A3B8;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.default-dot {
+  background: #CBD5E1;
+}
+
+/* ================================================================
+   ===== 7. TRIAGE WIDGET =====
+   ================================================================ */
+.triage-active-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  border: 1.5px solid;
+}
+
+.triage-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.triage-level-pill {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.triage-banner-name {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.triage-banner-sub {
+  font-size: 11px;
+  opacity: 0.8;
+}
+
+.triage-check-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.1);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.triage-badge-red {
+  background: #FEF2F2;
+  border-color: #F87171;
+  color: #DC2626;
+}
+
+.triage-badge-orange {
+  background: #FFF7ED;
+  border-color: #FB923C;
+  color: #EA580C;
+}
+
+.triage-badge-yellow {
+  background: #FEFCE8;
+  border-color: #FACC15;
+  color: #CA8A04;
+}
+
+.triage-badge-green {
+  background: #ECFDF5;
+  border-color: #34D399;
+  color: #059669;
+}
+
+.triage-suggest-notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #FEF3C7;
+  border: 1px solid #FCD34D;
+  color: #92400E;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  margin-bottom: 12px;
+}
+
+.triage-level-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.triage-option-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  background: #FFFFFF;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.triage-option-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+}
+
+.triage-option-btn.active {
+  border-width: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.triage-opt-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+}
+
+.triage-badge-red .triage-opt-indicator { background: #EF4444; }
+.triage-badge-orange .triage-opt-indicator { background: #F97316; }
+.triage-badge-yellow .triage-opt-indicator { background: #EAB308; }
+.triage-badge-green .triage-opt-indicator { background: #10B981; }
+
+.triage-opt-content {
+  flex: 1;
+}
+
+.triage-opt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.triage-opt-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.triage-opt-badge-tag {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #0F172A;
+  color: #FFFFFF;
+}
+
+.triage-opt-desc {
+  margin: 2px 0 0 0;
+  font-size: 11px;
+  color: #64748B;
+  line-height: 1.35;
+}
+
+/* ================================================================
+   ===== 8. WAITING QUEUE LIST WIDGET =====
+   ================================================================ */
+.queue-widget-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  height: 36px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  background: #F8FAFC;
+  margin-bottom: 10px;
+}
+
+.queue-widget-search svg {
+  color: #94A3B8;
+}
+
+.queue-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  color: #0F172A;
+  font-family: 'Inter', sans-serif;
+}
+
+.queue-search-clear {
+  border: none;
+  background: transparent;
+  color: #94A3B8;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.queue-quick-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.queue-quick-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.queue-quick-item:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  transform: translateY(-1px);
+}
+
+.queue-quick-item.selected {
+  border-color: #10B981;
+  background: #ECFDF5;
+}
+
+.queue-quick-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.queue-num-chip {
+  padding: 2px 6px;
+  background: #EFF6FF;
+  color: #2563EB;
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+.queue-patient-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-patient-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.queue-patient-sub {
+  font-size: 11px;
+  color: #64748B;
+}
+
+.queue-quick-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.queue-time-tag {
+  font-size: 10.5px;
+  color: #94A3B8;
+}
+
+.queue-select-btn {
+  padding: 3px 8px;
+  border: 1px solid #10B981;
+  background: #FFFFFF;
+  color: #059669;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.queue-select-btn:hover {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+.queue-select-btn.btn-selected {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+.queue-empty-notice {
+  text-align: center;
+  padding: 20px;
+  font-size: 12px;
+  color: #94A3B8;
+}
+
+/* ================================================================
+   ===== 9. RECENT SCREENINGS HISTORY TABLE =====
+   ================================================================ */
+.vitals-history-card {
+  margin-top: 10px;
+}
+
+.vitals-table-container {
+  overflow-x: auto;
+  border-top: 1px solid #E2E8F0;
+}
+
+.vitals-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.vitals-history-table th {
+  background: #F8FAFC;
+  padding: 12px 16px;
+  color: #64748B;
+  font-weight: 700;
+  font-size: 12px;
+  border-bottom: 1.5px solid #E2E8F0;
+  white-space: nowrap;
+}
+
+.vitals-history-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #F1F5F9;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.vitals-history-table tr:hover td {
+  background: #F8FAFC;
+}
+
+.vitals-queue-tag {
+  font-weight: 800;
+  color: #2563EB;
+  background: #EFF6FF;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.vitals-hn-tag {
+  font-weight: 600;
+  color: #0F172A;
+  font-size: 12px;
+}
+
+.vitals-pt-name-cell {
+  display: flex;
+  flex-direction: column;
+}
+
+.pt-main-name {
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.pt-sub-details {
+  font-size: 11.5px;
+  color: #64748B;
+}
+
+.table-triage-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vitals-summary-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.vitals-chip-pill {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.bp-chip { background: #EFF6FF; color: #2563EB; }
+.hr-chip { background: #F3E8FF; color: #9333EA; }
+.temp-chip { background: #FEF3C7; color: #D97706; }
+.bmi-chip { background: #ECFDF5; color: #059669; }
+
+.vitals-cc-cell {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12px;
+  color: #475569;
+  max-width: 200px;
+}
+
+.vitals-doc-cell {
+  font-weight: 600;
+  color: #0F172A;
+  font-size: 12px;
+}
+
+.vitals-time-cell {
+  font-size: 11.5px;
+  color: #94A3B8;
+  white-space: nowrap;
+}
+
+/* ================================================================
+   ===== 10. DARK MODE SUPPORT (ELEVATED DARK SLATE #212836) =====
+   ================================================================ */
+
+/* Page Header & Container */
+body.dark-mode .vitals-page-header {
+  background: #212836;
+  border-color: #333F53;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .vitals-title-icon {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34D399;
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+body.dark-mode .vitals-main-title {
+  color: #FFFFFF;
+}
+
+body.dark-mode .vitals-main-subtitle {
+  color: #94A3B8;
+}
+
+body.dark-mode .vitals-role-pill {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #34D399;
+}
+
+body.dark-mode .vitals-user-pill {
+  background: #171C26;
+  border-color: #3B485E;
+  color: #CBD5E1;
+}
+
+/* Toast Alert in Dark Mode */
+body.dark-mode .vitals-toast-alert {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10B981;
+  color: #6EE7B7;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .toast-close {
+  color: #6EE7B7;
+}
+
+/* Cards & Containers */
+body.dark-mode .vitals-queue-selector-card,
+body.dark-mode .vitals-card,
+body.dark-mode .vitals-widget-card {
+  background: #212836;
+  border-color: #333F53;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+body.dark-mode .vitals-card-header,
+body.dark-mode .vitals-widget-header {
+  background: #1C2230;
+  border-bottom: 1px solid #2F3B4E;
+}
+
+body.dark-mode .vitals-card-header:hover {
+  background: #232C3D;
+}
+
+body.dark-mode .vitals-card-title,
+body.dark-mode .vitals-widget-title {
+  color: #FFFFFF;
+}
+
+body.dark-mode .vitals-card-subtitle,
+body.dark-mode .vitals-widget-subtitle {
+  color: #94A3B8;
+}
+
+body.dark-mode .vitals-card-toggle {
+  color: #94A3B8;
+}
+
+body.dark-mode .vitals-card-toggle:hover {
+  background-color: #2A3547;
+  color: #FFFFFF;
+}
+
+/* Header Icon Boxes */
+body.dark-mode .vitals-header-icon-box.green-box,
+body.dark-mode .vitals-widget-icon-box.green-box {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34D399;
+}
+
+body.dark-mode .vitals-header-icon-box.blue-box,
+body.dark-mode .vitals-widget-icon-box.blue-box {
+  background: rgba(37, 99, 235, 0.2);
+  color: #60A5FA;
+}
+
+body.dark-mode .vitals-header-icon-box.purple-box,
+body.dark-mode .vitals-widget-icon-box.purple-box {
+  background: rgba(168, 85, 247, 0.2);
+  color: #C084FC;
+}
+
+/* Status Pills */
+body.dark-mode .vitals-status-pill.green-pill {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #34D399;
+}
+
+body.dark-mode .vitals-status-pill.yellow-pill {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #FBBF24;
+}
+
+body.dark-mode .vitals-status-pill.red-pill {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #F87171;
+}
+
+/* Combobox Search in Dark Mode */
+body.dark-mode .queue-selector-label {
+  color: #CBD5E1;
+}
+
+body.dark-mode .combobox-input-wrap {
+  background: #171C26;
+  border: 1.5px solid #3B485E;
+}
+
+body.dark-mode .combobox-input-wrap:focus-within {
+  background: #1C2230;
+  border-color: #34D399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
+}
+
+body.dark-mode .combobox-input {
+  color: #FFFFFF;
+}
+
+body.dark-mode .combobox-input::placeholder {
+  color: #94A3B8;
+}
+
+body.dark-mode .combobox-clear-btn {
+  background: #283143;
+  color: #CBD5E1;
+}
+
+body.dark-mode .combobox-clear-btn:hover {
+  background: #333F53;
+  color: #FFFFFF;
+}
+
+body.dark-mode .combobox-toggle-btn {
+  color: #94A3B8;
+}
+
+body.dark-mode .combobox-dropdown-menu {
+  background: #1C2230;
+  border: 1px solid #333F53;
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.6);
+}
+
+body.dark-mode .combobox-menu-header {
+  background: #171C26;
+  border-bottom: 1px solid #2F3B4E;
+  color: #94A3B8;
+}
+
+body.dark-mode .combobox-option-item {
+  border-bottom: 1px solid #2F3B4E;
+}
+
+body.dark-mode .combobox-option-item:hover {
+  background: #252F42;
+}
+
+body.dark-mode .combobox-option-item.selected {
+  background: rgba(16, 185, 129, 0.15);
+}
+
+body.dark-mode .option-queue-badge {
+  background: rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: #60A5FA;
+}
+
+body.dark-mode .option-patient-name {
+  color: #FFFFFF;
+}
+
+body.dark-mode .option-patient-meta {
+  color: #94A3B8;
+}
+
+body.dark-mode .option-select-action {
+  background: #283143;
+  color: #CBD5E1;
+}
+
+body.dark-mode .combobox-option-item:hover .option-select-action {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+body.dark-mode .combobox-empty-item {
+  color: #94A3B8;
+}
+
+/* Patient Identity Strip in Dark Mode */
+body.dark-mode .patient-identity-strip {
+  background: #171C26;
+  border: 1.5px solid #2F3B4E;
+}
+
+body.dark-mode .patient-strip-empty {
+  background: #171C26;
+  border: 1.5px dashed #3B485E;
+  color: #94A3B8;
+}
+
+body.dark-mode .pt-avatar-box {
+  background: rgba(37, 99, 235, 0.2);
+  color: #60A5FA;
+}
+
+body.dark-mode .pt-main-name {
+  color: #FFFFFF;
+}
+
+body.dark-mode .pt-sub-details {
+  color: #94A3B8;
+}
+
+body.dark-mode .strip-label {
+  color: #94A3B8;
+}
+
+body.dark-mode .strip-val {
+  color: #FFFFFF;
+}
+
+body.dark-mode .pt-meta-pill {
+  background: #212836;
+  border: 1px solid #333F53;
+  color: #CBD5E1;
+}
+
+body.dark-mode .pt-meta-pill.allergy-pill {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #F87171;
+}
+
+body.dark-mode .pt-meta-pill.chronic-pill {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #FBBF24;
+}
+
+/* Form Sections & Fields in Dark Mode */
+body.dark-mode .vitals-form-section {
+  border-bottom: 1px solid #2F3B4E;
+}
+
+body.dark-mode .vitals-section-header {
+  border-bottom: 1px solid #2F3B4E;
+}
+
+body.dark-mode .vitals-section-title {
+  color: #FFFFFF;
+}
+
+body.dark-mode .vitals-form-label {
+  color: #CBD5E1;
+}
+
+body.dark-mode .vitals-input-wrap {
+  background: #171C26;
+  border: 1.5px solid #3B485E;
+}
+
+body.dark-mode .vitals-input-wrap:focus-within {
+  background: #1C2230;
+  border-color: #34D399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
+}
+
+body.dark-mode .vitals-input-wrap.has-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: #F59E0B;
+}
+
+body.dark-mode .vitals-input-wrap.has-danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #EF4444;
+}
+
+body.dark-mode .vitals-select,
+body.dark-mode .vitals-input,
+body.dark-mode .vitals-textarea {
+  background: #171C26;
+  border: 1.5px solid #3B485E;
+  color: #FFFFFF;
+}
+
+body.dark-mode .vitals-input::placeholder,
+body.dark-mode .vitals-textarea::placeholder {
+  color: #94A3B8;
+}
+
+body.dark-mode .vitals-select:focus,
+body.dark-mode .vitals-input:focus,
+body.dark-mode .vitals-textarea:focus {
+  background: #1C2230;
+  border-color: #34D399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
+}
+
+body.dark-mode .vitals-unit-tag {
+  background: #212836;
+  border-left: 1px solid #3B485E;
+  color: #94A3B8;
+}
+
+/* Clinical Flags & Alert Chips in Dark Mode */
+body.dark-mode .bp-flag-chip.flag-normal {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+body.dark-mode .bp-flag-chip.flag-high {
+  background: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+body.dark-mode .bp-flag-chip.flag-crisis {
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+body.dark-mode .vitals-flag-tag.tag-fever {
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+body.dark-mode .vitals-flag-tag.tag-tachy {
+  background: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+body.dark-mode .vitals-flag-tag.tag-brady {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60A5FA;
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+body.dark-mode .vitals-flag-tag.tag-lowspo2 {
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+body.dark-mode .vitals-flag-tag.tag-allergy {
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+}
+
+/* Form Actions in Dark Mode */
+body.dark-mode .vitals-form-actions {
+  border-top: 1px solid #2F3B4E;
+}
+
+body.dark-mode .vitals-btn-reset {
+  background: #283143;
+  border: 1px solid #3E4D64;
+  color: #E2E8F0;
+}
+
+body.dark-mode .vitals-btn-reset:hover {
+  background: #333F53;
+  color: #FFFFFF;
+}
+
+/* BMI Widget in Dark Mode */
+body.dark-mode .bmi-display-container {
+  background: #171C26;
+  border: 1px solid #2F3B4E;
+}
+
+body.dark-mode .bmi-num {
+  color: #FFFFFF;
+}
+
+body.dark-mode .bmi-unit {
+  color: #94A3B8;
+}
+
+body.dark-mode .bmi-scale-bar {
+  border: 1px solid #333F53;
+}
+
+body.dark-mode .bmi-scale-labels span {
+  color: #94A3B8;
+}
+
+body.dark-mode .bmi-info-footer {
+  background: #1C2230;
+  border-top: 1px solid #2F3B4E;
+  color: #94A3B8;
+}
+
+body.dark-mode .bmi-empty-state {
+  background: #171C26;
+  border: 1.5px dashed #3B485E;
+}
+
+body.dark-mode .bmi-empty-text {
+  color: #94A3B8;
+}
+
+body.dark-mode .bmi-preview-badge {
+  background: #212836;
+  border: 1px solid #333F53;
+  color: #94A3B8;
+}
+
+/* Triage Widget in Dark Mode */
+body.dark-mode .triage-active-banner.triage-badge-green {
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid #10B981;
+  color: #34D399;
+}
+
+body.dark-mode .triage-active-banner.triage-badge-yellow {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid #F59E0B;
+  color: #FBBF24;
+}
+
+body.dark-mode .triage-active-banner.triage-badge-orange {
+  background: rgba(249, 115, 22, 0.18);
+  border: 1px solid #F97316;
+  color: #FB923C;
+}
+
+body.dark-mode .triage-active-banner.triage-badge-red {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid #EF4444;
+  color: #F87171;
+}
+
+body.dark-mode .triage-banner-name {
+  color: #FFFFFF;
+}
+
+body.dark-mode .triage-banner-sub {
+  color: #CBD5E1;
+}
+
+body.dark-mode .triage-suggest-notice {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #FBBF24;
+}
+
+body.dark-mode .triage-option-btn {
+  background: #171C26;
+  border: 1.5px solid #2F3B4E;
+  color: #FFFFFF;
+}
+
+body.dark-mode .triage-option-btn:hover {
+  background: #212836;
+  border-color: #3B485E;
+}
+
+body.dark-mode .triage-option-btn.active.triage-badge-green {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10B981;
+}
+
+body.dark-mode .triage-option-btn.active.triage-badge-yellow {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: #F59E0B;
+}
+
+body.dark-mode .triage-option-btn.active.triage-badge-orange {
+  background: rgba(249, 115, 22, 0.18);
+  border-color: #F97316;
+}
+
+body.dark-mode .triage-option-btn.active.triage-badge-red {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #EF4444;
+}
+
+body.dark-mode .triage-opt-title {
+  color: #FFFFFF;
+}
+
+body.dark-mode .triage-opt-desc {
+  color: #94A3B8;
+}
+
+/* Waiting Queue List Widget in Dark Mode */
+body.dark-mode .vitals-count-badge {
+  background: #2D1B4E;
+  color: #C084FC;
+  border: 1px solid #4A2B7F;
+}
+
+body.dark-mode .queue-widget-search {
+  background: #171C26;
+  border: 1.5px solid #3B485E;
+}
+
+body.dark-mode .queue-search-input {
+  color: #FFFFFF;
+}
+
+body.dark-mode .queue-search-input::placeholder {
+  color: #94A3B8;
+}
+
+body.dark-mode .queue-quick-item {
+  background: #171C26;
+  border: 1px solid #2F3B4E;
+}
+
+body.dark-mode .queue-quick-item:hover {
+  background: #212836;
+  border-color: #3B485E;
+}
+
+body.dark-mode .queue-quick-item.selected {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10B981;
+}
+
+body.dark-mode .queue-num-chip {
+  background: rgba(37, 99, 235, 0.2);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: #60A5FA;
+}
+
+body.dark-mode .queue-patient-name {
+  color: #FFFFFF;
+}
+
+body.dark-mode .queue-patient-sub {
+  color: #94A3B8;
+}
+
+body.dark-mode .queue-time-tag {
+  color: #94A3B8;
+}
+
+body.dark-mode .queue-select-btn {
+  background: #283143;
+  border: 1px solid #3E4D64;
+  color: #CBD5E1;
+}
+
+body.dark-mode .queue-select-btn:hover {
+  background: #333F53;
+  color: #FFFFFF;
+}
+
+body.dark-mode .queue-select-btn.btn-selected {
+  background: #10B981;
+  color: #FFFFFF;
+  border-color: #10B981;
+}
+
+body.dark-mode .queue-empty-notice {
+  background: #171C26;
+  border: 1.5px dashed #3B485E;
+  color: #94A3B8;
+}
+
+/* History Table in Dark Mode (if displayed) */
+body.dark-mode .vitals-table-container {
+  border-color: #333F53;
+}
+
+body.dark-mode .vitals-history-table th {
+  background: #191E29;
+  border-bottom: 1.5px solid #333F53;
+  color: #E2E8F0;
+}
+
+body.dark-mode .vitals-history-table td {
+  border-bottom: 1px solid #2B3546;
+  color: #E2E8F0;
+}
+
+body.dark-mode .vitals-history-table tr:hover td {
+  background: #2A3345;
+}
