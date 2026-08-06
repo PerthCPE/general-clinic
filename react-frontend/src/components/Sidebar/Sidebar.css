@@ -6,11 +6,11 @@
   height: 100vh;
   left: 0px;
   top: 0px;
-  background: linear-gradient(180deg, #0f2027 0%, #1a3a4a 50%, #0f2027 100%);
+  background: linear-gradient(180deg, #0f2027 0%, #16323f 50%, #0f2027 100%);
   display: flex;
   flex-direction: column;
   z-index: 100;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, background 0.5s ease;
 }
 
 /* เปิด */
@@ -34,6 +34,7 @@
   padding: 0 18px;
   position: relative;
   flex-shrink: 0;
+  transition: background 0.5s ease;
 }
 
 /* Group 81 / Rectangle 32 - Logo Icon */
@@ -141,4 +142,16 @@
 
 .sidebar-nav-item .sidebar-nav-icon svg path {
   stroke: #E2E8F0;
+}
+
+/* ================================================================
+   ===== DARK MODE STYLES FOR SIDEBAR =====
+   ================================================================ */
+
+body.dark-mode .sidebar {
+  background: linear-gradient(180deg, #0A1618 0%, #122028 50%, #0A1618 100%);
+}
+
+body.dark-mode .sidebar-logo {
+  background: transparent;
 }
