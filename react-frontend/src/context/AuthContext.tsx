@@ -17,7 +17,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_STORAGE_KEY = 'clinic_auth_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // ค่าเริ่มต้น: ดึงจาก localStorage หรือ default เป็น registrar1 เพื่อความสะดวกในการใช้งาน
+  // ค่าเริ่มต้น: default เป็น null เพื่อให้เปิดหน้าเว็บมาอยู่ที่หน้า Login เสมอ
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem(AUTH_STORAGE_KEY);
     if (saved) {
@@ -27,7 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Fallback
       }
     }
-    return DEMO_USERS.registrar;
+    return null;
   });
 
   const isAuthenticated = currentUser !== null;

@@ -26,7 +26,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       setError('');
       onLoginSuccess();
     } else {
-      setError('ไม่พบชื่อผู้ใช้งานนี้ในระบบ (ลองใช้ registrar1 หรือ nurse1)');
+      setError('ไม่พบชื่อผู้ใช้งานนี้ในระบบ (ลองใช้ registrar1, nurse1 หรือ assistant1)');
     }
   };
 
@@ -92,7 +92,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <input
               type="text"
               className="login-form-input"
-              placeholder="เช่น registrar1, nurse1"
+              placeholder="เช่น registrar1, nurse1, assistant1"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />

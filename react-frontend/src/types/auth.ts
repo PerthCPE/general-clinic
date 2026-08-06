@@ -1,4 +1,4 @@
-export type UserRole = 'registrar' | 'nurse';
+export type UserRole = 'registrar' | 'nurse' | 'nurse_assistant';
 
 export interface User {
   id: string;

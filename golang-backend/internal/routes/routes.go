@@ -32,7 +32,7 @@ func SetUpRoutes(r *gin.Engine) {
 		
 		
 	nurseRoutes := api.Group("/nurse")
-	nurseRoutes.Use(middleware.RoleRequired("nurse"))
+	nurseRoutes.Use(middleware.RoleRequired("nurse", "nurse_assistant"))
 	// role check
 	{
 		nurseRoutes.POST("/vitals", controllers.RecordVitalsAndTriage)
@@ -41,7 +41,7 @@ func SetUpRoutes(r *gin.Engine) {
 
 	queueRoutes := api.Group("/queue")
 	// role check 
-	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse"))
+	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant"))
 	{
 		queueRoutes.GET("/list", func(c *gin.Context) {
 			// Mock up for waiting func, (c * gin.Context) is just universal mailbox

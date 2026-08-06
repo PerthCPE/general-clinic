@@ -24,6 +24,17 @@ export const DEMO_USERS: Record<UserRole, User> = {
     avatarText: 'KD',
     avatarColor: '#10B981',
   },
+  nurse_assistant: {
+    id: 'user-asst-01',
+    username: 'assistant1',
+    fullName: 'คุณมาลี ช่วยพยาบาล',
+    role: 'nurse_assistant',
+    roleTitleTh: 'ผู้ช่วยพยาบาล',
+    roleTitleEn: 'Nurse Assistant',
+    department: 'แผนกคัดกรอง',
+    avatarText: 'ML',
+    avatarColor: '#0D9488',
+  },
 };
 
 // เมนูใน Sidebar สำหรับแต่ละ Role
@@ -38,19 +49,25 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'vitals', title: 'บันทึกสัญญาณชีพ', iconType: 'vitals', path: '/vitals' },
     { id: 'vitals-history', title: 'ประวัติการคัดกรอง', iconType: 'history', path: '/vitals-history' },
   ],
+  nurse_assistant: [
+    { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
+    { id: 'vitals', title: 'บันทึกสัญญาณชีพ', iconType: 'vitals', path: '/vitals' },
+    { id: 'vitals-history', title: 'ประวัติการคัดกรอง', iconType: 'history', path: '/vitals-history' },
+  ],
 };
 
 // หน้าเริ่มต้นเมื่อ Login เข้าสู่ระบบตาม Role
 export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
   registrar: 'registration',
   nurse: 'queue',
+  nurse_assistant: 'queue',
 };
 
 // กำหนดว่าแต่ละหน้าอนุญาตให้ Role ใดเข้าถึงได้บ้าง (Role-based Route Permissions)
 export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'registration': ['registrar'],
-  'queue': ['registrar', 'nurse'],
+  'queue': ['registrar', 'nurse', 'nurse_assistant'],
   'eligibility': ['registrar'],
-  'vitals': ['nurse'],
-  'vitals-history': ['nurse'],
+  'vitals': ['nurse', 'nurse_assistant'],
+  'vitals-history': ['nurse', 'nurse_assistant'],
 };

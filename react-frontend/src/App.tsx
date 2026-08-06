@@ -7,7 +7,8 @@ import QueuePage from './pages/Queue/QueuePage';
 import EligibilityPage from './pages/Eligibility/EligibilityPage';
 import LoginPage from './pages/Login/LoginPage';
 import UnauthorizedPage from './pages/Unauthorized/UnauthorizedPage';
-import PageShowcase from './pages/Common/PageShowcase';
+import { VitalsPage } from './pages/Vitals/VitalsPage';
+import { ScreeningHistoryPage } from './pages/ScreeningHistory/ScreeningHistoryPage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
 import './App.css';
 
@@ -91,37 +92,10 @@ function MainApp() {
 
       // ===== Nurse Pages =====
       case 'vitals':
-        return (
-          <PageShowcase
-            roleBadge="Nurse"
-            roleBadgeColor="#10B981"
-            title="บันทึกสัญญาณชีพ & คัดกรอง (Vitals & Triage)"
-            subtitle="บันทึกค่าความดันโลหิต อุณหภูมิ ชีพจร อัตราการหายใจ และอาการสำคัญ"
-            description="ฟอร์มบันทึกสัญญาณชีพและคัดกรองอาการเบื้องต้นเพื่อประเมินความเร่งด่วนก่อนส่งพบแพทย์"
-            features={[
-              'บันทึกค่าความดัน (BP), ชีพจร (PR), อุณหภูมิ (Temp), น้ำหนัก, ส่วนสูง, BMI',
-              'ประเมินระดับความรุนแรงและฉุกเฉิน (Triage Classification)',
-              'บันทึกอาการสำคัญ (Chief Complaint) และประวัติแพ้ยา',
-              'ส่งต่อไปยังคิวห้องตรวจแพทย์ที่พร้อมให้บริการ',
-            ]}
-          />
-        );
+        return <VitalsPage />;
 
       case 'vitals-history':
-        return (
-          <PageShowcase
-            roleBadge="Nurse"
-            roleBadgeColor="#10B981"
-            title="ประวัติการคัดกรอง (Screening History)"
-            subtitle="ดูประวัติการตรวจวัดสัญญาณชีพย้อนหลังของผู้ป่วยแต่ละราย"
-            description="ค้นหาและตรวจสอบประวัติการวัดสัญญาณชีพในแต่ละครั้งที่ผู้ป่วยมารับบริการ"
-            features={[
-              'ค้นหาประวัติการคัดกรองด้วยเลขบัตรประชาชนหรือชื่อคนไข้',
-              'ดูกราฟแนวโน้มความดันโลหิตและน้ำหนักตัวย้อนหลัง',
-              'พิมพ์ใบคัดกรองประวัติสัญญาณชีพ',
-            ]}
-          />
-        );
+        return <ScreeningHistoryPage />;
 
       default:
         return <RegistrationPage />;
