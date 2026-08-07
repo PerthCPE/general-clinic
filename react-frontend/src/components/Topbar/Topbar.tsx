@@ -9,16 +9,129 @@ interface TopbarProps {
   onToggleTheme: () => void;
 }
 
+interface NotificationItem {
+  id: string;
+  category: string;
+  message: string;
+  time: string;
+  isUnread: boolean;
+}
+
 function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: TopbarProps) {
   const { currentUser, logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isNoticeOpen, setIsNoticeOpen] = useState(false);
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const [isSpeakingAll, setIsSpeakingAll] = useState(false);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('');
+  const [speechRate, setSpeechRate] = useState<number>(1.0);
+  const [speechPitch, setSpeechPitch] = useState<number>(1.35); // ตั้งค่าเริ่มต้นเป็นโทนเสียงผู้หญิง
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [showAllGlobalVoices, setShowAllGlobalVoices] = useState(false);
+  const [voiceProfile, setVoiceProfile] = useState<'standard' | 'male' | 'female' | 'robot' | 'announcer'>('female');
+  const [ttsProvider, setTtsProvider] = useState<'google_online' | 'responsive_online' | 'browser_native'>('responsive_online');
+
+  const [queueInput, setQueueInput] = useState<string>('A01');
+  const [channelInput, setChannelInput] = useState<string>('ช่อง 1');
+  const [customTextInput, setCustomTextInput] = useState<string>('ขอเชิญหมายเลขคิว A01 ที่ช่องบริการรับยา ช่อง 1 ค่ะ');
+
+  const [notifications, setNotifications] = useState<NotificationItem[]>([
+    {
+      id: '1',
+      category: 'ห้องยา',
+      message: 'มีใบสั่งยาใหม่ส่งมาจากห้องตรวจแพทย์ รอจัดยาสำหรับ คุณสมชาย ใจดี',
+      time: 'เมื่อสักครู่',
+      isUnread: true,
+    },
+    {
+      id: '2',
+      category: 'จุดคัดกรอง',
+      message: 'วัดสัญญาณชีพเรียบร้อย คุณสมหญิง มีสุข คิว A04 รอส่งเข้าห้องตรวจ 1',
+      time: '5 นาทีที่แล้ว',
+      isUnread: true,
+    },
+    {
+      id: '3',
+      category: 'การชำระเงิน',
+      message: 'ชำระเงินเรียบร้อยแล้วสำหรับ คิว A03 คุณวิชัย รักดี ออกใบเสร็จสำเร็จ',
+      time: '12 นาทีที่แล้ว',
+      isUnread: true,
+    },
+    {
+      id: '4',
+      category: 'ผลตรวจแล็บ',
+      message: 'ผลตรวจเลือดอนุมัติเรียบร้อยแล้ว พร้อมให้แพทย์สรุปผลตรวจ',
+      time: '25 นาทีที่แล้ว',
+      isUnread: false,
+    },
+    {
+      id: '5',
+      category: 'นัดหมายผู้ป่วย',
+      message: 'แจ้งเตือนนัดติดตามอาการ คุณวิภา ติดดี เวลา 14:00 น.',
+      time: '1 ชั่วโมงที่แล้ว',
+      isUnread: false,
+    },
+  ]);
+
+  // ฟังก์ชันจัดรูปแบบประโยคประกาศเรียกคิวสไตล์ Narakeet (เว้นวรรคตัวอักษรและตัวเลขเพื่อให้อ่านออกเสียงชัดเจน)
+  const formatNarakeetQueueText = (queueNo: string, channel: string) => {
+    const formattedQueue = queueNo.toUpperCase().split('').join(' ');
+    return `ขอเชิญหมายเลขคิว ${formattedQueue} ที่ช่องบริการรับยา ${channel} ค่ะ`;
+  };
+
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const noticeRef = useRef<HTMLDivElement>(null);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // ดึงรายการเสียงทั้งหมดในเครื่องของผู้ใช้ (Windows/Chrome/Edge)
+  useEffect(() => {
+    const updateVoices = () => {
+      if ('speechSynthesis' in window) {
+        const voices = window.speechSynthesis.getVoices();
+        if (showAllGlobalVoices) {
+          setAvailableVoices(voices);
+        } else {
+          // กรองเสียงภาษาไทยและเสียงยอดนิยม
+          const thaiVoices = voices.filter(v => v.lang.includes('th') || v.lang.includes('TH'));
+          setAvailableVoices(thaiVoices.length > 0 ? thaiVoices : voices);
+        }
+
+        if (voices.length > 0 && !selectedVoiceURI) {
+          const naturalVoice = voices.find(v => v.lang.includes('th') && (v.name.includes('Natural') || v.name.includes('Niwat') || v.name.includes('Premwadee'))) 
+            || voices.find(v => v.lang.includes('th')) 
+            || voices[0];
+          setSelectedVoiceURI(naturalVoice.voiceURI);
+        }
+      }
+    };
+
+    updateVoices();
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+    }
+  }, [showAllGlobalVoices]);
+
+  // หยุดเสียงเมื่อปิดหน้าจอหรือเปลี่ยนคอมโพเนนต์
+  useEffect(() => {
+    return () => {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      if (activeAudioRef.current) {
+        activeAudioRef.current.pause();
+      }
+    };
+  }, []);
 
   // ปิด dropdown เมื่อคลิกที่อื่นบนหน้าจอ
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (noticeRef.current && !noticeRef.current.contains(event.target as Node)) {
+        setIsNoticeOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -27,8 +140,250 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
     };
   }, []);
 
+  const playBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.05, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.1);
+      }
+    } catch {
+      // ละเว้น
+    }
+  };
+
+  // ฟังก์ชันหยุดการอ่านข้อความ
+  const stopSpeech = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    if ((window as unknown as { responsiveVoice?: { cancel: () => void } }).responsiveVoice) {
+      (window as unknown as { responsiveVoice: { cancel: () => void } }).responsiveVoice.cancel();
+    }
+    if (activeAudioRef.current) {
+      activeAudioRef.current.pause();
+      activeAudioRef.current = null;
+    }
+    setSpeakingId(null);
+    setIsSpeakingAll(false);
+  };
+
+  // ฟังก์ชันปรับข้อความให้อ่านเสียงผู้หญิงไทยได้อย่างไพเราะและชัดเจน
+  const formatThaiSpeechText = (input: string) => {
+    return input
+      .replace(/A(\d+)/gi, (_, num) => `เอ ${num.split('').join(' ')}`)
+      .replace(/B(\d+)/gi, (_, num) => `บี ${num.split('').join(' ')}`)
+      .replace(/C(\d+)/gi, (_, num) => `ซี ${num.split('').join(' ')}`);
+  };
+
+  // ฟังก์ชันอ่านข้อความด้วย ResponsiveVoice SDK (เสียงผู้หญิงไทยออนไลน์ 100%)
+  const speakText = (text: string, id?: string, customPitch?: number, customRate?: number) => {
+    playBeep();
+    stopSpeech();
+
+    if (id && speakingId === id) {
+      setSpeakingId(null);
+      return;
+    }
+
+    if (id) setSpeakingId(id);
+
+    const formattedText = formatThaiSpeechText(text);
+    const rv = (window as unknown as { responsiveVoice?: { speak: (t: string, v: string, opts?: object) => void } }).responsiveVoice;
+
+    // 1. เรียกใช้ ResponsiveVoice SDK สตรีมเสียงผู้หญิงไทย (Thai Female) โดยตรง
+    if (rv && typeof rv.speak === 'function') {
+      try {
+        rv.speak(formattedText, 'Thai Female', {
+          rate: customRate || speechRate,
+          onend: () => {
+            setSpeakingId(null);
+            setIsSpeakingAll(false);
+          },
+          onerror: () => {
+            speakGoogleOnlineFemale(formattedText, id, customRate);
+          }
+        });
+        return;
+      } catch {
+        speakGoogleOnlineFemale(formattedText, id, customRate);
+        return;
+      }
+    }
+
+    // 2. สำรองออนไลน์: Google Online Female Voice (SoundOfText)
+    speakGoogleOnlineFemale(formattedText, id, customRate);
+  };
+
+  // ฟังก์ชันสตรีมเสียงผู้หญิงไทยออนไลน์จาก Google Cloud (SoundOfText API)
+  const speakGoogleOnlineFemale = (text: string, id?: string, customRate?: number) => {
+    fetch('https://api.soundoftext.com/sounds', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ engine: 'Google', data: { text: text, voice: 'th-TH' } })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success && data.id) {
+        const soundUrl = `https://files.soundoftext.com/${data.id}.mp3`;
+        const audio = new Audio(soundUrl);
+        activeAudioRef.current = audio;
+        audio.onended = () => {
+          setSpeakingId(null);
+          setIsSpeakingAll(false);
+        };
+        audio.onerror = () => {
+          speakBrowserNative(text, id, 1.45, customRate);
+        };
+        audio.play().catch(() => {
+          speakBrowserNative(text, id, 1.45, customRate);
+        });
+      } else {
+        speakBrowserNative(text, id, 1.45, customRate);
+      }
+    })
+    .catch(() => {
+      speakBrowserNative(text, id, 1.45, customRate);
+    });
+  };
+
+  // ฟังก์ชันย่อยสำหรับเล่นด้วย Browser Native Speech Synthesis (บังคับโทนเสียงผู้หญิง Pitch 1.45 เสมอ)
+  const speakBrowserNative = (text: string, id?: string, customPitch?: number, customRate?: number) => {
+    if (!('speechSynthesis' in window)) {
+      alert('เบราว์เซอร์ของคุณไม่รองรับฟังก์ชันการอ่านข้อความด้วยเสียง (Text-to-Speech)');
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
+
+    // บังคับระดับเสียงเป็น 1.45 (โทนเสียงผู้หญิงแจ่มใส) เสมอ
+    const currentPitch = 1.45;
+    const currentRate = customRate !== undefined ? customRate : speechRate;
+
+    setTimeout(() => {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'th-TH';       // ตั้งค่าเป้าหมายเป็นภาษาไทย
+      utterance.rate = currentRate;   // ความเร็วเสียง
+      utterance.pitch = currentPitch; // บังคับ Pitch โทนเสียงสูงผู้หญิง (Female Pitch)
+
+      // บังคับค้นหาเสียงพากย์ผู้หญิงไทย (Female Thai Voice / Premwadee) ในเครื่องเสมอ
+      const voices = window.speechSynthesis.getVoices();
+      let femaleThaiVoice = voices.find(v => (v.lang.includes('th') || v.lang.includes('TH')) && (v.name.toLowerCase().includes('premwadee') || v.name.toLowerCase().includes('female')));
+
+      if (!femaleThaiVoice) {
+        femaleThaiVoice = voices.find(v => v.lang.includes('th') || v.lang.includes('TH'));
+      }
+
+      if (femaleThaiVoice) {
+        utterance.voice = femaleThaiVoice;
+      }
+
+      utterance.onstart = () => {
+        if (id) setSpeakingId(id);
+      };
+
+      utterance.onend = () => {
+        setSpeakingId(null);
+        setIsSpeakingAll(false);
+      };
+
+      utterance.onerror = (e) => {
+        console.warn('SpeechSynthesis error:', e);
+        setSpeakingId(null);
+        setIsSpeakingAll(false);
+      };
+
+      window.speechSynthesis.speak(utterance);
+    }, 50);
+  };
+
+  // เลือกแนวเสียงลัด (Preset Profile) และทดลองเล่นเสียงทันที
+  const applyVoiceProfile = (profile: 'standard' | 'male' | 'female' | 'robot' | 'announcer') => {
+    setVoiceProfile(profile);
+
+    let targetPitch = 1.0;
+    let targetRate = 1.0;
+    let sampleMsg = 'นี่คือเสียงปกติระบบคลินิกครับ';
+
+    switch (profile) {
+      case 'male':
+        targetPitch = 0.55; // ปรับโทนเสียงทุ้มต่ำผู้ชาย
+        targetRate = 0.9;
+        sampleMsg = 'สวัสดีครับ หมอขอเชิญผู้ป่วยรายถัดไปเข้าห้องตรวจครับ';
+        break;
+      case 'female':
+        targetPitch = 1.4; // ปรับโทนเสียงสูงแจ่มใสผู้หญิง
+        targetRate = 1.05;
+        sampleMsg = 'สวัสดีค่ะ พยาบาลเตรียมวัดสัญญาณชีพเรียบร้อยแล้วค่ะ';
+        break;
+      case 'robot':
+        targetPitch = 0.3; // ปรับโทนเสียงแบนหุ่นยนต์ AI
+        targetRate = 0.85;
+        sampleMsg = 'ระบบ เอไอ กำลังประมวลผลการแจ้งเตือน';
+        break;
+      case 'announcer':
+        targetPitch = 1.15; // ปรับจังหวะกระชับสไตล์ประกาศด่วน
+        targetRate = 1.35;
+        sampleMsg = 'ประกาศด่วน! ขอเชิญคิว A 0 1 2 ที่ช่องชำระเงินค่ะ';
+        break;
+      default:
+        targetPitch = 1.0;
+        targetRate = 1.0;
+        sampleMsg = 'นี่คือเสียงอ่านการแจ้งเตือนปกติครับ';
+        break;
+    }
+
+    setSpeechPitch(targetPitch);
+    setSpeechRate(targetRate);
+
+    // เล่นเสียงตัวอย่างของสไตล์นั้นทันทีเมื่อกดปุ่ม
+    speakText(sampleMsg, undefined, targetPitch, targetRate);
+  };
+
+  // อ่านข้อความการแจ้งเตือนทั้งหมดต่อเนื่อง
+  const handleReadAll = () => {
+    if (!('speechSynthesis' in window)) return;
+
+    if (isSpeakingAll) {
+      stopSpeech();
+      return;
+    }
+
+    const allText = notifications
+      .map((item, idx) => `การแจ้งเตือนที่ ${idx + 1}. ${item.category}. ${item.message}`)
+      .join(' ... ');
+
+    setIsSpeakingAll(true);
+    speakText(`มีแจ้งเตือนทั้งหมด ${notifications.length} รายการ. ` + allText);
+  };
+
   const toggleDropdown = () => {
     setIsDropdownOpen((prev) => !prev);
+    setIsNoticeOpen(false);
+  };
+
+  const toggleNotice = () => {
+    const nextState = !isNoticeOpen;
+    setIsNoticeOpen(nextState);
+    setIsDropdownOpen(false);
+  };
+
+  const unreadCount = notifications.filter(n => n.isUnread).length;
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({ ...n, isUnread: false })));
   };
 
   return (
@@ -55,14 +410,168 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
 
       {/* Actions Group (Notifications + Profile) */}
       <div className="actions-group">
-        {/* Notice icon */}
-        <button className="notice-btn" aria-label="Notifications">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M13.73 21a2 2 0 01-3.46 0" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
-          <span className="notice-badge" />
-        </button>
+        {/* Notification Icon & Dropdown Panel */}
+        <div className="notice-container" ref={noticeRef}>
+          <button 
+            className={`notice-btn ${isNoticeOpen ? 'active' : ''}`} 
+            onClick={toggleNotice}
+            aria-label="Notifications"
+            title="การแจ้งเตือน และอ่านข้อความด้วยเสียง"
+          >
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M13.73 21a2 2 0 01-3.46 0" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            {unreadCount > 0 && <span className="notice-badge" />}
+          </button>
+
+          {/* Notification Popup Menu */}
+          {isNoticeOpen && (
+            <div className="notice-dropdown-menu">
+              <div className="notice-header">
+                <div className="notice-header-title">
+                  <span>การแจ้งเตือน</span>
+                  {unreadCount > 0 && <span className="notice-count-tag">{unreadCount} ใหม่</span>}
+                </div>
+                <div className="notice-header-actions">
+                  <button 
+                    className={`voice-settings-toggle-btn ${showVoiceSettings ? 'active' : ''}`}
+                    onClick={() => setShowVoiceSettings(!showVoiceSettings)}
+                    title="เปิดแผงประกาศเรียกคิวด้วยเสียง"
+                  >
+                    ⚙️ เสียง
+                  </button>
+                </div>
+              </div>
+
+              {/* แผงประกาศข้อความด้วยเสียง (Speech Announcer Panel) */}
+              {showVoiceSettings && (
+                <div className="voice-settings-panel">
+                  {/* 1. ระบบกำหนดคิวและช่องบริการ (Narakeet Queue Builder) */}
+                  <div className="voice-setting-row narakeet-builder-box">
+                    <label className="voice-label">📢 กำหนดหมายเลขคิว และ ห้อง/ช่องบริการ:</label>
+                    <div className="narakeet-input-group">
+                      <div className="narakeet-input-field">
+                        <span className="narakeet-field-label">หมายเลขคิว:</span>
+                        <input 
+                          type="text" 
+                          value={queueInput} 
+                          onChange={(e) => setQueueInput(e.target.value)}
+                          placeholder="A01"
+                          className="narakeet-input"
+                        />
+                      </div>
+                      <div className="narakeet-input-field">
+                        <span className="narakeet-field-label">ห้อง / ช่องบริการ:</span>
+                        <input 
+                          type="text" 
+                          value={channelInput} 
+                          onChange={(e) => setChannelInput(e.target.value)}
+                          placeholder="ช่อง 1"
+                          className="narakeet-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. ปุ่มกดประกาศด่วนอัตโนมัติ (1-Click Quick Auto Announce - Dynamic based on inputs) */}
+                  <div className="voice-setting-row">
+                    <label className="voice-label">⚡ ประกาศด่วนตามห้อง/ช่องที่ระบุข้างต้น (กด 1 ครั้ง):</label>
+                    <div className="quick-auto-btn-grid">
+                      <button 
+                        className="quick-auto-btn"
+                        onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ช่องบริการรับยา ${channelInput || 'ช่อง 1'} ค่ะ`)}
+                      >
+                        💊 คิว {queueInput || 'A01'} รับยา {channelInput || 'ช่อง 1'}
+                      </button>
+                      <button 
+                        className="quick-auto-btn"
+                        onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ห้องตรวจ ${channelInput || 'ห้อง 1'} ค่ะ`)}
+                      >
+                        🩺 คิว {queueInput || 'A01'} ห้องตรวจ {channelInput || 'ห้อง 1'}
+                      </button>
+                      <button 
+                        className="quick-auto-btn"
+                        onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ช่องชำระเงิน ${channelInput || 'ช่อง 1'} ค่ะ`)}
+                      >
+                        💳 คิว {queueInput || 'A01'} ชำระเงิน {channelInput || 'ช่อง 1'}
+                      </button>
+                      <button 
+                        className="quick-auto-btn"
+                        onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ช่องบริการ ${channelInput || 'ช่อง 1'} ค่ะ`)}
+                      >
+                        🔔 คิว {queueInput || 'A01'} ช่องบริการ {channelInput || 'ช่อง 1'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 3. พิมพ์ข้อความอิสระที่ต้องการประกาศ */}
+                  <div className="voice-setting-row custom-text-box">
+                    <label className="voice-label">✍️ พิมพ์ข้อความประกาศอิสระเพิ่มเติม:</label>
+                    <div className="custom-text-input-group">
+                      <input 
+                        type="text" 
+                        value={customTextInput} 
+                        onChange={(e) => setCustomTextInput(e.target.value)}
+                        placeholder="พิมพ์ข้อความที่ต้องการให้เสียงอ่านที่นี่..."
+                        className="custom-text-input"
+                      />
+                      <button 
+                        className="custom-text-speak-btn"
+                        onClick={() => speakText(customTextInput)}
+                      >
+                        🔊 ประกาศ
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="notice-list">
+                {notifications.map((item) => (
+                  <div key={item.id} className={`notice-item ${item.isUnread ? 'unread' : ''}`}>
+                    <div className="notice-item-content">
+                      <div className="notice-item-header">
+                        <span className="notice-category-badge">{item.category}</span>
+                        <span className="notice-time">{item.time}</span>
+                      </div>
+                      <p className="notice-message">{item.message}</p>
+                    </div>
+
+                    {/* ปุ่มอ่านข้อความเฉพาะรายการ */}
+                    <button 
+                      className={`notice-speak-btn ${speakingId === item.id ? 'speaking' : ''}`}
+                      onClick={() => speakText(item.message, item.id)}
+                      title="กดเพื่อฟังเสียงอ่านข้อความนี้"
+                    >
+                      {speakingId === item.id ? (
+                        <div className="sound-wave-icon playing">
+                          <span></span><span></span><span></span>
+                        </div>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M11 5L6 9H2V15H6L11 19V5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M15.54 8.46A5 5 0 0115.54 15.54" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="notice-footer">
+                <button className="clear-notice-btn" onClick={markAllAsRead}>
+                  ทำเครื่องหมายอ่านแล้วทั้งหมด
+                </button>
+                {(speakingId || isSpeakingAll) && (
+                  <button className="stop-speech-footer-btn" onClick={stopSpeech}>
+                    ⏹️ หยุดการอ่านเสียง
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Profile with Dropdown */}
         <div className="profile-container" ref={dropdownRef}>

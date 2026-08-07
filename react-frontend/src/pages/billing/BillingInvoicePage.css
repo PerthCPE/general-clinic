@@ -1,0 +1,702 @@
+/* ===== BillingInvoicePage - Scoped CSS ===== */
+
+.billing-invoice-container {
+  padding: 0;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  color: #1E293B;
+  box-sizing: border-box;
+}
+
+body.dark-mode .billing-invoice-container {
+  color: #E2E8F0;
+}
+
+.billing-invoice-container .card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
+  border: 1px solid #E2E8F0;
+}
+
+body.dark-mode .billing-invoice-container .card {
+  background: #1E1E1E;
+  border-color: #2D2D2D;
+}
+
+.billing-invoice-container .search-card {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 20px 24px;
+}
+
+.billing-invoice-container .search-inputs {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+}
+
+.billing-invoice-container .input-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+}
+
+.billing-invoice-container .input-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+body.dark-mode .billing-invoice-container .input-group label {
+  color: #94A3B8;
+}
+
+.billing-invoice-container .input-group input {
+  padding: 10px 14px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: #F8FAFC;
+  color: inherit;
+  outline: none;
+}
+
+body.dark-mode .billing-invoice-container .input-group input {
+  background: #2D2D2D;
+  border-color: #475569;
+  color: #F8FAFC;
+}
+
+.billing-invoice-container .search-btn {
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  padding: 10px 32px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  height: 42px;
+}
+
+.billing-invoice-container .page-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.billing-invoice-container .invoice-patient-switcher {
+  display: flex;
+  gap: 10px;
+}
+
+.billing-invoice-container .patient-switch-btn {
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  color: #334155;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+body.dark-mode .billing-invoice-container .patient-switch-btn {
+  background: #2D2D2D;
+  border-color: #475569;
+  color: #E2E8F0;
+}
+
+.billing-invoice-container .patient-switch-btn.active {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+.billing-invoice-container .page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 4px 0;
+}
+
+body.dark-mode .billing-invoice-container .page-title {
+  color: #F8FAFC;
+}
+
+.billing-invoice-container .page-subtitle {
+  font-size: 0.9rem;
+  color: #64748B;
+  margin: 0;
+}
+
+.billing-invoice-container .patient-dark-banner {
+  background: #1E293B;
+  border-radius: 12px;
+  padding: 24px;
+  color: white;
+  margin-bottom: 24px;
+}
+
+.billing-invoice-container .patient-dark-name {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+}
+
+.billing-invoice-container .patient-dark-sub {
+  font-size: 0.85rem;
+  color: #94A3B8;
+  margin-bottom: 16px;
+}
+
+.billing-invoice-container .patient-dark-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 20px;
+  font-size: 0.85rem;
+  border-top: 1px solid #334155;
+  padding-top: 16px;
+}
+
+.billing-invoice-container .dark-info-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.billing-invoice-container .dark-label {
+  color: #94A3B8;
+  font-weight: 600;
+}
+
+.billing-invoice-container .banner-rights-select {
+  background: #0F172A;
+  color: #38BDF8;
+  border: 1px solid #0284C7;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+}
+
+.billing-invoice-container .banner-rights-select option {
+  background: #1E293B;
+  color: #FFFFFF;
+}
+
+.billing-invoice-container .allergy-tag {
+  background: #FEF2F2;
+  color: #EF4444;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.billing-invoice-container .status-tag {
+  color: #34D399;
+  font-weight: 600;
+}
+
+.billing-invoice-container .invoice-breakdown-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.billing-invoice-container .fee-card-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 20px 0;
+  border-bottom: 1px solid #E2E8F0;
+  padding-bottom: 12px;
+}
+
+body.dark-mode .billing-invoice-container .fee-card-title {
+  color: #F8FAFC;
+  border-bottom-color: #334155;
+}
+
+.billing-invoice-container .fee-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.billing-invoice-container .fee-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: #334155;
+}
+
+body.dark-mode .billing-invoice-container .fee-item {
+  color: #CBD5E1;
+}
+
+.billing-invoice-container .fee-price {
+  font-weight: 600;
+}
+
+.billing-invoice-container .fee-divider {
+  height: 1px;
+  background: #E2E8F0;
+  margin: 8px 0;
+}
+
+body.dark-mode .billing-invoice-container .fee-divider {
+  background: #334155;
+}
+
+.billing-invoice-container .fee-sub-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: #64748B;
+}
+
+.billing-invoice-container .grand-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 2px solid #E2E8F0;
+}
+
+body.dark-mode .billing-invoice-container .grand-total-row {
+  border-top-color: #334155;
+}
+
+.billing-invoice-container .grand-label {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+body.dark-mode .billing-invoice-container .grand-label {
+  color: #F8FAFC;
+}
+
+.billing-invoice-container .grand-price {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #2563EB;
+}
+
+body.dark-mode .billing-invoice-container .grand-price {
+  color: #60A5FA;
+}
+
+.billing-invoice-container .bottom-action-bar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.billing-invoice-container .pay-qr-btn {
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  color: white;
+  border: none;
+  padding: 16px 36px;
+  border-radius: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* QR Modal */
+.billing-invoice-container .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.65);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.billing-invoice-container .qr-modal-card {
+  background: white;
+  border-radius: 16px;
+  max-width: 680px;
+  width: 100%;
+  padding: 20px 24px;
+}
+
+body.dark-mode .billing-invoice-container .qr-modal-card {
+  background: #1E1E1E;
+  border: 1px solid #2D2D2D;
+}
+
+.billing-invoice-container .qr-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  border-bottom: 1px solid #E2E8F0;
+  padding-bottom: 12px;
+}
+
+body.dark-mode .billing-invoice-container .qr-modal-header {
+  border-bottom-color: #334155;
+}
+
+.billing-invoice-container .qr-modal-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin: 0 0 2px 0;
+  color: #0F172A;
+}
+
+body.dark-mode .billing-invoice-container .qr-modal-title {
+  color: #F8FAFC;
+}
+
+.billing-invoice-container .qr-modal-sub {
+  font-size: 0.8rem;
+  color: #64748B;
+}
+
+.billing-invoice-container .modal-close-icon {
+  background: #F1F5F9;
+  border: none;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+}
+
+body.dark-mode .billing-invoice-container .modal-close-icon {
+  background: #2D2D2D;
+  color: #E2E8F0;
+}
+
+/* Payment Method Toggle Tabs */
+.billing-invoice-container .payment-method-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  background: #F1F5F9;
+  padding: 4px;
+  border-radius: 10px;
+}
+
+body.dark-mode .billing-invoice-container .payment-method-toggle {
+  background: #2D2D2D;
+}
+
+.billing-invoice-container .toggle-tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748B;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+body.dark-mode .billing-invoice-container .toggle-tab-btn {
+  color: #94A3B8;
+}
+
+.billing-invoice-container .toggle-tab-btn.active-qr,
+.billing-invoice-container .toggle-tab-btn.active-cash {
+  background: #FFFFFF;
+  color: #2563EB;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  font-weight: 700;
+}
+
+body.dark-mode .billing-invoice-container .toggle-tab-btn.active-qr,
+body.dark-mode .billing-invoice-container .toggle-tab-btn.active-cash {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+.billing-invoice-container .toast-receipt-sent {
+  background: #DCFCE7;
+  color: #166534;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.billing-invoice-container .qr-modal-body {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 20px;
+}
+
+.billing-invoice-container .qr-code-box,
+.billing-invoice-container .cash-payment-box {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 18px;
+  text-align: center;
+}
+
+body.dark-mode .billing-invoice-container .qr-code-box,
+body.dark-mode .billing-invoice-container .cash-payment-box {
+  background: #2D2D2D;
+  border-color: #3F3F46;
+}
+
+.billing-invoice-container .qr-box-title {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0 0 12px 0;
+  color: #0F172A;
+}
+
+body.dark-mode .billing-invoice-container .qr-box-title {
+  color: #F8FAFC;
+}
+
+.billing-invoice-container .qr-patient-row,
+.billing-invoice-container .qr-amount-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.billing-invoice-container .qr-amount {
+  font-weight: 800;
+  color: #2563EB;
+}
+
+body.dark-mode .billing-invoice-container .qr-amount {
+  color: #60A5FA;
+}
+
+.billing-invoice-container .thai-qr-card-container {
+  margin: 10px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.billing-invoice-container .thai-qr-card-img {
+  max-width: 190px;
+  width: 100%;
+  border-radius: 10px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+  border: 1px solid #CBD5E1;
+}
+
+.billing-invoice-container .timeout-alert {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #B45309;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  margin-bottom: 12px;
+}
+
+/* Cash Payment Styles */
+.billing-invoice-container .cash-input-group {
+  margin: 14px 0 10px 0;
+  text-align: left;
+}
+
+.billing-invoice-container .cash-input-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+  display: block;
+  margin-bottom: 6px;
+}
+
+body.dark-mode .billing-invoice-container .cash-input-label {
+  color: #CBD5E1;
+}
+
+.billing-invoice-container .cash-input-field {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  outline: none;
+  background: #FFFFFF;
+  box-sizing: border-box;
+}
+
+body.dark-mode .billing-invoice-container .cash-input-field {
+  background: #1E1E1E;
+  border-color: #475569;
+  color: white;
+}
+
+.billing-invoice-container .quick-cash-pills {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.billing-invoice-container .quick-cash-pills button {
+  flex: 1;
+  padding: 6px 8px;
+  background: #EFF6FF;
+  color: #2563EB;
+  border: 1px solid #BFDBFE;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+body.dark-mode .billing-invoice-container .quick-cash-pills button {
+  background: rgba(37, 99, 235, 0.2);
+  color: #93C5FD;
+  border-color: #2563EB;
+}
+
+.billing-invoice-container .cash-change-box {
+  background: #F1F5F9;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+body.dark-mode .billing-invoice-container .cash-change-box {
+  background: #1E1E1E;
+}
+
+.billing-invoice-container .change-val {
+  font-size: 1.1rem;
+  color: #64748B;
+}
+
+.billing-invoice-container .green-change {
+  color: #166534 !important;
+}
+
+body.dark-mode .billing-invoice-container .green-change {
+  color: #4ADE80 !important;
+}
+
+.billing-invoice-container .cash-confirm-btn:disabled {
+  background: #94A3B8;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.billing-invoice-container .confirm-qr-btn {
+  width: 100%;
+  background: #2563EB;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.billing-invoice-container .confirmed-badge {
+  background: #DCFCE7;
+  color: #166534;
+  padding: 10px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.billing-invoice-container .receipt-actions-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.billing-invoice-container .pending-status-box {
+  text-align: center;
+  color: #64748B;
+}
+
+.billing-invoice-container .pending-pulse-circle {
+  font-size: 3rem;
+  margin-bottom: 12px;
+}
+
+.billing-invoice-container .success-status-box {
+  text-align: center;
+}
+
+.billing-invoice-container .big-green-check {
+  width: 64px;
+  height: 64px;
+  background: #10B981;
+  color: white;
+  border-radius: 50%;
+  font-size: 2.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px auto;
+}
+
+.billing-invoice-container .success-text {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 6px 0;
+}
+
+body.dark-mode .billing-invoice-container .success-text {
+  color: #F8FAFC;
+}
+
+.billing-invoice-container .receipt-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.billing-invoice-container .receipt-btn {
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid #CBD5E1;
+  background: white;
+  color: #334155;
+}
+
+body.dark-mode .billing-invoice-container .receipt-btn {
+  background: #2D2D2D;
+  border-color: #475569;
+  color: #F8FAFC;
+}
