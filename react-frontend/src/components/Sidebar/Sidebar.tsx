@@ -44,6 +44,30 @@ const renderNavIcon = (iconType: NavItem['iconType']) => {
           <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       );
+    case 'dispense':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+    case 'stock':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+    case 'invoice':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 14h6m-6 4h6m2 4H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V20a2 2 0 01-2 2z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+    case 'dashboard':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zm0 11h7v7h-7v-7zm-11 0h7v7H3v-7z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
     default:
       return null;
   }

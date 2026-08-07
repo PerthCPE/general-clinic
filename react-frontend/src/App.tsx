@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Sidebar from './components/Sidebar/Sidebar';
 import Topbar from './components/Topbar/Topbar';
-import RegistrationPage from './pages/Registration/RegistrationPage';
-import QueuePage from './pages/Queue/QueuePage';
-import EligibilityPage from './pages/Eligibility/EligibilityPage';
+
 import LoginPage from './pages/Login/LoginPage';
 import UnauthorizedPage from './pages/Unauthorized/UnauthorizedPage';
 import PageShowcase from './pages/Common/PageShowcase';
+import DetailPage from './pages/pharmacy/DetailPage';
+import MedicinePage from './pages/pharmacy/MedicinePage';
+import PatientHistoryPage from './pages/pharmacy/PatientHistoryPage';
+import BillingDashboardPage from './pages/billing/BillingDashboardPage';
+import BillingDispensePage from './pages/billing/BillingDispensePage';
+import BillingInvoicePage from './pages/billing/BillingInvoicePage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
 import './App.css';
 
@@ -20,6 +24,11 @@ function MainApp() {
   const [activePage, setActivePage] = useState<string>(() => {
     return localStorage.getItem('activePage') || 'registration';
   });
+
+  const [patientRightsMap, setPatientRightsMap] = useState<Record<string, string>>({});
+  const handleUpdatePatientRights = (patientId: string, rights: string) => {
+    setPatientRightsMap(prev => ({ ...prev, [patientId]: rights }));
+  };
 
   // บันทึก Tab ปัจจุบันลง localStorage เมื่อมีการเปลี่ยน Tab
   useEffect(() => {
@@ -81,13 +90,13 @@ function MainApp() {
     switch (activePage) {
       // ===== Shared & Registrar Pages =====
       case 'registration':
-        return <RegistrationPage />;
+        return <PageShowcase roleBadge="Registrar" roleBadgeColor="#2563EB" title="ลงทะเบียนผู้ป่วย" subtitle="กำลังพัฒนาระบบ..." description="หน้าจอนี้ยังไม่เปิดใช้งาน" features={[]} />;
 
       case 'queue':
-        return <QueuePage />;
+        return <PageShowcase roleBadge="Registrar" roleBadgeColor="#2563EB" title="จัดการคิว" subtitle="กำลังพัฒนาระบบ..." description="หน้าจอนี้ยังไม่เปิดใช้งาน" features={[]} />;
 
       case 'eligibility':
-        return <EligibilityPage />;
+        return <PageShowcase roleBadge="Registrar" roleBadgeColor="#2563EB" title="ตรวจสอบสิทธิ์การรักษา" subtitle="กำลังพัฒนาระบบ..." description="หน้าจอนี้ยังไม่เปิดใช้งาน" features={[]} />;
 
       // ===== Nurse Pages =====
       case 'vitals':
@@ -123,8 +132,33 @@ function MainApp() {
           />
         );
 
+      // ===== Pharmacist Pages =====
+      case 'pharmacy-dispense':
+        return <DetailPage 
+          patientRightsMap={patientRightsMap}
+          onUpdatePatientRights={handleUpdatePatientRights}
+        />;
+      case 'pharmacy-stock':
+        return <MedicinePage />;
+      case 'pharmacy-history':
+        return <PatientHistoryPage />;
+
+      // ===== Cashier Pages =====
+      case 'billing-dispense':
+        return <BillingDispensePage 
+          patientRightsMap={patientRightsMap}
+          onUpdatePatientRights={handleUpdatePatientRights}
+        />;
+      case 'billing-invoice':
+        return <BillingInvoicePage 
+          patientRightsMap={patientRightsMap}
+          onUpdatePatientRights={handleUpdatePatientRights}
+        />;
+      case 'billing-dashboard':
+        return <BillingDashboardPage />;
+
       default:
-        return <RegistrationPage />;
+        return <PageShowcase roleBadge="System" roleBadgeColor="#6B7280" title="หน้าแรก" subtitle="ยินดีต้อนรับ" description="กรุณาเลือกเมนูจากแถบด้านซ้าย" features={[]} />;
     }
   };
 

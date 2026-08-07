@@ -43,3 +43,23 @@ body.dark-mode .placeholder-page {
 body.dark-mode .placeholder-page h2 {
   color: #F1F5F9;
 }
+
+/* ===== Body Layout for Sidebar Toggle ===== */
+.body-content {
+  flex: 1;
+  transition: margin-left 0.3s ease, width 0.3s ease;
+  min-height: 100vh;
+  padding: 94px 32px 40px 32px; /* 74px Topbar offset + 20px top spacing */
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.body-with-sidebar {
+  margin-left: 256px; /* Width of the sidebar */
+  width: calc(100% - 256px); /* Shrink body width dynamically */
+}
+
+.body-full {
+  margin-left: 0;
+  width: 100%; /* Full width when sidebar is hidden */
+}

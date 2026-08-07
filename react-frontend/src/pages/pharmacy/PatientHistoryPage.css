@@ -1,0 +1,562 @@
+/* ===== PatientHistoryPage - Scoped CSS ===== */
+
+.patient-history-container {
+  padding: 0;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  color: #1E293B;
+  box-sizing: border-box;
+}
+
+body.dark-mode .patient-history-container {
+  color: #E2E8F0;
+}
+
+.patient-history-container .page-title {
+  color: #0D3B66;
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0 0 24px 0;
+}
+
+body.dark-mode .patient-history-container .page-title {
+  color: #60A5FA;
+}
+
+.patient-history-container .search-card {
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  border: 1px solid #E2E8F0;
+}
+
+body.dark-mode .patient-history-container .search-card {
+  background-color: #1E1E1E;
+  border-color: #2D2D2D;
+}
+
+.patient-history-container .search-inputs {
+  display: flex;
+  gap: 20px;
+  flex: 1;
+}
+
+.patient-history-container .input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.patient-history-container .input-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+body.dark-mode .patient-history-container .input-group label {
+  color: #CBD5E1;
+}
+
+.patient-history-container .input-with-icon input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #E2E8F0;
+  border-radius: 8px;
+  font-size: 14px;
+  background-color: #F8FAFC;
+  color: #1E293B;
+  outline: none;
+}
+
+body.dark-mode .patient-history-container .input-with-icon input {
+  background-color: #2D2D2D;
+  border-color: #475569;
+  color: #F8FAFC;
+}
+
+.patient-history-container .search-btn {
+  background-color: #0052CC;
+  color: white;
+  padding: 10px 28px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  height: 42px;
+}
+
+.patient-history-container .patient-table-card {
+  background-color: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #E2E8F0;
+}
+
+body.dark-mode .patient-history-container .patient-table-card {
+  background-color: #1E1E1E;
+  border-color: #2D2D2D;
+}
+
+.patient-history-container .table-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.patient-history-container .table-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+}
+
+body.dark-mode .patient-history-container .table-title {
+  color: #F8FAFC;
+}
+
+.patient-history-container .count-badge {
+  font-size: 12px;
+  color: #64748B;
+  background: #F1F5F9;
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+
+body.dark-mode .patient-history-container .count-badge {
+  background: #2D2D2D;
+  color: #94A3B8;
+}
+
+.patient-history-container .patient-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.patient-history-container .patient-table th {
+  padding: 14px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748B;
+  background-color: #F8FAFC;
+  border-bottom: 1px solid #E2E8F0;
+}
+
+body.dark-mode .patient-history-container .patient-table th {
+  background-color: #2D2D2D;
+  color: #94A3B8;
+  border-color: #475569;
+}
+
+.patient-history-container .patient-table td {
+  padding: 16px;
+  font-size: 14px;
+  border-bottom: 1px solid #F1F5F9;
+  color: #334155;
+}
+
+body.dark-mode .patient-history-container .patient-table td {
+  border-color: #2D2D2D;
+  color: #CBD5E1;
+}
+
+.patient-history-container .hn-cell {
+  font-weight: 600;
+  color: #1E40AF;
+}
+
+.patient-history-container .blood-badge {
+  background: #FEE2E2;
+  color: #DC2626;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.patient-history-container .disease-tag {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+/* Clickable Patient History Name in Table */
+.patient-history-container .clickable-patient-history {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.patient-history-container .clickable-patient-history:hover {
+  background-color: #EFF6FF;
+}
+
+body.dark-mode .patient-history-container .clickable-patient-history:hover {
+  background-color: #2D2D2D;
+}
+
+.patient-history-container .history-name-link {
+  font-weight: 700;
+  color: #2563EB;
+  display: block;
+}
+
+body.dark-mode .patient-history-container .history-name-link {
+  color: #60A5FA;
+}
+
+.patient-history-container .history-hint-tag {
+  font-size: 0.75rem;
+  color: #64748B;
+  display: block;
+  margin-top: 2px;
+}
+
+/* Patient Full History Pop-up Modal */
+.patient-history-container .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(15, 23, 42, 0.65);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.patient-history-container .patient-history-modal-card {
+  background: white;
+  border-radius: 18px;
+  max-width: 780px;
+  width: 100%;
+  padding: 28px 32px;
+  box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.25);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+body.dark-mode .patient-history-container .patient-history-modal-card {
+  background: #1E1E1E;
+  border: 1px solid #2D2D2D;
+}
+
+.patient-history-container .history-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid #E2E8F0;
+  padding-bottom: 16px;
+  margin-bottom: 18px;
+}
+
+body.dark-mode .patient-history-container .history-modal-header {
+  border-bottom-color: #334155;
+}
+
+.patient-history-container .history-modal-badge {
+  display: inline-block;
+  background: #EFF6FF;
+  color: #2563EB;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 999px;
+  margin-bottom: 6px;
+}
+
+body.dark-mode .patient-history-container .history-modal-badge {
+  background: rgba(37, 99, 235, 0.2);
+  color: #60A5FA;
+}
+
+.patient-history-container .history-modal-name {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 4px 0;
+}
+
+body.dark-mode .patient-history-container .history-modal-name {
+  color: #F8FAFC;
+}
+
+.patient-history-container .history-modal-hn {
+  font-size: 0.95rem;
+  color: #64748B;
+}
+
+.patient-history-container .history-modal-close {
+  background: #F1F5F9;
+  border: none;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #475569;
+  font-size: 1rem;
+}
+
+body.dark-mode .patient-history-container .history-modal-close {
+  background: #2D2D2D;
+  color: #CBD5E1;
+}
+
+.patient-history-container .history-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.patient-history-container .history-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  background: #F8FAFC;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #E2E8F0;
+}
+
+body.dark-mode .patient-history-container .history-stats-bar {
+  background: #2D2D2D;
+  border-color: #334155;
+}
+
+.patient-history-container .h-stat-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.patient-history-container .h-stat-label {
+  font-size: 0.82rem;
+  color: #64748B;
+}
+
+.patient-history-container .h-stat-val {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin-top: 3px;
+}
+
+body.dark-mode .patient-history-container .h-stat-val {
+  color: #F8FAFC;
+}
+
+.patient-history-container .history-section-block {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  padding: 18px;
+}
+
+body.dark-mode .patient-history-container .history-section-block {
+  background: #2D2D2D;
+  border-color: #334155;
+}
+
+.patient-history-container .section-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #0F172A;
+  margin: 0 0 14px 0;
+}
+
+body.dark-mode .patient-history-container .section-title {
+  color: #F8FAFC;
+}
+
+.patient-history-container .text-red {
+  color: #DC2626;
+}
+
+.patient-history-container .allergy-list-grid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.patient-history-container .allergy-pill-item {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  flex: 1;
+  min-width: 200px;
+}
+
+.patient-history-container .sev-high {
+  background: #FEE2E2;
+  border: 1px solid #FCA5A5;
+  color: #991B1B;
+}
+
+.patient-history-container .sev-low {
+  background: #FEF3C7;
+  border: 1px solid #FDE68A;
+  color: #92400E;
+}
+
+.patient-history-container .allergy-pill-name {
+  font-weight: 700;
+}
+
+.patient-history-container .allergy-pill-symptom {
+  font-size: 0.78rem;
+  margin-top: 2px;
+}
+
+.patient-history-container .history-modal-footer {
+  margin-top: 20px;
+  text-align: right;
+}
+
+.patient-history-container .primary-close-btn {
+  background: #2563EB;
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+/* Detail View */
+.patient-history-container .detail-top-bar {
+  margin-bottom: 16px;
+}
+
+.patient-history-container .back-btn {
+  background: white;
+  border: 1px solid #E2E8F0;
+  color: #334155;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+body.dark-mode .patient-history-container .back-btn {
+  background: #2D2D2D;
+  border-color: #475569;
+  color: #F8FAFC;
+}
+
+.patient-history-container .patient-banner-card {
+  background: linear-gradient(135deg, #0052CC 0%, #1565C0 100%);
+  border-radius: 14px;
+  padding: 24px;
+  color: white;
+  margin-bottom: 24px;
+}
+
+.patient-history-container .banner-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.patient-history-container .stat-box {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.patient-history-container .detail-body-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.patient-history-container .allergies-card,
+.patient-history-container .med-history-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  border: 1px solid #E2E8F0;
+}
+
+body.dark-mode .patient-history-container .allergies-card,
+body.dark-mode .patient-history-container .med-history-card {
+  background: #1E1E1E;
+  border-color: #2D2D2D;
+}
+
+.patient-history-container .allergy-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.patient-history-container .allergy-item {
+  padding: 14px 16px;
+  border-radius: 8px;
+}
+
+.patient-history-container .severity-high {
+  background: #FEF2F2;
+  color: #991B1B;
+}
+
+.patient-history-container .severity-low {
+  background: #F8FAFC;
+  color: #334155;
+}
+
+body.dark-mode .patient-history-container .severity-low {
+  background: #2D2D2D;
+  color: #CBD5E1;
+}
+
+.patient-history-container .med-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.patient-history-container .med-history-table th {
+  padding: 14px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748B;
+  background: #F8FAFC;
+  border-bottom: 1px solid #E2E8F0;
+  text-align: left;
+}
+
+.patient-history-container .med-history-table th:last-child {
+  text-align: right;
+  padding-right: 24px;
+}
+
+.patient-history-container .med-history-table td {
+  padding: 16px;
+  border-bottom: 1px solid #F1F5F9;
+  font-size: 14px;
+  text-align: left;
+}
+
+.patient-history-container .qty-cell {
+  font-weight: 600;
+  text-align: right !important;
+  padding-right: 24px !important;
+}
