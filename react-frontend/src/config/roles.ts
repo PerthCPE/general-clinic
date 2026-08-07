@@ -57,6 +57,21 @@ export const DEMO_USERS: Record<UserRole, User> = {
     avatarText: 'AN',
     avatarColor: '#F59E0B',
   },
+  doctor: {
+    id: 'user-doc-01',
+    username: 'doctor1',
+    fullName: 'นพ. สมเกียรติ รักษาดี',
+    role: 'doctor',
+    roleTitleTh: 'แพทย์ประจำคลินิก',
+    roleTitleEn: 'Doctor',
+    department: 'แผนกตรวจโรคทั่วไป',
+    avatarText: 'SK',
+    avatarColor: '#EF4444',
+  },
+  admin: {
+    id: 'user-admin-01', username: 'admin1', fullName: 'คุณอารยา ดีมาก',
+    role: 'admin', roleTitleTh: 'ผู้ดูแลระบบ', roleTitleEn: 'System Admin', department: 'แผนกไอที', avatarText: 'AD', avatarColor: '#1E40AF', email: 'aranya.admin@clinic.com'
+  }
 };
 
 // เมนูใน Sidebar สำหรับแต่ละ Role
@@ -65,6 +80,7 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'registration', title: 'ลงทะเบียนผู้ป่วย', iconType: 'registration', path: '/registration' },
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
     { id: 'eligibility', title: 'ตรวจสอบสิทธิ์การรักษา', iconType: 'eligibility', path: '/eligibility' },
+    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' }, // เพิ่มให้ registrar
   ],
   nurse: [
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
@@ -86,6 +102,14 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'billing-invoice', title: 'ออกใบแจ้งหนี้', iconType: 'invoice', path: '/billing-invoice' },
     { id: 'billing-dashboard', title: 'แดชบอร์ด', iconType: 'dashboard', path: '/billing-dashboard' },
   ],
+  doctor: [
+    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' },
+    { id: 'appointment-form', title: 'สร้างนัดหมายใหม่', iconType: 'appointment', path: '/appointment-form' },
+  ],
+  admin: [
+    { id: 'admin-users', title: 'จัดการบัญชีผู้ใช้งาน', iconType: 'admin-users', path: '/admin-users' },
+    { id: 'admin-access', title: 'จัดการสิทธิ์การใช้งานระบบ', iconType: 'admin-access', path: '/admin-access' },
+  ]
 };
 
 // หน้าเริ่มต้นเมื่อ Login เข้าสู่ระบบตาม Role
@@ -95,6 +119,8 @@ export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
   nurse_assistant: 'queue',
   pharmacist: 'pharmacy-dispense',
   cashier: 'billing-dispense',
+  doctor: 'appointment-dashboard',
+  admin: 'admin-users',
 };
 
 // กำหนดว่าแต่ละหน้าอนุญาตให้ Role ใดเข้าถึงได้บ้าง (Role-based Route Permissions)
@@ -110,4 +136,8 @@ export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'billing-dispense': ['cashier'],
   'billing-invoice': ['cashier'],
   'billing-dashboard': ['cashier'],
+  'appointment-form': ['doctor'], 
+  'appointment-dashboard': ['registrar', 'doctor', 'nurse', 'nurse_assistant', 'pharmacist', 'cashier'], 
+  'admin-users': ['admin'],
+  'admin-access': ['admin'],
 };
