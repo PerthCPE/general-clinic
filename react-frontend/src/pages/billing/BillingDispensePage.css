@@ -1,0 +1,345 @@
+/* ===== BillingDispensePage - Scoped CSS ===== */
+
+.billing-dispense-container {
+  padding: 0;
+  max-width: 1280px;
+  margin: 0 auto;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  color: #1E293B;
+  box-sizing: border-box;
+}
+
+body.dark-mode .billing-dispense-container {
+  color: #E2E8F0;
+}
+
+.billing-dispense-container .card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  margin-bottom: 24px;
+  border: 1px solid #E2E8F0;
+}
+
+body.dark-mode .billing-dispense-container .card {
+  background: #1E1E1E;
+  border-color: #2D2D2D;
+}
+
+.billing-dispense-container .search-card {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 20px 24px;
+}
+
+.billing-dispense-container .search-inputs {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+}
+
+.billing-dispense-container .input-group {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 8px;
+}
+
+.billing-dispense-container .input-group label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+body.dark-mode .billing-dispense-container .input-group label {
+  color: #94A3B8;
+}
+
+.billing-dispense-container .input-group input {
+  padding: 10px 14px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  background: #F8FAFC;
+  color: inherit;
+  outline: none;
+}
+
+body.dark-mode .billing-dispense-container .input-group input {
+  background: #2D2D2D;
+  border-color: #475569;
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .search-btn {
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  padding: 10px 32px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  height: 42px;
+}
+
+.billing-dispense-container .page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 20px 0;
+}
+
+body.dark-mode .billing-dispense-container .page-title {
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .dispense-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 24px;
+}
+
+.billing-dispense-container .card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.billing-dispense-container .card-heading {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0;
+}
+
+body.dark-mode .billing-dispense-container .card-heading {
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .doctor-select {
+  padding: 6px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+body.dark-mode .billing-dispense-container .doctor-select {
+  background: #2D2D2D;
+  border-color: #475569;
+  color: #E2E8F0;
+}
+
+.billing-dispense-container .patient-search-box input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  outline: none;
+  background: #F8FAFC;
+  margin-bottom: 16px;
+}
+
+body.dark-mode .billing-dispense-container .patient-search-box input {
+  background: #2D2D2D;
+  border-color: #475569;
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .stock-alert-box {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #B45309;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+body.dark-mode .billing-dispense-container .stock-alert-box {
+  background: rgba(180, 83, 9, 0.15);
+  border-color: #B45309;
+  color: #FBBF24;
+}
+
+.billing-dispense-container .dispense-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.billing-dispense-container .dispense-table th {
+  padding: 12px 14px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748B;
+  background: #F8FAFC;
+  border-bottom: 1px solid #E2E8F0;
+  text-align: left;
+}
+
+body.dark-mode .billing-dispense-container .dispense-table th {
+  background: #2D2D2D;
+  color: #94A3B8;
+  border-color: #334155;
+}
+
+.billing-dispense-container .dispense-table td {
+  padding: 14px;
+  border-bottom: 1px solid #F1F5F9;
+  font-size: 0.875rem;
+}
+
+body.dark-mode .billing-dispense-container .dispense-table td {
+  border-color: #2D2D2D;
+}
+
+.billing-dispense-container .font-bold {
+  font-weight: 600;
+  color: #0F172A;
+}
+
+body.dark-mode .billing-dispense-container .font-bold {
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .summary-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.billing-dispense-container .summary-rights-box {
+  background: #F0F9FF;
+  border: 1px solid #BAE6FD;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+body.dark-mode .billing-dispense-container .summary-rights-box {
+  background: rgba(2, 132, 199, 0.15);
+  border-color: #0369A1;
+}
+
+.billing-dispense-container .summary-rights-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0369A1;
+}
+
+body.dark-mode .billing-dispense-container .summary-rights-label {
+  color: #38BDF8;
+}
+
+.billing-dispense-container .summary-rights-select {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1.5px solid #0284C7;
+  background: white;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #0F172A;
+  outline: none;
+  cursor: pointer;
+}
+
+body.dark-mode .billing-dispense-container .summary-rights-select {
+  background: #2D2D2D;
+  border-color: #38BDF8;
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .summary-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+  flex: 1;
+}
+
+.billing-dispense-container .summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.billing-dispense-container .item-title {
+  font-weight: 700;
+  color: #0F172A;
+  font-size: 0.95rem;
+}
+
+body.dark-mode .billing-dispense-container .item-title {
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .item-sub {
+  font-size: 0.8rem;
+  color: #64748B;
+}
+
+.billing-dispense-container .item-price {
+  font-weight: 700;
+  color: #1E293B;
+}
+
+body.dark-mode .billing-dispense-container .item-price {
+  color: #E2E8F0;
+}
+
+.billing-dispense-container .summary-divider {
+  height: 1px;
+  background: #E2E8F0;
+  margin: 20px 0;
+}
+
+body.dark-mode .billing-dispense-container .summary-divider {
+  background: #334155;
+}
+
+.billing-dispense-container .main-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0F172A;
+  margin-bottom: 24px;
+}
+
+body.dark-mode .billing-dispense-container .main-total {
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .total-price {
+  font-size: 1.25rem;
+  color: #2563EB;
+}
+
+body.dark-mode .billing-dispense-container .total-price {
+  color: #60A5FA;
+}
+
+.billing-dispense-container .submit-billing-btn {
+  width: 100%;
+  background: #2563EB;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
