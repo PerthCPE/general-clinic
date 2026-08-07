@@ -2,6 +2,20 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserRole } from '../types/auth';
 import { DEMO_USERS, ROLE_DEFAULT_PAGES, PAGE_PERMISSIONS } from '../config/roles';
 
+export interface PatientQueueItem {
+  id: number;
+  name: string;
+  initial: string;
+  dept: string;
+  date: string;
+  time: string;
+  phone: string;
+  status: string;
+  statusColor: string;
+  deptColor: string;
+  notes?: string;
+}
+
 interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
@@ -10,17 +24,47 @@ interface AuthContextType {
   logout: () => void;
   hasAccess: (pageId: string) => boolean;
   defaultPage: string;
+  
+  patientQueue: PatientQueueItem[];
+  addAppointment: (item: PatientQueueItem) => void;
+  updateAppointment: (id: number, updates: Partial<PatientQueueItem>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_STORAGE_KEY = 'clinic_auth_user';
+const QUEUE_STORAGE_KEY = 'clinic_queue_data_v3'; 
+
+// ฟังก์ชันดึงวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
+const getTodayDateString = () => {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const todayStr = getTodayDateString();
+
+// รายชื่อผู้ป่วยเริ่มต้นโดยใช้วันที่ปัจจุบันเป็นค่าตั้งต้น
+const initialDefaultQueue: PatientQueueItem[] = [
+  { id: 1, name: 'อนันต์ สุขสวัสดิ์', initial: 'อน', dept: 'โรคทั่วไป', date: '2026-08-08', time: '09:00', phone: '081-456-7890', status: '-', statusColor: 'default', deptColor: 'primary' },
+  { id: 2, name: 'วิมล มั่นคง', initial: 'วม', dept: 'อายุรกรรม', date: '2026-08-08', time: '09:30', phone: '089-123-4567', status: '-', statusColor: 'default', deptColor: 'warning' },
+  { id: 3, name: 'เกียรติศักดิ์ ศรีสุข', initial: 'กศ', dept: 'จิตวิทยา', date: '2026-08-08', time: '10:00', phone: '082-987-6543', status: '-', statusColor: 'default', deptColor: 'secondary' },
+  { id: 4, name: 'พงษ์ศักดิ์ แสนดี', initial: 'พศ', dept: 'กายภาพบำบัด', date: '2026-08-08', time: '10:30', phone: '085-333-2211', status: '-', statusColor: 'default', deptColor: 'success' },
+  { id: 5, name: 'สมชาย ใจดี', initial: 'สช', dept: 'โรคทั่วไป', date: '2026-08-08', time: '11:00', phone: '088-777-8899', status: '-', statusColor: 'default', deptColor: 'primary' },
+  { id: 6, name: 'นภา  งามตา', initial: 'นภ', dept: 'อายุรกรรม', date: '2026-08-08', time: '13:00', phone: '086-555-4321', status: '-', statusColor: 'default', deptColor: 'warning' },
+  { id: 7, name: 'ประเสริฐ เลิศพงษ์', initial: 'ปร', dept: 'โรคทั่วไป', date: '2026-08-08', time: '13:30', phone: '084-111-9988', status: '-', statusColor: 'default', deptColor: 'primary' },
+  { id: 8, name: 'วรรณา รัก,ไทย', initial: 'วน', dept: 'กายภาพบำบัด', date: '2026-08-08', time: '14:00', phone: '083-666-5544', status: '-', statusColor: 'default', deptColor: 'success' },
+];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // ค่าเริ่มต้น: เริ่มต้นที่ null เสมอ เพื่อให้เปิดเข้ามาที่หน้า Login เป็น Default
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const isAuthenticated = currentUser !== null;
+  const [patientQueue, setPatientQueue] = useState<PatientQueueItem[]>(() => {
+    const saved = localStorage.getItem(QUEUE_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : initialDefaultQueue;
+  });
 
   useEffect(() => {
     if (currentUser) {
@@ -30,15 +74,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [currentUser]);
 
-  // ฟังก์ชัน Login: รับ username หรือ role
+  useEffect(() => {
+    localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(patientQueue));
+  }, [patientQueue]);
+
+  const addAppointment = (item: PatientQueueItem) => {
+    setPatientQueue(prev => [item, ...prev]);
+  };
+
+  const updateAppointment = (id: number, updates: Partial<PatientQueueItem>) => {
+    setPatientQueue(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+  };
+
   const login = (roleOrUsername: string, _password?: string): boolean => {
     let matchedUser: User | undefined;
-
-    // เช็คกรณีส่ง role ตรงๆ เช่น "registrar", "nurse"
     if (roleOrUsername in DEMO_USERS) {
       matchedUser = DEMO_USERS[roleOrUsername as UserRole];
     } else {
-      // เช็คตาม username เช่น "registrar1", "nurse1"
       matchedUser = Object.values(DEMO_USERS).find((u) => u.username === roleOrUsername);
     }
 
@@ -49,7 +101,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
-  // ฟังก์ชันสลับ Role อย่างรวดเร็ว (สำหรับทดสอบ)
   const switchRole = (role: UserRole) => {
     const targetUser = DEMO_USERS[role];
     if (targetUser) {
@@ -57,16 +108,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // ฟังก์ชันออกจากระบบ
   const logout = () => {
     setCurrentUser(null);
   };
 
-  // ฟังก์ชันตรวจสอบสิทธิ์การเข้าถึงหน้าเพจ (RBAC Check)
   const hasAccess = (pageId: string): boolean => {
     if (!currentUser) return false;
     const allowedRoles = PAGE_PERMISSIONS[pageId];
-    if (!allowedRoles) return true; // หากไม่มีการกำหนดสิทธิ์ แปลว่าเป็นหน้าสาธารณะ
+    if (!allowedRoles) return true;
     return allowedRoles.includes(currentUser.role);
   };
 
@@ -76,12 +125,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         currentUser,
-        isAuthenticated,
+        isAuthenticated: currentUser !== null,
         login,
         switchRole,
         logout,
         hasAccess,
         defaultPage,
+        patientQueue,
+        addAppointment,
+        updateAppointment,
       }}
     >
       {children}

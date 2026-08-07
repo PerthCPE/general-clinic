@@ -19,6 +19,10 @@ import BillingDispensePage from './pages/billing/BillingDispensePage';
 import BillingInvoicePage from './pages/billing/BillingInvoicePage';
 import VitalsScreeningPage from './pages/nurse/VitalsScreeningPage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
+import AppointmentForm from './pages/Appointment/AppointmentForm';
+import AppointmentDashboard from './pages/Appointment/AppointmentDashboard';
+import UserManagement from './pages/Admin/UserManagement'; 
+import GrantAccess from './pages/Admin/GrantAccess';
 import './App.css';
 
 function MainApp() {
@@ -144,6 +148,20 @@ function MainApp() {
       case 'billing-dashboard':
         return <BillingDashboardPage />;
 
+      // ===== Appointment Pages =====
+      case 'appointment-form':
+        return <AppointmentForm />;
+      
+      case 'appointment-dashboard':
+        return <AppointmentDashboard />;
+
+      // ===== Admin Pages =====
+      case 'admin-users':
+        return <UserManagement />;
+
+      case 'admin-access':
+        return <GrantAccess />;
+
       default:
         return <PageShowcase roleBadge="System" roleBadgeColor="#6B7280" title="หน้าแรก" subtitle="ยินดีต้อนรับ" description="กรุณาเลือกเมนูจากแถบด้านซ้าย" features={[]} />;
     }
@@ -151,7 +169,7 @@ function MainApp() {
 
   return (
     <div className="app-layout">
-      {/* 1. Left Sidebar - Menu filtered dynamically for Registrar & Nurse */}
+      {/* 1. Left Sidebar */}
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
