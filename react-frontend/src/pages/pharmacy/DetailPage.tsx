@@ -143,7 +143,15 @@ export default function DetailPage({
             </div>
           </div>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {activePatient && (
+              <span style={{ 
+                background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', 
+                padding: '4px 12px', borderRadius: '16px', fontSize: '13px', border: '1px solid #93C5FD' 
+              }}>
+                🔔 ถึงคิวที่ {activePatient.queueNumber} ({activePatient.name})
+              </span>
+            )}
             <span style={{ 
               background: '#F3E8FF', color: '#9333EA', fontWeight: 'bold', 
               padding: '4px 12px', borderRadius: '16px', fontSize: '13px' 
@@ -179,16 +187,17 @@ export default function DetailPage({
 
             {/* Patients Table */}
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+              <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead>
-                  <tr style={{ color: '#64748B', borderBottom: '1px solid #E2E8F0', height: '40px' }}>
-                    <th style={{ padding: '8px 12px', fontWeight: '600' }}>HN</th>
-                    <th style={{ padding: '8px 12px', fontWeight: '600' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '8px 12px', fontWeight: '600' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '8px 12px', fontWeight: '600' }}>เบอร์โทรศัพท์</th>
-                    <th style={{ padding: '8px 12px', fontWeight: '600' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '8px 12px', fontWeight: '600' }}>เวลาลงทะเบียน</th>
-                    <th style={{ padding: '8px 12px', fontWeight: '600', textAlign: 'center' }}>การดำเนินการ</th>
+                  <tr style={{ color: '#64748B', borderBottom: '1px solid #E2E8F0', height: '40px', whiteSpace: 'nowrap' }}>
+                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>ลำดับคิว</th>
+                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>HN</th>
+                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>เบอร์โทรศัพท์</th>
+                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>สิทธิการรักษา</th>
+                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>เวลาลงทะเบียน</th>
+                    <th style={{ padding: '10px 12px', fontWeight: '600', textAlign: 'center' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -203,49 +212,60 @@ export default function DetailPage({
                     .map((p, index) => (
                     <tr 
                       key={p.id + '_' + index}
-                      style={{ 
-                        borderBottom: '1px solid #F1F5F9',
-                        background: localPatientId === p.id ? '#EFF6FF' : 'transparent'
-                      }}
+                      className={localPatientId === p.id ? 'active-row' : ''}
+                      style={{ borderBottom: '1px solid #F1F5F9', whiteSpace: 'nowrap' }}
                     >
-                      <td style={{ padding: '12px' }}>
+                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
                         <span style={{ 
+                          background: localPatientId === p.id ? '#10B981' : '#F1F5F9', 
+                          color: localPatientId === p.id ? '#FFFFFF' : '#0F172A', 
+                          border: `1px solid ${localPatientId === p.id ? '#10B981' : '#CBD5E1'}`,
+                          padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px',
+                          whiteSpace: 'nowrap', display: 'inline-block', minWidth: '85px', textAlign: 'center'
+                        }}>
+                          {localPatientId === p.id ? '► ' : ''}คิว {p.queueNumber || index + 1}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                        <span className="patient-hn-badge" style={{ 
                           background: '#EFF6FF', color: '#2563EB', padding: '4px 8px', 
-                          borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', border: '1px solid #BFDBFE' 
+                          borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', border: '1px solid #BFDBFE',
+                          whiteSpace: 'nowrap'
                         }}>
                           {p.hn}
                         </span>
                       </td>
-                      <td style={{ padding: '12px' }}>
-                        <div style={{ fontWeight: 'bold', color: '#0F172A' }}>{p.name}</div>
-                        <div style={{ fontSize: '12px', color: '#64748B' }}>เพศ {p.gender}, อายุ {p.age} ปี</div>
+                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                        <div className="patient-table-name" style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{p.name}</div>
                       </td>
-                      <td style={{ padding: '12px', color: '#334155' }}>{p.nationalId}</td>
-                      <td style={{ padding: '12px', color: '#334155' }}>{p.phone}</td>
-                      <td style={{ padding: '12px' }}>
+                      <td className="patient-table-sub" style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap' }}>{p.nationalId}</td>
+                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>{p.phone}</td>
+                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
                         <span style={{ 
                           background: p.treatmentRights.includes('30') ? '#FEF3C7' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
                           color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6B21A8',
-                          padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '500'
+                          padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '500',
+                          whiteSpace: 'nowrap'
                         }}>
                           {p.treatmentRights.split(' ')[0]} {p.treatmentRights.includes('บัตรทอง') ? '(สปสช.)' : ''}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', color: '#64748B', fontSize: '13px' }}>
-                        {p.visitDate} {p.visitTime} น.
+                      <td className="patient-table-sub" style={{ padding: '12px', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                        {p.visitDate} {p.visitTime}
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                      <td style={{ padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <button 
                           onClick={() => {
                             setLocalPatientId(p.id);
                             if (onSelectPatientId) onSelectPatientId(p.id);
                           }}
                           style={{ 
-                            padding: '6px 14px', 
+                            padding: '8px 16px', 
                             background: localPatientId === p.id ? '#10B981' : '#2563EB', 
-                            color: 'white', border: 'none', borderRadius: '6px', 
-                            cursor: 'pointer', fontWeight: 'bold', fontSize: '13px',
-                            display: 'inline-flex', alignItems: 'center', gap: '4px'
+                            color: 'white', border: 'none', borderRadius: '8px', 
+                            cursor: 'pointer', fontWeight: 'bold', fontSize: '13.5px',
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                            whiteSpace: 'nowrap', minWidth: '95px'
                           }}
                         >
                           ⚡ {localPatientId === p.id ? 'เลือกอยู่' : 'เข้าคิว'}
@@ -274,29 +294,23 @@ export default function DetailPage({
                   <span className="badge hn-badge">HN: {activePatient.hn}</span>
                 </div>
               </div>
-              <div className="patient-details">
-                เพศ{activePatient.gender}, อายุ {activePatient.age} ปี • วันเกิด: {activePatient.dob} • โทร: {activePatient.phone} • อาชีพ: {activePatient.occupation}
+              <div className="patient-details" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', fontSize: '1.05rem' }}>
+                <span>เพศ {activePatient.gender}</span>
+                <span>อายุ {activePatient.age} ปี</span>
+                <span>วันเกิด: {activePatient.dob}</span>
+                <span>เบอร์โทร: {activePatient.phone}</span>
+                <span>อาชีพ: {activePatient.occupation}</span>
               </div>
             </div>
           </div>
 
           <div className="patient-card-footer">
 
-              <div className="info-box rights-selector-box">
-                <span className="info-label">🛡️ สิทธิการรักษา (CLICK TO CHANGE)</span>
-                <select
-                  className="rights-select-dropdown"
-                  value={currentRights}
-                  onChange={(e) => {
-                    const newRights = e.target.value;
-                    if (onUpdatePatientRights) onUpdatePatientRights(activePatient.id, newRights);
-                    triggerToast(`อัปเดตสิทธิการรักษาของ ${activePatient.name} เป็น "${newRights}" สำเร็จ`, 'success');
-                  }}
-                >
-                  {TREATMENT_RIGHTS_OPTIONS.map((right, idx) => (
-                    <option key={idx} value={right}>{right}</option>
-                  ))}
-                </select>
+              <div className="info-box">
+                <span className="info-label">สิทธิการรักษา (TREATMENT RIGHTS)</span>
+                <span className="info-val" style={{ color: '#60A5FA', fontWeight: 'bold' }}>
+                  {currentRights}
+                </span>
               </div>
               <div className="info-box">
                 <span className="info-label">เวลาเข้ารักษา (VISIT TIME)</span>
@@ -354,89 +368,91 @@ export default function DetailPage({
                 </div>
               )}
 
-              {/* Medication + Stock Combined List */}
+              {/* Medication + Stock Combined List Table */}
               <div className="card" style={{ padding: '20px' }}>
                 <h4 className="column-title" style={{ marginBottom: '16px' }}>
                   รายการยาที่สั่งจ่าย ({activePatient.medications.length} รายการ)
                 </h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {activePatient.medications.map((med, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '14px 16px',
-                        borderRadius: '10px',
-                        border: '1px solid #E2E8F0',
-                        background: '#F8FAFC',
-                      }}
-                    >
-                      {/* MED ID Badge */}
-                      <div style={{ 
-                        flexShrink: 0, width: '80px',
-                        fontSize: '12px', color: '#64748B', fontWeight: '600' 
-                      }}>
-                        {med.medId}
-                      </div>
-
-                      {/* Icon */}
-                      <div className="med-item-icon-box" style={{ flexShrink: 0 }}>
-                        <span className="med-icon-pill">💊</span>
-                      </div>
-
-                      {/* Med details - clickable name */}
-                      <div className="med-item-details" style={{ flex: 1, minWidth: 0 }}>
-                        <h4 
-                          className="med-item-name" 
-                          style={{ marginBottom: '2px', cursor: 'pointer', color: '#2563EB', textDecoration: 'underline dotted' }}
-                          onClick={() => setSelectedMedInfo({ name: med.name, medId: med.medId, properties: med.properties })}
-                          title="คลิกเพื่อดูสรรพคุณยา"
-                        >
-                          {med.name}
-                        </h4>
-                        <div style={{ fontSize: '12px', color: '#94A3B8', marginBottom: '4px' }}>
-                          🔍 คลิกเพื่อดูรายละเอียดสรรพคุณ
-                        </div>
-                        <div className="med-item-dosage">{med.dosage}</div>
-                        <div className="med-item-instructions">คำแนะนำ: {med.instructions}</div>
-                      </div>
-
-                      {/* Stock Status */}
-                      <div
-                        className={`stock-status-card ${med.stockStatus === 'out-stock' ? 'status-card-out' : 'status-card-in'}`}
-                        style={{ flexShrink: 0, minWidth: '160px', margin: 0 }}
-                      >
-                        <div className="status-card-info">
-                          <div className="status-main-text">
-                            {med.stockStatus === 'out-stock' ? 'Out of Stock' : 'In Stock (มีในคลัง)'}
-                          </div>
-                          <div className="status-sub-count">จำนวน: {med.stock}</div>
-                        </div>
-                        <div className="status-card-badge">
-                          {med.stockStatus === 'out-stock' ? (
-                            <div className="alert-badge-red">
-                              <span className="x-circle">✕</span>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                    <thead>
+                      <tr style={{ color: '#64748B', borderBottom: '1px solid #E2E8F0', height: '40px' }}>
+                        <th style={{ padding: '10px 12px', fontWeight: '600' }}>รหัสยา</th>
+                        <th style={{ padding: '10px 12px', fontWeight: '600' }}>ชื่อรายการยา & สรรพคุณ</th>
+                        <th style={{ padding: '10px 12px', fontWeight: '600' }}>ขนาด / วิธีรับประทาน</th>
+                        <th style={{ padding: '10px 12px', fontWeight: '600', textAlign: 'right' }}>ราคา</th>
+                        <th style={{ padding: '10px 12px', fontWeight: '600', textAlign: 'center' }}>สถานะคลังยา</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activePatient.medications.map((med, index) => (
+                        <tr key={index} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                          <td style={{ padding: '12px' }}>
+                            <span className="patient-hn-badge" style={{ background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1' }}>
+                              {med.medId}
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <div 
+                              className="patient-table-name" 
+                              style={{ color: '#2563EB', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                              onClick={() => setSelectedMedInfo({ name: med.name, medId: med.medId, properties: med.properties })}
+                              title="คลิกเพื่อดูรายละเอียดสรรพคุณ"
+                            >
+                              💊 {med.name}
                             </div>
-                          ) : (
-                            <div className="check-circle-green">✓</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                            <div>
+                              <span 
+                                style={{ 
+                                  fontSize: '13px', color: '#0284C7', fontWeight: '600', 
+                                  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '3px' 
+                                }}
+                                onClick={() => setSelectedMedInfo({ name: med.name, medId: med.medId, properties: med.properties })}
+                              >
+                                🔍 คลิกเพื่อดูรายละเอียดสรรพคุณ
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <div style={{ fontWeight: '600', color: '#1E293B' }}>{med.dosage}</div>
+                            <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>คำแนะนำ: {med.instructions}</div>
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', fontSize: '14.5px', color: '#0F172A' }}>
+                            ฿ {med.price.toLocaleString()}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <span 
+                              style={{ 
+                                background: med.stockStatus === 'out-stock' ? '#FEE2E2' : '#DCFCE7', 
+                                color: med.stockStatus === 'out-stock' ? '#991B1B' : '#166534', 
+                                border: `1px solid ${med.stockStatus === 'out-stock' ? '#FCA5A5' : '#86EFAC'}`,
+                                padding: '4px 12px', borderRadius: '12px', fontSize: '12.5px', fontWeight: 'bold',
+                                display: 'inline-flex', alignItems: 'center', gap: '4px'
+                              }}
+                            >
+                              {med.stockStatus === 'out-stock' ? '✕ สต็อกหมด (0)' : `✓ มีในคลัง (${med.stock})`}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
               {/* Action Button: Confirm & Send to Billing */}
               <div className="send-billing-action-bar">
                 <button className="confirm-send-billing-btn" onClick={handleSendToBilling}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                     <polyline points="22 4 12 14.01 9 11.01"/>
                   </svg>
-                  ยืนยันการจ่ายยา & ส่งข้อมูลไปการเงิน (Confirm & Send to Billing)
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: '1.3' }}>
+                    <span style={{ fontSize: '1rem', fontWeight: '800' }}>ยืนยันการจ่ายยา & ส่งข้อมูลไปการเงิน</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: '500', opacity: 0.95 }}>
+                      (Confirm & Send to Billing)
+                    </span>
+                  </div>
                 </button>
               </div>
             </>
@@ -461,6 +477,84 @@ export default function DetailPage({
             {toast.type === 'error' && '✕'}
           </div>
           <div className="toast-message">{toast.message}</div>
+        </div>
+      )}
+
+      {/* Medication Details Modal Popup */}
+      {selectedMedInfo && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}
+          onClick={() => setSelectedMedInfo(null)}
+        >
+          <div 
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '520px',
+              width: '100%',
+              padding: '28px',
+              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
+              border: '1px solid #E2E8F0'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '28px' }}>💊</span>
+                <div>
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748B' }}>{selectedMedInfo.medId}</span>
+                  <h3 style={{ margin: 0, fontSize: '18px', color: '#0F172A', fontWeight: 'bold' }}>{selectedMedInfo.name}</h3>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedMedInfo(null)}
+                style={{
+                  background: '#F1F5F9', border: 'none', borderRadius: '50%',
+                  width: '32px', height: '32px', cursor: 'pointer',
+                  fontWeight: 'bold', color: '#64748B', fontSize: '16px'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ background: '#F0F9FF', padding: '18px 20px', borderRadius: '12px', border: '1.5px solid #BAE6FD', marginBottom: '22px' }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0284C7', fontWeight: '800' }}>
+                📋 สรรพคุณและข้อมูลยา (Medication Properties & Indications):
+              </h4>
+              <p style={{ margin: 0, fontSize: '15px', color: '#0F172A', lineHeight: '1.65', fontWeight: '500' }}>
+                {selectedMedInfo.properties || 'ยารักษาโรคทั่วไปตามคำสั่งแพทย์ ควรรับประทานยาตามวิธีใช้ที่ระบุบนฉลากยาอย่างเคร่งครัด'}
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button 
+                onClick={() => setSelectedMedInfo(null)}
+                style={{
+                  padding: '10px 24px',
+                  background: '#2563EB',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

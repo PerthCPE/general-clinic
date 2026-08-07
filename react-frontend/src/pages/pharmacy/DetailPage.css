@@ -203,8 +203,8 @@ body.dark-mode .detail-page-container .patient-pill {
 
 /* Patient Summary Header */
 .detail-page-container .section-title {
-  font-size: 1.35rem;
-  font-weight: 700;
+  font-size: 1.55rem;
+  font-weight: 800;
   margin: 0 0 16px 0;
   color: #0F172A;
 }
@@ -224,21 +224,21 @@ body.dark-mode .detail-page-container .section-title {
 }
 
 .detail-page-container .patient-card-main {
-  padding: 20px 24px;
+  padding: 22px 26px;
   display: flex;
   align-items: flex-start;
-  gap: 16px;
+  gap: 18px;
 }
 
 .detail-page-container .patient-avatar {
-  width: 54px;
-  height: 54px;
+  width: 58px;
+  height: 58px;
   background: #2A9D8F;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 1.65rem;
   font-weight: 700;
   flex-shrink: 0;
   border: 2px solid rgba(255, 255, 255, 0.3);
@@ -257,8 +257,8 @@ body.dark-mode .detail-page-container .section-title {
 
 .detail-page-container .patient-name {
   margin: 0;
-  font-size: 1.4rem;
-  font-weight: 700;
+  font-size: 1.65rem;
+  font-weight: 800;
 }
 
 .detail-page-container .patient-badges {
@@ -267,10 +267,10 @@ body.dark-mode .detail-page-container .section-title {
 }
 
 .detail-page-container .badge {
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 0.85rem;
+  font-weight: 700;
 }
 
 .detail-page-container .ticket-badge {
@@ -284,38 +284,39 @@ body.dark-mode .detail-page-container .section-title {
 }
 
 .detail-page-container .patient-details {
-  font-size: 1.05rem;
-  font-weight: 500;
+  font-size: 1.15rem;
+  font-weight: 600;
   color: #FFFFFF;
+  margin-top: 4px;
 }
 
 .detail-page-container .patient-card-footer {
   background: rgba(0, 0, 0, 0.22);
-  padding: 18px 24px;
+  padding: 20px 26px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px 16px;
+  gap: 14px 18px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .detail-page-container .info-box {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .detail-page-container .info-label {
   color: #CBD5E1;
-  font-weight: 600;
-  font-size: 0.72rem;
-  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
 }
 
 .detail-page-container .info-val {
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: #FFFFFF;
 }
@@ -401,10 +402,10 @@ body.dark-mode .detail-page-container .doctor-advice-title {
 }
 
 .detail-page-container .doctor-advice-text {
-  font-size: 0.9rem;
+  font-size: 1.05rem;
   color: #1E293B;
   margin: 0;
-  line-height: 1.5;
+  line-height: 1.65;
   font-weight: 500;
 }
 
@@ -422,8 +423,8 @@ body.dark-mode .detail-page-container .doctor-advice-text {
 
 .detail-page-container .column-title {
   margin: 0 0 16px 0;
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 800;
   color: #0F172A;
   border-bottom: 1px solid #E2E8F0;
   padding-bottom: 12px;
@@ -707,5 +708,146 @@ body.dark-mode .detail-page-container .alert-text strong {
 @media (max-width: 900px) {
   .detail-page-container .prescription-dispense-grid {
     grid-template-columns: 1fr;
-  }
 }
+
+.detail-page-container table tr.active-row {
+  background: #EFF6FF !important;
+}
+
+/* ===== Comprehensive Dark Mode Overrides for DetailPage ===== */
+body.dark-mode .detail-page-container .search-card {
+  background: #1E293B !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode .detail-page-container .search-card > div:first-child {
+  background: #1E293B !important;
+  border-bottom-color: #334155 !important;
+}
+
+body.dark-mode .detail-page-container .search-card > div:first-child h3 {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .detail-page-container .search-card > div:first-child p {
+  color: #94A3B8 !important;
+}
+
+body.dark-mode .detail-page-container .search-card > div:nth-child(2) {
+  background: #0F172A !important;
+}
+
+body.dark-mode .detail-page-container .search-card input {
+  background: #1E293B !important;
+  border-color: #334155 !important;
+  color: #F1F5F9 !important;
+}
+
+body.dark-mode .detail-page-container .search-card input::placeholder {
+  color: #64748B !important;
+}
+
+body.dark-mode .detail-page-container table {
+  color: #E2E8F0 !important;
+}
+
+.detail-page-container table th {
+  font-size: 0.92rem !important;
+  font-weight: 700 !important;
+}
+
+body.dark-mode .detail-page-container table th {
+  color: #CBD5E1 !important;
+  border-bottom-color: #334155 !important;
+}
+
+.detail-page-container table td {
+  font-size: 0.95rem;
+}
+
+body.dark-mode .detail-page-container table tr {
+  border-bottom-color: #334155 !important;
+}
+
+body.dark-mode .detail-page-container table tr.active-row {
+  background: #0F172A !important;
+}
+
+body.dark-mode .detail-page-container table td {
+  color: #CBD5E1 !important;
+}
+
+body.dark-mode .detail-page-container .patient-table-name {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .detail-page-container .patient-table-sub {
+  color: #94A3B8 !important;
+}
+
+body.dark-mode .detail-page-container .patient-hn-badge {
+  background: rgba(59, 130, 246, 0.15) !important;
+  color: #60A5FA !important;
+  border-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Patient Summary Card Dark Mode */
+body.dark-mode .detail-page-container .patient-card {
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%) !important;
+  border: 1px solid #334155 !important;
+  box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.4) !important;
+}
+
+body.dark-mode .detail-page-container .patient-card-footer {
+  background: rgba(15, 23, 42, 0.7) !important;
+  border-top-color: #334155 !important;
+}
+
+body.dark-mode .detail-page-container .info-box {
+  background: rgba(30, 41, 59, 0.8) !important;
+  border: 1px solid #334155 !important;
+}
+
+body.dark-mode .detail-page-container .info-label {
+  color: #94A3B8 !important;
+}
+
+body.dark-mode .detail-page-container .info-val {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .detail-page-container .rights-select-dropdown {
+  background: #0F172A !important;
+  color: #60A5FA !important;
+  border-color: #2563EB !important;
+}
+
+body.dark-mode .detail-page-container .rights-select-dropdown option {
+  background: #1E293B !important;
+  color: #F8FAFC !important;
+}
+
+/* Doctor Advice & Medication List Cards */
+body.dark-mode .detail-page-container .doctor-advice-card {
+  background: #1E293B !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode .detail-page-container .doctor-advice-title {
+  color: #60A5FA !important;
+}
+
+body.dark-mode .detail-page-container .doctor-advice-text {
+  color: #CBD5E1 !important;
+}
+
+body.dark-mode .detail-page-container .med-item-card,
+body.dark-mode .detail-page-container .card {
+  background: #1E293B !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode .detail-page-container .column-title {
+  color: #F8FAFC !important;
+}
+

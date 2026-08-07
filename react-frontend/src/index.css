@@ -1,5 +1,5 @@
 /* ===== Global Reset & Base Styles ===== */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Prompt:wght@400;500;600;700&display=swap');
 
 *,
 *::before,
@@ -10,18 +10,25 @@
 }
 
 :root {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Prompt', 'Inter', system-ui, -apple-system, sans-serif;
   font-size: 14px;
   line-height: 1.5;
-  color: #334155;
+  color: #1E293B;
   background: #f8fafc;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  --font-size-base: 0.95rem;
+  --font-size-sm: 0.85rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.08rem;
+  --font-size-xl: 1.25rem;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
 }
 
 a {
@@ -33,3 +40,53 @@ button {
   cursor: pointer;
   font-family: inherit;
 }
+
+button,
+input,
+select,
+textarea,
+label,
+p,
+span,
+div,
+td,
+th,
+li {
+  font-size: inherit;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2;
+}
+
+h1 {
+  font-size: var(--font-size-xl);
+}
+
+h2 {
+  font-size: 1.15rem;
+}
+
+h3 {
+  font-size: 1.05rem;
+}
+
+/* Global Dark Mode Base Overrides */
+body.dark-mode {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+}
+
+body.dark-mode input,
+body.dark-mode textarea,
+body.dark-mode select {
+  background-color: #1E293B;
+  color: #F1F5F9;
+  border-color: #334155;
+}
+
+body.dark-mode input::placeholder,
+body.dark-mode textarea::placeholder {
+  color: #64748B;
+}
+

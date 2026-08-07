@@ -1,0 +1,297 @@
+/* ===== VitalsScreeningPage Modern Scoped CSS ===== */
+.vitals-page-container {
+  padding: 0;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  color: #1E293B;
+  box-sizing: border-box;
+}
+
+body.dark-mode .vitals-page-container {
+  color: #E2E8F0;
+}
+
+.vitals-header {
+  margin-bottom: 24px;
+}
+
+.vitals-title {
+  font-size: 26px;
+  font-weight: 700;
+  color: #0D3B66;
+  margin: 0 0 6px 0;
+  transition: color 0.3s ease;
+}
+
+body.dark-mode .vitals-title {
+  color: #60A5FA;
+}
+
+.vitals-subtitle {
+  font-size: 14px;
+  color: #64748B;
+  margin: 0;
+  transition: color 0.3s ease;
+}
+
+body.dark-mode .vitals-subtitle {
+  color: #94A3B8;
+}
+
+/* Toast Banner */
+.vitals-toast-banner {
+  background: #DCFCE7;
+  color: #166534;
+  border: 1px solid #86EFAC;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  animation: slideInDown 0.3s ease;
+}
+
+body.dark-mode .vitals-toast-banner {
+  background: #064E3B;
+  color: #A7F3D0;
+  border-color: #059669;
+}
+
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Form Container Card */
+.vitals-form-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 32px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+body.dark-mode .vitals-form-card {
+  background: #1E293B;
+  border-color: #334155;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.3);
+}
+
+/* Form Sections */
+.vitals-page-container .form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #F1F5F9;
+}
+
+body.dark-mode .vitals-page-container .form-section {
+  border-bottom-color: #334155;
+}
+
+.vitals-page-container .form-section:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.vitals-page-container .section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vitals-page-container .step-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  flex-shrink: 0;
+}
+
+.vitals-page-container .section-header h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #10B981;
+  margin: 0;
+}
+
+body.dark-mode .vitals-page-container .section-header h2 {
+  color: #34D399;
+}
+
+/* Form Grids */
+.vitals-page-container .form-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.vitals-page-container .grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.vitals-page-container .grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 850px) {
+  .vitals-page-container .grid-3,
+  .vitals-page-container .grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Input Fields */
+.vitals-page-container .input-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vitals-page-container .input-field-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.vitals-page-container .input-field-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+body.dark-mode .vitals-page-container .input-field-group label {
+  color: #CBD5E1;
+}
+
+.vitals-page-container .req {
+  color: #EF4444;
+  font-weight: 700;
+}
+
+.vitals-page-container .input-with-unit {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.vitals-page-container input[type="text"],
+.vitals-page-container textarea,
+.vitals-page-container select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #CBD5E1;
+  background: #FFFFFF;
+  font-size: 14px;
+  font-family: inherit;
+  color: #1E293B;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.vitals-page-container .input-with-unit input {
+  padding-right: 70px;
+}
+
+.vitals-page-container .unit-label {
+  position: absolute;
+  right: 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #94A3B8;
+  pointer-events: none;
+}
+
+.vitals-page-container input:focus,
+.vitals-page-container textarea:focus,
+.vitals-page-container select:focus {
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+/* Dark Mode Inputs */
+body.dark-mode .vitals-page-container input[type="text"],
+body.dark-mode .vitals-page-container textarea,
+body.dark-mode .vitals-page-container select {
+  background: #0F172A;
+  border-color: #334155;
+  color: #F1F5F9;
+}
+
+body.dark-mode .vitals-page-container .unit-label {
+  color: #64748B;
+}
+
+body.dark-mode .vitals-page-container input:focus,
+body.dark-mode .vitals-page-container textarea:focus,
+body.dark-mode .vitals-page-container select:focus {
+  border-color: #34D399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
+}
+
+/* Action Bar Buttons */
+.vitals-action-bar {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.save-forward-btn {
+  flex: 1;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  transition: transform 0.15s ease, background-color 0.2s ease;
+}
+
+.save-forward-btn:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-1px);
+}
+
+.reset-form-btn {
+  padding: 12px 24px;
+  background: #F1F5F9;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reset-form-btn:hover {
+  background: #E2E8F0;
+  color: #1E293B;
+}
+
+body.dark-mode .reset-form-btn {
+  background: #334155;
+  color: #CBD5E1;
+  border-color: #475569;
+}
+
+body.dark-mode .reset-form-btn:hover {
+  background: #475569;
+  color: #FFFFFF;
+}

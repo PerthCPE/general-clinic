@@ -15,6 +15,7 @@ export interface PatientConfig {
   phone: string;
   occupation: string;
   treatmentRights: string;
+  patientType: 'ผู้ป่วยนอก (OPD)' | 'ผู้ป่วยใน (IPD)';
   allergies: string[];
   chronicDiseases: string;
   vitals: string;
@@ -64,8 +65,8 @@ export const CLINIC_CONFIG = {
   // ข้อมูลผู้ป่วยตัวอย่าง 2 คนที่ค้นหาได้ในระบบ
   patients: [
     {
-      id: 'B6741990',
-      hn: 'B6741990',
+      id: 'HN-2023-045',
+      hn: 'HN-2023-045',
       nationalId: '1101800234567',
       queueNumber: '001',
       ticket: 'Ticket: 4931',
@@ -77,6 +78,7 @@ export const CLINIC_CONFIG = {
       phone: '081-234-5678',
       occupation: 'วิศวกรซอฟต์แวร์',
       treatmentRights: 'สิทธิ 30 บาท',
+      patientType: 'ผู้ป่วยนอก (OPD)',
       allergies: ['เพนิซิลลิน (Penicillin)'],
       chronicDiseases: 'โรคความดันโลหิตสูง',
       vitals: 'ความดัน 120/80 | ชีพจร 78',
@@ -118,8 +120,8 @@ export const CLINIC_CONFIG = {
       ]
     },
     {
-      id: 'B6741991',
-      hn: 'B6741991',
+      id: 'HN-2023-112',
+      hn: 'HN-2023-112',
       nationalId: '1101800234568',
       queueNumber: '002',
       ticket: 'Ticket: 4932',
@@ -131,6 +133,7 @@ export const CLINIC_CONFIG = {
       phone: '089-987-6543',
       occupation: 'ผู้จัดการฝ่ายการตลาด',
       treatmentRights: 'ประกันสุขภาพเอกชน',
+      patientType: 'ผู้ป่วยใน (IPD)',
       allergies: ['แอสไพริน (Aspirin)'],
       chronicDiseases: 'โรคหอบหืด',
       vitals: 'ความดัน 118/75 | ชีพจร 72',

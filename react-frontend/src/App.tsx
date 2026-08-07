@@ -12,6 +12,7 @@ import PatientHistoryPage from './pages/pharmacy/PatientHistoryPage';
 import BillingDashboardPage from './pages/billing/BillingDashboardPage';
 import BillingDispensePage from './pages/billing/BillingDispensePage';
 import BillingInvoicePage from './pages/billing/BillingInvoicePage';
+import VitalsScreeningPage from './pages/nurse/VitalsScreeningPage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
 import './App.css';
 
@@ -25,6 +26,7 @@ function MainApp() {
     return localStorage.getItem('activePage') || 'registration';
   });
 
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('HN-2023-045');
   const [patientRightsMap, setPatientRightsMap] = useState<Record<string, string>>({});
   const handleUpdatePatientRights = (patientId: string, rights: string) => {
     setPatientRightsMap(prev => ({ ...prev, [patientId]: rights }));
@@ -100,21 +102,7 @@ function MainApp() {
 
       // ===== Nurse Pages =====
       case 'vitals':
-        return (
-          <PageShowcase
-            roleBadge="Nurse"
-            roleBadgeColor="#10B981"
-            title="บันทึกสัญญาณชีพ & คัดกรอง (Vitals & Triage)"
-            subtitle="บันทึกค่าความดันโลหิต อุณหภูมิ ชีพจร อัตราการหายใจ และอาการสำคัญ"
-            description="ฟอร์มบันทึกสัญญาณชีพและคัดกรองอาการเบื้องต้นเพื่อประเมินความเร่งด่วนก่อนส่งพบแพทย์"
-            features={[
-              'บันทึกค่าความดัน (BP), ชีพจร (PR), อุณหภูมิ (Temp), น้ำหนัก, ส่วนสูง, BMI',
-              'ประเมินระดับความรุนแรงและฉุกเฉิน (Triage Classification)',
-              'บันทึกอาการสำคัญ (Chief Complaint) และประวัติแพ้ยา',
-              'ส่งต่อไปยังคิวห้องตรวจแพทย์ที่พร้อมให้บริการ',
-            ]}
-          />
-        );
+        return <VitalsScreeningPage />;
 
       case 'vitals-history':
         return (
@@ -135,6 +123,8 @@ function MainApp() {
       // ===== Pharmacist Pages =====
       case 'pharmacy-dispense':
         return <DetailPage 
+          selectedPatientId={selectedPatientId}
+          onSelectPatientId={setSelectedPatientId}
           patientRightsMap={patientRightsMap}
           onUpdatePatientRights={handleUpdatePatientRights}
         />;
@@ -146,11 +136,16 @@ function MainApp() {
       // ===== Cashier Pages =====
       case 'billing-dispense':
         return <BillingDispensePage 
+          selectedPatientId={selectedPatientId}
+          onSelectPatientId={setSelectedPatientId}
           patientRightsMap={patientRightsMap}
           onUpdatePatientRights={handleUpdatePatientRights}
+          onNavigateToBilling={() => setActivePage('billing-invoice')}
         />;
       case 'billing-invoice':
         return <BillingInvoicePage 
+          selectedPatientId={selectedPatientId}
+          onSelectPatientId={setSelectedPatientId}
           patientRightsMap={patientRightsMap}
           onUpdatePatientRights={handleUpdatePatientRights}
         />;

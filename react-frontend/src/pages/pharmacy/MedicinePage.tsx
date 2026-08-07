@@ -289,13 +289,13 @@ export default function MedicinePage() {
                   className={`mode-btn ${updateMode === 'add' ? 'active-add' : ''}`}
                   onClick={() => setUpdateMode('add')}
                 >
-                  + เพิ่มสต็อกยา (รับเข้า)
+                  + เพิ่มสต็อก (รับเข้า)
                 </button>
                 <button
                   className={`mode-btn ${updateMode === 'reduce' ? 'active-reduce' : ''}`}
                   onClick={() => setUpdateMode('reduce')}
                 >
-                  - ลดสต็อกยา (จำหน่ายออก/เบิก)
+                  - ลดสต็อก (จ่าย/เบิก)
                 </button>
               </div>
 
@@ -309,6 +309,17 @@ export default function MedicinePage() {
                   onChange={(e) => setQuantity(e.target.value === '' ? '' : Number(e.target.value))}
                 />
               </div>
+
+              {quantity !== '' && Number(quantity) > 0 && !isReduceInvalid && (
+                <div style={{ marginTop: '12px', fontSize: '13.5px', background: 'var(--preview-bg, #F8FAFC)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--preview-border, #E2E8F0)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--preview-text, #475569)' }}>ยอดคงเหลือใหม่หลังปรับปรุง:</span>
+                    <strong style={{ color: updateMode === 'add' ? '#166534' : '#B45309', fontSize: '16px' }}>
+                      {updateMode === 'add' ? selectedMedicine.stock + Number(quantity) : selectedMedicine.stock - Number(quantity)} เม็ด
+                    </strong>
+                  </div>
+                </div>
+              )}
 
               {isReduceInvalid && (
                 <p className="error-text">
