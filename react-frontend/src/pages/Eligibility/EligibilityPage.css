@@ -1,0 +1,1670 @@
+/* ================================================================
+   ===== MODERN MEDICAL ELIGIBILITY CHECK PAGE STYLES =====
+   ================================================================ */
+
+.eligibility-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 20px 0 36px;
+}
+
+/* ===== Toast Notification ===== */
+.eligibility-toast {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  background: #10B981;
+  color: #FFFFFF;
+  padding: 14px 22px;
+  border-radius: 12px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(16, 185, 129, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 2000;
+  animation: toastSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.toast-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+@keyframes toastSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Page Header ===== */
+.eligibility-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.eligibility-title {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 34px;
+  color: #0F172A;
+  margin: 0 0 4px 0;
+  letter-spacing: -0.3px;
+  transition: color 0.5s ease;
+}
+
+.eligibility-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: #64748B;
+  margin: 0;
+  transition: color 0.5s ease;
+}
+
+/* ================================================================
+   ===== 1. STATS GRID (MATCHING QUEUE DASHBOARD) =====
+   ================================================================ */
+
+.eligibility-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+}
+
+.stat-card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 16px 18px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  border-color: #CBD5E1;
+}
+
+.stat-card.active {
+  border-color: #2563EB;
+  background: #F8FAFC;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.stat-value {
+  font-family: 'Inter', sans-serif;
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 32px;
+  color: #0F172A;
+  transition: color 0.5s ease;
+}
+
+.stat-label {
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 12.5px;
+  color: #64748B;
+  transition: color 0.5s ease;
+}
+
+/* Accent borders for specific cards */
+.stat-card.stat-gold.active {
+  border-color: #F59E0B;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+.stat-card.stat-gold .stat-value {
+  color: #D97706;
+}
+
+.stat-card.stat-social.active {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+.stat-card.stat-social .stat-value {
+  color: #2563EB;
+}
+
+.stat-card.stat-gov.active {
+  border-color: #9333EA;
+  box-shadow: 0 0 0 2px rgba(147, 51, 234, 0.2);
+}
+.stat-card.stat-gov .stat-value {
+  color: #7E22CE;
+}
+
+.stat-card.stat-other.active {
+  border-color: #059669;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+}
+.stat-card.stat-other .stat-value {
+  color: #059669;
+}
+
+/* ================================================================
+   ===== 2. MAIN VERIFICATION CARD =====
+   ================================================================ */
+
+.eligibility-main-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+  transition: background-color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+}
+
+.main-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+  border-bottom: 1px solid #F1F5F9;
+  background: #FAFAFC;
+  transition: background-color 0.15s ease, border-color 0.5s ease;
+}
+
+.clickable-header {
+  cursor: pointer;
+  user-select: none;
+}
+
+.clickable-header:hover {
+  background-color: #F1F5F9;
+}
+
+.header-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-header-icon-box {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.card-header-icon-box.blue-box {
+  background: #EFF6FF;
+  color: #2563EB;
+}
+
+.card-header-icon-box.purple-box {
+  background: #FAF5FF;
+  color: #7E22CE;
+}
+
+.card-header-icon-box svg {
+  width: 20px;
+  height: 20px;
+}
+
+.main-card-title {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 16.5px;
+  line-height: 22px;
+  color: #0F172A;
+  margin: 0;
+  transition: color 0.5s ease;
+}
+
+.main-card-subtitle,
+.table-card-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-weight: 400;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: #64748B;
+  margin: 2px 0 0 0;
+  transition: color 0.5s ease;
+}
+
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-accordion-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  padding: 4px;
+  color: #64748B;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1), color 0.2s ease;
+}
+
+.card-accordion-toggle:hover {
+  background: transparent;
+  color: #0F172A;
+}
+
+.card-accordion-toggle.open {
+  transform: rotate(180deg);
+}
+
+.card-accordion-toggle svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.online-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #059669;
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  padding: 3px 10px;
+  border-radius: 9999px;
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  background: #10B981;
+  border-radius: 50%;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+  animation: pulseDot 2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.6; }
+}
+
+.main-card-body {
+  padding: 24px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Search Section */
+.eligibility-search-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.search-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: #0F172A;
+  transition: color 0.5s ease;
+}
+
+.label-sub-tip {
+  font-weight: 400;
+  font-size: 12px;
+  color: #64748B;
+}
+
+.search-input-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-input-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon-inside {
+  position: absolute;
+  left: 14px;
+  width: 18px;
+  height: 18px;
+  color: #94A3B8;
+  pointer-events: none;
+}
+
+.eligibility-input {
+  width: 100%;
+  height: 46px;
+  padding: 0 36px 0 42px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #1E293B;
+  background: #FFFFFF;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.eligibility-input::placeholder {
+  color: #94A3B8;
+}
+
+.eligibility-input:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.12);
+  background: #FFFFFF;
+}
+
+.btn-clear-input {
+  position: absolute;
+  right: 12px;
+  border: none;
+  background: transparent;
+  color: #94A3B8;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.btn-clear-input:hover {
+  color: #475569;
+}
+
+.btn-submit-check {
+  height: 46px;
+  padding: 0 26px;
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+  box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s ease;
+}
+
+.btn-submit-check .btn-check-icon {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-submit-check:hover:not(:disabled) {
+  background: #1D4ED8;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-submit-check:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-submit-check:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* Quick Demo Chips */
+.quick-test-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.chips-title {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #64748B;
+}
+
+.chip-badge {
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: 'Inter', monospace, sans-serif;
+  font-size: 12px;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chip-badge:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+  border-color: #CBD5E1;
+}
+
+.error-message-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #EF4444;
+  margin: 2px 0 0 0;
+}
+
+/* ===== Verification Result Container ===== */
+.verification-result-container {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  animation: resultSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes resultSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Alert Header Banner */
+.result-banner-header {
+  background: #E6F4EA;
+  border: 1px solid #A8DAB5;
+  border-radius: 10px;
+  padding: 12px 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.banner-badge-icon {
+  width: 28px;
+  height: 28px;
+  background: #15803D;
+  color: #FFFFFF;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(21, 128, 61, 0.25);
+}
+
+.banner-badge-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.banner-text-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.banner-heading {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #166534;
+}
+
+.banner-subheading {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #15803D;
+}
+
+.banner-status-tag {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #15803D;
+  background: #DCFCE7;
+  border: 1px solid #86EFAC;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  white-space: nowrap;
+}
+
+/* Result Info Grid */
+.result-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 24px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 18px 22px;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-item.full-width-item {
+  grid-column: span 2;
+}
+
+.info-field-label {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: #64748B;
+  transition: color 0.5s ease;
+}
+
+.info-field-value {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: #1E293B;
+  line-height: 20px;
+  transition: color 0.5s ease;
+}
+
+.font-bold-patient {
+  font-weight: 700;
+  font-size: 15px;
+  color: #0F172A;
+}
+
+.font-id-mono {
+  font-family: monospace;
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.coverage-highlight {
+  color: #334155;
+  line-height: 22px;
+}
+
+.verified-time-text {
+  color: #475569;
+}
+
+/* Scheme Pill Badges */
+.scheme-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+.badge-scheme-gold {
+  background: #FEF3C7;
+  color: #92400E;
+  border: 1px solid #FDE68A;
+}
+
+.badge-scheme-social {
+  background: #EFF6FF;
+  color: #1E40AF;
+  border: 1px solid #BFDBFE;
+}
+
+.badge-scheme-gov {
+  background: #FAF5FF;
+  color: #6B21A8;
+  border: 1px solid #E9D5FF;
+}
+
+.badge-scheme-private {
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1px solid #A7F3D0;
+}
+
+/* Action Footer */
+.result-action-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-confirm-save-action {
+  flex: 2;
+  height: 46px;
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 14.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  transition: all 0.2s ease;
+}
+
+.btn-confirm-save-action .btn-icon-svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-confirm-save-action:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-confirm-save-action:active {
+  transform: scale(0.98);
+}
+
+.btn-cancel-clear-action {
+  flex: 1;
+  height: 46px;
+  background: #64748B;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-cancel-clear-action:hover {
+  background: #475569;
+}
+
+.btn-cancel-clear-action:active {
+  transform: scale(0.98);
+}
+
+/* Empty Placeholder */
+.result-empty-placeholder {
+  padding: 36px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: #F8FAFC;
+  border: 1.5px dashed #CBD5E1;
+  border-radius: 12px;
+  text-align: center;
+}
+
+.empty-shield-icon {
+  width: 40px;
+  height: 40px;
+  color: #94A3B8;
+  margin-bottom: 4px;
+}
+
+.empty-main-text {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 14.5px;
+  color: #334155;
+  margin: 0;
+}
+
+.empty-sub-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #64748B;
+  margin: 0;
+}
+
+/* ================================================================
+   ===== 3. ELIGIBILITY HISTORY TABLE CARD =====
+   ================================================================ */
+
+.eligibility-table-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: background-color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+}
+
+.table-controls-header {
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #F1F5F9;
+  gap: 16px;
+  flex-wrap: wrap;
+  transition: border-color 0.5s ease;
+}
+
+.header-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-card-title {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 16.5px;
+  line-height: 24px;
+  color: #0F172A;
+  margin: 0;
+  transition: color 0.5s ease;
+}
+
+.history-count-pill {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563EB;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  padding: 2px 10px;
+  border-radius: 9999px;
+}
+
+.table-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* Search Input */
+.history-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 240px;
+}
+
+.table-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: #94A3B8;
+  pointer-events: none;
+}
+
+.history-search-input {
+  width: 100%;
+  height: 38px;
+  padding: 0 28px 0 36px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #1E293B;
+  background: #FFFFFF;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.history-search-input:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.clear-filter-btn {
+  position: absolute;
+  right: 8px;
+  border: none;
+  background: transparent;
+  color: #94A3B8;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.scheme-dropdown-filter {
+  height: 38px;
+  padding: 0 12px;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #334155;
+  background: #FFFFFF;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scheme-dropdown-filter:focus {
+  border-color: #2563EB;
+}
+
+/* Table */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.modern-eligibility-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.modern-eligibility-table thead th {
+  background: #F8FAFC;
+  padding: 13px 18px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 18px;
+  color: #475569;
+  border-bottom: 1px solid #E2E8F0;
+  white-space: nowrap;
+  transition: background-color 0.5s ease, color 0.5s ease, border-color 0.5s ease;
+}
+
+.col-date { width: 14%; white-space: nowrap; }
+.col-patient { width: 22%; }
+.col-scheme { width: 18%; white-space: nowrap; }
+.col-coverage { width: 24%; }
+.col-status { width: 10%; text-align: center; white-space: nowrap; }
+.col-action { width: 12%; text-align: center; white-space: nowrap; }
+
+.modern-eligibility-table thead th.col-status,
+.modern-eligibility-table thead th.col-action {
+  text-align: center;
+}
+
+.eligibility-table-row {
+  border-bottom: 1px solid #F1F5F9;
+  transition: background-color 0.15s ease;
+}
+
+.eligibility-table-row:hover {
+  background-color: #F8FAFC;
+}
+
+.eligibility-table-row td {
+  padding: 12px 18px;
+  vertical-align: middle;
+  transition: border-color 0.5s ease;
+}
+
+.eligibility-table-row td.col-status,
+.eligibility-table-row td.col-action {
+  text-align: center;
+}
+
+.table-date-badge {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  transition: color 0.5s ease;
+}
+
+.table-patient-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.patient-name-bold {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 13.5px;
+  color: #0F172A;
+  transition: color 0.5s ease;
+}
+
+.patient-id-sub {
+  font-family: monospace;
+  font-size: 12px;
+  color: #64748B;
+  transition: color 0.5s ease;
+}
+
+.coverage-cell-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.coverage-cell-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #334155;
+  line-height: 18px;
+  transition: color 0.5s ease;
+}
+
+.coverage-hospital-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: 11.5px;
+  color: #64748B;
+  transition: color 0.5s ease;
+}
+
+/* Status Active Pill */
+.status-pill-active {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  background: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #86EFAC;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Details Action Button */
+.btn-view-details {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: #F1F5F9;
+  color: #334155;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 16px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-view-details span {
+  white-space: nowrap;
+}
+
+.btn-view-details .view-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.btn-view-details:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+  border-color: #CBD5E1;
+}
+
+.btn-view-details:active {
+  transform: scale(0.97);
+}
+
+/* Empty Table State */
+.empty-table-cell {
+  text-align: center;
+  padding: 36px 20px !important;
+}
+
+.empty-state-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #94A3B8;
+}
+
+.empty-state-wrap svg {
+  width: 32px;
+  height: 32px;
+}
+
+.empty-state-wrap p {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+}
+
+/* Pagination Footer (Matching Queue Management) */
+.table-pagination-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-top: 1px solid #F1F5F9;
+  background: #FAFAFC;
+  transition: background-color 0.5s ease, border-color 0.5s ease;
+}
+
+.pagination-info {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #64748B;
+  transition: color 0.5s ease;
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pagination-btn {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  border-radius: 6px;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: #F1F5F9;
+  border-color: #CBD5E1;
+}
+
+.pagination-btn.active {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+  font-weight: 600;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ================================================================
+   ===== 4. MODAL DIALOG =====
+   ================================================================ */
+
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: modalFade 0.2s ease;
+}
+
+.modal-content {
+  background: #FFFFFF;
+  border-radius: 14px;
+  width: 90%;
+  max-width: 520px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  animation: modalSlide 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlide {
+  from { transform: scale(0.95) translateY(10px); }
+  to { transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid #F1F5F9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal-title {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 16.5px;
+  color: #0F172A;
+  margin: 0;
+}
+
+.modal-subtitle {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: #64748B;
+  margin: 2px 0 0 0;
+}
+
+.modal-close-btn {
+  border: none;
+  background: transparent;
+  color: #94A3B8;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.modal-close-btn:hover {
+  color: #0F172A;
+}
+
+.modal-body {
+  padding: 22px 24px;
+}
+
+.modal-detail-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+
+.modal-detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 13.5px;
+}
+
+.modal-label {
+  color: #64748B;
+  font-weight: 500;
+}
+
+.modal-val {
+  color: #0F172A;
+  font-weight: 600;
+}
+
+.modal-footer {
+  padding: 14px 24px;
+  border-top: 1px solid #F1F5F9;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modal-btn-close {
+  height: 38px;
+  padding: 0 20px;
+  background: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.modal-btn-close:hover {
+  background: #1D4ED8;
+}
+
+/* ================================================================
+   ===== 5. DARK MODE STYLES (HARMONIZED WITH QUEUE MANAGEMENT) =====
+   ================================================================ */
+
+body.dark-mode .eligibility-title {
+  color: #FFFFFF;
+}
+
+body.dark-mode .eligibility-subtitle {
+  color: #94A3B8;
+}
+
+/* Stat Cards in Dark Mode */
+body.dark-mode .stat-card {
+  background: #212836;
+  border: 1px solid #333F53;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+body.dark-mode .stat-card:hover {
+  background: #283143;
+  border-color: #4B5563;
+}
+
+body.dark-mode .stat-card.active {
+  background: #2A364A;
+  border-color: #60A5FA;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25);
+}
+
+body.dark-mode .stat-value {
+  color: #FFFFFF;
+}
+
+body.dark-mode .stat-label {
+  color: #94A3B8;
+}
+
+body.dark-mode .stat-card.stat-gold .stat-value {
+  color: #FBBF24;
+}
+
+body.dark-mode .stat-card.stat-social .stat-value {
+  color: #60A5FA;
+}
+
+body.dark-mode .stat-card.stat-gov .stat-value {
+  color: #C084FC;
+}
+
+body.dark-mode .stat-card.stat-other .stat-value {
+  color: #34D399;
+}
+
+/* Main Card in Dark Mode */
+body.dark-mode .eligibility-main-card {
+  background: #212836;
+  border: 1px solid #333F53;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+body.dark-mode .main-card-header {
+  background: #1C2230;
+  border-bottom: 1px solid #2F3B4E;
+}
+
+body.dark-mode .clickable-header:hover {
+  background-color: #262F40;
+}
+
+body.dark-mode .main-card-title {
+  color: #FFFFFF;
+}
+
+body.dark-mode .main-card-subtitle,
+body.dark-mode .table-card-subtitle {
+  color: #94A3B8;
+}
+
+body.dark-mode .card-header-icon-box.blue-box {
+  background: rgba(37, 99, 235, 0.2);
+  color: #60A5FA;
+}
+
+body.dark-mode .card-header-icon-box.purple-box {
+  background: rgba(126, 34, 206, 0.2);
+  color: #C084FC;
+}
+
+body.dark-mode .card-accordion-toggle {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+}
+
+body.dark-mode .card-accordion-toggle:hover {
+  background: transparent;
+  color: #FFFFFF;
+}
+
+body.dark-mode .search-label {
+  color: #FFFFFF;
+}
+
+body.dark-mode .label-sub-tip {
+  color: #94A3B8;
+}
+
+body.dark-mode .eligibility-input {
+  background: #171C26;
+  border: 1.5px solid #3B485E;
+  color: #FFFFFF;
+}
+
+body.dark-mode .eligibility-input::placeholder {
+  color: #94A3B8;
+}
+
+body.dark-mode .eligibility-input:focus {
+  background: #1C2230;
+  border-color: #60A5FA;
+  box-shadow: 0 0 0 3.5px rgba(96, 165, 250, 0.2);
+}
+
+body.dark-mode .chip-badge {
+  background: #171C26;
+  border-color: #3B485E;
+  color: #CBD5E1;
+}
+
+body.dark-mode .chip-badge:hover {
+  background: #283143;
+  color: #FFFFFF;
+  border-color: #4B5563;
+}
+
+body.dark-mode .chips-title {
+  color: #94A3B8;
+}
+
+/* Alert Banner in Dark Mode */
+body.dark-mode .result-banner-header {
+  background: rgba(16, 185, 129, 0.16);
+  border: 1.5px solid rgba(52, 211, 153, 0.4);
+}
+
+body.dark-mode .banner-heading {
+  color: #34D399;
+}
+
+body.dark-mode .banner-subheading {
+  color: #A7F3D0;
+}
+
+body.dark-mode .banner-status-tag {
+  background: rgba(16, 185, 129, 0.3);
+  color: #4ADE80;
+  border-color: rgba(74, 222, 128, 0.4);
+}
+
+/* Result Info Grid in Dark Mode */
+body.dark-mode .result-info-grid {
+  background: #191E29;
+  border: 1px solid #2E3A4D;
+}
+
+body.dark-mode .info-field-label {
+  color: #94A3B8;
+}
+
+body.dark-mode .info-field-value {
+  color: #E2E8F0;
+}
+
+body.dark-mode .font-bold-patient {
+  color: #FFFFFF;
+}
+
+body.dark-mode .coverage-highlight {
+  color: #CBD5E1;
+}
+
+body.dark-mode .verified-time-text {
+  color: #94A3B8;
+}
+
+/* Dark Mode Scheme Badges */
+body.dark-mode .badge-scheme-gold {
+  background: rgba(245, 158, 11, 0.2);
+  color: #FBBF24;
+  border: 1.5px solid rgba(251, 191, 36, 0.45);
+}
+
+body.dark-mode .badge-scheme-social {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60A5FA;
+  border: 1.5px solid rgba(96, 165, 250, 0.45);
+}
+
+body.dark-mode .badge-scheme-gov {
+  background: rgba(168, 85, 247, 0.2);
+  color: #C084FC;
+  border: 1.5px solid rgba(192, 132, 252, 0.45);
+}
+
+body.dark-mode .badge-scheme-private {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ADE80;
+  border: 1.5px solid rgba(74, 222, 128, 0.45);
+}
+
+/* Action Buttons in Dark Mode */
+body.dark-mode .btn-confirm-save-action {
+  background: linear-gradient(135deg, #10B981, #059669);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
+}
+
+body.dark-mode .btn-confirm-save-action:hover {
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+}
+
+body.dark-mode .btn-cancel-clear-action {
+  background: #333F53;
+  color: #E2E8F0;
+}
+
+body.dark-mode .btn-cancel-clear-action:hover {
+  background: #3E4D64;
+  color: #FFFFFF;
+}
+
+body.dark-mode .result-empty-placeholder {
+  background: #191E29;
+  border-color: #333F53;
+}
+
+body.dark-mode .empty-main-text {
+  color: #E2E8F0;
+}
+
+body.dark-mode .empty-sub-text {
+  color: #94A3B8;
+}
+
+/* History Table in Dark Mode */
+body.dark-mode .eligibility-table-card {
+  background: #212836;
+  border: 1px solid #333F53;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+body.dark-mode .table-controls-header {
+  border-bottom-color: #2F3B4E;
+}
+
+body.dark-mode .table-card-title {
+  color: #FFFFFF;
+}
+
+body.dark-mode .history-count-pill {
+  background: #1E2D4A;
+  color: #60A5FA;
+  border-color: #2B426B;
+}
+
+body.dark-mode .history-search-input {
+  background: #171C26;
+  border-color: #3B485E;
+  color: #FFFFFF;
+}
+
+body.dark-mode .history-search-input:focus {
+  background: #1C2230;
+  border-color: #60A5FA;
+}
+
+body.dark-mode .scheme-dropdown-filter {
+  background: #171C26;
+  border-color: #3B485E;
+  color: #E2E8F0;
+}
+
+body.dark-mode .modern-eligibility-table thead th {
+  background: #191E29;
+  color: #E2E8F0;
+  border-bottom: 1.5px solid #333F53;
+}
+
+body.dark-mode .eligibility-table-row {
+  background: #212836;
+  border-bottom-color: #2B3546;
+}
+
+body.dark-mode .eligibility-table-row:hover {
+  background: #2A3345;
+}
+
+body.dark-mode .table-date-badge {
+  color: #E2E8F0;
+}
+
+body.dark-mode .patient-name-bold {
+  color: #FFFFFF;
+}
+
+body.dark-mode .patient-id-sub {
+  color: #94A3B8;
+}
+
+body.dark-mode .coverage-cell-text {
+  color: #CBD5E1;
+}
+
+body.dark-mode .coverage-hospital-sub {
+  color: #94A3B8;
+}
+
+body.dark-mode .status-pill-active {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ADE80;
+  border: 1.5px solid rgba(74, 222, 128, 0.45);
+}
+
+body.dark-mode .btn-view-details {
+  background: #283143;
+  border-color: #3E4D64;
+  color: #E2E8F0;
+}
+
+body.dark-mode .btn-view-details:hover {
+  background: #333F53;
+  color: #FFFFFF;
+}
+
+body.dark-mode .table-pagination-footer {
+  background: #1C2230;
+  border-top-color: #2F3B4E;
+}
+
+body.dark-mode .pagination-info {
+  color: #94A3B8;
+}
+
+body.dark-mode .pagination-btn {
+  background: #212836;
+  border-color: #333F53;
+  color: #CBD5E1;
+}
+
+body.dark-mode .pagination-btn:hover:not(:disabled) {
+  background: #2A3345;
+  color: #FFFFFF;
+}
+
+body.dark-mode .pagination-btn.active {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+/* Modal in Dark Mode */
+body.dark-mode .modal-content {
+  background: #212836;
+  border: 1px solid #333F53;
+}
+
+body.dark-mode .modal-header {
+  border-bottom-color: #2F3B4E;
+}
+
+body.dark-mode .modal-title {
+  color: #FFFFFF;
+}
+
+body.dark-mode .modal-subtitle {
+  color: #94A3B8;
+}
+
+body.dark-mode .modal-close-btn {
+  color: #94A3B8;
+}
+
+body.dark-mode .modal-close-btn:hover {
+  color: #FFFFFF;
+}
+
+body.dark-mode .modal-detail-card {
+  background: #191E29;
+  border-color: #2E3A4D;
+}
+
+body.dark-mode .modal-label {
+  color: #94A3B8;
+}
+
+body.dark-mode .modal-val {
+  color: #FFFFFF;
+}
+
+body.dark-mode .modal-footer {
+  border-top-color: #2F3B4E;
+}
+
+body.dark-mode .online-status-badge {
+  color: #4ADE80;
+  background: rgba(16, 185, 129, 0.3);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}

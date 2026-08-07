@@ -5,6 +5,11 @@ import Topbar from './components/Topbar/Topbar';
 
 import LoginPage from './pages/Login/LoginPage';
 import UnauthorizedPage from './pages/Unauthorized/UnauthorizedPage';
+import { VitalsPage } from './pages/Vitals/VitalsPage';
+import { ScreeningHistoryPage } from './pages/ScreeningHistory/ScreeningHistoryPage';
+import RegistrationPage from './pages/Registration/RegistrationPage';
+import QueuePage from './pages/Queue/QueuePage';
+import EligibilityPage from './pages/Eligibility/EligibilityPage';
 import PageShowcase from './pages/Common/PageShowcase';
 import DetailPage from './pages/pharmacy/DetailPage';
 import MedicinePage from './pages/pharmacy/MedicinePage';
@@ -92,33 +97,20 @@ function MainApp() {
     switch (activePage) {
       // ===== Shared & Registrar Pages =====
       case 'registration':
-        return <PageShowcase roleBadge="Registrar" roleBadgeColor="#2563EB" title="ลงทะเบียนผู้ป่วย" subtitle="กำลังพัฒนาระบบ..." description="หน้าจอนี้ยังไม่เปิดใช้งาน" features={[]} />;
+        return <RegistrationPage />;
 
       case 'queue':
-        return <PageShowcase roleBadge="Registrar" roleBadgeColor="#2563EB" title="จัดการคิว" subtitle="กำลังพัฒนาระบบ..." description="หน้าจอนี้ยังไม่เปิดใช้งาน" features={[]} />;
+        return <QueuePage />;
 
       case 'eligibility':
-        return <PageShowcase roleBadge="Registrar" roleBadgeColor="#2563EB" title="ตรวจสอบสิทธิ์การรักษา" subtitle="กำลังพัฒนาระบบ..." description="หน้าจอนี้ยังไม่เปิดใช้งาน" features={[]} />;
+        return <EligibilityPage />;
 
       // ===== Nurse Pages =====
       case 'vitals':
-        return <VitalsScreeningPage />;
+        return <VitalsPage />;
 
       case 'vitals-history':
-        return (
-          <PageShowcase
-            roleBadge="Nurse"
-            roleBadgeColor="#10B981"
-            title="ประวัติการคัดกรอง (Screening History)"
-            subtitle="ดูประวัติการตรวจวัดสัญญาณชีพย้อนหลังของผู้ป่วยแต่ละราย"
-            description="ค้นหาและตรวจสอบประวัติการวัดสัญญาณชีพในแต่ละครั้งที่ผู้ป่วยมารับบริการ"
-            features={[
-              'ค้นหาประวัติการคัดกรองด้วยเลขบัตรประชาชนหรือชื่อคนไข้',
-              'ดูกราฟแนวโน้มความดันโลหิตและน้ำหนักตัวย้อนหลัง',
-              'พิมพ์ใบคัดกรองประวัติสัญญาณชีพ',
-            ]}
-          />
-        );
+        return <ScreeningHistoryPage />;
 
       // ===== Pharmacist Pages =====
       case 'pharmacy-dispense':

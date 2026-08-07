@@ -24,6 +24,17 @@ export const DEMO_USERS: Record<UserRole, User> = {
     avatarText: 'KD',
     avatarColor: '#10B981',
   },
+  nurse_assistant: {
+    id: 'user-asst-01',
+    username: 'assistant1',
+    fullName: 'คุณมาลี ช่วยพยาบาล',
+    role: 'nurse_assistant',
+    roleTitleTh: 'ผู้ช่วยพยาบาล',
+    roleTitleEn: 'Nurse Assistant',
+    department: 'แผนกคัดกรอง',
+    avatarText: 'ML',
+    avatarColor: '#0D9488',
+  },
   pharmacist: {
     id: 'user-phar-01',
     username: 'pharmacist1',
@@ -60,6 +71,11 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'vitals', title: 'บันทึกสัญญาณชีพ', iconType: 'vitals', path: '/vitals' },
     { id: 'vitals-history', title: 'ประวัติการคัดกรอง', iconType: 'history', path: '/vitals-history' },
   ],
+  nurse_assistant: [
+    { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
+    { id: 'vitals', title: 'บันทึกสัญญาณชีพ', iconType: 'vitals', path: '/vitals' },
+    { id: 'vitals-history', title: 'ประวัติการคัดกรอง', iconType: 'history', path: '/vitals-history' },
+  ],
   pharmacist: [
     { id: 'pharmacy-dispense', title: 'บันทึกและจ่ายยา', iconType: 'dispense', path: '/pharmacy-dispense' },
     { id: 'pharmacy-stock', title: 'คลังยา', iconType: 'stock', path: '/pharmacy-stock' },
@@ -76,6 +92,7 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
 export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
   registrar: 'registration',
   nurse: 'queue',
+  nurse_assistant: 'queue',
   pharmacist: 'pharmacy-dispense',
   cashier: 'billing-dispense',
 };
@@ -83,10 +100,10 @@ export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
 // กำหนดว่าแต่ละหน้าอนุญาตให้ Role ใดเข้าถึงได้บ้าง (Role-based Route Permissions)
 export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'registration': ['registrar'],
-  'queue': ['registrar', 'nurse'],
+  'queue': ['registrar', 'nurse', 'nurse_assistant'],
   'eligibility': ['registrar'],
-  'vitals': ['nurse'],
-  'vitals-history': ['nurse'],
+  'vitals': ['nurse', 'nurse_assistant'],
+  'vitals-history': ['nurse', 'nurse_assistant'],
   'pharmacy-dispense': ['pharmacist'],
   'pharmacy-stock': ['pharmacist'],
   'pharmacy-history': ['pharmacist'],

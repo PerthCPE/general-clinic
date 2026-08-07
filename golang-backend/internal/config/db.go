@@ -75,9 +75,16 @@ func seedUsers() {
 			Password: string(hashNurse),
 			Role:     "nurse",
 		}
+		hashAsst, _ := bcrypt.GenerateFromPassword([]byte("password"), 10)
+		assistant := models.User{
+			Username: "assistant1",
+			Password: string(hashAsst),
+			Role:     "nurse_assistant",
+		}
 		// บันทึกลงฐานข้อมูล
 		DB.Create(&registrar)
 		DB.Create(&nurse)
-		log.Println("Demo users seeded: registrar1, nurse1 (password: password)")
+		DB.Create(&assistant)
+		log.Println("Demo users seeded: registrar1, nurse1, assistant1 (password: password)")
 	}
 }
