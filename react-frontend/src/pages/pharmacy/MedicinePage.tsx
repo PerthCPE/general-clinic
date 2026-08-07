@@ -176,8 +176,10 @@ export default function MedicinePage() {
   return (
     <div className="medicine-page-container">
       <div className="page-header">
-        <h1 className="page-title">รายการยา</h1>
-        <p className="page-subtitle">ค้นหาและจัดการระบบสินค้าคงคลัง</p>
+        <div className="header-titles">
+          <h1 className="page-title">รายการยา</h1>
+          <p className="page-subtitle">ค้นหาและจัดการระบบสินค้าคงคลัง</p>
+        </div>
       </div>
 
       <div className="search-card card">

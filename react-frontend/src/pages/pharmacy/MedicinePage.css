@@ -18,31 +18,35 @@ body.dark-mode .medicine-page-container {
 /* Header Section */
 .medicine-page-container .page-header {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: flex-start;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
-.medicine-page-container .header-titles h1 {
-  font-size: 28px;
+.medicine-page-container .header-titles h1,
+.medicine-page-container .page-title {
+  font-size: 26px;
   font-weight: 700;
   color: #0D3B66;
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   transition: color 0.5s ease;
 }
 
-body.dark-mode .medicine-page-container .header-titles h1 {
+body.dark-mode .medicine-page-container .header-titles h1,
+body.dark-mode .medicine-page-container .page-title {
   color: #60A5FA;
 }
 
-.medicine-page-container .header-titles p {
-  font-size: 16px;
+.medicine-page-container .header-titles p,
+.medicine-page-container .page-subtitle {
+  font-size: 14px;
   color: #64748B;
   margin: 0;
   transition: color 0.5s ease;
 }
 
-body.dark-mode .medicine-page-container .header-titles p {
+body.dark-mode .medicine-page-container .header-titles p,
+body.dark-mode .medicine-page-container .page-subtitle {
   color: #94A3B8;
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './DetailPage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 
@@ -44,13 +44,32 @@ export default function DetailPage({
     message: 'ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์เรียบร้อยแล้ว',
     type: 'doctor'
   });
+  const [isToastFading, setIsToastFading] = useState(false);
 
   const triggerToast = (message: string, type: 'success' | 'error' | 'doctor') => {
+    setIsToastFading(false);
     setToast({ message, type });
     setTimeout(() => {
-      setToast(null);
-    }, 4500);
+      setIsToastFading(true);
+      setTimeout(() => {
+        setToast(null);
+        setIsToastFading(false);
+      }, 400);
+    }, 3500);
   };
+
+  // ค้างไว้ 3.5 วินาที แล้วค่อยๆ จางหายไปเมื่อโหลดหน้าเว็บครั้งแรก
+  useEffect(() => {
+    const timer1 = setTimeout(() => {
+      setIsToastFading(true);
+      const timer2 = setTimeout(() => {
+        setToast(null);
+        setIsToastFading(false);
+      }, 400);
+      return () => clearTimeout(timer2);
+    }, 3500);
+    return () => clearTimeout(timer1);
+  }, []);
 
 
 
@@ -435,7 +454,7 @@ export default function DetailPage({
 
       {/* Toast Notification */}
       {toast && (
-        <div className={`bottom-left-toast toast-${toast.type}`}>
+        <div className={`bottom-left-toast toast-${toast.type} ${isToastFading ? 'toast-fading' : ''}`}>
           <div className="toast-icon">
             {toast.type === 'success' && '✓'}
             {toast.type === 'doctor' && '🩺'}

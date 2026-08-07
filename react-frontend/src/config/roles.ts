@@ -27,7 +27,7 @@ export const DEMO_USERS: Record<UserRole, User> = {
   pharmacist: {
     id: 'user-phar-01',
     username: 'pharmacist1',
-    fullName: 'ภก. สมชาย จ่ายยา',
+    fullName: 'ดร.บุญ สั่งยา',
     role: 'pharmacist',
     roleTitleTh: 'เภสัชกรคลังยา',
     roleTitleEn: 'Pharmacist',
@@ -38,7 +38,7 @@ export const DEMO_USERS: Record<UserRole, User> = {
   cashier: {
     id: 'user-cash-01',
     username: 'cashier1',
-    fullName: 'นส. อนงค์ สมบูรณ์',
+    fullName: 'นส.รวย การเงิน',
     role: 'cashier',
     roleTitleTh: 'เจ้าหน้าที่การเงิน',
     roleTitleEn: 'Cashier',

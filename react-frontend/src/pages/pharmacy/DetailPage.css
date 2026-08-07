@@ -658,7 +658,7 @@ body.dark-mode .detail-page-container .alert-text strong {
   background: linear-gradient(135deg, #047857 0%, #065F46 100%);
 }
 
-/* Toast - moved to top-right */
+/* Toast Notification Banner */
 .detail-page-container .bottom-left-toast {
   position: fixed;
   top: 88px;
@@ -672,12 +672,18 @@ body.dark-mode .detail-page-container .alert-text strong {
   gap: 8px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
   z-index: 999;
-  animation: slideInRight 0.3s ease;
+  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.detail-page-container .bottom-left-toast.toast-fading {
+  opacity: 0;
+  transform: translateY(-16px) scale(0.96);
 }
 
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(60px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translateX(60px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
 }
 
 .detail-page-container .toast-success {
