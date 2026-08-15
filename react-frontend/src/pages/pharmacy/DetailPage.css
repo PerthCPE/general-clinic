@@ -709,6 +709,7 @@ body.dark-mode .detail-page-container .alert-text strong {
 @media (max-width: 900px) {
   .detail-page-container .prescription-dispense-grid {
     grid-template-columns: 1fr;
+  }
 }
 
 .detail-page-container table tr.active-row {

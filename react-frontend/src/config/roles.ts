@@ -57,6 +57,17 @@ export const DEMO_USERS: Record<UserRole, User> = {
     avatarText: 'AN',
     avatarColor: '#F59E0B',
   },
+  doctor: {
+    id: 'user-doc-01',
+    username: 'doctor1',
+    fullName: 'นพ.อานนท์ ศรีตรวจ',
+    role: 'doctor',
+    roleTitleTh: 'แพทย์ผู้ตรวจ',
+    roleTitleEn: 'Doctor',
+    department: 'แผนกตรวจโรคทั่วไป',
+    avatarText: 'AS',
+    avatarColor: '#DC2626',
+  },
 };
 
 // เมนูใน Sidebar สำหรับแต่ละ Role
@@ -86,6 +97,13 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'billing-invoice', title: 'ออกใบแจ้งหนี้', iconType: 'invoice', path: '/billing-invoice' },
     { id: 'billing-dashboard', title: 'แดชบอร์ด', iconType: 'dashboard', path: '/billing-dashboard' },
   ],
+  doctor: [
+    { id: 'doctor-dashboard', title: 'แดชบอร์ด', iconType: 'dashboard', path: '/doctor-dashboard' },
+    { id: 'doctor-queue', title: 'คิวผู้ป่วย', iconType: 'queue', path: '/doctor-queue' },
+    { id: 'doctor-examination', title: 'บันทึกการตรวจ', iconType: 'examination', path: '/doctor-examination' },
+    { id: 'doctor-schedule', title: 'ตารางเวร', iconType: 'schedule', path: '/doctor-schedule' },
+    { id: 'doctor-records', title: 'ประวัติเวชระเบียน', iconType: 'records', path: '/doctor-records' },
+  ],
 };
 
 // หน้าเริ่มต้นเมื่อ Login เข้าสู่ระบบตาม Role
@@ -95,6 +113,7 @@ export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
   nurse_assistant: 'queue',
   pharmacist: 'pharmacy-dispense',
   cashier: 'billing-dispense',
+  doctor: 'doctor-dashboard',
 };
 
 // กำหนดว่าแต่ละหน้าอนุญาตให้ Role ใดเข้าถึงได้บ้าง (Role-based Route Permissions)
@@ -110,4 +129,9 @@ export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'billing-dispense': ['cashier'],
   'billing-invoice': ['cashier'],
   'billing-dashboard': ['cashier'],
+  'doctor-dashboard': ['doctor'],
+  'doctor-queue': ['doctor'],
+  'doctor-examination': ['doctor'],
+  'doctor-schedule': ['doctor'],
+  'doctor-records': ['doctor'],
 };

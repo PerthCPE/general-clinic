@@ -1,0 +1,214 @@
+import React, { useState } from 'react';
+import type { Patient, QueueStatus } from '../types';
+import { StatusBadge } from './StatusBadge';
+import { CopyableText } from './CopyableText';
+import { Stethoscope, Clock, AlertCircle, Search, X } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
+import { translateClinicalText } from '../utils/clinicalTranslation';
+import { generateVN } from '../utils/vnGenerator';
+import { matchPatientSearch } from '../utils/searchUtils';
+
+/**
+ * ==============================================================================
+ * Patient Queue Table Component (QueueTable.tsx)
+ * ==============================================================================
+ * ตารางคิวผู้ป่วยประจำวัน (Outpatient Queue Table):
+ * 1. แสดงคิวผู้ป่วยเรียงตามหมายเลขคิว (Q001, Q002, ...)
+ * 2. ค้นหาคิวรวดเร็ว (Quick Search) ด้วยชื่อ, HN, VN
+ * 3. กรองตามสถานะคิว (ทั้งหมด, รอตรวจ, กำลังตรวจ, ตรวจเสร็จแล้ว)
+ * 4. ปุ่มเข้าตรวจ (Start Exam) สำหรับเรียกผู้ป่วยเข้าห้องตรวจ
+ *
+ * 📍 จุดที่ใช้แก้ไข/ปรับแต่ง (Customization Guide):
+ * - displayedPatients: ตารางกรองผู้ป่วยตามข้อความค้นหา
+ * - onExamine: Callback เมื่อกดปุ่มตรวจผู้ป่วย
+ * - onUpdateStatus: Callback เปลี่ยนสถานะคิวผู้ป่วย
+ */
+interface QueueTableProps {
+  patients: Patient[];
+  onExamine: (patient: Patient) => void;
+  onUpdateStatus: (patientId: string, status: QueueStatus) => void;
+  statusFilter?: string;
+  setStatusFilter?: (status: string) => void;
+}
+
+export const QueueTable: React.FC<QueueTableProps> = ({
+  patients,
+  onExamine,
+  onUpdateStatus,
+  statusFilter = 'All',
+  setStatusFilter
+}) => {
+  const { language, t } = useLanguage();
+  const [queueSearch, setQueueSearch] = useState('');
+
+  const getFilterLabel = (st: string) => {
+    switch (st) {
+      case 'All': return t('filterAll');
+      case 'Waiting': return t('filterWaiting');
+      case 'Examining': return t('filterExamining');
+      case 'Completed': return t('filterCompleted');
+      default: return st;
+    }
+  };
+
+  const displayedPatients = patients.filter((patient) => {
+    if (!queueSearch.trim()) return true;
+    return matchPatientSearch(patient, queueSearch);
+  });
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+      {/* Header section with Title, Search Bar, and Filters */}
+      <div className="p-6 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100">
+        <div>
+          <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+            {t('todaysQueue')}
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {language === 'th'
+              ? `แสดง ${displayedPatients.length} รายการคิวผู้ป่วย${queueSearch ? ` (จากผลการค้นหา "${queueSearch}")` : ''}`
+              : `Showing ${displayedPatients.length} patient${displayedPatients.length !== 1 ? 's' : ''} in queue`}
+          </p>
+        </div>
+
+        <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 max-w-3xl">
+          {/* Patient Search Input for Queue Table */}
+          <div className="relative flex-1 min-w-[260px] max-w-md">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={queueSearch}
+              onChange={(e) => setQueueSearch(e.target.value)}
+              placeholder={language === 'th' ? 'ค้นหาชื่อผู้ป่วย, เลข HN, เลข VN, เลขบัตรประชาชน, ลำดับคิว...' : 'Search Patient Name, HN, VN, National ID, Queue...'}
+              className="w-full pl-10 pr-8 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-slate-800 text-xs rounded-xl border border-slate-200 focus:border-blue-500 focus:outline-hidden transition-all shadow-2xs font-sans placeholder:text-slate-400"
+            />
+            {queueSearch && (
+              <button
+                type="button"
+                onClick={() => setQueueSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                title={language === 'th' ? 'ล้างการค้นหา' : 'Clear search'}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Status Quick Filters */}
+          {setStatusFilter && (
+            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-medium self-start sm:self-auto overflow-x-auto max-w-full">
+              {['All', 'Waiting', 'Examining', 'Completed'].map((st) => (
+                <button
+                  key={st}
+                  onClick={() => setStatusFilter(st)}
+                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
+                    statusFilter === st
+                      ? 'bg-white text-slate-900 shadow-2xs font-semibold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {getFilterLabel(st)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Patients Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-slate-200/80 text-xs font-semibold text-slate-500 tracking-wider">
+              <th className="py-5 px-6 w-28">{t('colQueueNo')}</th>
+              <th className="py-5 px-6 w-32">{t('colHN')}</th>
+              <th className="py-5 px-6 w-36">{t('colVN')}</th>
+              <th className="py-5 px-6">{t('colPatientName')}</th>
+              <th className="py-5 px-6 w-36">{t('colStatus')}</th>
+              <th className="py-5 px-6 w-36">{t('colWaitingTime')}</th>
+              <th className="py-5 px-6 w-28 text-right">{t('colAction')}</th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-slate-100 text-sm">
+            {displayedPatients.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="py-12 text-center text-slate-400">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <AlertCircle className="w-8 h-8 text-slate-300" />
+                    <span>
+                      {queueSearch
+                        ? (language === 'th' ? `ไม่พบผู้ป่วยที่ตรงกับ "${queueSearch}"` : `No queue patient found matching "${queueSearch}"`)
+                        : t('noPatientsFound')}
+                    </span>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              displayedPatients.map((patient) => (
+                <tr
+                  key={patient.id}
+                  className="hover:bg-slate-50/80 transition-colors group"
+                >
+                  {/* Queue No */}
+                  <td className="py-5 px-6 font-semibold text-slate-800 font-mono">
+                    {patient.queueNo}
+                  </td>
+
+                  {/* HN */}
+                  <td className="py-5 px-6 text-slate-600 font-medium">
+                    <CopyableText value={patient.hn} />
+                  </td>
+
+                  {/* VN */}
+                  <td className="py-5 px-6 text-slate-600 font-medium">
+                    <CopyableText value={patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)} />
+                  </td>
+
+                  {/* Patient Name */}
+                  <td className="py-5 px-6 font-medium text-slate-900">
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-slate-900">
+                        {patient.name}
+                      </span>
+                      {patient.chiefComplaint && (
+                        <span className="text-[12px] text-slate-400 font-normal truncate max-w-xs">
+                          {translateClinicalText(patient.chiefComplaint, language)}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+
+                  {/* Status */}
+                  <td className="py-5 px-6">
+                    <StatusBadge status={patient.status} />
+                  </td>
+
+                  {/* Waiting Time */}
+                  <td className="py-5 px-6 text-slate-600 font-medium">
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{patient.waitingTimeMinutes} {language === 'th' ? 'นาที' : 'min'}</span>
+                    </div>
+                  </td>
+
+                  {/* Action Button matching Figma primary blue button */}
+                  <td className="py-5 px-6 text-right">
+                    <button
+                      onClick={() => onExamine(patient)}
+                      className="px-4 py-1.5 bg-[#2563eb] hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs hover:shadow-xs active:scale-95 transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Stethoscope className="w-3.5 h-3.5" />
+                      <span>{t('examineBtn')}</span>
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
