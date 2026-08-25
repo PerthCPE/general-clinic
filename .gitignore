@@ -9,3 +9,8 @@ react-frontend/.env.local
 
 .DS_Store
 Thumbs.db
+
+# MCP Server Binaries & Local Antigravity Configurations
+mcp-server/*.exe
+mcp-server/bin/
+.agents/
