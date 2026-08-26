@@ -57,7 +57,7 @@
 /* General Clinic text */
 .sidebar-logo-text {
   margin-left: 8px;
-  font-family: 'Inter';
+  font-family: var(--font-heading);
   font-style: normal;
   font-weight: 700;
   font-size: 18px;
@@ -102,10 +102,10 @@
   height: 48px;
   border-radius: 12px;
   text-decoration: none;
-  font-family: 'Inter';
+  font-family: var(--font-heading);
   font-style: normal;
-  font-weight: 700;
-  font-size: 16px;
+  font-weight: 600;
+  font-size: 15px;
   line-height: 24px;
   color: #E2E8F0;
   transition: background 0.2s;

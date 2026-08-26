@@ -9,3 +9,11 @@ react-frontend/.env.local
 
 .DS_Store
 Thumbs.db
+aboutmypart.md
+
+# MCP Server Executables & Local Configuration
+mcp-server/*.exe
+mcp-server/bin/
+.agents/
+package-lock.json
+

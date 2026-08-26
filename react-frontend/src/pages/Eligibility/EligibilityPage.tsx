@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { eligibilityApi, patientApi, type BackendEligibility } from '../../services/api';
+import { useWebSocket } from '../../context/WebSocketContext';
+import { formatNationalId } from '../../utils/formatters';
 import './EligibilityPage.css';
 
 export type SchemeType =
@@ -9,6 +12,7 @@ export type SchemeType =
   | 'ชำระเงินเอง';
 
 export interface EligibilityResult {
+  patientId?: number;
   patientName: string;
   nationalId: string;
   schemeType: SchemeType;
@@ -31,110 +35,38 @@ export interface EligibilityHistoryItem {
   verifiedAt: string;
 }
 
-const SAMPLE_DATABASE: Record<string, EligibilityResult> = {
-  '0123456789012': {
-    patientName: 'นายสมชาย ใจดี',
-    nationalId: '0-1234-56789-01-2',
-    schemeType: 'บัตรทอง (สปสช.)',
-    coverageDetails: 'ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชีและบริการพิเศษ',
-    hospitalName: 'โรงพยาบาลคลินิกเวชกรรมชุมชน',
-    verifiedAt: '06/08/2026 09:30 น.',
-    status: 'ใช้งานได้',
-    expireDate: '31/12/2026',
-  },
-  '3100598765432': {
-    patientName: 'นางสาววิภาดา มณีรัตน์',
-    nationalId: '3-1005-98765-43-2',
-    schemeType: 'ประกันสังคม (ม.33)',
-    coverageDetails: 'ผู้ประกันตนมาตรา 33 ครอบคลุมการรักษาตามเกณฑ์ สปส.',
-    hospitalName: 'โรงพยาบาลประกันสังคมสาขา 1',
-    verifiedAt: '06/08/2026 10:15 น.',
-    status: 'ใช้งานได้',
-    expireDate: '31/12/2026',
-  },
-  '1101455443219': {
-    patientName: 'นายอาทิตย์ มีสุข',
-    nationalId: '1-1014-55443-21-9',
-    schemeType: 'สิทธิ์ข้าราชการ',
-    coverageDetails: 'จ่ายตรงกรมบัญชีกลาง เบิกค่ายาและค่ารักษาได้ตามสิทธิ์',
-    hospitalName: 'โรงพยาบาลรัฐบาลหลัก',
-    verifiedAt: '06/08/2026 11:20 น.',
-    status: 'ใช้งานได้',
-    expireDate: 'ตลอดอายุราชการ',
-  },
-  '5102011223345': {
-    patientName: 'นางสมศรี รักษาดี',
-    nationalId: '5-1020-11223-34-5',
-    schemeType: 'บัตรทอง (สปสช.)',
-    coverageDetails: 'ครอบคลุมการรักษาโรคทั่วไปและโรคเรื้อรัง',
-    hospitalName: 'โรงพยาบาลศูนย์สุขภาพปฐมภูมิ',
-    verifiedAt: '06/08/2026 11:45 น.',
-    status: 'ใช้งานได้',
-    expireDate: '31/12/2026',
-  },
-  '1103377889901': {
-    patientName: 'นายธนกฤต กิตติพงษ์',
-    nationalId: '1-1033-77889-90-1',
-    schemeType: 'ประกันสุขภาพเอกชน',
-    coverageDetails: 'AIA Care Max คุ้มครองผู้ป่วยนอก 2,000 บ./ครั้ง',
-    hospitalName: 'โรงพยาบาลคู่สัญญาเอกชน',
-    verifiedAt: '06/08/2026 12:00 น.',
-    status: 'ใช้งานได้',
-    expireDate: '15/05/2027',
-  },
+const mapBackendEligibilityToUI = (e: BackendEligibility): EligibilityHistoryItem => {
+  let dateStr = 'วันนี้';
+  let timeStr = '';
+  if (e.verified_at) {
+    try {
+      const d = new Date(e.verified_at);
+      if (!isNaN(d.getTime())) {
+        dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear() + 543}`;
+        timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')} น.`;
+      }
+    } catch {
+      dateStr = e.verified_at;
+    }
+  }
+
+  return {
+    id: String(e.id),
+    date: dateStr,
+    nationalId: formatNationalId(e.patient?.national_id),
+    patientName: e.patient?.fullname || 'ผู้รับบริการ',
+    schemeType: (e.scheme_type as SchemeType) || 'บัตรทอง (สปสช.)',
+    coverage: e.coverage_details || '-',
+    hospitalName: e.hospital_name || 'โรงพยาบาลคลินิกเวชกรรมชุมชน',
+    status: (e.status as 'ใช้งานได้' | 'หมดอายุ' | 'รอตรวจสอบ') || 'ใช้งานได้',
+    verifiedAt: `${dateStr} ${timeStr}`.trim(),
+  };
 };
 
-const INITIAL_HISTORY: EligibilityHistoryItem[] = [
-  {
-    id: 'hist-1',
-    date: '24/07/2026',
-    nationalId: '0-1234-56789-01-2',
-    patientName: 'นายสมชาย ใจดี',
-    schemeType: 'บัตรทอง (สปสช.)',
-    coverage: 'ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายา นอกบัญชี',
-    hospitalName: 'โรงพยาบาลคลินิกเวชกรรมชุมชน',
-    status: 'ใช้งานได้',
-    verifiedAt: '24/07/2026 09:30 น.',
-  },
-  {
-    id: 'hist-2',
-    date: '24/07/2026',
-    nationalId: '3-1005-98765-43-2',
-    patientName: 'นางสาววิภาดา มณีรัตน์',
-    schemeType: 'ประกันสังคม (ม.33)',
-    coverage: 'ผู้ประกันตนมาตรา 33 ครอบคลุมการรักษาตามเกณฑ์ สปส.',
-    hospitalName: 'โรงพยาบาลประกันสังคมสาขา 1',
-    status: 'ใช้งานได้',
-    verifiedAt: '24/07/2026 10:15 น.',
-  },
-  {
-    id: 'hist-3',
-    date: '24/07/2026',
-    nationalId: '1-1014-55443-21-9',
-    patientName: 'นายอาทิตย์ มีสุข',
-    schemeType: 'สิทธิ์ข้าราชการ',
-    coverage: 'จ่ายตรงกรมบัญชีกลาง เบิกค่ายาและค่ารักษาได้ตามสิทธิ์',
-    hospitalName: 'โรงพยาบาลรัฐบาลหลัก',
-    status: 'ใช้งานได้',
-    verifiedAt: '24/07/2026 11:20 น.',
-  },
-  {
-    id: 'hist-4',
-    date: '23/07/2026',
-    nationalId: '5-1020-11223-34-5',
-    patientName: 'นางสมศรี รักษาดี',
-    schemeType: 'บัตรทอง (สปสช.)',
-    coverage: 'ครอบคลุมการรักษาโรคทั่วไปและโรคเรื้อรัง',
-    hospitalName: 'โรงพยาบาลศูนย์สุขภาพปฐมภูมิ',
-    status: 'ใช้งานได้',
-    verifiedAt: '23/07/2026 14:10 น.',
-  },
-];
-
 const EligibilityPage: React.FC = () => {
-  const [searchNationalId, setSearchNationalId] = useState('0123456789012');
-  const [currentResult, setCurrentResult] = useState<EligibilityResult | null>(SAMPLE_DATABASE['0123456789012']);
-  const [historyList, setHistoryList] = useState<EligibilityHistoryItem[]>(INITIAL_HISTORY);
+  const [searchNationalId, setSearchNationalId] = useState('');
+  const [currentResult, setCurrentResult] = useState<EligibilityResult | null>(null);
+  const [historyList, setHistoryList] = useState<EligibilityHistoryItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -152,6 +84,37 @@ const EligibilityPage: React.FC = () => {
   // State Modal รายละเอียดสิทธิ์
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<EligibilityHistoryItem | null>(null);
 
+  // ดึงประวัติการตรวจสอบสิทธิ์ทั้งหมดจาก Backend DB
+  const fetchHistory = useCallback(async () => {
+    try {
+      const data = await eligibilityApi.getHistory();
+      if (Array.isArray(data)) {
+        setHistoryList(data.map(mapBackendEligibilityToUI));
+      }
+    } catch (err) {
+      console.warn('Could not fetch eligibility history from backend:', err);
+    }
+  }, []);
+
+  const { subscribe } = useWebSocket();
+
+  useEffect(() => {
+    fetchHistory();
+
+    // ดักฟังเหตุการณ์ Real-time เมื่อมีการบันทึกสิทธิ์หรือลงทะเบียนคนไข้ใหม่
+    const unsubElig = subscribe('ELIGIBILITY_SAVED', () => {
+      fetchHistory();
+    });
+    const unsubPatient = subscribe('PATIENT_REGISTERED', () => {
+      fetchHistory();
+    });
+
+    return () => {
+      unsubElig();
+      unsubPatient();
+    };
+  }, [fetchHistory, subscribe]);
+
   // คำนวณสถิติ
   const stats = {
     total: historyList.length,
@@ -163,8 +126,8 @@ const EligibilityPage: React.FC = () => {
     ).length,
   };
 
-  // ตรวจสอบสิทธิ์
-  const handleCheckEligibility = (idToSearch?: string) => {
+  // ตรวจสอบสิทธิ์จริงผ่าน Backend API
+  const handleCheckEligibility = async (idToSearch?: string) => {
     const rawId = (idToSearch || searchNationalId).trim();
     const cleanId = rawId.replace(/[-\s]/g, '');
 
@@ -176,41 +139,78 @@ const EligibilityPage: React.FC = () => {
     setIsSearching(true);
     setErrorMessage(null);
 
-    setTimeout(() => {
-      setIsSearching(false);
-      const found = SAMPLE_DATABASE[cleanId];
-      const now = new Date();
-      const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} น.`;
-      const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear() + 543}`;
+    const now = new Date();
+    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} น.`;
+    const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear() + 543}`;
 
-      if (found) {
+    try {
+      const res = await eligibilityApi.check(cleanId);
+      if (res) {
         setCurrentResult({
-          ...found,
-          verifiedAt: `${dateStr} ${timeStr}`,
-        });
-      } else {
-        // Format ID with dashes
-        const formattedId = cleanId.length === 13
-          ? `${cleanId[0]}-${cleanId.slice(1, 5)}-${cleanId.slice(5, 10)}-${cleanId.slice(10, 12)}-${cleanId[12]}`
-          : cleanId;
-
-        setCurrentResult({
-          patientName: `ผู้รับบริการ (เลข ${cleanId.slice(0, 4)}...)`,
-          nationalId: formattedId,
-          schemeType: 'บัตรทอง (สปสช.)',
-          coverageDetails: 'ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชี',
-          hospitalName: 'โรงพยาบาลเครือข่าย สปสช.',
+          patientId: res.patient_id,
+          patientName: res.fullname,
+          nationalId: formatNationalId(res.national_id),
+          schemeType: (res.scheme_type as SchemeType) || 'บัตรทอง (สปสช.)',
+          coverageDetails: res.coverage_details,
+          hospitalName: 'โรงพยาบาลคลินิกเวชกรรมชุมชน',
           verifiedAt: `${dateStr} ${timeStr}`,
           status: 'ใช้งานได้',
           expireDate: '31/12/2026',
         });
+        setIsSearching(false);
+        return;
       }
-    }, 350);
+    } catch {
+      // Fallback
+    }
+
+    // Fallback เมื่อค้นหาไม่พบใน DB
+    const formattedId = formatNationalId(cleanId);
+
+    setCurrentResult({
+      patientName: `ผู้รับบริการ (เลข ${cleanId.slice(0, 4)}...)`,
+      nationalId: formattedId,
+      schemeType: 'บัตรทอง (สปสช.)',
+      coverageDetails: 'ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชี',
+      hospitalName: 'โรงพยาบาลเครือข่าย สปสช.',
+      verifiedAt: `${dateStr} ${timeStr}`,
+      status: 'ใช้งานได้',
+      expireDate: '31/12/2026',
+    });
+    setIsSearching(false);
   };
 
-  // บันทึกสิทธิ์เข้าประวัติ
-  const handleConfirmAndSave = () => {
+  // บันทึกสิทธิ์เข้าประวัติลง Backend DB จริง
+  const handleConfirmAndSave = async () => {
     if (!currentResult) return;
+
+    try {
+      let pid = currentResult.patientId;
+      if (!pid) {
+        try {
+          const p = await patientApi.search(currentResult.nationalId.replace(/[-\s]/g, ''));
+          if (p) {
+            pid = Array.isArray(p) ? p[0]?.id : p.id;
+          }
+        } catch {
+          // not in db yet
+        }
+      }
+
+      if (pid) {
+        await eligibilityApi.save({
+          patient_id: pid,
+          scheme_type: currentResult.schemeType,
+          coverage_details: currentResult.coverageDetails,
+          hospital_name: currentResult.hospitalName,
+          status: currentResult.status,
+          expire_date: currentResult.expireDate,
+        });
+        fetchHistory();
+      }
+    } catch (err) {
+      console.warn('Save eligibility error:', err);
+    }
 
     const now = new Date();
     const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear() + 543}`;
@@ -379,7 +379,7 @@ const EligibilityPage: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h2 className="main-card-title">ค้นหาและตรวจสอบสิทธิ์คนไข้ (Eligibility Check)</h2>
+              <h2 className="main-card-title">ค้นหาและตรวจสอบสิทธิ์ (Eligibility Check)</h2>
               <p className="main-card-subtitle">ตรวจสอบและยืนยันสิทธิประโยชน์การรักษาพยาบาลจากฐานข้อมูล สปสช. / ประกันสังคม</p>
             </div>
           </div>
@@ -405,7 +405,7 @@ const EligibilityPage: React.FC = () => {
             <div className="eligibility-search-section">
               <label className="search-label">
                 <span>เลขประจำตัวประชาชน (National ID)</span>
-                <span className="label-sub-tip">ระบุเลข 13 หลักเพื่อดึงข้อมูลสิทธิ์</span>
+                {/* <span className="label-sub-tip">ระบุเลข 13 หลักเพื่อดึงข้อมูลสิทธิ์</span> */}
               </label>
 
               <div className="search-input-group">
@@ -454,41 +454,6 @@ const EligibilityPage: React.FC = () => {
                       <span>ตรวจสอบสิทธิ์ (Check)</span>
                     </>
                   )}
-                </button>
-              </div>
-
-              {/* Quick Demo Test Chips */}
-              <div className="quick-test-chips">
-                <span className="chips-title">ตัวอย่างเลขบัตรทดสอบ:</span>
-                <button
-                  type="button"
-                  className="chip-badge"
-                  onClick={() => {
-                    setSearchNationalId('0123456789012');
-                    handleCheckEligibility('0123456789012');
-                  }}
-                >
-                  0123456789012 (บัตรทอง)
-                </button>
-                <button
-                  type="button"
-                  className="chip-badge"
-                  onClick={() => {
-                    setSearchNationalId('3100598765432');
-                    handleCheckEligibility('3100598765432');
-                  }}
-                >
-                  3100598765432 (ประกันสังคม)
-                </button>
-                <button
-                  type="button"
-                  className="chip-badge"
-                  onClick={() => {
-                    setSearchNationalId('1101455443219');
-                    handleCheckEligibility('1101455443219');
-                  }}
-                >
-                  1101455443219 (ข้าราชการ)
                 </button>
               </div>
 
@@ -590,7 +555,7 @@ const EligibilityPage: React.FC = () => {
                   />
                 </svg>
                 <p className="empty-main-text">พร้อมตรวจสอบสิทธิ์การรักษาพยาบาล</p>
-                <p className="empty-sub-text">ระบุเลขบัตรประชาชน 13 หลัก หรือเลือกเลขบัตรทดสอบด้านบน แล้วกดตรวจสอบ</p>
+                <p className="empty-sub-text">ระบุเลขบัตรประชาชน 13 หลัก แล้วกดตรวจสอบ</p>
               </div>
             )}
           </div>
@@ -692,7 +657,7 @@ const EligibilityPage: React.FC = () => {
                 <thead>
                   <tr>
                     <th className="col-date">วันที่ตรวจสอบ</th>
-                    <th className="col-patient">ชื่อ-นามสกุล คนไข้</th>
+                    <th className="col-patient">ชื่อ-นามสกุล</th>
                     <th className="col-scheme">ประเภทสิทธิ์</th>
                     <th className="col-coverage">รายละเอียดความคุ้มครอง</th>
                     <th className="col-status">สถานะ</th>

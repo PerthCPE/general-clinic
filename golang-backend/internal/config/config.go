@@ -24,10 +24,13 @@ var AppConfig *Config
 
 // Load data from .env for database
 func LoadConfig() {
-	err := godotenv.Load()
-
-	if err != nil {
-		log.Println("Warning: No .env file found, using system environment variables.")
+	// ค้นหาและโหลดไฟล์ .env จากหลายตำแหน่งที่อาจรันคำสั่ง
+	if err := godotenv.Load(); err != nil {
+		if err2 := godotenv.Load("golang-backend/.env"); err2 != nil {
+			if err3 := godotenv.Load("../.env"); err3 != nil {
+				log.Println("Notice: No .env file found in default paths, checking environment variables or fallback defaults.")
+			}
+		}
 	}
 
 	AppConfig = &Config{
@@ -36,11 +39,11 @@ func LoadConfig() {
 		DBUser:     getEnv("DB_USER", "postgres"),
 		DBPassword: getEnv("DB_PASSWORD", ""),
 		DBName:     getEnv("DB_NAME", "postgres"),
-		DBPort:     getEnv("DB_PORT", "6543"),
+		DBPort:     getEnv("DB_PORT", "5432"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
-		JWTSecret:  getEnv("JWT_SECRET", "secret"),
+		JWTSecret:  getEnv("JWT_SECRET", "supersecretclinicjwtkey2026"),
 	}
-	log.Println("Configation Loaded Successfully.")
+	log.Println("Configuration Loaded Successfully.")
 }
 
 // getting data from .env fucntion return as string

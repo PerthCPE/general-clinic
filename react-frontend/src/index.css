@@ -1,5 +1,5 @@
 /* ===== Global Reset & Base Styles ===== */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Prompt:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Prompt:wght@400;500;600;700;800&display=swap');
 
 /* ===========================================================================
    Tailwind CSS — ใช้กับหน้าจอฝั่งแพทย์ที่ย้ายมาจากระบบ clinicms
@@ -16,13 +16,14 @@
 @import "tailwindcss/utilities";
 
 @theme {
-  /* บังคับให้ font-sans ของ Tailwind ใช้ฟอนต์เดียวกับ Project รวม (Prompt/Inter) */
-  --font-sans: 'Prompt', 'Inter', system-ui, -apple-system, sans-serif;
+  /* กำหนด font-sans ของ Tailwind ให้ตรงกับระบบหลัก (IBM Plex Sans Thai + Plus Jakarta Sans + Inter) */
+  --font-sans: 'IBM Plex Sans Thai', 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', 'Prompt', 'Kanit', sans-serif;
 
   /* ต้องระบุ font-mono เป็นชื่อฟอนต์จริง ห้ามปล่อยให้เหลือคำว่า monospace เดี่ยว ๆ
      เพราะ Chrome จะสลับไปใช้ "ขนาดฟอนต์ความกว้างคงที่" ที่ตั้งไว้ในเบราว์เซอร์ (13px)
      ทำให้ช่องที่ใส่ font-mono (เช่น ค่าสัญญาณชีพ) เล็กกว่าช่องอื่นทั้งที่เขียน text-sm เท่ากัน */
-  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas,
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas,
     'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace;
 
   /* ระบบเดิมตั้ง :root { font-size: 14px } แต่ระบบ clinicms ต้นฉบับใช้ค่ามาตรฐาน 16px
@@ -170,7 +171,17 @@
 }
 
 :root {
-  font-family: 'Prompt', 'Inter', system-ui, -apple-system, sans-serif;
+  /* Modern Medical Typography System */
+  /* ฟอนต์หลัก (Primary): IBM Plex Sans Thai (ไทย) + Plus Jakarta Sans / Inter (อังกฤษ) — อ่านง่ายที่สุด คมชัดระดับโปรแกรมการแพทย์ */
+  --font-primary: 'IBM Plex Sans Thai', 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* ฟอนต์รอง / หัวข้อ (Secondary / Headings): Plus Jakarta Sans (อังกฤษ) + Prompt / Kanit (ไทย) — โมเดิร์น พรีเมียม หนักแน่น */
+  --font-heading: 'Plus Jakarta Sans', 'Prompt', 'Kanit', sans-serif;
+
+  /* ฟอนต์ตัวเลข / รหัส (Monospace / Identifiers): JetBrains Mono — เหมาะกับ HN, เลขบัตร ปชช., เลขคิว, สัญญาณชีพ */
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  font-family: var(--font-primary);
   font-size: 14px;
   line-height: 1.5;
   color: #1E293B;
@@ -187,6 +198,7 @@
 body {
   margin: 0;
   min-height: 100vh;
+  font-family: var(--font-primary);
   font-size: var(--font-size-base);
   line-height: 1.5;
 }
@@ -198,7 +210,7 @@ a {
 
 button {
   cursor: pointer;
-  font-family: inherit;
+  font-family: var(--font-heading);
 }
 
 button,
@@ -213,10 +225,13 @@ td,
 th,
 li {
   font-size: inherit;
+  font-family: inherit;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  line-height: 1.2;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 h1 {

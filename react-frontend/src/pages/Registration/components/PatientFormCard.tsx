@@ -23,8 +23,31 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  const formatNationalIdInput = (val: string): string => {
+    const digits = val.replace(/\D/g, '').slice(0, 13);
+    if (digits.length <= 1) return digits;
+    if (digits.length <= 5) return `${digits[0]}-${digits.slice(1)}`;
+    if (digits.length <= 10) return `${digits[0]}-${digits.slice(1, 5)}-${digits.slice(5)}`;
+    if (digits.length <= 12) return `${digits[0]}-${digits.slice(1, 5)}-${digits.slice(5, 10)}-${digits.slice(10)}`;
+    return `${digits[0]}-${digits.slice(1, 5)}-${digits.slice(5, 10)}-${digits.slice(10, 12)}-${digits[12]}`;
+  };
+
+  const formatPhoneInput = (val: string): string => {
+    const digits = val.replace(/\D/g, '').slice(0, 10);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
+  };
+
   const handleChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    let processedValue = value;
+    if (field === 'nationalId') {
+      processedValue = formatNationalIdInput(value);
+    } else if (field === 'phone') {
+      processedValue = formatPhoneInput(value);
+    }
+
+    setFormData((prev) => ({ ...prev, [field]: processedValue }));
     if (formErrors[field]) {
       setFormErrors((prev) => {
         const next = { ...prev };

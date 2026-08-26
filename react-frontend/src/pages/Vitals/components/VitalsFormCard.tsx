@@ -3,6 +3,17 @@ import type { DoctorOption, QueuePatientItem } from '../types';
 
 interface VitalsFormCardProps {
   selectedPatient: QueuePatientItem | null;
+  // Queue Selector Props
+  queueList: QueuePatientItem[];
+  filteredWaitingQueues: QueuePatientItem[];
+  searchQuery: string;
+  isQueueDropdownOpen: boolean;
+  onSearchQueryChange: (val: string) => void;
+  onToggleQueueDropdown: (open?: boolean) => void;
+  onSelectPatient: (patient: QueuePatientItem) => void;
+  onResetSelection: () => void;
+  queueDropdownRef: React.RefObject<HTMLDivElement | null>;
+  // Form fields
   weight: string;
   height: string;
   temperature: string;
@@ -26,6 +37,15 @@ interface VitalsFormCardProps {
 
 export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
   selectedPatient,
+  queueList,
+  filteredWaitingQueues,
+  searchQuery,
+  isQueueDropdownOpen,
+  onSearchQueryChange,
+  onToggleQueueDropdown,
+  onSelectPatient,
+  onResetSelection,
+  queueDropdownRef,
   weight,
   height,
   temperature,
@@ -61,12 +81,13 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
   const isBradycardia = !isNaN(hrNum) && hrNum < 60 && hrNum > 0;
 
   const hasAllergy = allergies.trim().length > 0 && allergies.trim() !== 'ปฏิเสธการแพ้ยา' && allergies.trim() !== 'ไม่มี';
+  const waitingCount = queueList.filter((p) => p.queueStatus === 'รอคัดกรอง').length;
 
   return (
     <div className="vitals-card">
       <div className="vitals-card-header" onClick={onToggleAccordion}>
         <div className="vitals-header-title-wrap">
-          <div className="vitals-header-icon-box green-box">
+          <div className="vitals-header-icon-box blue-box">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
@@ -78,24 +99,17 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
             </svg>
           </div>
           <div>
-            <h2 className="vitals-card-title">Record Vital Signs (บันทึกสัญญาณชีพ)</h2>
+            <h2 className="vitals-card-title">บันทึกสัญญาณชีพ & คัดกรองผู้ป่วย (Vital Signs & Screening)</h2>
             <p className="vitals-card-subtitle">
-              กรอกข้อมูลการตรวจวัดสัญญาณชีพและประวัติอาการสำคัญของผู้ป่วย
+              เลือกคิวผู้ป่วย บันทึกสัญญาณชีพ ประเมิน Triage และส่งต่อห้องตรวจแพทย์
             </p>
           </div>
         </div>
 
         <div className="vitals-header-actions">
-          {selectedPatient ? (
-            <span className="vitals-status-pill green-pill">
-              <span className="pulse-dot"></span>
-              คิว {selectedPatient.queueNo} ({selectedPatient.fullName})
-            </span>
-          ) : (
-            <span className="vitals-status-pill yellow-pill">
-              โปรดเลือกคิวคนไข้
-            </span>
-          )}
+          <span className="vitals-queue-blue-box">
+            {waitingCount} คิว
+          </span>
 
           <button
             type="button"
@@ -117,10 +131,144 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
 
       <div className={`vitals-card-body ${isAccordionOpen ? 'expanded' : ''}`}>
         <form onSubmit={onSubmit} className="vitals-form">
-          {/* Section 1: Physical Measurements */}
+          {/* Section 1: Queue Selection & Search (Integrated Step 1) */}
           <div className="vitals-form-section">
             <div className="vitals-section-header">
               <span className="vitals-section-num">1</span>
+              <span className="vitals-section-title">เลือกคิวผู้ป่วยเพื่อคัดกรอง (Select Patient Queue)</span>
+              <span className="text-required">*</span>
+            </div>
+
+            <div className="vitals-queue-selector-box" ref={queueDropdownRef}>
+              <div className="combobox-input-wrap">
+                <span className="combobox-search-icon">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+                <input
+                  id="queue-select-input"
+                  type="text"
+                  className="combobox-input"
+                  placeholder="พิมพ์ค้นหาด้วยเลขคิว (เช่น Q0001), ชื่อผู้ป่วย, HN (เช่น HN0001), หรือเลขบัตรประชาชน..."
+                  value={searchQuery}
+                  onFocus={() => onToggleQueueDropdown(true)}
+                  onClick={() => onToggleQueueDropdown(true)}
+                  onChange={(e) => onSearchQueryChange(e.target.value)}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    className="combobox-clear-btn"
+                    onClick={() => {
+                      onSearchQueryChange('');
+                      onResetSelection();
+                      onToggleQueueDropdown(true);
+                    }}
+                    title="ล้างการค้นหา"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={`combobox-toggle-btn ${isQueueDropdownOpen ? 'open' : ''}`}
+                  onClick={() => onToggleQueueDropdown(!isQueueDropdownOpen)}
+                  title="เปิด/ปิด รายการคิว"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Dropdown Options Menu */}
+              {isQueueDropdownOpen && (
+                <div className="combobox-dropdown-menu">
+                  <div className="combobox-menu-header">
+                    <span>ผู้ป่วยที่รอคัดกรอง ({filteredWaitingQueues.length} คิว)</span>
+                    {searchQuery && <span className="search-hint">คลิกเลือกผู้ป่วย</span>}
+                  </div>
+                  <div className="combobox-options-list">
+                    {filteredWaitingQueues.length > 0 ? (
+                      filteredWaitingQueues.map((patient) => {
+                        const isSelected = selectedPatient?.id === patient.id;
+                        return (
+                          <div
+                            key={patient.id}
+                            className={`combobox-option-item ${isSelected ? 'selected' : ''}`}
+                            onClick={() => onSelectPatient(patient)}
+                          >
+                            <div className="option-item-left">
+                              <span className="option-queue-badge">{patient.queueNo}</span>
+                              <div className="option-patient-info">
+                                <span className="option-patient-name">{patient.fullName}</span>
+                                <span className="option-patient-meta">
+                                  HN: {patient.hn} • {patient.gender}, {patient.age} ปี • {patient.schemeType}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="option-item-right">
+                              <span className="option-arrival-time">{patient.registeredTime}</span>
+                              {isSelected ? (
+                                <span className="option-selected-tag">
+                                  <svg width="11" height="11" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                  เลือกอยู่
+                                </span>
+                              ) : (
+                                <span className="option-select-action">เลือก</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="combobox-empty-item">
+                        <span>ไม่พบคิวผู้ป่วยที่ตรงกับคำค้นหา "{searchQuery}"</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Selected Patient Compact Summary */}
+            {selectedPatient && (
+              <div className="patient-compact-strip">
+                <div className="patient-compact-left">
+                  <span className="patient-compact-badge">{selectedPatient.queueNo}</span>
+                  <span className="patient-compact-name">{selectedPatient.fullName}</span>
+                  <span className="patient-compact-divider">•</span>
+                  <span className="patient-compact-hn">HN: {selectedPatient.hn}</span>
+                  <span className="patient-compact-divider">•</span>
+                  <span className="patient-compact-meta">เพศ {selectedPatient.gender}, {selectedPatient.age} ปี</span>
+                  <span className="patient-compact-divider">•</span>
+                  <span className="patient-compact-scheme">{selectedPatient.schemeType}</span>
+                </div>
+              </div>
+            )}
+          </div>
+          {/* Section 2: Physical Measurements */}
+          <div className="vitals-form-section">
+            <div className="vitals-section-header">
+              <span className="vitals-section-num">2</span>
               <span className="vitals-section-title">สรีรวิทยาและสัญญาณชีพพื้นฐาน (Physical & Vitals)</span>
             </div>
 
@@ -128,7 +276,7 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               {/* Weight */}
               <div className="vitals-form-group">
                 <label className="vitals-form-label">
-                  น้ำหนัก (Weight) <span className="text-required">*</span>
+                  <span className="vitals-label-title">น้ำหนัก (Weight) <span className="text-required">*</span></span>
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
@@ -149,14 +297,12 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               {/* Height */}
               <div className="vitals-form-group">
                 <label className="vitals-form-label">
-                  ส่วนสูง (Height) <span className="text-required">*</span>
+                  <span className="vitals-label-title">ส่วนสูง (Height) <span className="text-required">*</span></span>
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
-                    type="number"
-                    step="0.5"
-                    min="30"
-                    max="250"
+                    type="text"
+                    inputMode="decimal"
                     className="vitals-input"
                     placeholder="เช่น 170"
                     value={height}
@@ -170,7 +316,7 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               {/* Body Temperature */}
               <div className="vitals-form-group">
                 <label className="vitals-form-label">
-                  อุณหภูมิร่างกาย (Temp) <span className="text-required">*</span>
+                  <span className="vitals-label-title">อุณหภูมิ (Temp) <span className="text-required">*</span></span>
                   {isHighFever && <span className="clinical-badge badge-high-fever">ไข้สูง!</span>}
                   {isFever && !isHighFever && <span className="clinical-badge badge-fever">มีไข้</span>}
                 </label>
@@ -196,7 +342,7 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               {/* Systolic BP */}
               <div className="vitals-form-group">
                 <label className="vitals-form-label">
-                  ความดันโลหิตตัวบน (Systolic) <span className="text-required">*</span>
+                  <span className="vitals-label-title">ความดันตัวบน (Systolic) <span className="text-required">*</span></span>
                   {isCrisisBP ? (
                     <span className="clinical-badge badge-crisis">วิกฤต!</span>
                   ) : isHighBP ? (
@@ -221,7 +367,7 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               {/* Diastolic BP */}
               <div className="vitals-form-group">
                 <label className="vitals-form-label">
-                  ความดันโลหิตตัวล่าง (Diastolic) <span className="text-required">*</span>
+                  <span className="vitals-label-title">ความดันตัวล่าง (Diastolic) <span className="text-required">*</span></span>
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
@@ -241,7 +387,7 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               {/* Heart Rate / Pulse */}
               <div className="vitals-form-group">
                 <label className="vitals-form-label">
-                  ชีพจร (Heart Rate / Pulse) <span className="text-required">*</span>
+                  <span className="vitals-label-title">ชีพจร (Pulse) <span className="text-required">*</span></span>
                   {isTachycardia && <span className="clinical-badge badge-warning">เต้นเร็ว</span>}
                   {isBradycardia && <span className="clinical-badge badge-info">เต้นช้า</span>}
                 </label>
@@ -264,7 +410,9 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
             {/* Row 3: Optional Clinical Metrics (SpO2, Respiratory Rate) */}
             <div className="vitals-grid-2">
               <div className="vitals-form-group">
-                <label className="vitals-form-label">ออกซิเจนในเลือด (SpO2)</label>
+                <label className="vitals-form-label">
+                  <span className="vitals-label-title">ออกซิเจนในเลือด (SpO2)</span>
+                </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
                     type="number"
@@ -280,7 +428,9 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               </div>
 
               <div className="vitals-form-group">
-                <label className="vitals-form-label">อัตราการหายใจ (Respiratory Rate)</label>
+                <label className="vitals-form-label">
+                  <span className="vitals-label-title">อัตราการหายใจ (Respiratory Rate)</span>
+                </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
                     type="number"
@@ -297,10 +447,10 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
             </div>
           </div>
 
-          {/* Section 2: Clinical Symptoms & Medical History */}
+          {/* Section 3: Clinical Symptoms & Medical History */}
           <div className="vitals-form-section">
             <div className="vitals-section-header">
-              <span className="vitals-section-num">2</span>
+              <span className="vitals-section-num">3</span>
               <span className="vitals-section-title">อาการสำคัญและประวัติทางการแพทย์ (Clinical History)</span>
             </div>
 
@@ -324,7 +474,14 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               <div className="vitals-form-group">
                 <label className="vitals-form-label">
                   ประวัติการแพ้ยา (Allergies)
-                  {hasAllergy && <span className="clinical-badge badge-allergy-alert">⚠️ มีประวัติแพ้ยา</span>}
+                  {hasAllergy && (
+                    <span className="clinical-badge badge-allergy-alert">
+                      <svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor" style={{ marginRight: '4px' }}>
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      มีประวัติแพ้ยา
+                    </span>
+                  )}
                 </label>
                 <input
                   type="text"
@@ -348,10 +505,10 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
             </div>
           </div>
 
-          {/* Section 3: Destination Routing */}
+          {/* Section 4: Destination Routing */}
           <div className="vitals-form-section">
             <div className="vitals-section-header">
-              <span className="vitals-section-num">3</span>
+              <span className="vitals-section-num">4</span>
               <span className="vitals-section-title">ส่งต่อห้องตรวจแพทย์ (Forward to Doctor Room)</span>
             </div>
 

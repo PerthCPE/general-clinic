@@ -58,19 +58,32 @@ export const PatientVitalsTrendCard: React.FC<PatientVitalsTrendCardProps> = ({
             <div className="trend-warning-pills">
               {hasAllergy ? (
                 <div className="warning-pill pill-allergy">
-                  <span className="pill-icon">⚠️</span>
+                  <span className="pill-icon">
+                    <svg viewBox="0 0 20 20" width="13" height="13" fill="currentColor">
+                      <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </span>
                   <span><strong>แพ้ยา:</strong> {profile.allergies}</span>
                 </div>
               ) : (
                 <div className="warning-pill pill-safe">
-                  <span className="pill-icon">✓</span>
+                  <span className="pill-icon">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </span>
                   <span>ปฏิเสธการแพ้ยา</span>
                 </div>
               )}
 
               {profile.chronicDiseases && profile.chronicDiseases !== 'ไม่มี' && (
                 <div className="warning-pill pill-disease">
-                  <span className="pill-icon">🩺</span>
+                  <span className="pill-icon">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4.5 3v5a4.5 4.5 0 009 0V3M9 12.5v3a4.5 4.5 0 009 0v-2" />
+                      <circle cx="18" cy="13.5" r="2.5" />
+                    </svg>
+                  </span>
                   <span><strong>โรคประจำตัว:</strong> {profile.chronicDiseases}</span>
                 </div>
               )}
@@ -99,7 +112,7 @@ export const PatientVitalsTrendCard: React.FC<PatientVitalsTrendCardProps> = ({
         <div className="trend-charts-section">
           <div className="trend-charts-header">
             <h4 className="trend-section-title">
-              📈 แนวโน้มสัญญาณชีพย้อนหลัง ({chronologicalRecords.length} ครั้งล่าสุด)
+              แนวโน้มสัญญาณชีพย้อนหลัง ({chronologicalRecords.length} ครั้งล่าสุด)
             </h4>
             <span className="trend-section-sub">เปรียบเทียบการเปลี่ยนแปลงความดันโลหิตและน้ำหนักตัว</span>
           </div>

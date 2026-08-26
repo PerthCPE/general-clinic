@@ -14,27 +14,43 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleManualLogin = (e: React.FormEvent) => {
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) {
       setError('กรุณากรอกชื่อผู้ใช้งาน');
       return;
     }
 
-    const success = login(username.trim(), password);
-    if (success) {
-      setError('');
-      onLoginSuccess();
-    } else {
-      setError('ไม่พบชื่อผู้ใช้งานนี้ในระบบ (ลองใช้ registrar1, nurse1 หรือ assistant1)');
+    setIsLoading(true);
+    setError('');
+    try {
+      const success = await login(username.trim(), password);
+      if (success) {
+        onLoginSuccess();
+      } else {
+        setError('ไม่พบชื่อผู้ใช้งานนี้ในระบบ (ลองใช้ registrar1, nurse1 หรือ assistant1)');
+      }
+    } catch {
+      setError('เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleQuickLogin = (role: UserRole) => {
-    const success = login(role);
-    if (success) {
-      setError('');
-      onLoginSuccess();
+  const handleQuickLogin = async (role: UserRole) => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const success = await login(role);
+      if (success) {
+        onLoginSuccess();
+      }
+    } catch {
+      setError('เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
+    } finally {
+      setIsLoading(false);
     }
   };
 

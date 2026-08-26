@@ -5,6 +5,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/routes"
+	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,6 +16,9 @@ func main() {
 
 	// Connect postgres and update table
 	config.ConnectDB()
+
+	// Start WebSocket Hub in background
+	go ws.GlobalHub.Run()
 
 	// Start Gin API Router
 	r := gin.Default()
