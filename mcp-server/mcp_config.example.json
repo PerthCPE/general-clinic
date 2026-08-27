@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "general-clinic": {
-      "command": "Z:\\general-clinic\\mcp-server\\clinic-mcp.exe",
-      "args": ["--root=Z:\\general-clinic"]
-    }
-  }
-}

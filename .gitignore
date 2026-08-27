@@ -11,9 +11,15 @@ react-frontend/.env.local
 Thumbs.db
 aboutmypart.md
 
-# MCP Server Executables & Local Configuration
-mcp-server/*.exe
-mcp-server/bin/
+# MCP Server, AI Assistant Tooling, Brain & Local State
+mcp-server/
 .agents/
+.gemini/
+brain/
+*.exe
+*.exe~
+*.tmp
+*.log
 package-lock.json
+
 
