@@ -187,7 +187,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={language === 'th' ? 'ค้นหาด้วยชื่อ, เลข HN, เลข VN หรือ เลขบัตรประชาชน...' : 'Search by name, HN, VN, or National ID...'}
-                className="w-full pl-12 pr-10 py-3 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 rounded-2xl text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-hidden transition-all shadow-inner"
+                className="w-full pl-12 pr-10 py-3 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 rounded-2xl text-sm font-semibold focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all shadow-inner"
               />
               {search && (
                 <button
@@ -311,7 +311,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                             <span>•</span>
                             <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={patient.nationalId || '1-1002-34567-89-0'} />
                           </div>
-                          <div><strong className="text-slate-800">{language === 'th' ? 'เพศ/อายุ:' : 'Gender/Age:'}</strong> {patient.gender}, {patient.age} {language === 'th' ? 'ปี' : 'yrs'}</div>
+                          <div className="px-1.5 py-0.5"><strong className="text-slate-800">{language === 'th' ? 'เพศ/อายุ:' : 'Gender/Age:'}</strong> {patient.gender}, {patient.age} {language === 'th' ? 'ปี' : 'yrs'}</div>
                         </div>
 
                         {patient.chiefComplaint && (
@@ -369,7 +369,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={language === 'th' ? 'ค้นหาผู้ป่วยคนอื่น...' : 'Search another patient...'}
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden"
               />
             </div>
           </div>
@@ -495,7 +495,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                         value={historySearch}
                         onChange={(e) => setHistorySearch(e.target.value)}
                         placeholder={language === 'th' ? 'ค้นหาในประวัติรักษา (โรค, วันที่, ชื่อแพทย์, ยา)...' : 'Filter visits by diagnosis, date, doctor, medicine...'}
-                        className="w-full pl-9 pr-4 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+                        className="w-full pl-9 pr-4 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden"
                       />
                     </div>
                     <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">
@@ -920,7 +920,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
 
       {/* PRINT EMR SUMMARY MODAL */}
       {showPrintModal && selectedPatient && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl border border-slate-100 max-h-[85vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b pb-3">
               <div className="flex items-center gap-2">

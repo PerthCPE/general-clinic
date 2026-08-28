@@ -48,7 +48,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
 
   return (
     <span
-      className={`inline-flex items-center justify-center rounded-full tracking-wide ${getStyles()} ${sizeStyles}`}
+      className={`inline-flex items-center justify-center rounded-full tracking-wide whitespace-nowrap ${getStyles()} ${sizeStyles}`}
     >
       {getLabel()}
     </span>

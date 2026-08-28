@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { Patient, QueueStatus } from '../types';
 import { StatusBadge } from './StatusBadge';
 import { CopyableText } from './CopyableText';
-import { Stethoscope, Clock, AlertCircle, Search, X } from 'lucide-react';
+import { Stethoscope, Clock, AlertCircle, Search, X, Edit3 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
 import { generateVN } from '../utils/vnGenerator';
@@ -51,10 +51,15 @@ export const QueueTable: React.FC<QueueTableProps> = ({
     }
   };
 
-  const displayedPatients = patients.filter((patient) => {
-    if (!queueSearch.trim()) return true;
-    return matchPatientSearch(patient, queueSearch);
-  });
+  const displayedPatients = patients
+    .filter((patient) => {
+      if (!queueSearch.trim()) return true;
+      return matchPatientSearch(patient, queueSearch);
+    })
+    // ผู้ป่วยที่ตรวจเสร็จแล้วให้ตกไปอยู่ท้ายตาราง เพื่อให้คิวที่ยังต้องทำงานอยู่บนสุดเสมอ
+    // .filter() คืน array ใหม่อยู่แล้ว จึง .sort() ได้โดยไม่กระทบ props เดิม
+    // และ sort ของ JS เป็น stable ลำดับคิวเดิมภายในกลุ่มเดียวกันจึงไม่เปลี่ยน
+    .sort((a, b) => Number(a.status === 'Completed') - Number(b.status === 'Completed'));
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
@@ -80,7 +85,7 @@ export const QueueTable: React.FC<QueueTableProps> = ({
               value={queueSearch}
               onChange={(e) => setQueueSearch(e.target.value)}
               placeholder={language === 'th' ? 'ค้นหาชื่อผู้ป่วย, เลข HN, เลข VN, เลขบัตรประชาชน, ลำดับคิว...' : 'Search Patient Name, HN, VN, National ID, Queue...'}
-              className="w-full pl-10 pr-8 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-slate-800 text-xs rounded-xl border border-slate-200 focus:border-blue-500 focus:outline-hidden transition-all shadow-2xs font-sans placeholder:text-slate-400"
+              className="w-full pl-10 pr-8 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-slate-800 text-xs rounded-xl border border-slate-200 focus:outline-hidden transition-all shadow-2xs font-sans placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
             />
             {queueSearch && (
               <button
@@ -120,13 +125,13 @@ export const QueueTable: React.FC<QueueTableProps> = ({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-200/80 text-xs font-semibold text-slate-500 tracking-wider">
-              <th className="py-5 px-6 w-28">{t('colQueueNo')}</th>
+              <th className="py-5 px-6 w-28 text-center">{t('colQueueNo')}</th>
               <th className="py-5 px-6 w-32">{t('colHN')}</th>
               <th className="py-5 px-6 w-36">{t('colVN')}</th>
               <th className="py-5 px-6">{t('colPatientName')}</th>
-              <th className="py-5 px-6 w-36">{t('colStatus')}</th>
-              <th className="py-5 px-6 w-36">{t('colWaitingTime')}</th>
-              <th className="py-5 px-6 w-28 text-right">{t('colAction')}</th>
+              <th className="py-5 px-6 w-40 text-center">{t('colStatus')}</th>
+              <th className="py-5 px-6 w-36 text-center">{t('colWaitingTime')}</th>
+              <th className="py-5 px-6 w-40 text-center">{t('colAction')}</th>
             </tr>
           </thead>
 
@@ -151,7 +156,7 @@ export const QueueTable: React.FC<QueueTableProps> = ({
                   className="hover:bg-slate-50/80 transition-colors group"
                 >
                   {/* Queue No */}
-                  <td className="py-5 px-6 font-semibold text-slate-800 font-mono">
+                  <td className="py-5 px-6 font-semibold text-slate-800 font-mono text-center">
                     {patient.queueNo}
                   </td>
 
@@ -180,26 +185,30 @@ export const QueueTable: React.FC<QueueTableProps> = ({
                   </td>
 
                   {/* Status */}
-                  <td className="py-5 px-6">
+                  <td className="py-5 px-6 text-center">
                     <StatusBadge status={patient.status} />
                   </td>
 
                   {/* Waiting Time */}
                   <td className="py-5 px-6 text-slate-600 font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                      <Clock className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                       <span>{patient.waitingTimeMinutes} {language === 'th' ? 'นาที' : 'min'}</span>
                     </div>
                   </td>
 
                   {/* Action Button matching Figma primary blue button */}
-                  <td className="py-5 px-6 text-right">
+                  <td className="py-5 px-6 text-center">
                     <button
                       onClick={() => onExamine(patient)}
-                      className="px-4 py-1.5 bg-[#2563eb] hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs hover:shadow-xs active:scale-95 transition-all inline-flex items-center gap-1.5 cursor-pointer"
+                      className="px-4 py-1.5 bg-[#2563eb] hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs hover:shadow-xs active:scale-95 transition-all inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
                     >
-                      <Stethoscope className="w-3.5 h-3.5" />
-                      <span>{t('examineBtn')}</span>
+                      {patient.status === 'Completed' ? (
+                        <Edit3 className="w-3.5 h-3.5 shrink-0" />
+                      ) : (
+                        <Stethoscope className="w-3.5 h-3.5 shrink-0" />
+                      )}
+                      <span>{patient.status === 'Completed' ? t('editRecordBtn') : t('examineBtn')}</span>
                     </button>
                   </td>
                 </tr>

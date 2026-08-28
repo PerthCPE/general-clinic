@@ -611,7 +611,6 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
   // Validation Warnings
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
-  const [showAutoSaveToast, setShowAutoSaveToast] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState<string | null>(null);
 
   // Success Feedback Modal State
@@ -620,6 +619,18 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     title: string;
     message: string;
     onConfirm?: () => void;
+  } | null>(null);
+
+  // Shared Confirmation Modal State
+  // ใช้ร่วมกันทั้ง 3 ปุ่ม (ยกเลิกการตรวจ / บันทึกฉบับร่าง / บันทึกและเสร็จสิ้น)
+  // เพื่อให้หน้าตาและลำดับการทำงานเหมือนกันทุกปุ่ม: กด -> ยืนยัน -> ทำงาน -> แจ้งผลสำเร็จ
+  const [confirmDialog, setConfirmDialog] = useState<{
+    tone: 'danger' | 'primary';
+    title: string;
+    message: string;
+    hint?: string;
+    confirmLabel: string;
+    onConfirm: () => void;
   } | null>(null);
 
   // Allergy warning check on medicine selection
@@ -729,14 +740,51 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     };
   };
 
-  // Save Draft
-  const handleSaveDraft = () => {
+  // Save Draft — งานจริง (เรียกหลังผู้ใช้กดยืนยันในโมดัล)
+  const runSaveDraft = () => {
     const activeDiags = [...(primaryDiag ? [primaryDiag] : []), ...secondaryDiags];
     saveToRecentDiagnoses(activeDiags);
     const updated = buildUpdatedPatient('Examining');
     onSavePatient(updated);
-    setShowAutoSaveToast(true);
-    setTimeout(() => setShowAutoSaveToast(false), 3000);
+    setSuccessNotice({
+      isOpen: true,
+      title: language === 'th' ? 'บันทึกฉบับร่างแล้ว' : 'Draft Saved',
+      message: language === 'th'
+        ? `เก็บข้อมูลการตรวจของ ${patient.name} (HN: ${patient.hn}) ไว้เรียบร้อย สถานะยังเป็น "กำลังตรวจ" กลับมาทำต่อได้ทุกเมื่อ`
+        : `Examination data for ${patient.name} (HN: ${patient.hn}) has been saved. The visit remains "Examining" so you can continue later.`
+    });
+  };
+
+  // Save Draft — เปิดโมดัลยืนยัน
+  const handleSaveDraft = () => {
+    setConfirmDialog({
+      tone: 'primary',
+      title: language === 'th' ? 'บันทึกฉบับร่าง?' : 'Save Draft?',
+      message: language === 'th'
+        ? 'ระบบจะเก็บข้อมูลที่กรอกไว้ทั้งหมด แต่ยังไม่ปิดการตรวจ ผู้ป่วยจะยังอยู่ในสถานะ "กำลังตรวจ"'
+        : 'All entered data will be saved without closing the visit. The patient stays in "Examining" status.',
+      hint: language === 'th'
+        ? 'ยังไม่ส่งรายการสั่งยาไปห้องยา จนกว่าจะกด "บันทึกและเสร็จสิ้นการตรวจ"'
+        : 'Prescriptions are not sent to the pharmacy until you use "Save & Complete Visit".',
+      confirmLabel: language === 'th' ? 'บันทึกฉบับร่าง' : 'Save Draft',
+      onConfirm: runSaveDraft
+    });
+  };
+
+  // Cancel Visit — เปิดโมดัลยืนยัน
+  const handleCancelVisit = () => {
+    setConfirmDialog({
+      tone: 'danger',
+      title: language === 'th' ? 'ยกเลิกการตรวจรับบริการ?' : 'Cancel Visit Session?',
+      message: language === 'th'
+        ? 'ระบบจะกลับไปหน้าคิวผู้ป่วย ข้อมูลการตรวจที่กรอกไว้แต่ยังไม่ได้บันทึกจะหายทั้งหมด'
+        : 'You will return to the patient queue. Any examination data not yet saved will be lost.',
+      hint: language === 'th'
+        ? 'หากยังต้องการเก็บข้อมูลไว้ ให้กด "บันทึกฉบับร่าง" แทน'
+        : 'To keep your work, use "Save Draft" instead.',
+      confirmLabel: language === 'th' ? 'ยืนยันยกเลิก' : 'Confirm Cancel',
+      onConfirm: onBackToQueue
+    });
   };
 
   // Complete Visit Validation & Execution
@@ -760,26 +808,47 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
     if (warnings.length > 0) {
       setValidationWarnings(warnings);
-    } else {
-      setValidationWarnings([]);
-      const activeDiags = [...(primaryDiag ? [primaryDiag] : []), ...secondaryDiags];
-      saveToRecentDiagnoses(activeDiags);
-      const updated = buildUpdatedPatient('Completed');
-      onSavePatient(updated);
-      const rxNotice = prescriptions.length > 0 
-        ? (language === 'th' ? `\n(ระบบส่งรายการสั่งยา ${prescriptions.length} รายการไปยังห้องยาโดยอัตโนมัติ)` : `\n(${prescriptions.length} prescription item(s) automatically synced to pharmacy queue)`)
-        : '';
-      setSuccessNotice({
-        isOpen: true,
-        title: language === 'th' ? 'บันทึกสำเร็จ!' : 'Success!',
-        message: language === 'th'
-          ? `บันทึกและเสร็จสิ้นการตรวจเรียบร้อยแล้วสำหรับผู้ป่วย ${patient.name} (HN: ${patient.hn}, VN: ${patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)})${rxNotice}`
-          : `Examination completed successfully for patient ${patient.name} (HN: ${patient.hn}, VN: ${patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)})${rxNotice}`,
-        onConfirm: () => {
-          onBackToQueue();
-        }
-      });
+      return;
     }
+
+    setValidationWarnings([]);
+    setConfirmDialog({
+      tone: 'primary',
+      title: language === 'th' ? 'บันทึกและเสร็จสิ้นการตรวจ?' : 'Save & Complete Visit?',
+      message: language === 'th'
+        ? `ปิดการตรวจของ ${patient.name} (HN: ${patient.hn}) และเปลี่ยนสถานะเป็น "ตรวจเสร็จสิ้น"`
+        : `This will close the visit for ${patient.name} (HN: ${patient.hn}) and set the status to "Completed".`,
+      hint: prescriptions.length > 0
+        ? (language === 'th'
+            ? `ระบบจะส่งรายการสั่งยา ${prescriptions.length} รายการไปยังห้องยาโดยอัตโนมัติ`
+            : `${prescriptions.length} prescription item(s) will be sent to the pharmacy queue automatically.`)
+        : (language === 'th'
+            ? 'การตรวจนี้ไม่มีรายการสั่งยา'
+            : 'No prescription items in this visit.'),
+      confirmLabel: language === 'th' ? 'ยืนยันบันทึก' : 'Confirm & Complete',
+      onConfirm: runCompleteVisit
+    });
+  };
+
+  // Complete Visit — งานจริง (เรียกหลังผู้ใช้กดยืนยันในโมดัล)
+  const runCompleteVisit = () => {
+    const activeDiags = [...(primaryDiag ? [primaryDiag] : []), ...secondaryDiags];
+    saveToRecentDiagnoses(activeDiags);
+    const updated = buildUpdatedPatient('Completed');
+    onSavePatient(updated);
+    const rxNotice = prescriptions.length > 0 
+      ? (language === 'th' ? `\n(ระบบส่งรายการสั่งยา ${prescriptions.length} รายการไปยังห้องยาโดยอัตโนมัติ)` : `\n(${prescriptions.length} prescription item(s) automatically synced to pharmacy queue)`)
+      : '';
+    setSuccessNotice({
+      isOpen: true,
+      title: language === 'th' ? 'บันทึกสำเร็จ!' : 'Success!',
+      message: language === 'th'
+        ? `บันทึกและเสร็จสิ้นการตรวจเรียบร้อยแล้วสำหรับผู้ป่วย ${patient.name} (HN: ${patient.hn}, VN: ${patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)})${rxNotice}`
+        : `Examination completed successfully for patient ${patient.name} (HN: ${patient.hn}, VN: ${patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)})${rxNotice}`,
+      onConfirm: () => {
+        onBackToQueue();
+      }
+    });
   };
 
   // Select medicine and auto-fill Thai hospital default fields
@@ -939,13 +1008,6 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       </div>
 
       {/* Auto-save notification */}
-      {showAutoSaveToast && (
-        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-3 rounded-xl text-xs flex items-center gap-2 animate-in fade-in">
-          <Check className="w-4 h-4 text-emerald-600" />
-          <span>Draft examination record auto-saved successfully!</span>
-        </div>
-      )}
-
       {/* Drug Allergy Critical Alert Banner */}
       {allergyAlert && (
         <div className="bg-red-50 text-red-900 border-2 border-red-300 p-4 rounded-2xl flex items-start gap-3 shadow-xs animate-bounce">
@@ -1514,7 +1576,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                         ? 'รู้สึกตัวดี มีอาการไม่สบายตัวเล็กน้อยจากเจ็บคอ...'
                         : 'Good consciousness, non-toxic appearance...'
                     }
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-hidden transition-all resize-none leading-relaxed"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 outline-hidden transition-all resize-none leading-relaxed"
                   />
                 </div>
 
@@ -1531,7 +1593,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                         ? 'ผนังคอหอยแดงมากและมีคราบหนองบริเวณต่อมทอนซิล คลำพบต่อมน้ำเหลืองบริเวณลำคอโต...'
                         : 'Pharynx erythematous with tonsillar exudates, cervical lymph nodes palpable...'
                     }
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-hidden transition-all resize-none leading-relaxed"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 outline-hidden transition-all resize-none leading-relaxed"
                   />
                 </div>
 
@@ -1548,7 +1610,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                         ? 'เสียงหัวใจ S1, S2 ปกติ ไม่พบเสียงฟู่ (Murmur)...'
                         : 'Normal S1, S2, no murmur...'
                     }
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-hidden transition-all resize-none leading-relaxed"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 outline-hidden transition-all resize-none leading-relaxed"
                   />
                 </div>
 
@@ -1565,7 +1627,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                         ? 'ปอดฟังชัดเจนทั้งสองข้าง ไม่พบเสียงวี้ดหรือเสียงครืดคราด...'
                         : 'Clear bilaterally, no adventitious sounds, no wheezing...'
                     }
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-hidden transition-all resize-none leading-relaxed"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 outline-hidden transition-all resize-none leading-relaxed"
                   />
                 </div>
 
@@ -1582,7 +1644,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                         ? 'หน้าท้องนุ่ม ไม่กดเจ็บ ไม่พบตับหรือม้ามโต...'
                         : 'Soft, non-tender, active bowel sounds, no organomegaly...'
                     }
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-hidden transition-all resize-none leading-relaxed"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 outline-hidden transition-all resize-none leading-relaxed"
                   />
                 </div>
 
@@ -1599,7 +1661,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                         ? 'การเคลื่อนไหวของข้อและกล้ามเนื้อปกติ...'
                         : 'Normal range of motion, muscle power 5/5...'
                     }
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-hidden transition-all resize-none leading-relaxed"
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 outline-hidden transition-all resize-none leading-relaxed"
                   />
                 </div>
               </div>
@@ -1642,7 +1704,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   }}
                   onFocus={() => setShowDiagDropdown(true)}
                   placeholder={language === 'th' ? 'พิมพ์รหัส ICD-10 หรือชื่อโรค เช่น J02.9, Pharyngitis, คออักเสบ...' : 'Search ICD-10 code or disease name (e.g. J02.9, Pharyngitis)...'}
-                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-none"
                 />
                 {diagSearch && (
                   <button
@@ -1840,7 +1902,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                           type="text"
                           value={editDiagText}
                           onChange={(e) => setEditDiagText(e.target.value)}
-                          className="flex-1 p-2 bg-white border border-blue-300 rounded-xl text-xs font-medium"
+                          className="flex-1 p-2 bg-white border border-blue-300 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                         />
                         <button
                           type="button"
@@ -1936,7 +1998,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                           type="text"
                           value={editDiagText}
                           onChange={(e) => setEditDiagText(e.target.value)}
-                          className="flex-1 p-2 bg-white border border-slate-300 rounded-xl text-xs font-medium"
+                          className="flex-1 p-2 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                         />
                         <button
                           type="button"
@@ -1967,7 +2029,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   value={assessmentNotes}
                   onChange={(e) => setAssessmentNotes(e.target.value)}
                   placeholder={language === 'th' ? 'ระบุเหตุผลทางการแพทย์ ข้อควรพิจารณา การประเมินความรุนแรง...' : 'Enter clinical reasoning, severity assessment, and considerations...'}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                 />
               </div>
 
@@ -1980,7 +2042,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   value={treatmentPlan}
                   onChange={(e) => setTreatmentPlan(e.target.value)}
                   placeholder={language === 'th' ? 'ระบุแผนการดูแล คำแนะนำที่ไม่ใช้ยา หัตถการที่ทำ...' : 'Enter care plan, non-pharmacological advice, procedures performed...'}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white"
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                 />
               </div>
             </div>
@@ -1994,7 +2056,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             {/* Add New Medicine Form */}
             <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-emerald-600" />
+                <Plus className="w-4 h-4 text-[#2563eb]" />
                 <span>{language === 'th' ? 'ค้นหาและสั่งจ่ายยา' : 'Search & Prescribe Medicine'}</span>
               </h3>
 
@@ -2005,8 +2067,8 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'เลือก / ค้นหารายการยา * (พิมพ์ค้นหา หรือ เลือกจากรายการ)' : 'Select / Search Medicine *'}
                   </label>
                   
-                  <div className="relative flex items-center">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
+                  <div className="group relative flex items-center">
+                    <Search className="w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors absolute left-3 pointer-events-none" />
                     <input
                       type="text"
                       value={medSearch}
@@ -2018,7 +2080,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                         handleSelectMedicine(val);
                       }}
                       placeholder={language === 'th' ? 'พิมพ์ค้นหาชื่อยา เช่น Paracetamol, Amoxicillin หรือคลิกเลือก...' : 'Search medicine e.g., Paracetamol, Amoxicillin or click to select...'}
-                      className="w-full pl-9 pr-16 py-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-800 shadow-sm transition-all"
+                      className="w-full pl-9 pr-16 py-2.5 bg-slate-50/80 hover:bg-slate-50 focus:bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden shadow-inner transition-all"
                     />
 
                     <div className="absolute right-2 flex items-center gap-1">
@@ -2071,20 +2133,20 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                                 handleSelectMedicine(med.name);
                                 setIsMedDropdownOpen(false);
                               }}
-                              className={`w-full text-left px-3.5 py-2.5 hover:bg-emerald-50/80 transition-colors flex items-center justify-between group ${
-                                isSelected ? 'bg-emerald-50 text-emerald-900 font-semibold' : 'text-slate-700'
+                              className={`w-full text-left px-3.5 py-2.5 hover:bg-blue-50/80 transition-colors flex items-center justify-between group ${
+                                isSelected ? 'bg-blue-50 text-blue-900 font-semibold' : 'text-slate-700'
                               }`}
                             >
                               <div>
-                                <div className="text-xs sm:text-sm font-semibold group-hover:text-emerald-700 flex items-center gap-1.5">
+                                <div className="text-xs sm:text-sm font-semibold group-hover:text-blue-700 flex items-center gap-1.5">
                                   <span>{med.name}</span>
-                                  {isSelected && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-blue-600" />}
                                 </div>
-                                <div className="text-[11px] text-slate-500 group-hover:text-emerald-600">
+                                <div className="text-[11px] text-slate-500 group-hover:text-blue-600">
                                   {med.category}
                                 </div>
                               </div>
-                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 group-hover:bg-emerald-100 group-hover:text-emerald-700 transition-colors">
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors">
                                 {language === 'th' ? 'เลือกยา' : 'Select'}
                               </span>
                             </button>
@@ -2119,7 +2181,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <select
                     value={newMedDosage}
                     onChange={(e) => setNewMedDosage(e.target.value)}
-                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-blue-500 text-slate-700 cursor-pointer"
+                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden text-slate-700 cursor-pointer"
                   >
                     <option value="">-- {language === 'th' ? 'เลือกขนาดการใช้' : 'Select Dosage'} --</option>
                     <option value={language === 'th' ? '1 เม็ด' : '1 tablet'}>{language === 'th' ? '1 เม็ด' : '1 tablet'}</option>
@@ -2150,7 +2212,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <select
                     value={newMedFreq}
                     onChange={(e) => setNewMedFreq(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium cursor-pointer"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium cursor-pointer focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                   >
                     <option value="">-- {language === 'th' ? 'เลือกความถี่' : 'Select Frequency'} --</option>
                     <option value={language === 'th' ? 'วันละ 3 ครั้ง' : '3 times daily'}>{language === 'th' ? 'วันละ 3 ครั้ง' : '3 times daily'}</option>
@@ -2177,7 +2239,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <select
                     value={newMedDuration}
                     onChange={(e) => setNewMedDuration(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium cursor-pointer"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium cursor-pointer focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                   >
                     <option value="">-- {language === 'th' ? 'เลือกระยะเวลา' : 'Select Duration'} --</option>
                     <option value={language === 'th' ? '3 วัน' : '3 days'}>{language === 'th' ? '3 วัน' : '3 days'}</option>
@@ -2206,7 +2268,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <select
                     value={String(newMedQty)}
                     onChange={(e) => setNewMedQty(e.target.value === '' ? '' : (isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value)) as any)}
-                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium cursor-pointer font-mono"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium cursor-pointer font-mono focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                   >
                     <option value="">-- {language === 'th' ? 'เลือกจำนวน' : 'Select Qty'} --</option>
                     <option value="1">1</option>
@@ -2237,7 +2299,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <select
                     value={newMedRoute}
                     onChange={(e) => setNewMedRoute(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium cursor-pointer"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium cursor-pointer focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                   >
                     <option value="">-- {language === 'th' ? 'เลือกทางให้ยา' : 'Select Route'} --</option>
                     <option value={language === 'th' ? 'รับประทาน' : 'Oral'}>{language === 'th' ? 'รับประทาน' : 'Oral'}</option>
@@ -2263,7 +2325,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <select
                     value={newMedTiming}
                     onChange={(e) => setNewMedTiming(e.target.value)}
-                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium cursor-pointer"
+                    className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-medium cursor-pointer focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                   >
                     <option value="">-- {language === 'th' ? 'เลือกเวลารับประทาน' : 'Select Meal Timing'} --</option>
                     <option value={language === 'th' ? 'หลังอาหาร' : 'After Meal'}>{language === 'th' ? 'หลังอาหาร' : 'After Meal'}</option>
@@ -2284,7 +2346,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <button
                     type="button"
                     onClick={handleAddPrescription}
-                    className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-2 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
                   >
                     <Plus className="w-4 h-4 shrink-0" />
                     <span>{language === 'th' ? 'เพิ่มรายการสั่งยา' : 'Add to Order'}</span>
@@ -2302,7 +2364,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   value={newMedInstructions}
                   onChange={(e) => setNewMedInstructions(e.target.value)}
                   placeholder={language === 'th' ? 'คำแนะนำพิเศษเพิ่มเติม...' : 'Special instructions for pharmacy label...'}
-                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs"
+                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                 />
               </div>
             </div>
@@ -2377,7 +2439,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <select
                     value={refDept}
                     onChange={(e) => setRefDept(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                   >
                     <option value="">{language === 'th' ? '-- เลือกแผนกผู้เชี่ยวชาญ --' : '-- Select Specialty --'}</option>
                     <option value="Cardiology">{language === 'th' ? 'แผนกโรคหัวใจ' : 'Cardiology'}</option>
@@ -2397,7 +2459,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     value={refReason}
                     onChange={(e) => setRefReason(e.target.value)}
                     placeholder={language === 'th' ? 'เช่น ประเมินระบบหัวใจอย่างละเอียด' : 'e.g. Further cardiac evaluation'}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                   />
                 </div>
               </div>
@@ -2417,7 +2479,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     rows={2}
                     value={counselMed}
                     onChange={(e) => setCounselMed(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                   />
                 </div>
 
@@ -2429,7 +2491,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     rows={2}
                     value={counselLifestyle}
                     onChange={(e) => setCounselLifestyle(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                   />
                 </div>
               </div>
@@ -2480,7 +2542,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                       type="date"
                       value={followUpDate}
                       onChange={(e) => setFollowUpDate(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                     />
                   </div>
 
@@ -2493,7 +2555,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                       value={followUpReason}
                       onChange={(e) => setFollowUpReason(e.target.value)}
                       placeholder={language === 'th' ? 'ระบุเหตุผลในการนัดหมาย' : 'Enter reason for follow-up'}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                     />
                   </div>
 
@@ -2506,7 +2568,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                       value={followUpInstructions}
                       onChange={(e) => setFollowUpInstructions(e.target.value)}
                       placeholder={language === 'th' ? 'คำแนะนำการเตรียมตัว' : 'Patient preparation instructions'}
-                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs"
+                      className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                     />
                   </div>
                 </div>
@@ -2524,11 +2586,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (confirm(language === 'th' ? 'คุณแน่ใจหรือไม่ว่าต้องการยกเลิกการตรวจรับบริการนี้?' : 'Are you sure you want to cancel this visit session?')) {
-                      onBackToQueue();
-                    }
-                  }}
+                  onClick={handleCancelVisit}
                   className="p-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
                 >
                   <XCircle className="w-4 h-4 text-white" />
@@ -2578,7 +2636,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
       {/* History Preview Modal */}
       {showHistoryModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[1200] bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between border-b pb-3">
               <h3 className="font-bold text-base text-slate-900">
@@ -2606,9 +2664,98 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         </div>
       )}
 
+      {/* Shared Confirmation Modal — ใช้ร่วมกันทั้งปุ่มยกเลิก / บันทึกฉบับร่าง / บันทึกและเสร็จสิ้น */}
+      {confirmDialog && (
+        <div
+          className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          onClick={() => setConfirmDialog(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border border-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ring-8 shadow-inner ${
+                confirmDialog.tone === 'danger'
+                  ? 'bg-red-100 text-red-600 ring-red-50'
+                  : 'bg-blue-100 text-blue-600 ring-blue-50'
+              }`}
+            >
+              {confirmDialog.tone === 'danger' ? (
+                <AlertTriangle className="w-9 h-9 stroke-[2.5]" />
+              ) : (
+                <Save className="w-9 h-9 stroke-[2.5]" />
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
+                {confirmDialog.title}
+              </h3>
+              <p className="text-sm font-medium text-slate-600 leading-relaxed px-2">
+                {confirmDialog.message}
+              </p>
+            </div>
+
+            {confirmDialog.hint && (
+              <div
+                className={`rounded-xl px-3 py-2 flex items-start gap-2 text-left border ${
+                  confirmDialog.tone === 'danger'
+                    ? 'bg-red-50/70 border-red-100'
+                    : 'bg-blue-50/70 border-blue-100'
+                }`}
+              >
+                <Info
+                  className={`w-4 h-4 shrink-0 mt-0.5 ${
+                    confirmDialog.tone === 'danger' ? 'text-red-500' : 'text-blue-500'
+                  }`}
+                />
+                <span
+                  className={`text-[12px] leading-relaxed ${
+                    confirmDialog.tone === 'danger' ? 'text-red-800' : 'text-blue-800'
+                  }`}
+                >
+                  {confirmDialog.hint}
+                </span>
+              </div>
+            )}
+
+            <div className="pt-1 grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="w-full py-3 px-4 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-sm font-bold transition-all cursor-pointer"
+              >
+                {language === 'th' ? 'กลับไปทำต่อ' : 'Keep Working'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const run = confirmDialog.onConfirm;
+                  setConfirmDialog(null);
+                  run();
+                }}
+                className={`w-full py-3 px-4 text-white rounded-xl text-sm font-bold shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
+                  confirmDialog.tone === 'danger'
+                    ? 'bg-red-600 hover:bg-red-700 shadow-red-600/20'
+                    : 'bg-[#2563eb] hover:bg-blue-700 shadow-blue-600/20'
+                }`}
+              >
+                {confirmDialog.tone === 'danger' ? (
+                  <XCircle className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                ) : (
+                  <Check className="w-4 h-4 shrink-0 stroke-[3]" />
+                )}
+                <span>{confirmDialog.confirmLabel}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Feedback Modal */}
       {successNotice && successNotice.isOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border border-slate-100 transform transition-all scale-100">
             {/* Green Checkmark Icon Container */}
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto ring-8 ring-emerald-50 shadow-inner">
