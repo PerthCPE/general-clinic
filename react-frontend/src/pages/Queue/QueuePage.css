@@ -412,20 +412,16 @@
 }
 
 .col-queue-no {
-  width: 74px;
-  min-width: 70px;
+  width: 125px;
+  min-width: 125px;
+  max-width: 125px;
   text-align: left;
-}
-
-.col-call-audio {
-  width: 34px;
-  min-width: 34px;
-  text-align: left;
+  white-space: nowrap;
 }
 
 .col-patient-name {
   width: 26%;
-  max-width: 260px;
+  max-width: 280px;
   text-align: left;
   overflow: hidden;
 }
@@ -450,18 +446,12 @@
 .modern-queue-table thead th.col-queue-no {
   text-align: left;
   padding-left: 20px;
-  padding-right: 0;
-}
-
-.modern-queue-table thead th.col-call-audio {
-  text-align: left;
-  padding-left: 4px;
-  padding-right: 0;
+  padding-right: 8px;
 }
 
 .modern-queue-table thead th.col-patient-name {
   text-align: left;
-  padding-left: 10px;
+  padding-left: 14px;
   padding-right: 14px;
 }
 
@@ -494,18 +484,12 @@
 .queue-table-row td.col-queue-no {
   text-align: left;
   padding-left: 20px;
-  padding-right: 0;
-}
-
-.queue-table-row td.col-call-audio {
-  text-align: left;
-  padding-left: 4px;
-  padding-right: 0;
+  padding-right: 8px;
 }
 
 .queue-table-row td.col-patient-name {
   text-align: left;
-  padding-left: 10px;
+  padding-left: 14px;
   padding-right: 14px;
 }
 
@@ -524,6 +508,29 @@
   display: inline-block;
   width: 32px;
   height: 32px;
+  flex-shrink: 0;
+}
+
+/* ===== Locked Queue & Audio Button Wrapper ===== */
+.queue-locked-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.queue-mono-tag {
+  width: 58px;
+  min-width: 58px;
+  max-width: 58px;
+  flex-shrink: 0;
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 700;
+  color: #2563EB;
+  letter-spacing: 0.5px;
+  text-align: left;
+  white-space: nowrap;
 }
 
 /* ===== Column Specifics ===== */
@@ -532,18 +539,6 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  white-space: nowrap;
-}
-
-.queue-mono-tag {
-  font-family: var(--font-heading);
-  font-size: 16px;
-  font-weight: 700;
-  color: #2563EB;
-  background: transparent;
-  border: none;
-  padding: 0;
-  letter-spacing: 0.5px;
   white-space: nowrap;
 }
 
