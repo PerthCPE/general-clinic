@@ -173,12 +173,12 @@ func SearchPatient(c *gin.Context) {
 	} else if len(words) > 1 {
 		// 2. ค้นหาหลายคำ เช่น "สมชาย ใจดี" หรือ "นาย สมชาย"
 		for _, w := range words {
-			tx = tx.Where("fullname ILIKE ?", "%"+w+"%")
+			tx = tx.Where("full_name ILIKE ?", "%"+w+"%")
 		}
 	} else {
 		// 3. คำค้นหาเดี่ยว: ชื่อ หรือ นามสกุล หรือ เลขบัตรบางส่วน หรือ HN หรือ เบอร์โทร
 		tx = tx.Where(
-			"fullname ILIKE ? OR national_id LIKE ? OR hn ILIKE ? OR phone_number LIKE ?",
+			"full_name ILIKE ? OR national_id LIKE ? OR hn ILIKE ? OR phone_number LIKE ?",
 			"%"+query+"%",
 			"%"+cleanDigits+"%",
 			"%"+query+"%",
