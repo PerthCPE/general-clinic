@@ -14,6 +14,7 @@ import { VitalsFormCard } from './components/VitalsFormCard';
 import { queueApi, vitalsApi, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
+import toast from 'react-hot-toast';
 import './VitalsPage.css';
 
 export { formatHN, formatQueueNo };
@@ -75,16 +76,14 @@ export const VitalsPage: React.FC = () => {
     try {
       const data = await queueApi.getList();
       if (Array.isArray(data)) {
-        if (data.length > 0) {
-          const mapped = data.map(mapBackendQueueToPatientItem);
-          setQueueList(mapped);
-        } else {
-          setQueueList([]);
-        }
+        const mapped = data.map(mapBackendQueueToPatientItem);
+        setQueueList(mapped);
+        return mapped;
       }
     } catch (err) {
       console.warn('Could not load queues in vitals:', err);
     }
+    return [];
   }, []);
 
   // ดึงรายชื่อแพทย์ประจำห้องตรวจจาก Backend DB
@@ -365,9 +364,11 @@ export const VitalsPage: React.FC = () => {
     const numSpO2 = parseInt(spo2, 10) || 98;
 
     const targetPatientId = selectedPatient.patientId || parseInt(selectedPatient.id, 10) || 1;
+    const targetQueueId = selectedPatient.queueId || (typeof selectedPatient.id === 'number' ? selectedPatient.id : parseInt(selectedPatient.id, 10));
 
     try {
-      await vitalsApi.record({
+      const res = await vitalsApi.record({
+        queue_id: targetQueueId,
         patient_id: targetPatientId,
         queue_number: selectedPatient.queueNo,
         chief_complaint: chiefComplaint.trim() || 'ตรวจสุขภาพและคัดกรองทั่วไป',
@@ -384,35 +385,57 @@ export const VitalsPage: React.FC = () => {
         assigned_doctor_id: docObj.doctorId,
         triage_level: selectedTriage,
       });
-      fetchQueues();
-    } catch (err) {
-      console.warn('Record vitals API error:', err);
-    }
+      if (res && res.message) {
+        toast.success(res.message, { id: 'vitals-success-toast' });
+      }
 
-    // Update local queue status from 'รอคัดกรอง' to 'รอพบแพทย์'
-    setQueueList((prev) =>
-      prev.map((q) =>
-        q.id === selectedPatient.id ? { ...q, queueStatus: 'รอพบแพทย์' } : q
-      )
-    );
+      // 1. ดึงรายการคิวล่าสุดจากฐานข้อมูลทันที
+      const freshQueues = await fetchQueues();
+
+      // 2. เคลียร์ฟอร์ม
+      handleResetForm();
+
+      // 3. หาคิวที่ยังรอคัดกรองอยู่จริง
+      if (freshQueues && freshQueues.length > 0) {
+        const remainingWaiting = freshQueues.filter((q) => q.queueStatus === 'รอคัดกรอง');
+        if (remainingWaiting.length > 0) {
+          handleSelectPatient(remainingWaiting[0]);
+        } else {
+          setSelectedPatientId('');
+          setSearchQuery('');
+        }
+      } else {
+        setSelectedPatientId('');
+        setSearchQuery('');
+      }
+    } catch (err: any) {
+      console.warn('Record vitals API error:', err);
+      if (err?.message) {
+        toast.error(`แจ้งเตือน: ${err.message}`, { id: 'vitals-error-toast' });
+      }
+
+      // Local fallback กรณีเครือข่ายมีปัญหา (อัปเดตเฉพาะคิวที่เลือกเท่านั้น ไม่อ้างอิงตาม patientId)
+      const updatedQueueList = queueList.map((q) =>
+        q.id === selectedPatient.id || (selectedPatient.queueId && q.queueId === selectedPatient.queueId) || q.queueNo === selectedPatient.queueNo
+          ? { ...q, queueStatus: 'รอพบแพทย์' as const }
+          : q
+      );
+      setQueueList(updatedQueueList);
+      handleResetForm();
+
+      const remainingQueues = updatedQueueList.filter((q) => q.queueStatus === 'รอคัดกรอง');
+      if (remainingQueues.length > 0) {
+        handleSelectPatient(remainingQueues[0]);
+      } else {
+        setSelectedPatientId('');
+        setSearchQuery('');
+      }
+    }
 
     setIsSaving(false);
-    setToastMessage(
-      `บันทึกข้อมูลการคัดกรองของ ${selectedPatient.fullName} (${selectedPatient.queueNo}) สำเร็จ! ส่งต่อไปยัง ${docObj.roomName} (${docObj.fullName}) เรียบร้อยแล้ว`
-    );
-
-    // Auto clear selection and form
-    handleResetForm();
-
-    // Pick next available queue if any
-    const remainingQueues = queueList.filter(
-      (q) => q.id !== selectedPatient.id && q.queueStatus === 'รอคัดกรอง'
-    );
-    if (remainingQueues.length > 0) {
-      handleSelectPatient(remainingQueues[0]);
-    } else {
-      setSelectedPatientId('');
-    }
+    const msg = `บันทึกข้อมูลการคัดกรองของ ${selectedPatient.fullName} (${selectedPatient.queueNo}) สำเร็จ! ส่งต่อไปยัง ${docObj.roomName} (${docObj.fullName}) เรียบร้อยแล้ว`;
+    setToastMessage(msg);
+    toast.success(msg, { id: 'vitals-local-toast' });
 
     // Auto dismiss toast after 5s
     setTimeout(() => setToastMessage(null), 5000);

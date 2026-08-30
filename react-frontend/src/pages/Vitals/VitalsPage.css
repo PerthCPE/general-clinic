@@ -799,6 +799,10 @@
   color: #1E293B;
 }
 
+.vitals-section-header .vitals-queue-blue-box {
+  margin-left: auto;
+}
+
 .vitals-grid-3 {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -847,6 +851,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+
 
 .text-required {
   color: #EF4444;
@@ -1802,7 +1808,7 @@ body.dark-mode .vitals-main-title {
 }
 
 body.dark-mode .vitals-main-subtitle {
-  color: #ADBAC7;
+  color: #CBD5E1;
 }
 
 body.dark-mode .vitals-role-pill {
@@ -1858,7 +1864,7 @@ body.dark-mode .vitals-widget-title {
 
 body.dark-mode .vitals-card-subtitle,
 body.dark-mode .vitals-widget-subtitle {
-  color: #ADBAC7;
+  color: #CBD5E1;
 }
 
 body.dark-mode .vitals-card-toggle {
@@ -1931,6 +1937,10 @@ body.dark-mode .combobox-input-wrap:focus-within {
   background: #22272E;
   border-color: #539BF5;
   box-shadow: 0 0 0 3px rgba(83, 155, 245, 0.15);
+}
+
+body.dark-mode .vitals-label-title {
+  color: #CBD5E1;
 }
 
 body.dark-mode .combobox-input {
@@ -2134,7 +2144,7 @@ body.dark-mode .vitals-section-title {
 }
 
 body.dark-mode .vitals-form-label {
-  color: #CDD9E5;
+  color: #CBD5E1;
   font-weight: 500;
 }
 
@@ -2204,78 +2214,89 @@ body.dark-mode .vitals-unit-tag {
 
 /* Clinical Flags & Alert Chips in Dark Mode */
 body.dark-mode .bp-flag-chip.flag-normal {
-  background: rgba(16, 185, 129, 0.18);
-  color: #34D399;
-  border: 1.5px solid rgba(52, 211, 153, 0.45);
-  font-weight: 600;
+  background: rgba(22, 163, 74, 0.3);
+  color: #86EFAC;
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
 }
 
 body.dark-mode .bp-flag-chip.flag-high {
-  background: rgba(245, 158, 11, 0.18);
-  color: #FBBF24;
-  border: 1.5px solid rgba(251, 191, 36, 0.45);
-  font-weight: 600;
+  background: rgba(217, 119, 6, 0.3);
+  color: #FDE047;
+  border: 1.5px solid #FBBF24;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
 }
 
 body.dark-mode .bp-flag-chip.flag-crisis {
-  background: rgba(239, 68, 68, 0.18);
-  color: #F87171;
-  border: 1.5px solid rgba(248, 113, 113, 0.45);
-  font-weight: 600;
+  background: rgba(220, 38, 38, 0.3);
+  color: #FCA5A5;
+  border: 1.5px solid #F87171;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
 }
 
 body.dark-mode .vitals-flag-tag.tag-fever {
-  background: rgba(239, 68, 68, 0.18);
-  color: #F87171;
-  border: 1.5px solid rgba(248, 113, 113, 0.45);
-  font-weight: 600;
+  background: rgba(220, 38, 38, 0.3);
+  color: #FCA5A5;
+  border: 1.5px solid #F87171;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
 }
 
 body.dark-mode .vitals-flag-tag.tag-tachy {
-  background: rgba(245, 158, 11, 0.18);
-  color: #FBBF24;
-  border: 1.5px solid rgba(251, 191, 36, 0.45);
-  font-weight: 600;
+  background: rgba(217, 119, 6, 0.3);
+  color: #FDE047;
+  border: 1.5px solid #FBBF24;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
 }
 
 body.dark-mode .vitals-flag-tag.tag-brady {
-  background: rgba(59, 130, 246, 0.18);
-  color: #60A5FA;
-  border: 1.5px solid rgba(96, 165, 250, 0.45);
-  font-weight: 600;
+  background: rgba(37, 99, 235, 0.3);
+  color: #93C5FD;
+  border: 1.5px solid #60A5FA;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 body.dark-mode .vitals-flag-tag.tag-lowspo2 {
-  background: rgba(239, 68, 68, 0.18);
-  color: #F87171;
-  border: 1.5px solid rgba(248, 113, 113, 0.45);
-  font-weight: 600;
+  background: rgba(220, 38, 38, 0.3);
+  color: #FCA5A5;
+  border: 1.5px solid #F87171;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
 }
 
 body.dark-mode .clinical-badge.badge-high-fever,
 body.dark-mode .clinical-badge.badge-crisis {
-  background: rgba(239, 68, 68, 0.2);
-  color: #F87171;
-  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(220, 38, 38, 0.3);
+  color: #FCA5A5;
+  border: 1.5px solid #F87171;
+  font-weight: 700;
 }
 
 body.dark-mode .clinical-badge.badge-fever,
 body.dark-mode .clinical-badge.badge-warning {
-  background: rgba(245, 158, 11, 0.2);
-  color: #FBBF24;
-  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(217, 119, 6, 0.3);
+  color: #FDE047;
+  border: 1.5px solid #FBBF24;
+  font-weight: 700;
 }
 
 body.dark-mode .clinical-badge.badge-info {
-  background: rgba(59, 130, 246, 0.2);
-  color: #60A5FA;
-  border: 1px solid rgba(96, 165, 250, 0.45);
+  background: rgba(37, 99, 235, 0.3);
+  color: #93C5FD;
+  border: 1.5px solid #60A5FA;
+  font-weight: 700;
 }
 
 body.dark-mode .clinical-badge.badge-allergy-alert {
-  background: rgba(239, 68, 68, 0.2);
-  color: #F87171;
-  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(220, 38, 38, 0.3);
+  color: #FCA5A5;
+  border: 1.5px solid #F87171;
+  font-weight: 700;
 }
 
 /* Form Actions in Dark Mode */
@@ -2284,19 +2305,23 @@ body.dark-mode .vitals-form-actions {
 }
 
 body.dark-mode .vitals-btn-submit {
-  background: #316DCA;
+  background: #2563EB;
+  border: 1.5px solid #60A5FA;
   color: #FFFFFF;
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
 }
 
 body.dark-mode .vitals-btn-submit:hover:not(:disabled) {
-  background: #2563EB;
+  background: #1D4ED8;
+  border-color: #93C5FD;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.6);
 }
 
 body.dark-mode .vitals-btn-reset {
   background: #373E47;
   border: 1px solid #444C56;
-  color: #CDD9E5;
+  color: #E2E8F0;
 }
 
 body.dark-mode .vitals-btn-reset:hover {

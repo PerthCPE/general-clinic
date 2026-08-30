@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { eligibilityApi, patientApi, type BackendEligibility } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatNationalId } from '../../utils/formatters';
+import { validateThaiNationalID } from '../../utils/thaiIdValidator';
+import toast from 'react-hot-toast';
 import './EligibilityPage.css';
 
 export type SchemeType =
@@ -242,6 +244,7 @@ const EligibilityPage: React.FC = () => {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
+    toast.success(msg, { id: msg });
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
@@ -403,10 +406,43 @@ const EligibilityPage: React.FC = () => {
           <div className="main-card-body">
             {/* Search Box Section */}
             <div className="eligibility-search-section">
-              <label className="search-label">
-                <span>เลขประจำตัวประชาชน (National ID)</span>
-                {/* <span className="label-sub-tip">ระบุเลข 13 หลักเพื่อดึงข้อมูลสิทธิ์</span> */}
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <label className="search-label" style={{ marginBottom: 0 }}>
+                  <span>เลขประจำตัวประชาชน (National ID)</span>
+                </label>
+                {searchNationalId.length > 0 && (() => {
+                  const val = validateThaiNationalID(searchNationalId);
+                  return (
+                    <span
+                      style={{
+                        fontSize: '12.5px',
+                        fontWeight: 700,
+                        padding: '2px 8px',
+                        borderRadius: '6px',
+                        backgroundColor: val.isValid
+                          ? '#ECFDF5'
+                          : val.isComplete
+                          ? '#FEF2F2'
+                          : '#EFF6FF',
+                        color: val.isValid
+                          ? '#059669'
+                          : val.isComplete
+                          ? '#DC2626'
+                          : '#2563EB',
+                        border: `1px solid ${
+                          val.isValid ? '#A7F3D0' : val.isComplete ? '#FECACA' : '#BFDBFE'
+                        }`,
+                      }}
+                    >
+                      {val.isValid
+                        ? '✓ เลขบัตรถูกต้อง (Mod 11)'
+                        : val.isComplete
+                        ? '✕ Checksum ไม่ตรง'
+                        : `พิมพ์แล้ว ${searchNationalId.replace(/\D/g, '').length}/13 หลัก`}
+                    </span>
+                  );
+                })()}
+              </div>
 
               <div className="search-input-group">
                 <div className="search-input-wrap">

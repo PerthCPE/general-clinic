@@ -13,8 +13,10 @@ aboutmypart.md
 
 # MCP Server, AI Assistant Tooling, Brain & Local State
 mcp-server/
+mcp-qa-server/
 .agents/
 .gemini/
+
 brain/
 *.exe
 *.exe~

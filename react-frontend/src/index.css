@@ -252,22 +252,43 @@ h3 {
   font-size: 1.05rem;
 }
 
-/* Global Dark Mode Base Overrides */
+/* Global Dark Mode High-Luminance Typography & Contrast */
 body.dark-mode {
   background-color: #0F172A !important;
-  color: #F8FAFC !important;
+  color: #FFFFFF !important;
+}
+
+body.dark-mode h1,
+body.dark-mode h2,
+body.dark-mode h3,
+body.dark-mode h4,
+body.dark-mode h5,
+body.dark-mode h6 {
+  color: #FFFFFF !important;
+}
+
+body.dark-mode p {
+  color: #F1F5F9;
+}
+
+body.dark-mode label {
+  color: #E2E8F0;
 }
 
 body.dark-mode input,
 body.dark-mode textarea,
 body.dark-mode select {
   background-color: #1E293B;
-  color: #F1F5F9;
+  color: #FFFFFF !important;
   border-color: #334155;
 }
 
 body.dark-mode input::placeholder,
 body.dark-mode textarea::placeholder {
-  color: #64748B;
+  color: #94A3B8 !important;
+}
+
+body.dark-mode thead th {
+  color: #F8FAFC !important;
 }
 

@@ -13,9 +13,9 @@ type Dispensing struct {
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 
-	VisitRecord VisitRecord `gorm:"foreignKey:VisitID" json:"visit_record"`
-	Medicine    Medicine    `gorm:"foreignKey:MedicineID" json:"medicine"`
+	VisitRecord VisitRecord `gorm:"foreignKey:VisitID;references:ID" json:"visit_record"`
+	Medicine    Medicine    `gorm:"foreignKey:MedicineID;references:ID" json:"medicine"`
 
-	DoctorID uint   `json:"doctor_id"`                         // ดึงข้อมูลจาก VisitRecord เพื่อให้ได้ DoctorID ของแพทย์ที่สั่งจ่ายยา
-	Doctor   Doctor `gorm:"foreignKey:DoctorID" json:"doctor"` // ดึงข้อมูล Doctor โดยใช้ DoctorID เป็น foreign key
+	DoctorID uint   `json:"doctor_id"`
+	Doctor   Doctor `gorm:"foreignKey:DoctorID;references:ID" json:"doctor"`
 }

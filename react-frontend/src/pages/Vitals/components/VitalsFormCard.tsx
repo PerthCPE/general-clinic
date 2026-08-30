@@ -107,10 +107,6 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
         </div>
 
         <div className="vitals-header-actions">
-          <span className="vitals-queue-blue-box">
-            {waitingCount} คิว
-          </span>
-
           <button
             type="button"
             className={`vitals-card-toggle ${isAccordionOpen ? 'open' : ''}`}
@@ -137,6 +133,9 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               <span className="vitals-section-num">1</span>
               <span className="vitals-section-title">เลือกคิวผู้ป่วยเพื่อคัดกรอง (Select Patient Queue)</span>
               <span className="text-required">*</span>
+              <span className="vitals-queue-blue-box">
+                {waitingCount} คิว
+              </span>
             </div>
 
             <div className="vitals-queue-selector-box" ref={queueDropdownRef}>
@@ -154,6 +153,7 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </span>
                 <input
                   id="queue-select-input"
+                  name="queue_patient_search_no_autofill"
                   type="text"
                   className="combobox-input"
                   placeholder="พิมพ์ค้นหาด้วยเลขคิว (เช่น Q0001), ชื่อผู้ป่วย, HN (เช่น HN0001), หรือเลขบัตรประชาชน..."
@@ -161,6 +161,12 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                   onFocus={() => onToggleQueueDropdown(true)}
                   onClick={() => onToggleQueueDropdown(true)}
                   onChange={(e) => onSearchQueryChange(e.target.value)}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  data-lpignore="true"
+                  data-form-type="other"
                 />
                 {searchQuery && (
                   <button

@@ -39,16 +39,24 @@ func ConnectDB() {
 
 	log.Println("Database Connection Established Successfully")
 
-	// table create by migration (only use err for create only)
+	// table create by migration (AutoMigrate ครบทุก Model ในระบบ 100%)
 	err = database.AutoMigrate(
 		&models.User{},
+		&models.Doctor{},
 		&models.Patient{},
 		&models.MedicalEligibility{},
 		&models.VisitRecord{},
 		&models.Queue{},
 		&models.Screening{},
 		&models.Medicine{},
+		&models.Dispensing{},
 		&models.Billing{},
+		&models.QRPayment{},
+		&models.Document{},
+		&models.DocumentForward{},
+		&models.DoctorSchedule{},
+		&models.LeaveRequest{},
+		&models.ShiftSwapRequest{},
 	)
 
 	// if error founded, notice
@@ -63,28 +71,30 @@ func ConnectDB() {
 }
 
 func seedDatabase() {
-	var userCount int64
-	DB.Model(&models.User{}).Count(&userCount)
+	hashPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), 10)
+	passStr := string(hashPassword)
 
-	if userCount == 0 {
-		hashPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), 10)
-		passStr := string(hashPassword)
-
-		// 1. Seed Users & Doctors
-		users := []models.User{
-			{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
-			{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
-			{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
-			{Username: "doctor1", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
-			{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
-			{Username: "doctor3", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
-		}
-		for i := range users {
+	// 1. Seed Users & Doctors (Always ensure all required roles and doctors exist in DB)
+	users := []models.User{
+		{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
+		{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
+		{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
+		{Username: "doctor1", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
+		{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
+		{Username: "doctor3", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
+	}
+	for i := range users {
+		var existing models.User
+		if err := DB.Where("username = ?", users[i].Username).First(&existing).Error; err != nil {
 			DB.Create(&users[i])
 		}
-		log.Println("Users & Doctors seeded successfully.")
+	}
+	log.Println("Users & Doctors verified and seeded successfully.")
 
-		// 2. Seed Patients
+	// 2. Seed Patients
+	var patientCount int64
+	DB.Model(&models.Patient{}).Count(&patientCount)
+	if patientCount == 0 {
 		parseDate := func(d string) time.Time {
 			t, _ := time.Parse("2006-01-02", d)
 			return t

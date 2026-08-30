@@ -28,7 +28,7 @@ func SetUpRoutes(r *gin.Engine) {
 
 	// 1. Registrar Module (ลงทะเบียน, ค้นหาผู้ป่วย, ตรวจสอบสิทธิ์)
 	registrarRoutes := api.Group("/registrar")
-	registrarRoutes.Use(middleware.RoleRequired("registrar"))
+	registrarRoutes.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant", "doctor"))
 	{
 		registrarRoutes.GET("/patients", controllers.GetPatients)
 		registrarRoutes.POST("/patients", controllers.RegisterPatient)
@@ -42,7 +42,7 @@ func SetUpRoutes(r *gin.Engine) {
 		
 	// 2. Nurse & Nurse Assistant Module (คัดกรอง, วัดสัญญาณชีพ, ประวัติคัดกรอง)
 	nurseRoutes := api.Group("/nurse")
-	nurseRoutes.Use(middleware.RoleRequired("nurse", "nurse_assistant"))
+	nurseRoutes.Use(middleware.RoleRequired("nurse", "nurse_assistant", "registrar", "doctor"))
 	{
 		nurseRoutes.GET("/doctors", controllers.GetDoctors)
 		nurseRoutes.POST("/vitals", controllers.RecordVitalsAndTriage)
@@ -52,7 +52,7 @@ func SetUpRoutes(r *gin.Engine) {
 
 	// 3. Queue Management Module (จัดการคิว สำหรับ Registrar, Nurse, Nurse Assistant)
 	queueRoutes := api.Group("/queue")
-	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant"))
+	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant", "doctor"))
 	{
 		queueRoutes.GET("/list", controllers.GetQueueList)
 		queueRoutes.POST("/create", controllers.CreateQueue)

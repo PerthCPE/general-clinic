@@ -27,20 +27,21 @@
 }
 
 .login-logo-icon {
-  width: 52px;
-  height: 52px;
-  background: linear-gradient(135deg, #0F2027 0%, #1A3A4A 100%);
-  border-radius: 14px;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   margin: 0 auto 16px;
-  box-shadow: 0 4px 12px rgba(15, 32, 39, 0.25);
+  overflow: hidden;
 }
 
-.login-logo-icon svg {
-  width: 28px;
-  height: 28px;
+.login-logo-icon img,
+.login-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .login-clinic-name {

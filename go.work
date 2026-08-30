@@ -3,4 +3,6 @@ go 1.26.4
 use (
 	./golang-backend
 	./mcp-server
+	./mcp-qa-server
 )
+

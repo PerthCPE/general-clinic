@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Patient, SchemeType } from '../types';
+import { validateThaiNationalID } from '../../../utils/thaiIdValidator';
 
 interface PatientFormCardProps {
   onSubmit: (formData: Partial<Patient>) => void;
   formRef?: React.RefObject<HTMLDivElement | null>;
 }
+
+const STORAGE_KEY = 'clinic_patient_reg_draft';
 
 const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) => {
   const [isOpen, setIsOpen] = useState(true);
@@ -22,6 +25,66 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [hasDraft, setHasDraft] = useState(false);
+  const [draftTime, setDraftTime] = useState<string | null>(null);
+
+  // Check for saved draft on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.data && (parsed.data.fullName || parsed.data.nationalId || parsed.data.phone)) {
+          setHasDraft(true);
+          setDraftTime(parsed.savedAt || '');
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Save draft whenever formData changes
+  useEffect(() => {
+    if (formData.fullName || formData.nationalId || formData.phone || formData.address) {
+      const timer = setTimeout(() => {
+        try {
+          const payload = {
+            data: formData,
+            savedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+          };
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        } catch {
+          // ignore
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [formData]);
+
+  const handleRestoreDraft = () => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.data) {
+          setFormData(parsed.data);
+          setHasDraft(false);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleDismissDraft = () => {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    setHasDraft(false);
+  };
 
   const formatNationalIdInput = (val: string): string => {
     const digits = val.replace(/\D/g, '').slice(0, 13);
@@ -38,6 +101,8 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
     if (digits.length <= 6) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
   };
+
+  const thaiIdValidation = validateThaiNationalID(formData.nationalId);
 
   const handleChange = (field: string, value: string) => {
     let processedValue = value;
@@ -116,6 +181,14 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
       schemeType: formData.schemeType,
     });
 
+    // Clear saved draft on submit
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      // ignore
+    }
+    setHasDraft(false);
+
     // ล้างข้อมูลที่กรอกไว้ในฟอร์มทันทีเมื่อกดบันทึก
     handleReset();
   };
@@ -164,6 +237,36 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
       </div>
 
       <div className={`reg-card-body ${isOpen ? 'expanded' : ''}`}>
+        {/* Draft Auto-Recovery Banner */}
+        {hasDraft && (
+          <div className="reg-draft-banner">
+            <div className="reg-draft-text-wrap">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+              <span>พบข้อมูลร่างที่บันทึกค้างไว้เมื่อเวลา {draftTime} ต้องการกู้คืนหรือไม่?</span>
+            </div>
+            <div className="reg-draft-actions">
+              <button
+                type="button"
+                onClick={handleRestoreDraft}
+                className="reg-btn-draft-restore"
+              >
+                กู้คืนข้อมูล
+              </button>
+              <button
+                type="button"
+                onClick={handleDismissDraft}
+                className="reg-btn-draft-dismiss"
+              >
+                ละทิ้ง
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="reg-form-section">
           <div className="reg-section-header">
             <span className="reg-section-num">1</span>
@@ -216,9 +319,44 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
             </div>
 
             <div className="reg-form-group span-2">
-              <label className="reg-form-label">
-                เลขประจำตัวประชาชน <span className="text-required">*</span>
-              </label>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="reg-form-label">
+                  เลขประจำตัวประชาชน <span className="text-required">*</span>
+                </label>
+                {formData.nationalId.length > 0 && (
+                  <span
+                    style={{
+                      fontSize: '12.5px',
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      backgroundColor: thaiIdValidation.isValid
+                        ? '#ECFDF5'
+                        : thaiIdValidation.isComplete
+                        ? '#FEF2F2'
+                        : '#EFF6FF',
+                      color: thaiIdValidation.isValid
+                        ? '#059669'
+                        : thaiIdValidation.isComplete
+                        ? '#DC2626'
+                        : '#2563EB',
+                      border: `1px solid ${
+                        thaiIdValidation.isValid
+                          ? '#A7F3D0'
+                          : thaiIdValidation.isComplete
+                          ? '#FECACA'
+                          : '#BFDBFE'
+                      }`,
+                    }}
+                  >
+                    {thaiIdValidation.isValid
+                      ? '✓ เลขบัตรถูกต้อง (Mod 11)'
+                      : thaiIdValidation.isComplete
+                      ? '✕ Checksum ไม่ตรง'
+                      : `พิมพ์แล้ว ${formData.nationalId.replace(/\D/g, '').length}/13 หลัก`}
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 className={`reg-form-input ${formErrors.nationalId ? 'has-error' : ''}`}
@@ -231,12 +369,23 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
 
             <div className="reg-form-group span-2">
               <label className="reg-form-label">วัน/เดือน/ปีเกิด (พ.ศ. หรือ ค.ศ.)</label>
-              <input
-                type="date"
-                className="reg-form-input"
-                value={formData.dob}
-                onChange={(e) => handleChange('dob', e.target.value)}
-              />
+              <div className="reg-date-input-wrap">
+                <input
+                  id="dob-input"
+                  type="date"
+                  className="reg-form-input"
+                  value={formData.dob}
+                  onChange={(e) => handleChange('dob', e.target.value)}
+                />
+                <span className="reg-calendar-svg-btn" title="เลือกวันเกิด">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </span>
+              </div>
             </div>
 
             <div className="reg-form-group">

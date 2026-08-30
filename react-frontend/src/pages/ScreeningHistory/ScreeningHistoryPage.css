@@ -186,7 +186,7 @@
 
 .scr-stat-label {
   font-size: 15px;
-  color: #64748B;
+  color: #000000;
   font-weight: 600;
 }
 
@@ -1074,7 +1074,7 @@
   align-items: center;
   justify-content: center;
   padding: 6px 16px;
-  background: #94A3B8;
+  background: #2563EB;
   color: #FFFFFF;
   border: none;
   border-radius: 20px;
@@ -1310,14 +1310,15 @@
 
 .scr-modal-subtitle {
   font-size: 13.5px;
-  color: #64748B;
+  color: #475569;
+  font-weight: 500;
   margin: 4px 0 0;
 }
 
 .scr-modal-close-btn {
   background: #F1F5F9;
-  border: none;
-  color: #64748B;
+  border: 1px solid #CBD5E1;
+  color: #334155;
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -1332,6 +1333,7 @@
 .scr-modal-close-btn:hover {
   background: #E2E8F0;
   color: #0F172A;
+  border-color: #94A3B8;
 }
 
 /* Modal Body */
@@ -1348,7 +1350,7 @@
   align-items: center;
   justify-content: space-between;
   background: #F8FAFC;
-  border: 1px solid #E2E8F0;
+  border: 1.5px solid #CBD5E1;
   border-radius: 12px;
   padding: 12px 18px;
   flex-wrap: wrap;
@@ -1363,7 +1365,8 @@
 
 .pt-lbl {
   font-size: 12px;
-  color: #64748B;
+  color: #334155;
+  font-weight: 600;
 }
 
 .pt-val {
@@ -1373,15 +1376,19 @@
 }
 
 .pt-val.name {
-  color: #2563EB;
+  color: #1D4ED8;
+  font-weight: 800;
 }
 
 .pt-val.code {
   font-family: var(--font-heading);
+  color: #0F172A;
+  font-weight: 700;
 }
 
 .pt-val.scheme {
-  color: #059669;
+  color: #15803D;
+  font-weight: 800;
 }
 
 .modal-pt-divider {
@@ -1410,7 +1417,7 @@
 
 .modal-vital-card {
   background: #FFFFFF;
-  border: 1.5px solid #E2E8F0;
+  border: 1.5px solid #CBD5E1;
   border-radius: 12px;
   padding: 12px 14px;
   display: flex;
@@ -1419,16 +1426,16 @@
 }
 
 .modal-vital-card.vital-normal {
-  border-color: #E2E8F0;
+  border-color: #CBD5E1;
 }
 
 .modal-vital-card.vital-warning {
-  border-color: #FDE68A;
+  border-color: #FBBF24;
   background: #FFFDF5;
 }
 
 .modal-vital-card.vital-danger {
-  border-color: #FECACA;
+  border-color: #F87171;
   background: #FFF5F5;
 }
 
@@ -1439,9 +1446,9 @@
 }
 
 .vital-card-title {
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
-  color: #64748B;
+  color: #1E293B;
 }
 
 .vital-status-pill {
@@ -1484,13 +1491,15 @@
 }
 
 .vital-unit-text {
-  font-size: 11px;
-  color: #64748B;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
 }
 
 .vital-standard-note {
-  font-size: 10.5px;
-  color: #94A3B8;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #475569;
 }
 
 /* Clinical Details Grid in Modal */
@@ -1502,7 +1511,7 @@
 
 .clinical-detail-box {
   background: #F8FAFC;
-  border: 1px solid #E2E8F0;
+  border: 1px solid #CBD5E1;
   border-radius: 10px;
   padding: 12px 14px;
   display: flex;
@@ -1511,21 +1520,21 @@
 }
 
 .box-title {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
-  color: #64748B;
+  color: #1E293B;
 }
 
 .box-content {
-  font-size: 13.5px;
+  font-size: 14px;
   color: #0F172A;
   margin: 0;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .box-content.cc-text {
-  color: #1E293B;
-  font-weight: 600;
+  color: #0F172A;
+  font-weight: 700;
 }
 
 .allergy-alert-tag {
@@ -1547,7 +1556,7 @@
   border: 1px solid #A7F3D0;
   border-radius: 6px;
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .doc-transfer-box {
@@ -1556,12 +1565,14 @@
 }
 
 .doc-name {
-  color: #1E40AF;
+  color: #1D4ED8;
+  font-weight: 700;
 }
 
 .screened-by-sub {
-  font-size: 11.5px;
-  color: #3B82F6;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1E40AF;
 }
 
 /* Modal Footer */
@@ -1570,7 +1581,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  border-top: 1px solid #F1F5F9;
+  border-top: 1px solid #E2E8F0;
   background: #F8FAFC;
   gap: 12px;
   flex-wrap: wrap;
@@ -1592,13 +1603,14 @@
 
 .btn-copy {
   background: #FFFFFF;
-  color: #475569;
-  border: 1px solid #CBD5E1;
+  color: #1E293B;
+  border: 1px solid #94A3B8;
 }
 
 .btn-copy:hover {
   background: #F1F5F9;
   color: #0F172A;
+  border-color: #64748B;
 }
 
 .btn-copy.copied {
@@ -1611,21 +1623,24 @@
   background: #2563EB;
   color: #FFFFFF;
   border: none;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
 }
 
 .btn-print:hover {
   background: #1D4ED8;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
 }
 
 .btn-close {
   background: #E2E8F0;
-  color: #475569;
-  border: none;
+  color: #1E293B;
+  border: 1px solid #CBD5E1;
 }
 
 .btn-close:hover {
   background: #CBD5E1;
   color: #0F172A;
+  border-color: #94A3B8;
 }
 
 /* ================================================================
@@ -1635,12 +1650,12 @@
 /* Page Header & Common Elements */
 body.dark-mode .scr-page-title,
 .dark-mode .scr-page-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .scr-page-subtitle,
 .dark-mode .scr-page-subtitle {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .scr-badge-role,
@@ -1680,22 +1695,22 @@ body.dark-mode .scr-stat-card:hover,
 
 body.dark-mode .scr-stat-label,
 .dark-mode .scr-stat-label {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .scr-stat-value,
 .dark-mode .scr-stat-value {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .scr-stat-unit,
 .dark-mode .scr-stat-unit {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .scr-stat-sub,
 .dark-mode .scr-stat-sub {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .blue-icon,
@@ -2034,7 +2049,7 @@ body.dark-mode .scr-table-title,
 
 body.dark-mode .scr-table-subtitle,
 .dark-mode .scr-table-subtitle {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .scr-card-toggle,
@@ -2098,7 +2113,7 @@ body.dark-mode .date-main,
 
 body.dark-mode .date-time,
 .dark-mode .date-time {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .patient-name,
@@ -2108,7 +2123,7 @@ body.dark-mode .patient-name,
 
 body.dark-mode .patient-id-code,
 .dark-mode .patient-id-code {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .wt-ht-val,
@@ -2123,58 +2138,65 @@ body.dark-mode .bmi-sub-tag,
 
 body.dark-mode .bp-normal-chip,
 .dark-mode .bp-normal-chip {
-  background: rgba(16, 185, 129, 0.18);
-  color: #34D399;
-  border: 1.5px solid rgba(52, 211, 153, 0.45);
-  font-weight: 600;
+  background: rgba(22, 163, 74, 0.3);
+  color: #86EFAC;
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
 }
 
 body.dark-mode .bp-high-chip,
 .dark-mode .bp-high-chip {
-  background: rgba(245, 158, 11, 0.18);
-  color: #FBBF24;
-  border: 1.5px solid rgba(251, 191, 36, 0.45);
-  font-weight: 600;
+  background: rgba(217, 119, 6, 0.3);
+  color: #FDE047;
+  border: 1.5px solid #FBBF24;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
 }
 
 body.dark-mode .bp-crisis-chip,
 .dark-mode .bp-crisis-chip {
-  background: rgba(239, 68, 68, 0.18);
-  color: #F87171;
-  border: 1.5px solid rgba(248, 113, 113, 0.45);
-  font-weight: 600;
+  background: rgba(220, 38, 38, 0.3);
+  color: #FCA5A5;
+  border: 1.5px solid #F87171;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
 }
 
 body.dark-mode .triage-badge-green,
 .dark-mode .triage-badge-green {
-  background: rgba(16, 185, 129, 0.18);
-  color: #34D399;
-  border: 1.5px solid rgba(52, 211, 153, 0.45);
-  font-weight: 600;
+  background: rgba(22, 163, 74, 0.3);
+  color: #86EFAC;
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
 }
 
 body.dark-mode .triage-badge-yellow,
 .dark-mode .triage-badge-yellow {
-  background: rgba(245, 158, 11, 0.18);
-  color: #FBBF24;
-  border: 1.5px solid rgba(251, 191, 36, 0.45);
-  font-weight: 600;
+  background: rgba(217, 119, 6, 0.3);
+  color: #FDE047;
+  border: 1.5px solid #FBBF24;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
 }
 
 body.dark-mode .triage-badge-orange,
 .dark-mode .triage-badge-orange {
-  background: rgba(249, 115, 22, 0.18);
-  color: #FB923C;
-  border: 1.5px solid rgba(251, 146, 60, 0.45);
-  font-weight: 600;
+  background: rgba(234, 88, 12, 0.3);
+  color: #FDBA74;
+  border: 1.5px solid #FB923C;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.25);
 }
 
 body.dark-mode .triage-badge-red,
 .dark-mode .triage-badge-red {
-  background: rgba(239, 68, 68, 0.18);
-  color: #F87171;
-  border: 1.5px solid rgba(248, 113, 113, 0.45);
-  font-weight: 600;
+  background: rgba(220, 38, 38, 0.3);
+  color: #FCA5A5;
+  border: 1.5px solid #F87171;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
 }
 
 body.dark-mode .scr-cc-cell,
@@ -2184,17 +2206,19 @@ body.dark-mode .scr-cc-cell,
 
 body.dark-mode .btn-more-info,
 .dark-mode .btn-more-info {
-  background: #373E47;
-  border: 1px solid #444C56;
-  color: #CDD9E5;
+  background: #2563EB;
+  border: 1.5px solid #60A5FA;
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
 }
 
 body.dark-mode .btn-more-info:hover,
 .dark-mode .btn-more-info:hover {
-  background: #316DCA;
+  background: #1D4ED8;
+  border-color: #93C5FD;
   color: #FFFFFF;
-  border-color: #316DCA;
-  box-shadow: 0 4px 10px rgba(49, 109, 202, 0.3);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.55);
 }
 
 body.dark-mode .empty-main,
@@ -2239,196 +2263,304 @@ body.dark-mode .page-btn.num-btn.active,
   border-color: #316DCA;
 }
 
-/* 6. Modal in Dark Mode */
+/* 6. Modal in Dark Mode (High Luminance & Crystal-Clear Contrast) */
 body.dark-mode .scr-modal-container,
 .dark-mode .scr-modal-container {
-  background: #2D333B;
-  border: 1px solid #444C56;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+  background: #212836;
+  border: 1px solid #334155;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
 }
 
 body.dark-mode .scr-modal-header,
 .dark-mode .scr-modal-header {
-  border-bottom-color: #373E47;
+  background: #1C2230;
+  border-bottom-color: #334155;
 }
 
 body.dark-mode .scr-modal-title,
 .dark-mode .scr-modal-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .scr-modal-subtitle,
 .dark-mode .scr-modal-subtitle {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .scr-modal-close-btn,
 .dark-mode .scr-modal-close-btn {
-  background: #373E47;
-  color: #768390;
+  background: #334155;
+  color: #CBD5E1;
 }
 
 body.dark-mode .scr-modal-close-btn:hover,
 .dark-mode .scr-modal-close-btn:hover {
-  background: #444C56;
+  background: #475569;
   color: #FFFFFF;
 }
 
 body.dark-mode .modal-patient-strip,
 .dark-mode .modal-patient-strip {
-  background: #22272E;
-  border-color: #373E47;
+  background: #1C2230;
+  border-color: #334155;
 }
 
 body.dark-mode .pt-lbl,
 .dark-mode .pt-lbl {
-  color: #768390;
+  color: #CBD5E1;
+  font-weight: 500;
 }
 
 body.dark-mode .pt-val,
 .dark-mode .pt-val {
-  color: #CDD9E5;
+  color: #FFFFFF;
+  font-weight: 600;
 }
 
 body.dark-mode .pt-val.name,
 .dark-mode .pt-val.name {
-  color: #539BF5;
+  color: #60A5FA;
+  font-weight: 700;
 }
 
 body.dark-mode .pt-val.code,
 .dark-mode .pt-val.code {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .pt-val.scheme,
 .dark-mode .pt-val.scheme {
-  color: #57AB5A;
+  color: #4ADE80;
+  font-weight: 700;
 }
 
 body.dark-mode .modal-pt-divider,
 .dark-mode .modal-pt-divider {
-  background: #444C56;
+  background: #334155;
 }
 
 body.dark-mode .modal-section-title,
 .dark-mode .modal-section-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
+  font-weight: 700;
 }
 
 body.dark-mode .modal-vital-card,
 .dark-mode .modal-vital-card {
-  background: #22272E;
-  border-color: #373E47;
+  background: #1C2230;
+  border: 1.5px solid #334155;
 }
 
 body.dark-mode .modal-vital-card.vital-warning,
 .dark-mode .modal-vital-card.vital-warning {
-  background: rgba(198, 144, 38, 0.1);
-  border-color: rgba(198, 144, 38, 0.35);
+  background: rgba(217, 119, 6, 0.15);
+  border-color: rgba(245, 158, 11, 0.45);
 }
 
 body.dark-mode .modal-vital-card.vital-danger,
 .dark-mode .modal-vital-card.vital-danger {
-  background: rgba(244, 112, 103, 0.1);
-  border-color: rgba(244, 112, 103, 0.35);
+  background: rgba(220, 38, 38, 0.15);
+  border-color: rgba(239, 68, 68, 0.45);
 }
 
 body.dark-mode .vital-card-title,
 .dark-mode .vital-card-title {
-  color: #768390;
+  color: #E2E8F0;
+  font-weight: 600;
 }
 
 body.dark-mode .vital-big-num,
 .dark-mode .vital-big-num {
-  color: #CDD9E5;
+  color: #FFFFFF;
+  font-weight: 800;
 }
 
 body.dark-mode .vital-unit-text,
 .dark-mode .vital-unit-text {
-  color: #768390;
+  color: #CBD5E1;
+  font-weight: 600;
 }
 
 body.dark-mode .vital-standard-note,
 .dark-mode .vital-standard-note {
-  color: #636E7B;
+  color: #CBD5E1;
+  font-weight: 500;
+}
+
+/* Modal Triage Badges in Dark Mode */
+body.dark-mode .modal-triage-green {
+  background: rgba(22, 163, 74, 0.3);
+  color: #86EFAC;
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+}
+
+body.dark-mode .modal-triage-yellow {
+  background: rgba(217, 119, 6, 0.3);
+  color: #FDE047;
+  border: 1.5px solid #FBBF24;
+  font-weight: 700;
+}
+
+body.dark-mode .modal-triage-orange {
+  background: rgba(234, 88, 12, 0.3);
+  color: #FDBA74;
+  border: 1.5px solid #FB923C;
+  font-weight: 700;
+}
+
+body.dark-mode .modal-triage-red {
+  background: rgba(220, 38, 38, 0.3);
+  color: #FCA5A5;
+  border: 1.5px solid #F87171;
+  font-weight: 700;
+}
+
+/* Vital Status Pills in Dark Mode */
+body.dark-mode .vital-status-pill.pill-normal {
+  background: rgba(22, 163, 74, 0.3);
+  color: #86EFAC;
+  border: 1px solid #4ADE80;
+  font-weight: 700;
+}
+
+body.dark-mode .vital-status-pill.pill-warning {
+  background: rgba(217, 119, 6, 0.3);
+  color: #FDE047;
+  border: 1px solid #FBBF24;
+  font-weight: 700;
+}
+
+body.dark-mode .vital-status-pill.pill-danger {
+  background: rgba(220, 38, 38, 0.3);
+  color: #FCA5A5;
+  border: 1px solid #F87171;
+  font-weight: 700;
+}
+
+body.dark-mode .vital-status-pill.pill-info {
+  background: rgba(37, 99, 235, 0.3);
+  color: #93C5FD;
+  border: 1px solid #60A5FA;
+  font-weight: 700;
 }
 
 body.dark-mode .clinical-detail-box,
 .dark-mode .clinical-detail-box {
-  background: #22272E;
-  border-color: #373E47;
+  background: #1C2230;
+  border-color: #334155;
 }
 
 body.dark-mode .box-title,
 .dark-mode .box-title {
-  color: #768390;
+  color: #E2E8F0;
+  font-weight: 600;
 }
 
 body.dark-mode .box-content,
 .dark-mode .box-content {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .box-content.cc-text,
 .dark-mode .box-content.cc-text {
-  color: #CDD9E5;
+  color: #FFFFFF;
+}
+
+body.dark-mode .allergy-safe-tag {
+  background: rgba(22, 163, 74, 0.25);
+  color: #86EFAC;
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+}
+
+body.dark-mode .allergy-alert-tag {
+  background: rgba(220, 38, 38, 0.25);
+  color: #FCA5A5;
+  border: 1.5px solid #F87171;
+  font-weight: 700;
 }
 
 body.dark-mode .doc-transfer-box,
 .dark-mode .doc-transfer-box {
-  background: #22272E;
-  border-color: #373E47;
+  background: #1C2230;
+  border-color: #334155;
 }
 
 body.dark-mode .doc-name,
 .dark-mode .doc-name {
-  color: #539BF5;
+  color: #60A5FA;
+  font-weight: 600;
+}
+
+body.dark-mode .doc-name strong {
+  color: #93C5FD;
 }
 
 body.dark-mode .screened-by-sub,
 .dark-mode .screened-by-sub {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .scr-modal-footer,
 .dark-mode .scr-modal-footer {
-  background: #252A33;
-  border-top-color: #373E47;
+  background: #1C2230;
+  border-top-color: #334155;
 }
 
 body.dark-mode .btn-copy,
 .dark-mode .btn-copy {
-  background: #373E47;
-  border-color: #444C56;
-  color: #CDD9E5;
+  background: #334155;
+  border: 1.5px solid #475569;
+  color: #FFFFFF;
+  font-weight: 600;
 }
 
 body.dark-mode .btn-copy:hover,
 .dark-mode .btn-copy:hover {
-  background: #444C56;
+  background: #475569;
+  border-color: #64748B;
   color: #FFFFFF;
 }
 
 body.dark-mode .btn-copy.copied,
 .dark-mode .btn-copy.copied {
-  background: rgba(87, 171, 90, 0.15);
-  color: #57AB5A;
-  border-color: rgba(87, 171, 90, 0.3);
+  background: rgba(22, 163, 74, 0.25);
+  color: #86EFAC;
+  border-color: #4ADE80;
+}
+
+body.dark-mode .btn-print,
+.dark-mode .btn-print {
+  background: #2563EB;
+  border: 1.5px solid #60A5FA;
+  color: #FFFFFF;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+}
+
+body.dark-mode .btn-print:hover,
+.dark-mode .btn-print:hover {
+  background: #1D4ED8;
+  border-color: #93C5FD;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.6);
 }
 
 body.dark-mode .btn-close,
 .dark-mode .btn-close {
-  background: #373E47;
-  border-color: #444C56;
-  color: #CDD9E5;
+  background: #334155;
+  border: 1.5px solid #475569;
+  color: #FFFFFF;
+  font-weight: 600;
 }
 
 body.dark-mode .btn-close:hover,
 .dark-mode .btn-close:hover {
-  background: #444C56;
+  background: #475569;
+  border-color: #64748B;
   color: #FFFFFF;
 }
 
 body.dark-mode .scr-cc-cell {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }

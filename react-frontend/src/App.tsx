@@ -26,6 +26,7 @@ import DoctorExaminationPage from './pages/doctor/DoctorExaminationPage';
 import DoctorSchedulePage from './pages/doctor/DoctorSchedulePage';
 import DoctorRecordsPage from './pages/doctor/DoctorRecordsPage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
+import { Toaster } from 'react-hot-toast';
 import './App.css';
 
 function MainApp() {
@@ -198,6 +199,40 @@ function MainApp() {
         >
           {renderContent()}
         </main>
+
+        {/* Global Clinical Toast Notifications */}
+        <Toaster
+          position="top-right"
+          gutter={10}
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: isDarkMode ? '#212836' : '#FFFFFF',
+              color: isDarkMode ? '#F8FAFC' : '#0F172A',
+              border: isDarkMode ? '1px solid #333F53' : '1px solid #E2E8F0',
+              borderRadius: '10px',
+              padding: '12px 18px',
+              fontSize: '14.5px',
+              fontWeight: 600,
+              fontFamily: "'IBM Plex Sans Thai', 'Plus Jakarta Sans', sans-serif",
+              boxShadow: isDarkMode
+                ? '0 0 0 1px #333F53, 0 10px 25px -5px rgba(0, 0, 0, 0.5)'
+                : '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)',
+            },
+            success: {
+              iconTheme: {
+                primary: '#10B981',
+                secondary: '#FFFFFF',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#EF4444',
+                secondary: '#FFFFFF',
+              },
+            },
+          }}
+        />
       </div>
     </DoctorDataProvider>
   );

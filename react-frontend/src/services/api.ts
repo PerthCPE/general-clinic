@@ -287,6 +287,7 @@ export interface BackendDoctor {
 export const vitalsApi = {
   getDoctors: () => request<BackendDoctor[]>('/api/doctors'),
   record: (payload: {
+    queue_id?: number;
     patient_id: number;
     queue_number?: string;
     chief_complaint: string;

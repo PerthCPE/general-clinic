@@ -66,21 +66,23 @@ func RegisterPatient(c *gin.Context) {
 		return
 	}
 
-	// Auto generate HN if empty
+	// Auto generate HN if empty (strictly HN + 4-digit hexadecimal format without hyphen)
 	hn := req.HN
 	if strings.TrimSpace(hn) == "" {
 		var lastPatient models.Patient
 		if err := config.DB.Order("id desc").First(&lastPatient).Error; err == nil {
 			var lastNum int
-			if _, scanErr := fmt.Sscanf(lastPatient.HN, "HN-%d", &lastNum); scanErr == nil && lastNum > 0 {
-				hn = fmt.Sprintf("HN-%04d", lastNum+1)
+			cleanHex := strings.TrimPrefix(strings.TrimPrefix(strings.ToUpper(lastPatient.HN), "HN-"), "HN")
+			fmt.Sscanf(cleanHex, "%X", &lastNum)
+			if lastNum > 0 {
+				hn = fmt.Sprintf("HN%04X", lastNum+1)
 			} else {
-				hn = fmt.Sprintf("HN-%04d", lastPatient.ID+1)
+				hn = fmt.Sprintf("HN%04X", lastPatient.ID+1)
 			}
 		} else {
 			var count int64
 			config.DB.Model(&models.Patient{}).Count(&count)
-			hn = fmt.Sprintf("HN-%04d", count+1)
+			hn = fmt.Sprintf("HN%04X", count+1)
 		}
 	}
 

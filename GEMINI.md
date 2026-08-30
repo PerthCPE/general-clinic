@@ -34,3 +34,63 @@
 - **RBAC & Role Parity**: `nurse_assistant` must always possess identical access permissions to `nurse` (`/queue`, `/vitals`, `/vitals-history`). The default initial route must always be `LoginPage`.
 - **Simulation Ready**: Maintain self-contained, in-memory state and mock data on all UI pages for 100% standalone simulation capability without backend dependencies.
 
+## 7. Smart Adaptive MCP Routing (Auto Mode Selection)
+
+Before processing each user request, **classify the task into one of three modes** and follow the corresponding MCP strategy. This ensures maximum token efficiency — simple tasks skip MCP entirely, while complex tasks get full context enrichment.
+
+### Step 1: Auto-Classify the Task
+
+```
+USER REQUEST
+     │
+     ▼
+┌─────────────────────────────────────────────────┐
+│  Is it a simple CSS/UI tweak, typo fix,         │
+│  formatting, or single-file cosmetic edit?       │──YES──▶ MODE: LIGHT (No MCP)
+│  (no backend, no schema, no cross-file logic)    │
+└────────────────────┬────────────────────────────┘
+                     │ NO
+                     ▼
+┌─────────────────────────────────────────────────┐
+│  Does it involve backend, schema, API routes,    │
+│  type contracts, clinical logic, or design       │──YES──▶ MODE: STANDARD (Clinic MCP)
+│  system tokens?                                  │
+└────────────────────┬────────────────────────────┘
+                     │ NO
+                     ▼
+┌─────────────────────────────────────────────────┐
+│  Does the user mention saving progress,          │
+│  resuming, recalling past decisions, or          │──YES──▶ MODE: DEEP (Clinic + WSE)
+│  checkpointing?                                  │
+└────────────────────┬────────────────────────────┘
+                     │ NO
+                     ▼
+               MODE: LIGHT (No MCP)
+```
+
+### Step 2: Execute Based on Mode
+
+**LIGHT MODE** — Native tools only, zero MCP calls:
+- Use for: CSS fixes, spacing adjustments, font changes, single-component edits, text corrections, simple questions
+- Cost: ~1,053 tokens/turn (baseline)
+
+**STANDARD MODE** — Invoke `general-clinic` MCP tools as needed:
+- **Database / Schema / Models** (keywords: schema, model, struct, GORM, table, migration, column, relation, foreign key) → call `clinic_context` with query `schema` or `schema:<ModelName>`
+- **API Routes / Endpoints / Middleware** (keywords: route, endpoint, API, middleware, RBAC, guard, handler, REST, GET, POST, PUT, DELETE) → call `clinic_context` with query `routes` or `routes:<role>`
+- **Project Architecture / Overview** (keywords: architecture, overview, summary, project structure, how does the system work) → call `clinic_context` with query `summary`
+- **Go Backend Patterns** (keywords: controller, service, transaction, GORM query, response format, error handling, Go backend) → call `clinic_backend`
+- **UI Design System / Tokens** (keywords: design system, color token, theme, dark mode palette, component pattern, card style) → call `clinic_design`
+- **Clinical Domain Logic** (keywords: patient flow, triage rules, queue lifecycle, pharmacy flow, billing flow, clinical workflow) → call `clinic_workflow`
+- **Type Contracts / DTO Validation** (keywords: type mismatch, DTO, contract, frontend-backend sync, API health) → call `clinic_validate`
+- **Symbol Search** (keywords: find struct, find handler, find interface, where is `<Name>` defined) → call `clinic_search`
+- **Memory & Decisions** (keywords: what did we decide, memory, recall, agreed rules) → call `clinic_context` with query `memory` or `memory:decisions`
+- **Task Tracking & Progress** (keywords: progress, task status, what is left, tracking) → call `clinic_context` with query `memory:tasks` or `memory:save_task:<ID>|<Title>|<Status>|<Notes>`
+- **Record Decision** (keywords: remember this, save decision, note this rule) → call `clinic_context` with query `memory:save_decision:<Topic>|<Decision>|<Context>`
+
+**DEEP MODE** — Invoke both `general-clinic` + `world-state-engine` MCP tools:
+- All STANDARD MODE triggers apply, plus:
+- **Save Progress / Checkpoint** (keywords: save progress, checkpoint, save state, remember where we are, snapshot) → call `wse_save_task_checkpoint`
+- **Resume / Continue** (keywords: resume, continue from last, load checkpoint, pick up where we left off) → call `wse_load_task_checkpoint`
+- **Record Decision / Memory** (keywords: remember this, record decision, log this, note this for later, save this context) → call `wse_record_memory` or `clinic_context(query: "memory:save_decision:...")`
+- **Recall / Previous Context** (keywords: what did we decide, recall, previous context, what was the plan, remind me) → call `wse_query_context` or `clinic_context(query: "memory")`
+
