@@ -178,6 +178,12 @@ export default function MedicinePage() {
     return matchId && matchName && matchStatus;
   });
   
+  const handleResetFilters = () => {
+    setSearchMedId('');
+    setSearchMedName('');
+    setStockStatusFilter('all');
+  };
+
   const getStatusClass = (status: string) => {
     switch (status) {
       case 'In Stock': return 'status-in-stock';
@@ -317,7 +323,19 @@ export default function MedicinePage() {
             />
           </div>
         </div>
-        <button className="search-btn">ค้นหา</button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="search-btn" type="button">ค้นหา</button>
+          {(searchMedId || searchMedName || stockStatusFilter !== 'all') && (
+            <button 
+              className="search-btn" 
+              type="button" 
+              onClick={handleResetFilters}
+              style={{ background: 'var(--bg-card, #F1F5F9)', color: 'var(--text-primary, #475569)', border: '1px solid #CBD5E1' }}
+            >
+              ล้างการค้นหา
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="stock-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
@@ -368,44 +386,70 @@ export default function MedicinePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMedicines.map((med) => (
-                    <tr key={med.id}>
-                      <td style={{ padding: '14px 20px', whiteSpace: 'nowrap' }}>
-                        <span style={{ 
-                          color: '#2563EB', 
-                          fontWeight: '700', 
-                          fontFamily: 'monospace', 
-                          fontSize: '14.5px',
-                          letterSpacing: '0.3px',
-                          display: 'inline-block'
-                        }}>
-                          {med.id}
-                        </span>
-                      </td>
-                      <td 
-                        className="med-name-cell clickable-med-name"
-                        onClick={() => setDetailModalMed(med)}
-                      >
-                        <span className="med-name-link">{med.name}</span>
-                        <span className="med-hint-tag">คลิกเพื่อดูรายละเอียดสรรพคุณ </span>
-                      </td>
-                      <td className="stock-num-cell">{med.stock} เม็ด</td>
-                      <td>
-                        <span className={`status-badge ${getStatusClass(med.status)}`}>
-                          {renderStatusText(med.status)}
-                        </span>
-                      </td>
-                      <td className="dispensed-cell">{med.dispensedToday} เม็ด</td>
-                      <td style={{ textAlign: 'right' }}>
-                        <button
-                          className="update-stock-btn"
-                          onClick={() => handleUpdateClick(med)}
-                        >
-                          ปรับสต็อก
-                        </button>
+                  {filteredMedicines.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary, #64748B)' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                          </svg>
+                          <span style={{ fontSize: '16px', fontWeight: '600' }}>ไม่พบข้อมูลยาที่ตรงกับการค้นหา</span>
+                          <span style={{ fontSize: '13.5px', opacity: 0.8 }}>ลองเปลี่ยนคำค้นหา หรือกดปุ่มล้างการค้นหาด้านบน</span>
+                          <button 
+                            type="button" 
+                            onClick={handleResetFilters}
+                            style={{
+                              marginTop: '8px', padding: '8px 16px', borderRadius: '8px',
+                              background: '#2563EB', color: '#FFFFFF', border: 'none',
+                              fontWeight: '600', cursor: 'pointer'
+                            }}
+                          >
+                            ล้างการค้นหาทั้งหมด
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    filteredMedicines.map((med) => (
+                      <tr key={med.id}>
+                        <td style={{ padding: '14px 20px', whiteSpace: 'nowrap' }}>
+                          <span style={{ 
+                            color: '#2563EB', 
+                            fontWeight: '700', 
+                            fontFamily: 'monospace', 
+                            fontSize: '14.5px',
+                            letterSpacing: '0.3px',
+                            display: 'inline-block'
+                          }}>
+                            {med.id}
+                          </span>
+                        </td>
+                        <td 
+                          className="med-name-cell clickable-med-name"
+                          onClick={() => setDetailModalMed(med)}
+                        >
+                          <span className="med-name-link">{med.name}</span>
+                          <span className="med-hint-tag">คลิกเพื่อดูรายละเอียดสรรพคุณ </span>
+                        </td>
+                        <td className="stock-num-cell">{med.stock} เม็ด</td>
+                        <td>
+                          <span className={`status-badge ${getStatusClass(med.status)}`}>
+                            {renderStatusText(med.status)}
+                          </span>
+                        </td>
+                        <td className="dispensed-cell">{med.dispensedToday} เม็ด</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            className="update-stock-btn"
+                            onClick={() => handleUpdateClick(med)}
+                          >
+                            ปรับสต็อก
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
