@@ -128,6 +128,7 @@ export default function PatientHistoryPage() {
   const [searchHn, setSearchHn] = useState('');
   const [searchName, setSearchName] = useState('');
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
+  const [isPatientListExpanded, setIsPatientListExpanded] = useState(true);
 
   const filteredPatients = mockPatients.filter(patient => {
     const matchHn = patient.hn.toLowerCase().includes(searchHn.toLowerCase());
@@ -177,48 +178,71 @@ export default function PatientHistoryPage() {
           <button className="search-btn">ค้นหา</button>
         </div>
 
-        <div className="patient-table-card">
-          <div className="table-header-row">
-            <h2 className="table-title">รายชื่อผู้ป่วยที่เข้ารับการรักษา</h2>
-            <span className="count-badge">แสดง {filteredPatients.length} รายการ</span>
+        <div className="patient-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
+          <div 
+            onClick={() => setIsPatientListExpanded(!isPatientListExpanded)}
+            style={{ 
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+              padding: '18px 24px', background: '#F8FAFC', borderBottom: isPatientListExpanded ? '1px solid #E2E8F0' : 'none',
+              cursor: 'pointer', userSelect: 'none' 
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: '700', color: '#0F172A' }}>
+                รายชื่อผู้ป่วยที่เข้ารับการรักษา
+              </h3>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', padding: '4px 12px', borderRadius: '16px', fontSize: '13px' }}>
+                แสดง {filteredPatients.length} รายการ
+              </span>
+              <svg 
+                width="18" height="18" viewBox="0 0 24 24" fill="none" 
+                style={{ color: '#64748B', transform: isPatientListExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', flexShrink: 0 }}
+              >
+                <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
           </div>
 
-          <div className="table-wrapper">
-            <table className="patient-table">
-              <thead>
-                <tr>
-                  <th>ID (HN)</th>
-                  <th>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
-                  <th>อายุ</th>
-                  <th>กรุ๊ปเลือด</th>
-                  <th>โรคประจำตัว</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPatients.map((patient) => (
-                  <tr key={patient.id}>
-                    <td className="hn-cell">{patient.hn}</td>
-                    <td 
-                      className="patient-name-cell clickable-patient-history"
-                      onClick={() => setSelectedPatientModal(patient)}
-                    >
-                      <span className="history-name-link">👤 {patient.name}</span>
-                      <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
-                    </td>
-                    <td>{patient.age} ปี</td>
-                    <td><span className="blood-badge">{patient.bloodType}</span></td>
-                    <td>
-                      <div className="disease-badges">
-                        {patient.diseases.map((d, i) => (
-                          <span key={i} className="disease-tag">{d}</span>
-                        ))}
-                      </div>
-                    </td>
+          {isPatientListExpanded && (
+            <div className="table-wrapper">
+              <table className="patient-table">
+                <thead>
+                  <tr>
+                    <th>ID (HN)</th>
+                    <th>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
+                    <th>อายุ</th>
+                    <th>กรุ๊ปเลือด</th>
+                    <th>โรคประจำตัว</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filteredPatients.map((patient) => (
+                    <tr key={patient.id}>
+                      <td className="hn-cell">{patient.hn}</td>
+                      <td 
+                        className="patient-name-cell clickable-patient-history"
+                        onClick={() => setSelectedPatientModal(patient)}
+                      >
+                        <span className="history-name-link">👤 {patient.name}</span>
+                        <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
+                      </td>
+                      <td>{patient.age} ปี</td>
+                      <td><span className="blood-badge">{patient.bloodType}</span></td>
+                      <td>
+                        <div className="disease-badges">
+                          {patient.diseases.map((d, i) => (
+                            <span key={i} className="disease-tag">{d}</span>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 

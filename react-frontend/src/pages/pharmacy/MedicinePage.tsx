@@ -114,6 +114,7 @@ export default function MedicinePage() {
   const [searchMedName, setSearchMedName] = useState('');
   
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
+  const [isStockTableExpanded, setIsStockTableExpanded] = useState(true);
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -224,73 +225,99 @@ export default function MedicinePage() {
         <button className="search-btn">ค้นหา</button>
       </div>
 
-      <div className="stock-table-card card">
-        <div className="table-header-row">
-          <h2 className="table-title">สถานะคลังยา & สรุปการจ่ายยาประจำวัน</h2>
-          {showSuccessBadge && (
-            <span className="success-badge">
-              ✓ อัปเดตคลังยาเรียบร้อยแล้ว
+      <div className="stock-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
+        <div 
+          onClick={() => setIsStockTableExpanded(!isStockTableExpanded)}
+          style={{ 
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+            padding: '18px 24px', background: '#F8FAFC', borderBottom: isStockTableExpanded ? '1px solid #E2E8F0' : 'none',
+            cursor: 'pointer', userSelect: 'none' 
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: '700', color: '#0F172A' }}>
+              สถานะคลังยา & สรุปการจ่ายยาประจำวัน
+            </h3>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {showSuccessBadge && (
+              <span className="success-badge" style={{ background: '#DCFCE7', color: '#166534', fontWeight: 'bold', padding: '4px 12px', borderRadius: '16px', fontSize: '13px' }}>
+                ✓ อัปเดตคลังยาเรียบร้อยแล้ว
+              </span>
+            )}
+            <span style={{ background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', padding: '4px 12px', borderRadius: '16px', fontSize: '13px' }}>
+              {filteredMedicines.length} รายการ
             </span>
-          )}
-        </div>
-
-        <div className="table-wrapper">
-          <table className="stock-table">
-            <thead>
-              <tr>
-                <th>รหัสยา (ID)</th>
-                <th>ชื่อยา (คลิกเพื่อดูรายละเอียด)</th>
-                <th>คงเหลือในคลัง (STOCK)</th>
-                <th>สถานะ (STATUS)</th>
-                <th>จ่ายวันนี้ (DISPENSED TODAY)</th>
-                <th style={{ textAlign: 'right' }}>การจัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMedicines.map((med) => (
-                <tr key={med.id}>
-                  <td className="med-id-cell">{med.id}</td>
-                  <td 
-                    className="med-name-cell clickable-med-name"
-                    onClick={() => setDetailModalMed(med)}
-                  >
-                    <span className="med-name-link">{med.name}</span>
-                    <span className="med-hint-tag">คลิกเพื่อดูรายละเอียดสรรพคุณ </span>
-                  </td>
-                  <td className="stock-num-cell">{med.stock} เม็ด</td>
-                  <td>
-                    <span className={`status-badge ${getStatusClass(med.status)}`}>
-                      {renderStatusText(med.status)}
-                    </span>
-                  </td>
-                  <td className="dispensed-cell">{med.dispensedToday} เม็ด</td>
-                  <td style={{ textAlign: 'right' }}>
-                    <button
-                      className="update-stock-btn"
-                      onClick={() => handleUpdateClick(med)}
-                    >
-                      ปรับสต็อก
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="pagination-bar">
-          <span className="pagination-info">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: '#2563EB' }}>
-              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            <svg 
+              width="18" height="18" viewBox="0 0 24 24" fill="none" 
+              style={{ color: '#64748B', transform: isStockTableExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', flexShrink: 0 }}
+            >
+              <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            แสดง 1 - {filteredMedicines.length} จากทั้งหมด <strong>{medicines.length}</strong> รายการ
-          </span>
-          <div className="pagination-buttons">
-            <button className="page-arrow" disabled title="หน้าก่อนหน้า">‹</button>
-            <button className="page-num active">1</button>
-            <button className="page-arrow" disabled title="หน้าถัดไป">›</button>
           </div>
         </div>
+
+        {isStockTableExpanded && (
+          <>
+            <div className="table-wrapper">
+              <table className="stock-table">
+                <thead>
+                  <tr>
+                    <th>รหัสยา (ID)</th>
+                    <th>ชื่อยา (คลิกเพื่อดูรายละเอียด)</th>
+                    <th>คงเหลือในคลัง (STOCK)</th>
+                    <th>สถานะ (STATUS)</th>
+                    <th>จ่ายวันนี้ (DISPENSED TODAY)</th>
+                    <th style={{ textAlign: 'right' }}>การจัดการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredMedicines.map((med) => (
+                    <tr key={med.id}>
+                      <td className="med-id-cell">{med.id}</td>
+                      <td 
+                        className="med-name-cell clickable-med-name"
+                        onClick={() => setDetailModalMed(med)}
+                      >
+                        <span className="med-name-link">{med.name}</span>
+                        <span className="med-hint-tag">คลิกเพื่อดูรายละเอียดสรรพคุณ </span>
+                      </td>
+                      <td className="stock-num-cell">{med.stock} เม็ด</td>
+                      <td>
+                        <span className={`status-badge ${getStatusClass(med.status)}`}>
+                          {renderStatusText(med.status)}
+                        </span>
+                      </td>
+                      <td className="dispensed-cell">{med.dispensedToday} เม็ด</td>
+                      <td style={{ textAlign: 'right' }}>
+                        <button
+                          className="update-stock-btn"
+                          onClick={() => handleUpdateClick(med)}
+                        >
+                          ปรับสต็อก
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="pagination-bar">
+              <span className="pagination-info">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: '#2563EB' }}>
+                  <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                แสดง 1 - {filteredMedicines.length} จากทั้งหมด <strong>{medicines.length}</strong> รายการ
+              </span>
+              <div className="pagination-buttons">
+                <button className="page-arrow" disabled title="หน้าก่อนหน้า">‹</button>
+                <button className="page-num active">1</button>
+                <button className="page-arrow" disabled title="หน้าถัดไป">›</button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Stock Adjustment Modal */}

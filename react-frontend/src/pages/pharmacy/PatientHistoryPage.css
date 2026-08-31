@@ -235,8 +235,9 @@ body.dark-mode .patient-history-container .history-name-link {
 }
 
 .patient-history-container .history-hint-tag {
-  font-size: 0.75rem;
-  color: #64748B;
+  font-size: 0.8rem;
+  color: #0284C7;
+  font-weight: 600;
   display: block;
   margin-top: 2px;
 }

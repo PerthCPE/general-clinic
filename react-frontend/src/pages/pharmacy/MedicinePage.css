@@ -567,8 +567,9 @@ body.dark-mode .medicine-page-container .med-name-link {
 }
 
 .medicine-page-container .med-hint-tag {
-  font-size: 0.75rem;
-  color: #64748B;
+  font-size: 0.8rem;
+  color: #0284C7;
+  font-weight: 600;
   display: block;
   margin-top: 2px;
 }
