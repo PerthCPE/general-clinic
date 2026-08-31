@@ -79,10 +79,10 @@ body.dark-mode .medicine-page-container .success-badge {
 /* Search Card Section */
 .medicine-page-container .search-card {
   background-color: #FFFFFF;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 24px;
   margin-bottom: 24px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   display: flex;
   gap: 20px;
   align-items: flex-end;
