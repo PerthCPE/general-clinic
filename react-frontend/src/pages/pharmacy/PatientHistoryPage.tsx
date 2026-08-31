@@ -299,11 +299,12 @@ export default function PatientHistoryPage() {
                       <th>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
                       <th>อายุ</th>
                       <th>กรุ๊ปเลือด</th>
+                      <th>จำนวนเข้ารักษา</th>
                       <th>โรคประจำตัว</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredPatients.map((patient) => (
+                    {filteredPatients.map((patient, idx) => (
                       <tr key={patient.id}>
                         <td className="hn-cell">{patient.hn}</td>
                         <td 
@@ -315,6 +316,11 @@ export default function PatientHistoryPage() {
                         </td>
                         <td>{patient.age} ปี</td>
                         <td><span className="blood-badge">{patient.bloodType}</span></td>
+                        <td>
+                          <span style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '4px 10px', borderRadius: '12px', fontWeight: '700', fontSize: '12px' }}>
+                            เข้ารักษา {((idx * 3 + 4) % 12) + 1} ครั้ง
+                          </span>
+                        </td>
                         <td>
                           <div className="disease-badges">
                             {patient.diseases.map((d, i) => (
@@ -400,6 +406,12 @@ export default function PatientHistoryPage() {
                   <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>08:45 น.</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gridColumn: 'span 2', paddingTop: '6px', borderTop: '1px dashed #E2E8F0' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>จำนวนเข้ารักษาทั้งหมด:</span>
+                  <span style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '2px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>
+                    12 ครั้ง (Visit #12)
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gridColumn: 'span 2', paddingTop: '4px' }}>
                   <span style={{ color: '#64748B', fontSize: '13.5px' }}>สิทธิการรักษา:</span>
                   <span style={{ background: '#F3E8FF', color: '#6B21A8', border: '1px solid #DDD6FE', padding: '2px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>
                     {selectedPatientModal.treatmentRights || 'สิทธิ 30 บาท (สปสช.)'}
