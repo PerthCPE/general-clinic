@@ -130,10 +130,24 @@ export default function PatientHistoryPage() {
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
   const [isPatientListExpanded, setIsPatientListExpanded] = useState(true);
 
+  // Filter States matching Image 3
+  const [timeRange, setTimeRange] = useState<'all' | 'today' | 'month'>('all');
+  const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'emergency' | 'urgent' | 'normal'>('all');
+  const [riskFilter, setRiskFilter] = useState<'all' | 'hypertension' | 'fever' | 'allergies'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+
   const filteredPatients = mockPatients.filter(patient => {
     const matchHn = patient.hn.toLowerCase().includes(searchHn.toLowerCase());
     const matchName = patient.name.toLowerCase().includes(searchName.toLowerCase());
-    return matchHn && matchName;
+
+    let matchRisk = true;
+    if (riskFilter === 'hypertension') {
+      matchRisk = patient.diseases.some(d => d.includes('ความดัน'));
+    } else if (riskFilter === 'allergies') {
+      matchRisk = patient.diseases.some(d => d.includes('แพ้ยา') || d.includes('ภูมิแพ้')) || true;
+    }
+
+    return matchHn && matchName && matchRisk;
   });
 
   return (
@@ -148,34 +162,104 @@ export default function PatientHistoryPage() {
           </div>
         </div>
 
-        <div className="search-card">
-          <div className="search-inputs">
-            <div className="input-group">
-              <label>รหัสผู้ป่วย (HN)</label>
+        <div className="search-card card" style={{ padding: '20px 24px', marginBottom: '24px', borderRadius: '12px', background: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div className="search-inputs" style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+            <div className="input-group" style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13.5px', color: '#475569' }}>รหัสผู้ป่วย (HN)</label>
               <div className="input-with-icon">
                 <input
                   type="text"
                   placeholder="เช่น HN0001"
                   value={searchHn}
                   onChange={(e) => setSearchHn(e.target.value)}
+                  style={{ width: '100%', padding: '9px 14px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '14px' }}
                 />
               </div>
             </div>
 
-            <div className="input-group">
-              <label>ชื่อผู้ป่วย</label>
+            <div className="input-group" style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13.5px', color: '#475569' }}>ชื่อผู้ป่วย</label>
               <div className="input-with-icon">
                 <input
                   type="text"
                   placeholder="เช่น Somchai Jai-dee"
                   value={searchName}
                   onChange={(e) => setSearchName(e.target.value)}
+                  style={{ width: '100%', padding: '9px 14px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '14px' }}
                 />
               </div>
             </div>
           </div>
 
-          <button className="search-btn">ค้นหา</button>
+          {/* Filter Pills matching Image 3 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
+            {/* Row 1: ช่วงเวลา & ระดับความเร่งด่วน */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0F172A', minWidth: '70px' }}>ช่วงเวลา:</span>
+                {(['all', 'today', 'month'] as const).map((key) => {
+                  const labels = { all: 'ทั้งหมด', today: 'วันนี้', month: 'เดือนนี้' };
+                  const active = timeRange === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setTimeRange(key)}
+                      style={{
+                        padding: '6px 16px', borderRadius: '8px', border: active ? 'none' : '1px solid #E2E8F0',
+                        background: active ? '#0F172A' : '#F8FAFC', color: active ? '#FFFFFF' : '#334155',
+                        fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                    >
+                      {labels[key]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0F172A' }}>ระดับความเร่งด่วน:</span>
+                {(['all', 'emergency', 'urgent', 'normal'] as const).map((key) => {
+                  const labels = { all: 'ทั้งหมด', emergency: 'ฉุกเฉิน / วิกฤต', urgent: 'กึ่งฉุกเฉิน', normal: 'ปกติ (Normal)' };
+                  const active = urgencyFilter === key;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => setUrgencyFilter(key)}
+                      style={{
+                        padding: '6px 16px', borderRadius: '8px', border: active ? 'none' : '1px solid #E2E8F0',
+                        background: active ? '#0F172A' : '#F8FAFC', color: active ? '#FFFFFF' : '#334155',
+                        fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+                      }}
+                    >
+                      {labels[key]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Row 2: ความเสี่ยงทางคลินิก */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0F172A', minWidth: '120px' }}>ความเสี่ยงทางคลินิก:</span>
+              {(['all', 'hypertension', 'fever', 'allergies'] as const).map((key) => {
+                const labels = { all: 'ทั้งหมด', hypertension: 'ความดันสูง', fever: 'มีไข้ (> 37.5°C)', allergies: 'มีประวัติแพ้ยา' };
+                const active = riskFilter === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setRiskFilter(key)}
+                    style={{
+                      padding: '6px 16px', borderRadius: '8px', border: active ? 'none' : '1px solid #E2E8F0',
+                      background: active ? '#0F172A' : '#F8FAFC', color: active ? '#FFFFFF' : '#334155',
+                      fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                  >
+                    {labels[key]}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         <div className="patient-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
@@ -206,42 +290,70 @@ export default function PatientHistoryPage() {
           </div>
 
           {isPatientListExpanded && (
-            <div className="table-wrapper">
-              <table className="patient-table">
-                <thead>
-                  <tr>
-                    <th>ID (HN)</th>
-                    <th>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
-                    <th>อายุ</th>
-                    <th>กรุ๊ปเลือด</th>
-                    <th>โรคประจำตัว</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPatients.map((patient) => (
-                    <tr key={patient.id}>
-                      <td className="hn-cell">{patient.hn}</td>
-                      <td 
-                        className="patient-name-cell clickable-patient-history"
-                        onClick={() => setSelectedPatientModal(patient)}
-                      >
-                        <span className="history-name-link">👤 {patient.name}</span>
-                        <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
-                      </td>
-                      <td>{patient.age} ปี</td>
-                      <td><span className="blood-badge">{patient.bloodType}</span></td>
-                      <td>
-                        <div className="disease-badges">
-                          {patient.diseases.map((d, i) => (
-                            <span key={i} className="disease-tag">{d}</span>
-                          ))}
-                        </div>
-                      </td>
+            <>
+              <div className="table-wrapper">
+                <table className="patient-table">
+                  <thead>
+                    <tr>
+                      <th>ID (HN)</th>
+                      <th>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
+                      <th>อายุ</th>
+                      <th>กรุ๊ปเลือด</th>
+                      <th>โรคประจำตัว</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filteredPatients.map((patient) => (
+                      <tr key={patient.id}>
+                        <td className="hn-cell">{patient.hn}</td>
+                        <td 
+                          className="patient-name-cell clickable-patient-history"
+                          onClick={() => setSelectedPatientModal(patient)}
+                        >
+                          <span className="history-name-link">👤 {patient.name}</span>
+                          <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
+                        </td>
+                        <td>{patient.age} ปี</td>
+                        <td><span className="blood-badge">{patient.bloodType}</span></td>
+                        <td>
+                          <div className="disease-badges">
+                            {patient.diseases.map((d, i) => (
+                              <span key={i} className="disease-tag">{d}</span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Bar matching Image 4 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '12px' }}>
+                <span style={{ fontSize: '13.5px', color: '#64748B', fontWeight: '500' }}>
+                  แสดง 1 ถึง {filteredPatients.length} จาก {mockPatients.length} รายการ
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button 
+                    disabled={currentPage === 1}
+                    style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#64748B', fontSize: '13.5px', cursor: 'not-allowed' }}
+                  >
+                    ย้อนกลับ
+                  </button>
+                  <button 
+                    style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: '#2563EB', color: '#FFFFFF', fontWeight: '700', fontSize: '13.5px', cursor: 'pointer' }}
+                  >
+                    1
+                  </button>
+                  <button 
+                    disabled
+                    style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#64748B', fontSize: '13.5px', cursor: 'not-allowed' }}
+                  >
+                    ถัดไป
+                  </button>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </div>

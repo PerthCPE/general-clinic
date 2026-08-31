@@ -244,8 +244,9 @@ export default function BillingDispensePage({
                             background: localPatientId === p.id ? '#10B981' : '#F1F5F9', 
                             color: localPatientId === p.id ? '#FFFFFF' : '#0F172A', 
                             border: `1px solid ${localPatientId === p.id ? '#10B981' : '#CBD5E1'}`,
-                            padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px',
-                            whiteSpace: 'nowrap', display: 'inline-block', minWidth: '85px', textAlign: 'center'
+                            padding: '6px 14px', borderRadius: '8px', fontWeight: '700', fontSize: '13.5px',
+                            whiteSpace: 'nowrap', display: 'inline-block', minWidth: '76px', textAlign: 'center',
+                            boxShadow: localPatientId === p.id ? '0 2px 6px rgba(16, 185, 129, 0.3)' : 'none'
                           }}>
                             {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
                           </span>

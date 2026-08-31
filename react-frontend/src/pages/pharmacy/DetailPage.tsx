@@ -103,6 +103,8 @@ export default function DetailPage({
 
 
 
+  const [statFilter, setStatFilter] = useState<'all' | 'pending' | 'dispensed' | 'completed'>('all');
+
   return (
     <div className="detail-page-container">
 
@@ -118,6 +120,89 @@ export default function DetailPage({
           </svg>
           จำลองหมอกด Submit ใบสั่งยา
         </button>
+      </div>
+
+      {/* Executive Pharmacy Stat Cards (Image 2 Format) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div 
+          onClick={() => setStatFilter('all')}
+          style={{
+            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            border: statFilter === 'all' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
+            boxShadow: statFilter === 'all' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>คิวรอรับยาทั้งหมด</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#0F172A', lineHeight: '38px' }}>{queueList.length}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>กำลังรับบริการระบบยาในคลัง</div>
+        </div>
+
+        <div 
+          onClick={() => setStatFilter('pending')}
+          style={{
+            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            border: statFilter === 'pending' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
+            boxShadow: statFilter === 'pending' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>รอจัดยา & แนะนำการใช้ยา</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#FFFBEB', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#2563EB', lineHeight: '38px' }}>
+            {Math.max(1, queueList.length - 1)}
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>รอจัดยา 1 • ซักถามคำแนะนำ 1</div>
+        </div>
+
+        <div 
+          onClick={() => setStatFilter('dispensed')}
+          style={{
+            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            border: statFilter === 'dispensed' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
+            boxShadow: statFilter === 'dispensed' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>จ่ายยาแล้ว / ส่งต่อไปการเงิน</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#F0FDFA', color: '#0D9488', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#0D9488', lineHeight: '38px' }}>
+            1
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>ส่งต่อไปแคชเชียร์ 1 • รอชำระ 1</div>
+        </div>
+
+        <div 
+          onClick={() => setStatFilter('completed')}
+          style={{
+            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            border: statFilter === 'completed' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
+            boxShadow: statFilter === 'completed' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>เสร็จสิ้นกระบวนการ</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#F0FDF4', color: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#16A34A', lineHeight: '38px' }}>0</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>เสร็จสิ้น 0 • รับยาเรียบร้อย 0</div>
+        </div>
       </div>
 
       {/* Patient Search & Collapsible Recent Patients Card */}
@@ -218,8 +303,9 @@ export default function DetailPage({
                           background: localPatientId === p.id ? '#10B981' : '#F1F5F9', 
                           color: localPatientId === p.id ? '#FFFFFF' : '#0F172A', 
                           border: `1px solid ${localPatientId === p.id ? '#10B981' : '#CBD5E1'}`,
-                          padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px',
-                          whiteSpace: 'nowrap', display: 'inline-block', minWidth: '85px', textAlign: 'center'
+                          padding: '6px 14px', borderRadius: '8px', fontWeight: '700', fontSize: '13.5px',
+                          whiteSpace: 'nowrap', display: 'inline-block', minWidth: '76px', textAlign: 'center',
+                          boxShadow: localPatientId === p.id ? '0 2px 6px rgba(16, 185, 129, 0.3)' : 'none'
                         }}>
                           {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
                         </span>
