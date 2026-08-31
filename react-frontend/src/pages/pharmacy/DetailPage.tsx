@@ -255,16 +255,16 @@ export default function DetailPage({
         {isSearchExpanded && (
           <div style={{ padding: '20px 24px' }}>
             {/* Filter Search Input */}
-            <div style={{ marginBottom: '15px', display: 'flex', gap: '10px' }}>
+            <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'stretch' }}>
               <input 
                 type="text" 
                 placeholder="ค้นหาด้วยข้อมูลเลขบัตรประชาชน, HN หรือ ชื่อ-นามสกุล..." 
                 value={patientIdInput} 
                 onChange={(e) => setPatientIdInput(e.target.value)} 
-                style={{ flex: 1, padding: '9px 14px', border: '1px solid #CBD5E1', borderRadius: '6px', fontSize: '14px' }}
+                style={{ flex: 1, padding: '10px 16px', border: '1.5px solid #CBD5E1', borderRadius: '10px', fontSize: '14px', height: '42px', boxSizing: 'border-box' }}
               />
               <button 
-                style={{ padding: '0 20px', background: '#2563EB', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px' }}
+                style={{ padding: '0 24px', background: '#2563EB', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', fontSize: '14px', height: '42px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)' }}
               >
                 ค้นหา
               </button>
@@ -272,15 +272,15 @@ export default function DetailPage({
 
             {/* Patients Table */}
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+              <table style={{ width: '100%', minWidth: '1000px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead>
-                  <tr style={{ color: '#64748B', borderBottom: '1px solid #E2E8F0', height: '40px', whiteSpace: 'nowrap' }}>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>ลำดับคิว</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>HN</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600', textAlign: 'center' }}>การดำเนินการ</th>
+                  <tr style={{ color: '#64748B', borderBottom: '1.5px solid #E2E8F0', height: '44px', whiteSpace: 'nowrap' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px', width: '100px' }}>ลำดับคิว</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px', width: '110px' }}>HN</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px', width: '180px' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '220px' }}>สิทธิการรักษา</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px', textAlign: 'right', width: '140px', paddingRight: '24px' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -296,9 +296,9 @@ export default function DetailPage({
                     <tr 
                       key={p.id + '_' + index}
                       className={localPatientId === p.id ? 'active-row' : ''}
-                      style={{ borderBottom: '1px solid #F1F5F9', whiteSpace: 'nowrap' }}
+                      style={{ borderBottom: '1px solid #F1F5F9', whiteSpace: 'nowrap', height: '56px' }}
                     >
-                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                         <span style={{ 
                           color: '#2563EB', 
                           fontWeight: '700', 
@@ -309,16 +309,16 @@ export default function DetailPage({
                           {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
-                        <span style={{ fontSize: '14px', fontWeight: '500', color: '#0F172A', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#0F172A', whiteSpace: 'nowrap' }}>
                           {p.hn.replace(/[-]/g, '')}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
-                        <div className="patient-table-name" style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{p.name}</div>
+                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                        <div className="patient-table-name" style={{ fontWeight: '700', color: '#0F172A', fontSize: '14px', whiteSpace: 'nowrap' }}>{p.name}</div>
                       </td>
-                      <td className="patient-table-sub" style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap' }}>{p.nationalId}</td>
-                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                      <td className="patient-table-sub" style={{ padding: '14px 16px', fontFamily: 'monospace', fontSize: '13.5px', color: '#475569', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>{p.nationalId}</td>
+                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
                         <span style={{ 
                           background: p.treatmentRights.includes('30') ? '#FEF9C3' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
                           color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
@@ -329,7 +329,7 @@ export default function DetailPage({
                           {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
                         </span>
                       </td>
-                      <td style={{ padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '14px 16px', paddingRight: '24px', textAlign: 'right', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                         <button 
                           onClick={() => {
                             setLocalPatientId(p.id);
