@@ -20,7 +20,7 @@
   color: #FFFFFF;
   padding: 12px 20px;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 14px;
   font-weight: 500;
   box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
@@ -58,7 +58,7 @@
 }
 
 .queue-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 26px;
   line-height: 34px;
@@ -68,7 +68,7 @@
 }
 
 .queue-subtitle {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 400;
   font-size: 13px;
   line-height: 20px;
@@ -111,7 +111,7 @@
 }
 
 .stat-value {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 24px;
   line-height: 28px;
@@ -120,7 +120,7 @@
 }
 
 .stat-label {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 500;
   font-size: 12px;
   color: #64748B;
@@ -206,7 +206,7 @@
   background: #F8FAFC;
   border: 1.5px solid #E2E8F0;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   color: #1E293B;
   outline: none;
@@ -246,7 +246,7 @@
   background: #F8FAFC;
   border: 1.5px solid #E2E8F0;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   font-weight: 500;
   color: #334155;
@@ -275,7 +275,7 @@
 .modern-queue-table thead th {
   background: #F8FAFC;
   padding: 16px 20px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   line-height: 18px;
@@ -349,7 +349,7 @@
   background: #F1F5F9;
   border: 1px solid #E2E8F0;
   border-radius: 8px;
-  font-family: 'Inter', monospace;
+  font-family: var(--font-mono);
   font-weight: 700;
   font-size: 13px;
   color: #1E293B;
@@ -366,7 +366,7 @@
 }
 
 .patient-name-text {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 14px;
   line-height: 20px;
@@ -376,7 +376,7 @@
 }
 
 .patient-sub-text {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12px;
   line-height: 16px;
   color: #64748B;
@@ -395,7 +395,7 @@
   height: 32px;
   padding: 0 12px;
   border-radius: 9999px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   line-height: 18px;
@@ -457,7 +457,7 @@
   color: #FFFFFF;
   border: 1.5px solid transparent;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   line-height: 18px;
@@ -510,7 +510,7 @@
 
 .empty-state p {
   margin: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 14px;
 }
 
@@ -526,7 +526,7 @@
 }
 
 .pagination-info {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12.5px;
   color: #64748B;
   transition: color 0.5s ease;
@@ -544,7 +544,7 @@
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
   border-radius: 6px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12.5px;
   font-weight: 500;
   color: #334155;
@@ -638,7 +638,7 @@
 }
 
 .modal-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 18px;
   line-height: 24px;
@@ -648,7 +648,7 @@
 }
 
 .modal-subtitle {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   color: #64748B;
   margin: 0;
@@ -694,7 +694,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
 }
 
@@ -709,7 +709,7 @@
 }
 
 .queue-highlight {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 14px;
   color: #2563EB;
 }
@@ -722,7 +722,7 @@
 }
 
 .modal-label {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   color: #334155;
@@ -773,7 +773,7 @@
 }
 
 .option-desc-th {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12px;
   color: #64748B;
 }
@@ -784,7 +784,7 @@
   padding: 0 14px;
   border: 1.5px solid #E2E8F0;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   color: #1E293B;
   background: #FFFFFF;
@@ -815,7 +815,7 @@
   background: #FFFFFF;
   border: 1.5px solid #E2E8F0;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   color: #475569;
@@ -834,7 +834,7 @@
   background: #2563EB;
   border: none;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   color: #FFFFFF;

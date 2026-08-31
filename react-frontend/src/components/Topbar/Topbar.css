@@ -174,7 +174,7 @@
 
 .search-result-meta {
   font-size: 11px;
-  font-family: monospace;
+  font-family: var(--font-mono);
   color: #64748B;
   margin-top: 2px;
 }
@@ -210,7 +210,7 @@
   border: none;
   background: transparent;
   outline: none;
-  font-family: 'Inter';
+  font-family: var(--font-primary);
   font-style: normal;
   font-weight: 400;
   font-size: 13px;
@@ -337,7 +337,7 @@
 }
 
 .user-name {
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--font-primary);
   font-style: normal;
   font-weight: 700;
   font-size: 14px;
@@ -350,7 +350,7 @@
 }
 
 .user-role {
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--font-primary);
   font-style: normal;
   font-weight: 500;
   font-size: 12px;
@@ -392,7 +392,7 @@
 /* Avatar Text */
 .avatar-text {
   color: #FFFFFF;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 13px;
   line-height: 1;
@@ -434,7 +434,7 @@
   padding: 13px 16px;
   background: transparent;
   border: none;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-style: normal;
   font-weight: 500;
   font-size: 13px;
@@ -490,7 +490,7 @@
 }
 
 .theme-toggle-text {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 500;
   font-size: 13px;
   line-height: 20px;
@@ -553,6 +553,10 @@
 
 .dropdown-item-3 {
   animation: smoothItemCascade 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.20s both;
+}
+
+.dropdown-item-4 {
+  animation: smoothItemCascade 0.35s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
 }
 
 @keyframes smoothItemCascade {
@@ -960,7 +964,7 @@ body.dark-mode .narakeet-builder-box {
   border: 1px solid #CBD5E1;
   border-radius: 6px;
   font-size: 12px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   color: #1E293B;
   outline: none;
   background: #FFFFFF;
@@ -1158,7 +1162,7 @@ body.dark-mode .voice-test-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 14px;
   color: #0F172A;
@@ -1184,7 +1188,7 @@ body.dark-mode .voice-test-btn {
   color: #FFFFFF;
   border: none;
   border-radius: 6px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;

@@ -20,7 +20,7 @@
   color: #FFFFFF;
   padding: 14px 22px;
   border-radius: 12px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 14px;
   font-weight: 600;
   box-shadow: 0 10px 30px rgba(16, 185, 129, 0.35);
@@ -54,7 +54,7 @@
 }
 
 .registration-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 26px;
   line-height: 34px;
@@ -65,7 +65,7 @@
 }
 
 .registration-subtitle {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 400;
   font-size: 13.5px;
   line-height: 20px;
@@ -103,7 +103,7 @@
 }
 
 .reg-stat-val {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 800;
   font-size: 26px;
   line-height: 32px;
@@ -112,7 +112,7 @@
 }
 
 .reg-stat-lbl {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 500;
   font-size: 12.5px;
   color: #64748B;
@@ -197,7 +197,7 @@
 }
 
 .reg-card-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 16.5px;
   line-height: 22px;
@@ -207,7 +207,7 @@
 }
 
 .reg-card-subtitle {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 400;
   font-size: 12.5px;
   line-height: 18px;
@@ -297,7 +297,7 @@
   padding: 0 36px 0 42px;
   border: 1.5px solid #E2E8F0;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 14px;
   color: #1E293B;
   background: #FFFFFF;
@@ -337,7 +337,7 @@
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
@@ -374,7 +374,7 @@
 }
 
 .reg-chips-label {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12px;
   color: #64748B;
 }
@@ -384,7 +384,7 @@
   border: 1px solid #E2E8F0;
   border-radius: 6px;
   padding: 4px 10px;
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   color: #334155;
   cursor: pointer;
@@ -434,7 +434,7 @@
   border-radius: 12px;
   background: linear-gradient(135deg, #2563EB, #1D4ED8);
   color: #FFFFFF;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 18px;
   display: flex;
@@ -459,7 +459,7 @@
 }
 
 .reg-patient-name {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 17px;
   color: #0F172A;
@@ -468,7 +468,7 @@
 }
 
 .reg-hn-badge {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12.5px;
   font-weight: 700;
   color: #2563EB;
@@ -479,7 +479,7 @@
 }
 
 .reg-patient-sub-meta {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   color: #64748B;
   margin: 0;
@@ -506,20 +506,20 @@
 }
 
 .reg-detail-label {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 12px;
   color: #64748B;
 }
 
 .reg-detail-val {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13.5px;
   color: #1E293B;
 }
 
-.font-mono { font-family: monospace; font-size: 13.5px; letter-spacing: 0.5px; }
-.font-phone { font-family: monospace; font-size: 13.5px; }
+.font-mono { font-family: var(--font-mono); font-size: 13.5px; letter-spacing: 0.5px; }
+.font-phone { font-family: var(--font-mono); font-size: 13.5px; }
 
 .text-allergy-alert {
   color: #DC2626;
@@ -543,7 +543,7 @@
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
@@ -577,7 +577,7 @@
   color: #334155;
   border: 1px solid #CBD5E1;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13.5px;
   cursor: pointer;
@@ -627,7 +627,7 @@
 }
 
 .not-found-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 14.5px;
   color: #991B1B;
@@ -635,7 +635,7 @@
 }
 
 .not-found-desc {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12.5px;
   color: #B91C1C;
   margin: 2px 0 0 0;
@@ -648,7 +648,7 @@
   color: #FFFFFF;
   border: none;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -691,7 +691,7 @@
   border-radius: 50%;
   background: #2563EB;
   color: #FFFFFF;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 12px;
   display: flex;
@@ -700,7 +700,7 @@
 }
 
 .reg-section-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 14.5px;
   color: #1E293B;
@@ -728,7 +728,7 @@
 }
 
 .reg-form-label {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   color: #334155;
@@ -757,7 +757,7 @@
   padding: 0 14px;
   border: 1.5px solid #E2E8F0;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 14px;
   color: #1E293B;
   background: #FFFFFF;
@@ -782,7 +782,7 @@
 }
 
 .input-error-hint {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 11.5px;
   color: #EF4444;
 }
@@ -807,7 +807,7 @@
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
@@ -841,7 +841,7 @@
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 15px;
   cursor: pointer;
@@ -866,7 +866,7 @@
   color: #64748B;
   border: 1px solid #CBD5E1;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 14px;
   cursor: pointer;
@@ -893,7 +893,7 @@
 }
 
 .reg-count-pill {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 700;
   color: #7E22CE;
@@ -913,7 +913,7 @@
 .reg-recent-table thead th {
   background: #F8FAFC;
   padding: 13px 16px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   line-height: 18px;
@@ -992,7 +992,7 @@
 }
 
 .reg-hn-tag {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12.5px;
   font-weight: 700;
   color: #2563EB;
@@ -1011,7 +1011,7 @@
 }
 
 .patient-name-link {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13.5px;
   color: #0F172A;
@@ -1026,27 +1026,27 @@
 }
 
 .patient-sub-meta {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 11.5px;
   color: #64748B;
   white-space: nowrap;
 }
 
 .font-mono {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   letter-spacing: 0.3px;
   white-space: nowrap;
 }
 
 .font-phone {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   white-space: nowrap;
 }
 
 .text-muted-time {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12.5px;
   color: #64748B;
   white-space: nowrap;
@@ -1060,7 +1060,7 @@
   width: 156px;
   height: 30px;
   border-radius: 9999px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -1102,7 +1102,7 @@
   color: #FFFFFF;
   border: none;
   border-radius: 6px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
@@ -1139,7 +1139,7 @@
 
 .reg-empty-wrap p {
   margin: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13.5px;
   font-weight: 500;
 }
@@ -1188,7 +1188,7 @@
 }
 
 .reg-modal-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 700;
   font-size: 16.5px;
   color: #0F172A;
@@ -1196,7 +1196,7 @@
 }
 
 .reg-modal-hn {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 12.5px;
   font-weight: 700;
   color: #2563EB;
@@ -1236,7 +1236,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13.5px;
 }
 
@@ -1265,7 +1265,7 @@
   color: #FFFFFF;
   border: none;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -1278,7 +1278,7 @@
   color: #334155;
   border: 1px solid #E2E8F0;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;

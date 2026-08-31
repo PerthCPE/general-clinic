@@ -9,6 +9,8 @@ interface TopbarProps {
   onToggleSidebar: () => void;
   isDarkMode: boolean;
   onToggleTheme: () => void;
+  useClinicalFont: boolean;
+  onToggleFont: () => void;
   onNavigate?: (page: string) => void;
 }
 
@@ -20,7 +22,7 @@ interface NotificationItem {
   isUnread: boolean;
 }
 
-function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onNavigate }: TopbarProps) {
+function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, useClinicalFont, onToggleFont, onNavigate }: TopbarProps) {
   const { currentUser, logout } = useAuth();
   const { patients: doctorPatients, setSelectedRecordPatient } = useDoctorData();
   const isDoctor = currentUser?.role === 'doctor';
@@ -712,9 +714,24 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 </span>
               </button>
 
-              {/* 3. ออกจากระบบ (Text align center, no emoji) */}
+              {/* 3. สลับฟอนต์ (Clinical / Legacy) */}
               <button
-                className="dropdown-menu-item dropdown-item-3 dropdown-logout-btn"
+                className="dropdown-menu-item dropdown-item-3 theme-toggle-btn"
+                onClick={() => {
+                  onToggleFont();
+                }}
+              >
+                <span className="theme-toggle-text">
+                  {useClinicalFont ? 'เปลี่ยนใช้ฟอนต์เดิม' : 'เปลี่ยนใช้ฟอนต์ใหม่'}
+                </span>
+                <span className="theme-toggle-icon-wrapper" style={{ fontSize: '14px', fontWeight: 'bold' }}>
+                  Aa
+                </span>
+              </button>
+
+              {/* 4. ออกจากระบบ (Text align center, no emoji) */}
+              <button
+                className="dropdown-menu-item dropdown-item-4 dropdown-logout-btn"
                 onClick={() => {
                   logout();
                   setIsDropdownOpen(false);

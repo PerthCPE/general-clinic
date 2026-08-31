@@ -44,7 +44,7 @@
 }
 
 .login-clinic-name {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 26px;
   font-weight: 700;
   color: #0F172A;
@@ -53,7 +53,7 @@
 }
 
 .login-tagline {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   color: #64748B;
   margin: 0;
@@ -67,7 +67,7 @@
 
 .login-section-label {
   display: block;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 600;
   color: #475569;
@@ -114,7 +114,7 @@
   align-items: center;
   justify-content: center;
   color: #FFFFFF;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   font-weight: 700;
   flex-shrink: 0;
@@ -127,7 +127,7 @@
 }
 
 .role-card-name {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 700;
   color: #1E293B;
@@ -138,14 +138,14 @@
 }
 
 .role-card-role {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 11px;
   color: #64748B;
   transition: color 0.5s ease;
 }
 
 .role-card-code {
-  font-family: monospace;
+  font-family: var(--font-mono);
   font-size: 10px;
   color: #2563EB;
   font-weight: 600;
@@ -157,7 +157,7 @@
   align-items: center;
   margin: 20px 0;
   color: #94A3B8;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12px;
 }
 
@@ -185,7 +185,7 @@
   color: #DC2626;
   padding: 10px 14px;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 12px;
   font-weight: 500;
   border-left: 3px solid #DC2626;
@@ -198,7 +198,7 @@
 }
 
 .login-form-label {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   font-weight: 600;
   color: #475569;
@@ -210,7 +210,7 @@
   padding: 0 14px;
   border: 1.5px solid #E2E8F0;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 14px;
   color: #1E293B;
   background: #FFFFFF;
@@ -231,7 +231,7 @@
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;

@@ -3,6 +3,7 @@ import './MedicinePage.css';
 
 interface Medicine {
   id: string;
+  medicine_code: string;
   name: string;
   genericName: string;
   category: string;
@@ -10,8 +11,10 @@ interface Medicine {
   dosage: string;
   precautions: string;
   price: string;
+  unit_price: number;
   manufacturer: string;
   stock: number;
+  stock_quantity: number;
   status: 'In Stock' | 'Low Stock' | 'Out of Stock';
   dispensedToday: number;
 }
@@ -19,6 +22,7 @@ interface Medicine {
 const initialMedicines: Medicine[] = [
   { 
     id: 'MED-0231', 
+    medicine_code: 'MED-0231',
     name: 'Paracetamol 500mg', 
     genericName: 'Paracetamol (Acetaminophen)',
     category: 'ยาลดไข้ บรรเทาปวด (Analgesic / Antipyretic)',
@@ -26,13 +30,16 @@ const initialMedicines: Medicine[] = [
     dosage: 'รับประทานครั้งละ 1-2 เม็ด ทุก 4-6 ชั่วโมง เมื่อมีอาการ (ห้ามรับประทานเกินวันละ 8 เม็ด หรือ 4,000mg)',
     precautions: 'ระวังการใช้ในผู้ป่วยโรคตับ ไต หรือผู้ที่ดื่มแอลกอฮอล์เป็นประจำ ไม่ควรทานติดต่อกันเกิน 5 วันโดยไม่มีคำสั่งแพทย์',
     price: '฿ 80.00 / กล่อง (10 แผง)',
+    unit_price: 80.0,
     manufacturer: 'บริษัท สยามเภสัช จำกัด (Siam Pharmaceutical)',
     stock: 342, 
+    stock_quantity: 342,
     status: 'In Stock', 
     dispensedToday: 12 
   },
   { 
     id: 'MED-0187', 
+    medicine_code: 'MED-0187',
     name: 'Amoxicillin 250mg', 
     genericName: 'Amoxicillin Trihydrate',
     category: 'ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย (Penicillin Antibiotic)',
@@ -40,13 +47,16 @@ const initialMedicines: Medicine[] = [
     dosage: 'รับประทานครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร (ต้องรับประทานติดต่อกันจนหมดตามแพทย์สั่งอย่างเคร่งครัด)',
     precautions: 'ห้ามใช้ในผู้ที่มีประวัติแพ้ยาในกลุ่มเพนิซิลลิน (Penicillin) หากเกิดผื่นคัน แน่นหน้าอก ให้หยุดยาและพบแพทย์ทันที',
     price: '฿ 150.00 / กล่อง (10 แผง)',
+    unit_price: 150.0,
     manufacturer: 'บริษัท องค์การเภสัชกรรม (GPO)',
     stock: 48, 
+    stock_quantity: 48,
     status: 'Low Stock', 
     dispensedToday: 8 
   },
   { 
     id: 'MED-0402', 
+    medicine_code: 'MED-0402',
     name: 'Ibuprofen 400mg', 
     genericName: 'Ibuprofen (NSAID)',
     category: 'ยาต้านการอักเสบชนิดไม่ใช่สเตียรอยด์ (NSAIDs)',
@@ -54,13 +64,16 @@ const initialMedicines: Medicine[] = [
     dosage: 'รับประทานครั้งละ 1 เม็ด วันละ 2-3 ครั้ง หลังอาหารทันที แล้วดื่มน้ำตามมากๆ',
     precautions: 'ระวังในผู้ป่วยโรคกระเพาะอาหาร เป็นแผลในกระเพาะ โรคไต หรือโรคหัวใจ ห้ามทานตอนท้องว่าง',
     price: '฿ 120.00 / กล่อง (10 แผง)',
+    unit_price: 120.0,
     manufacturer: 'บริษัท เบอร์ลินซัพพลาย จำกัด',
     stock: 0, 
+    stock_quantity: 0,
     status: 'Out of Stock', 
     dispensedToday: 3 
   },
   { 
     id: 'MED-0119', 
+    medicine_code: 'MED-0119',
     name: 'Cetirizine 10mg', 
     genericName: 'Cetirizine Dihydrochloride',
     category: 'ยาแก้อาการแพ้ ต้านฮิสตามีน (Second-Generation Antihistamine)',
@@ -68,13 +81,16 @@ const initialMedicines: Medicine[] = [
     dosage: 'รับประทานครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนนอน หรือเมื่อมีอาการแพ้',
     precautions: 'อาจทำให้ง่วงซึมเล็กน้อย ควรระวังการขับขี่ยานพาหนะหรือทำงานเกี่ยวกับเครื่องจักร',
     price: '฿ 90.00 / กล่อง (10 แผง)',
+    unit_price: 90.0,
     manufacturer: 'บริษัท เมดฮับ ฟาร์มาซูติคอล จำกัด',
     stock: 215, 
+    stock_quantity: 215,
     status: 'In Stock', 
     dispensedToday: 5 
   },
   { 
     id: 'MED-0356', 
+    medicine_code: 'MED-0356',
     name: 'Omeprazole 20mg', 
     genericName: 'Omeprazole Magnesium',
     category: 'ยาลดกรดในกระเพาะอาหาร (Proton Pump Inhibitor - PPI)',
@@ -82,8 +98,10 @@ const initialMedicines: Medicine[] = [
     dosage: 'รับประทานครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนอาหารเช้าประมาณ 30 นาที (กลืนทั้งเม็ด ห้ามเคี้ยว)',
     precautions: 'ไม่ควรกินติดต่อกันเป็นเวลานานเกิน 8 สัปดาห์โดยไม่มีแพทย์ดูแล',
     price: '฿ 180.00 / กล่อง (14 แคปซูล)',
+    unit_price: 180.0,
     manufacturer: 'บริษัท แอสตร้าเซนเนก้า จำกัด',
     stock: 76, 
+    stock_quantity: 76,
     status: 'In Stock', 
     dispensedToday: 9 
   },

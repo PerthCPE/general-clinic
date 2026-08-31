@@ -111,11 +111,11 @@ export default function BillingDashboardPage() {
         )}
       </div>
 
-      {/* Metric Cards Section */}
+      {/* Metric Cards Section - Pharmacy-style framed cards */}
       <div className="metrics-grid">
         <div className="metric-card card">
           <div className="metric-icon-bg blue-bg">
-            <span className="icon">💰</span>
+            <span className="icon" style={{ fontSize: '1.6rem' }}>💰</span>
           </div>
           <div className="metric-info">
             <span className="metric-label">รายได้รวมวันนี้ (Total Revenue)</span>
@@ -128,7 +128,7 @@ export default function BillingDashboardPage() {
 
         <div className="metric-card card">
           <div className="metric-icon-bg orange-bg">
-            <span className="icon">⏳</span>
+            <span className="icon" style={{ fontSize: '1.6rem' }}>⏳</span>
           </div>
           <div className="metric-info">
             <span className="metric-label">รอชำระเงิน (Pending Payment)</span>
@@ -138,7 +138,7 @@ export default function BillingDashboardPage() {
 
         <div className="metric-card card">
           <div className="metric-icon-bg green-bg">
-            <span className="icon">✅</span>
+            <span className="icon" style={{ fontSize: '1.6rem' }}>✅</span>
           </div>
           <div className="metric-info">
             <span className="metric-label">ชำระเงินสำเร็จแล้ว (Completed)</span>

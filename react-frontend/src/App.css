@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: center;
   min-height: 400px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   color: #64748B;
   transition: color 0.5s ease;
 }
