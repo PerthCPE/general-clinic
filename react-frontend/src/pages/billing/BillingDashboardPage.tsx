@@ -28,15 +28,15 @@ interface DetailedPatientRecord {
 }
 
 const mockPaymentRecords: PaymentRecord[] = [
-  { id: 'HN-2023-045', patientName: 'นายบุญค้ำ โยลัย', date: '23/07/2026', time: '10:15 น.', amount: '฿ 1,175.00', method: 'QR Code' },
-  { id: 'HN-2023-112', patientName: 'นางสาวกานดา มณีรัตน์', date: '23/07/2026', time: '11:00 น.', amount: '฿ 1,175.00', method: 'เงินสด' },
-  { id: 'HN-2024-018', patientName: 'นายสมชาย ใจดี', date: '23/07/2026', time: '11:45 น.', amount: '฿ 1,500.00', method: 'QR Code' },
-  { id: 'HN-2022-884', patientName: 'นางสาวสวย งามตา', date: '23/07/2026', time: '13:20 น.', amount: '฿ 600.00', method: 'เงินสด' },
-  { id: 'HN-2024-105', patientName: 'นางสาวแมว อานนท์', date: '23/07/2026', time: '14:00 น.', amount: '฿ 800.00', method: 'QR Code' },
-  { id: 'HN-2023-309', patientName: 'นางสาววุฒิศรี ร้อยสาย', date: '23/07/2026', time: '14:05 น.', amount: '฿ 400.00', method: 'เงินสด' },
-  { id: 'HN-2023-512', patientName: 'นางสาวจินตนา มานิน', date: '23/07/2026', time: '15:10 น.', amount: '฿ 700.00', method: 'QR Code' },
-  { id: 'HN-2023-640', patientName: 'นางสาวสุภาสิทธิ์ ดวงใจ', date: '23/07/2026', time: '15:30 น.', amount: '฿ 850.00', method: 'เงินสด' },
-  { id: 'HN-2023-789', patientName: 'นางสาวกุหลาบ สุขี', date: '23/07/2026', time: '16:20 น.', amount: '฿ 100.00', method: 'เงินสด' },
+  { id: 'HN0045', patientName: 'นายบุญค้ำ โยลัย', date: '23/07/2026', time: '10:15 น.', amount: '฿ 1,175.00', method: 'QR Code' },
+  { id: 'HN0112', patientName: 'นางสาวกานดา มณีรัตน์', date: '23/07/2026', time: '11:00 น.', amount: '฿ 1,175.00', method: 'เงินสด' },
+  { id: 'HN0018', patientName: 'นายสมชาย ใจดี', date: '23/07/2026', time: '11:45 น.', amount: '฿ 1,500.00', method: 'QR Code' },
+  { id: 'HN0884', patientName: 'นางสาวสวย งามตา', date: '23/07/2026', time: '13:20 น.', amount: '฿ 600.00', method: 'เงินสด' },
+  { id: 'HN0105', patientName: 'นางสาวแมว อานนท์', date: '23/07/2026', time: '14:00 น.', amount: '฿ 800.00', method: 'QR Code' },
+  { id: 'HN0309', patientName: 'นางสาววุฒิศรี ร้อยสาย', date: '23/07/2026', time: '14:05 น.', amount: '฿ 400.00', method: 'เงินสด' },
+  { id: 'HN0512', patientName: 'นางสาวจินตนา มานิน', date: '23/07/2026', time: '15:10 น.', amount: '฿ 700.00', method: 'QR Code' },
+  { id: 'HN0640', patientName: 'นางสาวสุภาสิทธิ์ ดวงใจ', date: '23/07/2026', time: '15:30 น.', amount: '฿ 850.00', method: 'เงินสด' },
+  { id: 'HN0789', patientName: 'นางสาวกุหลาบ สุขี', date: '23/07/2026', time: '16:20 น.', amount: '฿ 100.00', method: 'เงินสด' },
 ];
 
 export default function BillingDashboardPage() {
@@ -81,7 +81,7 @@ export default function BillingDashboardPage() {
     return {
       id: recordId,
       patientName: recordName,
-      hn: 'HN-49201',
+      hn: 'HN0045',
       date: defaultDate,
       time: defaultTime,
       amount: '฿ 1,175.00',
@@ -101,9 +101,12 @@ export default function BillingDashboardPage() {
 
   return (
     <div className="billing-dashboard-container">
-      {/* Dashboard Title Header */}
-      <div className="dashboard-title-row">
-        <h1 className="dashboard-title">แดชบอร์ดสรุปรายรับและการเงินประจำวัน</h1>
+      {/* Page Header */}
+      <div className="page-header" style={{ marginBottom: '24px' }}>
+        <div className="header-titles">
+          <h1 className="page-title">แดชบอร์ดสรุปรายรับและการเงินประจำวัน</h1>
+          <p className="page-subtitle">สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน</p>
+        </div>
         {hasSearched && (
           <span className="success-badge">
             <span className="check-icon">✓</span> ค้นหาผู้ป่วยสำเร็จ
@@ -154,7 +157,7 @@ export default function BillingDashboardPage() {
             <label>ค้นหารหัสผู้ป่วย หรือ ชื่อผู้ป่วย (Patient ID / Name)</label>
             <input
               type="text"
-              placeholder="เช่น HN-2023-045 หรือ HN-2023-112 หรือ พิมพ์ชื่อ..."
+              placeholder="เช่น HN0045 หรือ HN0112 หรือ พิมพ์ชื่อ..."
               value={patientId}
               onChange={(e) => setPatientId(e.target.value)}
             />

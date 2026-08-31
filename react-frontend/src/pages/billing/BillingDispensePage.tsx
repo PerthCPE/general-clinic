@@ -117,25 +117,33 @@ export default function BillingDispensePage({
 
   return (
     <div className="billing-dispense-container">
+      {/* Page Header */}
+      <div className="page-header" style={{ marginBottom: '24px' }}>
+        <div className="header-titles">
+          <h1 className="page-title">คิดเงินและออกบิลชำระเงิน</h1>
+          <p className="page-subtitle">สรุปรายการค่ายา ค่าบริการทางการแพทย์ คำนวณส่วนลดสิทธิ์ และรับชำระเงิน</p>
+        </div>
+      </div>
+
       {/* Patient Search & Collapsible Recent Pharmacy Patients Queue Card */}
-      <div className="search-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '20px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
+      <div className="search-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
         {/* Header Toggle */}
         <div 
           onClick={() => setIsSearchExpanded(!isSearchExpanded)}
           style={{ 
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-            padding: '16px 20px', background: '#F8FAFC', borderBottom: isSearchExpanded ? '1px solid #E2E8F0' : 'none',
+            padding: '18px 24px', background: '#F8FAFC', borderBottom: isSearchExpanded ? '1px solid #E2E8F0' : 'none',
             cursor: 'pointer', userSelect: 'none' 
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             
-            <div>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#0F172A' }}>
-                คิวรอชำระเงิน
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: '700', color: '#0F172A', lineHeight: '1.3' }}>
+                รายชื่อผู้ป่วยที่รอชำระเงิน (Pending Payments)
               </h3>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>
-                ผู้ป่วยที่รอชำระเงิน
+              <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B', lineHeight: '1.4' }}>
+                รายการผู้ป่วยที่บันทึกข้อมูลส่งมาจากห้องตรวจแพทย์ / ห้องยา เพื่อรับชำระเงิน
               </p>
             </div>
           </div>
@@ -146,7 +154,7 @@ export default function BillingDispensePage({
                 background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', 
                 padding: '4px 12px', borderRadius: '16px', fontSize: '13px', border: '1px solid #93C5FD' 
               }}>
-                ถึงคิวที่ {activePatient.queueNumber} ({activePatient.name})
+                ถึงคิวที่ {activePatient.queueNumber && activePatient.queueNumber.startsWith('Q') ? activePatient.queueNumber : `Q${String(activePatient.queueNumber).padStart(4, '0')}`} ({activePatient.name})
               </span>
             )}
             <span style={{ 
@@ -166,7 +174,7 @@ export default function BillingDispensePage({
 
         {/* Expandable Content */}
         {isSearchExpanded && (
-          <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#FFFFFF' }}>
+          <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', background: '#FFFFFF' }}>
             {/* Search Input Box for Queue */}
             <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
               <div style={{ position: 'relative', flex: 1 }}>
@@ -220,7 +228,6 @@ export default function BillingDispensePage({
                     <th style={{ padding: '10px 12px', fontWeight: '600' }}>เลขบัตรประชาชน</th>
                     <th style={{ padding: '10px 12px', fontWeight: '600' }}>สิทธิการรักษา</th>
                     <th style={{ padding: '10px 12px', fontWeight: '600' }}>สถานะการชำระ</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>วันที่ & เวลา</th>
                     <th style={{ padding: '10px 12px', fontWeight: '600', textAlign: 'center' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
@@ -240,12 +247,12 @@ export default function BillingDispensePage({
                             padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px',
                             whiteSpace: 'nowrap', display: 'inline-block', minWidth: '85px', textAlign: 'center'
                           }}>
-                            คิว {p.queueNumber || index + 1}
+                            {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
                           </span>
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
-                          <span className="patient-hn-badge" style={{ whiteSpace: 'nowrap' }}>
-                            {p.hn}
+                          <span style={{ fontSize: '14px', fontWeight: '500', color: '#0F172A', whiteSpace: 'nowrap' }}>
+                            {p.hn.replace(/[-]/g, '')}
                           </span>
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>

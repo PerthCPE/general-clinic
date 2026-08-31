@@ -32,7 +32,7 @@ interface AllergyInfo {
 const mockPatients: Patient[] = [
   {
     id: 'PT-88213',
-    hn: 'HN-2023-045',
+    hn: 'HN0045',
     name: 'นาย สมชาย ใจดี',
     age: 45,
     bloodType: 'O+',
@@ -42,7 +42,7 @@ const mockPatients: Patient[] = [
   },
   {
     id: 'PT-88214',
-    hn: 'HN-2023-112',
+    hn: 'HN0112',
     name: 'นาง มะลิวัน จันทร์เพ็ญ',
     age: 62,
     bloodType: 'A-',
@@ -52,7 +52,7 @@ const mockPatients: Patient[] = [
   },
   {
     id: 'PT-88215',
-    hn: 'HN-2024-018',
+    hn: 'HN0018',
     name: 'นาย พงศกร รัตนสัจจะ',
     age: 28,
     bloodType: 'B+',
@@ -62,7 +62,7 @@ const mockPatients: Patient[] = [
   },
   {
     id: 'PT-88216',
-    hn: 'HN-2022-884',
+    hn: 'HN0884',
     name: 'นางสาว ศิริพร แก้วมณี',
     age: 34,
     bloodType: 'AB+',
@@ -154,7 +154,7 @@ export default function PatientHistoryPage() {
               <div className="input-with-icon">
                 <input
                   type="text"
-                  placeholder="เช่น HN-2023-001"
+                  placeholder="เช่น HN0001"
                   value={searchHn}
                   onChange={(e) => setSearchHn(e.target.value)}
                 />

@@ -42,7 +42,7 @@ function MainApp() {
     return localStorage.getItem('activePage') || 'registration';
   });
 
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('HN-2023-045');
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('HN0045');
   const [patientRightsMap, setPatientRightsMap] = useState<Record<string, string>>({});
   const handleUpdatePatientRights = (patientId: string, rights: string) => {
     setPatientRightsMap(prev => ({ ...prev, [patientId]: rights }));

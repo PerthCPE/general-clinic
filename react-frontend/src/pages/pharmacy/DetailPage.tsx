@@ -84,7 +84,8 @@ export default function DetailPage({
     } else {
       // ถ้าคนไข้อยู่ในคิวหมดแล้ว เพิ่มซ้ำจากต้น
       const cyclePatient = allPatients[queueList.length % allPatients.length];
-      setQueueList(prev => [...prev, { ...cyclePatient, id: cyclePatient.id + '_' + Date.now(), hn: 'HN-' + Math.floor(Math.random() * 1000).toString().padStart(4,'0') }]);
+      const hexNum = Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+      setQueueList(prev => [...prev, { ...cyclePatient, id: cyclePatient.id + '_' + Date.now(), hn: 'HN' + hexNum }]);
       triggerToast(`แพทย์ส่งคนไข้เข้าคิวใหม่`, 'doctor');
     }
   };
@@ -193,9 +194,7 @@ export default function DetailPage({
                     <th style={{ padding: '10px 12px', fontWeight: '600' }}>HN</th>
                     <th style={{ padding: '10px 12px', fontWeight: '600' }}>ชื่อ-นามสกุล คนไข้</th>
                     <th style={{ padding: '10px 12px', fontWeight: '600' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>เบอร์โทรศัพท์</th>
                     <th style={{ padding: '10px 12px', fontWeight: '600' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>เวลาลงทะเบียน</th>
                     <th style={{ padding: '10px 12px', fontWeight: '600', textAlign: 'center' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
@@ -222,23 +221,18 @@ export default function DetailPage({
                           padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px',
                           whiteSpace: 'nowrap', display: 'inline-block', minWidth: '85px', textAlign: 'center'
                         }}>
-                          คิว {p.queueNumber || index + 1}
+                          {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
                         </span>
                       </td>
                       <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
-                        <span className="patient-hn-badge" style={{ 
-                          background: '#EFF6FF', color: '#2563EB', padding: '4px 8px', 
-                          borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', border: '1px solid #BFDBFE',
-                          whiteSpace: 'nowrap'
-                        }}>
-                          {p.hn}
+                        <span style={{ fontSize: '14px', fontWeight: '500', color: '#0F172A', whiteSpace: 'nowrap' }}>
+                          {p.hn.replace(/[-]/g, '')}
                         </span>
                       </td>
                       <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
                         <div className="patient-table-name" style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{p.name}</div>
                       </td>
                       <td className="patient-table-sub" style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap' }}>{p.nationalId}</td>
-                      <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>{p.phone}</td>
                       <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
                         <span style={{ 
                           background: p.treatmentRights.includes('30') ? '#FEF3C7' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
@@ -249,9 +243,6 @@ export default function DetailPage({
                         }}>
                           {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
                         </span>
-                      </td>
-                      <td className="patient-table-sub" style={{ padding: '12px', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                        {p.visitDate} {p.visitTime}
                       </td>
                       <td style={{ padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                         <button 
