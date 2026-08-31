@@ -163,11 +163,11 @@ body.dark-mode .patient-history-container .count-badge {
 
 .patient-history-container .patient-table th {
   padding: 14px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #64748B;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F172A;
   background-color: #F8FAFC;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 2px solid #E2E8F0;
 }
 
 body.dark-mode .patient-history-container .patient-table th {
@@ -189,8 +189,9 @@ body.dark-mode .patient-history-container .patient-table td {
 }
 
 .patient-history-container .hn-cell {
-  font-weight: 600;
-  color: #1E40AF;
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #0F172A;
 }
 
 .patient-history-container .blood-badge {

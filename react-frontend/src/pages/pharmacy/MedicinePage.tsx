@@ -276,14 +276,10 @@ export default function MedicinePage() {
                     <tr key={med.id}>
                       <td style={{ padding: '14px 20px', whiteSpace: 'nowrap' }}>
                         <span style={{ 
-                          background: '#EFF6FF', 
-                          color: '#1D4ED8', 
-                          border: '1px solid #BFDBFE', 
-                          padding: '4px 10px', 
-                          borderRadius: '8px', 
+                          color: '#2563EB', 
                           fontWeight: '700', 
                           fontFamily: 'monospace', 
-                          fontSize: '13px',
+                          fontSize: '14.5px',
                           letterSpacing: '0.3px',
                           display: 'inline-block'
                         }}>

@@ -274,13 +274,13 @@ export default function DetailPage({
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', minWidth: '1000px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead>
-                  <tr style={{ color: '#64748B', borderBottom: '1.5px solid #E2E8F0', height: '44px', whiteSpace: 'nowrap' }}>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px', width: '100px' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px', width: '110px' }}>HN</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px', width: '180px' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '220px' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '13.5px', textAlign: 'right', width: '140px', paddingRight: '24px' }}>การดำเนินการ</th>
+                  <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '100px' }}>ลำดับคิว</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '110px' }}>HN</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '180px' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '220px' }}>สิทธิการรักษา</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'right', width: '140px', paddingRight: '24px' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -310,7 +310,7 @@ export default function DetailPage({
                         </span>
                       </td>
                       <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#0F172A', whiteSpace: 'nowrap' }}>
+                        <span style={{ fontSize: '14.5px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
                           {p.hn.replace(/[-]/g, '')}
                         </span>
                       </td>
@@ -463,12 +463,12 @@ export default function DetailPage({
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                       <thead>
-                        <tr style={{ color: '#64748B', borderBottom: '1px solid #E2E8F0', height: '40px' }}>
-                          <th style={{ padding: '10px 12px', fontWeight: '600' }}>รหัสยา</th>
-                          <th style={{ padding: '10px 12px', fontWeight: '600' }}>ชื่อรายการยา & สรรพคุณ</th>
-                          <th style={{ padding: '10px 12px', fontWeight: '600' }}>ขนาด / วิธีรับประทาน</th>
-                          <th style={{ padding: '10px 12px', fontWeight: '600', textAlign: 'right' }}>ราคา</th>
-                          <th style={{ padding: '10px 12px', fontWeight: '600', textAlign: 'center' }}>สถานะคลังยา</th>
+                        <tr style={{ color: '#0F172A', background: '#F1F5F9', borderBottom: '2px solid #CBD5E1', height: '44px' }}>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>รหัสยา</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ชื่อรายการยา & สรรพคุณ</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ขนาด / วิธีรับประทาน</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'right' }}>ราคา</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>สถานะคลังยา</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -476,14 +476,10 @@ export default function DetailPage({
                           <tr key={index} style={{ borderBottom: '1px solid #F1F5F9' }}>
                             <td style={{ padding: '12px' }}>
                               <span style={{ 
-                                background: '#EFF6FF', 
-                                color: '#1D4ED8', 
-                                border: '1px solid #BFDBFE', 
-                                padding: '4px 10px', 
-                                borderRadius: '8px', 
+                                color: '#2563EB', 
                                 fontWeight: '700', 
                                 fontFamily: 'monospace', 
-                                fontSize: '13px',
+                                fontSize: '14.5px',
                                 letterSpacing: '0.3px',
                                 display: 'inline-block'
                               }}>

@@ -219,11 +219,11 @@ body.dark-mode .medicine-page-container .table-title {
 
 .medicine-page-container .stock-table th {
   padding: 14px 20px;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #64748B;
-  background-color: #FFFFFF;
-  border-bottom: 1px solid #E2E8F0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F172A;
+  background-color: #F8FAFC;
+  border-bottom: 2px solid #E2E8F0;
   white-space: nowrap;
 }
 

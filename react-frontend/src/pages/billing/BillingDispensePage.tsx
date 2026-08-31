@@ -220,15 +220,15 @@ export default function BillingDispensePage({
             <div style={{ overflowX: 'auto', marginTop: '16px' }}>
               <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead>
-                  <tr style={{ color: '#64748B', borderBottom: '1px solid #E2E8F0', height: '40px', whiteSpace: 'nowrap' }}>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>ลำดับคิว</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>HN</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>ประเภท</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600' }}>สถานะการชำระ</th>
-                    <th style={{ padding: '10px 12px', fontWeight: '600', textAlign: 'center' }}>การดำเนินการ</th>
+                  <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ลำดับคิว</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>HN</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ประเภท</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>สิทธิการรักษา</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>สถานะการชำระ</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -251,7 +251,7 @@ export default function BillingDispensePage({
                           </span>
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
-                          <span style={{ fontSize: '14px', fontWeight: '500', color: '#0F172A', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '14.5px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
                             {p.hn.replace(/[-]/g, '')}
                           </span>
                         </td>
