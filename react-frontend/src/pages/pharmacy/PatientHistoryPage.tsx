@@ -291,7 +291,13 @@ export default function PatientHistoryPage() {
                             className="patient-name-cell clickable-patient-history"
                             onClick={() => setSelectedPatientModal(patient)}
                           >
-                            <span className="history-name-link">👤 {patient.name}</span>
+                            <span className="history-name-link">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '6px', marginTop: '-2px' }}>
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                              </svg>
+                              {patient.name}
+                            </span>
                             <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
                           </td>
                           <td>{patient.age} ปี</td>
