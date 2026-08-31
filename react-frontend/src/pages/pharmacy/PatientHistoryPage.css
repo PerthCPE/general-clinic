@@ -613,21 +613,64 @@ body.dark-mode .patient-history-container .history-hint-tag {
   color: #60A5FA !important;
 }
 
+/* Base Light Mode Styles */
+.patient-history-container .filter-row-label {
+  color: #0F172A;
+}
+
+.patient-history-container .filter-pill-btn {
+  background: #F8FAFC;
+  color: #334155;
+  border: 1px solid #E2E8F0;
+}
+
+.patient-history-container .filter-pill-btn.active {
+  background: #0F172A;
+  color: #FFFFFF;
+  border: none;
+}
+
+.patient-history-container .visit-count-badge {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 13px;
+  display: inline-block;
+}
+
 /* Dark Mode Search Cards & Headers */
 body.dark-mode .patient-history-container .search-card {
   background: #1E293B !important;
   border-color: #334155 !important;
 }
 
-body.dark-mode .patient-history-container label,
-body.dark-mode .patient-history-container span {
-  color: #F8FAFC;
+body.dark-mode .patient-history-container .filter-row-label {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .patient-history-container label {
+  color: #F8FAFC !important;
 }
 
 body.dark-mode .patient-history-container input[type="text"] {
   background: #0F172A !important;
   border-color: #334155 !important;
   color: #F8FAFC !important;
+}
+
+body.dark-mode .patient-history-container .filter-pill-btn {
+  background: #0F172A !important;
+  color: #CBD5E1 !important;
+  border: 1px solid #334155 !important;
+}
+
+body.dark-mode .patient-history-container .filter-pill-btn.active {
+  background: #2563EB !important;
+  color: #FFFFFF !important;
+  border: none !important;
 }
 
 .patient-history-container .collapsible-card-header {
@@ -645,6 +688,25 @@ body.dark-mode .patient-history-container .collapsible-card-header {
 
 body.dark-mode .patient-history-container .card-header-title {
   color: #F8FAFC !important;
+}
+
+/* Dark Mode Badges inside Table */
+body.dark-mode .patient-history-container .blood-badge {
+  background: rgba(239, 68, 68, 0.25) !important;
+  color: #F87171 !important;
+  border: 1px solid #F87171 !important;
+}
+
+body.dark-mode .patient-history-container .disease-tag {
+  background: rgba(30, 41, 59, 0.8) !important;
+  color: #CBD5E1 !important;
+  border: 1px solid #334155 !important;
+}
+
+body.dark-mode .patient-history-container .visit-count-badge {
+  background: rgba(37, 99, 235, 0.28) !important;
+  color: #93C5FD !important;
+  border: 1.5px solid #60A5FA !important;
 }
 
 /* Dark Mode Pagination Footer */

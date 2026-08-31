@@ -195,7 +195,7 @@ export default function PatientHistoryPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
             {/* Row 1: ช่วงเวลา */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0F172A', minWidth: '80px' }}>ช่วงเวลา:</span>
+              <span className="filter-row-label" style={{ fontSize: '13.5px', fontWeight: '700', minWidth: '80px' }}>ช่วงเวลา:</span>
               {(['all', 'today', 'month'] as const).map((key) => {
                 const labels = { all: 'ทั้งหมด', today: 'วันนี้', month: 'เดือนนี้' };
                 const active = timeRange === key;
@@ -203,9 +203,9 @@ export default function PatientHistoryPage() {
                   <button
                     key={key}
                     onClick={() => setTimeRange(key)}
+                    className={`filter-pill-btn ${active ? 'active' : ''}`}
                     style={{
-                      padding: '6px 16px', borderRadius: '8px', border: active ? 'none' : '1px solid #E2E8F0',
-                      background: active ? '#0F172A' : '#F8FAFC', color: active ? '#FFFFFF' : '#334155',
+                      padding: '6px 16px', borderRadius: '8px',
                       fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
                     }}
                   >
@@ -217,7 +217,7 @@ export default function PatientHistoryPage() {
 
             {/* Row 2: ความเสี่ยงทางคลินิก */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0F172A', minWidth: '120px' }}>ความเสี่ยงทางคลินิก:</span>
+              <span className="filter-row-label" style={{ fontSize: '13.5px', fontWeight: '700', minWidth: '120px' }}>ความเสี่ยงทางคลินิก:</span>
               {(['all', 'hypertension', 'fever', 'allergies'] as const).map((key) => {
                 const labels = { all: 'ทั้งหมด', hypertension: 'ความดันสูง', fever: 'มีไข้ (> 37.5°C)', allergies: 'มีประวัติแพ้ยา' };
                 const active = riskFilter === key;
@@ -225,9 +225,9 @@ export default function PatientHistoryPage() {
                   <button
                     key={key}
                     onClick={() => setRiskFilter(key)}
+                    className={`filter-pill-btn ${active ? 'active' : ''}`}
                     style={{
-                      padding: '6px 16px', borderRadius: '8px', border: active ? 'none' : '1px solid #E2E8F0',
-                      background: active ? '#0F172A' : '#F8FAFC', color: active ? '#FFFFFF' : '#334155',
+                      padding: '6px 16px', borderRadius: '8px',
                       fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
                     }}
                   >
@@ -316,7 +316,7 @@ export default function PatientHistoryPage() {
                             </span>
                           </td>
                           <td style={{ textAlign: 'center' }}>
-                            <span style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '6px 14px', borderRadius: '9999px', fontWeight: '700', fontSize: '13px', display: 'inline-block' }}>
+                            <span className="visit-count-badge">
                               เข้ารักษา {((idx * 3 + 4) % 12) + 1} ครั้ง
                             </span>
                           </td>
