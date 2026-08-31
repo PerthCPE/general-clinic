@@ -23,8 +23,7 @@ import {
   Lock,
   UserCheck,
   Eye,
-  ShieldCheck,
-  AlertCircle
+  ShieldCheck
 } from 'lucide-react';
 
 export interface DoctorShift {
@@ -34,7 +33,7 @@ export interface DoctorShift {
   date: string; // YYYY-MM-DD
   startTime: string; // e.g. '08:30'
   endTime: string; // e.g. '12:00'
-  shiftType: 'OPD Duty' | 'IPD Rounds' | 'Surgery / OR' | 'On-Call Emergency' | 'Academic / Meeting' | 'Leave / Off';
+  shiftType: 'General Consultation' | 'Minor Procedure' | 'Health Check-up' | 'After-hours' | 'Academic / Meeting' | 'Leave / Off';
   roomLocation: string; // e.g. 'OPD Room 101'
   maxPatients: number;
   bookedPatients: number;
@@ -43,10 +42,10 @@ export interface DoctorShift {
 }
 
 const SHIFT_TYPES = [
-  'OPD Duty',
-  'IPD Rounds',
-  'Surgery / OR',
-  'On-Call Emergency',
+  'General Consultation',
+  'Minor Procedure',
+  'Health Check-up',
+  'After-hours',
   'Academic / Meeting',
   'Leave / Off'
 ] as const;
@@ -75,12 +74,12 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-20',
     startTime: '08:30',
     endTime: '12:00',
-    shiftType: 'OPD Duty',
+    shiftType: 'General Consultation',
     roomLocation: 'OPD Room 101',
     maxPatients: 15,
     bookedPatients: 14,
     status: 'Completed',
-    note: 'Morning OPD General Clinic'
+    note: 'Morning general clinic session'
   },
   {
     id: 's-2',
@@ -89,12 +88,12 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-21',
     startTime: '13:00',
     endTime: '16:30',
-    shiftType: 'IPD Rounds',
-    roomLocation: 'Inpatient Ward 4B',
+    shiftType: 'Health Check-up',
+    roomLocation: 'Check-up Room 2',
     maxPatients: 10,
     bookedPatients: 8,
     status: 'Completed',
-    note: 'Ward rounds for chronic care patients'
+    note: 'Annual health check-up package'
   },
   {
     id: 's-3',
@@ -103,7 +102,7 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-22',
     startTime: '08:30',
     endTime: '12:00',
-    shiftType: 'OPD Duty',
+    shiftType: 'General Consultation',
     roomLocation: 'OPD Room 101',
     maxPatients: 15,
     bookedPatients: 15,
@@ -117,12 +116,12 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-23', // Today
     startTime: '08:30',
     endTime: '12:00',
-    shiftType: 'OPD Duty',
+    shiftType: 'General Consultation',
     roomLocation: 'OPD Room 101',
     maxPatients: 15,
     bookedPatients: 12,
     status: 'In Progress',
-    note: 'Active OPD Duty Morning Session'
+    note: 'Active morning consultation session'
   },
   {
     id: 's-5',
@@ -131,12 +130,12 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-23',
     startTime: '13:30',
     endTime: '16:30',
-    shiftType: 'Surgery / OR',
-    roomLocation: 'OR Room 3',
+    shiftType: 'Minor Procedure',
+    roomLocation: 'Procedure Room 1',
     maxPatients: 3,
     bookedPatients: 2,
     status: 'Scheduled',
-    note: 'Minor surgical procedures'
+    note: 'Wound care & suturing'
   },
   {
     id: 's-6',
@@ -145,7 +144,7 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-24',
     startTime: '08:30',
     endTime: '12:00',
-    shiftType: 'OPD Duty',
+    shiftType: 'General Consultation',
     roomLocation: 'OPD Room 101',
     maxPatients: 15,
     bookedPatients: 9,
@@ -159,12 +158,12 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-25',
     startTime: '17:00',
     endTime: '23:00',
-    shiftType: 'On-Call Emergency',
-    roomLocation: 'ER Department',
+    shiftType: 'After-hours',
+    roomLocation: 'Clinic Front Desk',
     maxPatients: 20,
     bookedPatients: 4,
     status: 'Scheduled',
-    note: 'Evening Emergency On-Call'
+    note: 'Evening after-hours service'
   },
   {
     id: 's-8',
@@ -173,7 +172,7 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-23',
     startTime: '09:00',
     endTime: '15:00',
-    shiftType: 'OPD Duty',
+    shiftType: 'General Consultation',
     roomLocation: 'Heart Clinic Room 202',
     maxPatients: 18,
     bookedPatients: 16,
@@ -187,7 +186,7 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-23',
     startTime: '08:00',
     endTime: '12:00',
-    shiftType: 'OPD Duty',
+    shiftType: 'General Consultation',
     roomLocation: 'Pediatric Clinic 1',
     maxPatients: 20,
     bookedPatients: 18,
@@ -201,7 +200,7 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-06',
     startTime: '08:00',
     endTime: '12:00',
-    shiftType: 'OPD Duty',
+    shiftType: 'General Consultation',
     roomLocation: 'Heart Clinic Room 202',
     maxPatients: 15,
     bookedPatients: 15,
@@ -215,12 +214,12 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-15',
     startTime: '13:00',
     endTime: '17:00',
-    shiftType: 'Surgery / OR',
-    roomLocation: 'OR Room 1',
+    shiftType: 'Minor Procedure',
+    roomLocation: 'Procedure Room 2',
     maxPatients: 4,
     bookedPatients: 4,
     status: 'Completed',
-    note: 'Knee Replacement Surgery'
+    note: 'Joint injection & dressing change'
   },
   {
     id: 's-12',
@@ -229,7 +228,7 @@ const INITIAL_SHIFTS: DoctorShift[] = [
     date: '2026-07-28',
     startTime: '08:30',
     endTime: '12:00',
-    shiftType: 'OPD Duty',
+    shiftType: 'General Consultation',
     roomLocation: 'OPD Room 101',
     maxPatients: 15,
     bookedPatients: 5,
@@ -275,7 +274,7 @@ export const ScheduleView: React.FC = () => {
   const [formDate, setFormDate] = useState('2026-07-23');
   const [formStartTime, setFormStartTime] = useState('08:30');
   const [formEndTime, setFormEndTime] = useState('12:00');
-  const [formShiftType, setFormShiftType] = useState<DoctorShift['shiftType']>('OPD Duty');
+  const [formShiftType, setFormShiftType] = useState<DoctorShift['shiftType']>('General Consultation');
   const [formRoomLocation, setFormRoomLocation] = useState('OPD Room 101');
   const [formMaxPatients, setFormMaxPatients] = useState(15);
   const [formStatus, setFormStatus] = useState<DoctorShift['status']>('Scheduled');
@@ -393,7 +392,7 @@ export const ScheduleView: React.FC = () => {
     setFormDate(defaultDate || '2026-07-23');
     setFormStartTime('08:30');
     setFormEndTime('12:00');
-    setFormShiftType('OPD Duty');
+    setFormShiftType('General Consultation');
     setFormRoomLocation('OPD Room 101');
     setFormMaxPatients(15);
     setFormStatus('Scheduled');
@@ -490,13 +489,13 @@ export const ScheduleView: React.FC = () => {
   // Shift type badge color helper
   const getShiftBadgeStyle = (type: DoctorShift['shiftType']) => {
     switch (type) {
-      case 'OPD Duty':
+      case 'General Consultation':
         return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'IPD Rounds':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'Surgery / OR':
+      case 'Minor Procedure':
         return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'On-Call Emergency':
+      case 'Health Check-up':
+        return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+      case 'After-hours':
         return 'bg-red-100 text-red-800 border-red-200';
       case 'Academic / Meeting':
         return 'bg-indigo-100 text-indigo-800 border-indigo-200';
@@ -510,8 +509,8 @@ export const ScheduleView: React.FC = () => {
   // Stats
   const totalShiftsCount = filteredShifts.length;
   const myShiftsCount = shifts.filter((s) => s.doctorName === LOGGED_IN_DOCTOR.name).length;
-  const totalOPDShifts = filteredShifts.filter((s) => s.shiftType === 'OPD Duty').length;
-  const onCallCount = filteredShifts.filter((s) => s.shiftType === 'On-Call Emergency').length;
+  const totalOPDShifts = filteredShifts.filter((s) => s.shiftType === 'General Consultation').length;
+  const onCallCount = filteredShifts.filter((s) => s.shiftType === 'After-hours').length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
@@ -551,19 +550,6 @@ export const ScheduleView: React.FC = () => {
               {LOGGED_IN_DOCTOR.department} • {LOGGED_IN_DOCTOR.role}
             </div>
           </div>
-        </div>
-
-        {/* Permission Rules Summary */}
-        <div className="bg-white/10 backdrop-blur-md p-3 rounded-xl border border-white/15 text-xs space-y-1">
-          <div className="font-bold text-amber-300 flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5" />
-            <span>Schedule Access Control Rule:</span>
-          </div>
-          <p className="text-blue-100 text-[11px]">
-            คุณสามารถแก้ไข/จัดตารางงานได้<strong>เฉพาะของ {LOGGED_IN_DOCTOR.name} เท่านั้น</strong>
-            <br />
-            (ตารางงานของแพทย์ท่านอื่นจะแสดงเป็น Read-Only สำหรับดูภาพรวมเท่านั้น)
-          </p>
         </div>
       </div>
 
@@ -628,7 +614,7 @@ export const ScheduleView: React.FC = () => {
             <CalendarIcon className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">{t('totalScheduledShifts')}</span>
+            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('totalScheduledShifts')}</span>
             <span className="text-lg font-extrabold text-slate-900">{totalShiftsCount} {language === 'th' ? 'กะ' : 'Shifts'}</span>
           </div>
         </div>
@@ -638,7 +624,7 @@ export const ScheduleView: React.FC = () => {
             <UserCheck className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">{t('myManagedShifts')}</span>
+            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('myManagedShifts')}</span>
             <span className="text-lg font-extrabold text-indigo-700">{myShiftsCount} {language === 'th' ? 'กะ' : 'Duties'}</span>
           </div>
         </div>
@@ -648,7 +634,7 @@ export const ScheduleView: React.FC = () => {
             <Stethoscope className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">{t('opdSessions')}</span>
+            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('opdSessions')}</span>
             <span className="text-lg font-extrabold text-slate-900">{totalOPDShifts} {language === 'th' ? 'รอบ' : 'Sessions'}</span>
           </div>
         </div>
@@ -658,7 +644,7 @@ export const ScheduleView: React.FC = () => {
             <ShieldAlert className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">{t('emergencyOnCall')}</span>
+            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('emergencyOnCall')}</span>
             <span className="text-lg font-extrabold text-slate-900">{onCallCount} {language === 'th' ? 'กะ' : 'Duties'}</span>
           </div>
         </div>
@@ -672,7 +658,7 @@ export const ScheduleView: React.FC = () => {
           <select
             value={selectedDoctorFilter}
             onChange={(e) => setSelectedDoctorFilter(e.target.value)}
-            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 cursor-pointer"
+            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer"
           >
             <option value="All">{t('allDoctors')}</option>
             {ALL_DOCTORS.map((doc) => (
@@ -686,7 +672,7 @@ export const ScheduleView: React.FC = () => {
           <select
             value={filterShiftType}
             onChange={(e) => setFilterShiftType(e.target.value)}
-            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white cursor-pointer"
+            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white cursor-pointer focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
           >
             <option value="All">{t('allShiftTypes')}</option>
             {SHIFT_TYPES.map((type) => (
@@ -705,7 +691,7 @@ export const ScheduleView: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={language === 'th' ? 'ค้นหาห้อง, แพทย์, หมายเหตุ...' : 'Search room, doctor, note...'}
-            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white placeholder:text-slate-400"
+            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
           />
         </div>
       </div>
@@ -883,7 +869,7 @@ export const ScheduleView: React.FC = () => {
               return (
                 <div
                   key={day.fullDate}
-                  className={`p-3 space-y-3 flex flex-col justify-between ${
+                  className={`p-3 space-y-3 flex flex-col ${
                     day.isToday ? 'bg-blue-50/40' : 'bg-white'
                   }`}
                 >
@@ -902,6 +888,15 @@ export const ScheduleView: React.FC = () => {
                         </span>
                       )}
                     </div>
+
+                    {/* Add shift button — วางไว้บนสุดของแต่ละวัน กดเพิ่มเวรได้ทันทีโดยไม่ต้องเลื่อนลงไปท้ายคอลัมน์ */}
+                    <button
+                      onClick={() => handleOpenAddModal(day.fullDate)}
+                      className="w-full py-1.5 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-700 rounded-xl text-[11px] font-bold border border-dashed border-slate-200 hover:border-blue-300 transition-all flex items-center justify-center gap-1 mt-3 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3 shrink-0" />
+                      <span>Add Duty</span>
+                    </button>
 
                     {/* Shifts inside this day */}
                     <div className="space-y-2.5 mt-3">
@@ -984,7 +979,7 @@ export const ScheduleView: React.FC = () => {
                               </div>
 
                               {/* Patient progress limit bar */}
-                              {shift.shiftType === 'OPD Duty' && (
+                              {shift.shiftType === 'General Consultation' && (
                                 <div className="space-y-0.5 pt-1">
                                   <div className="flex justify-between text-[10px] font-medium text-slate-500">
                                     <span>Patients</span>
@@ -1011,15 +1006,6 @@ export const ScheduleView: React.FC = () => {
                       )}
                     </div>
                   </div>
-
-                  {/* Add shift button */}
-                  <button
-                    onClick={() => handleOpenAddModal(day.fullDate)}
-                    className="w-full py-1.5 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-700 rounded-xl text-[11px] font-bold border border-dashed border-slate-200 hover:border-blue-300 transition-all flex items-center justify-center gap-1 mt-3 cursor-pointer"
-                  >
-                    <Plus className="w-3 h-3" />
-                    <span>Add Duty</span>
-                  </button>
                 </div>
               );
             })}
@@ -1148,158 +1134,202 @@ export const ScheduleView: React.FC = () => {
 
       {/* MODAL 1: ADD / EDIT SHIFT DIALOG (For Logged-In Doctor) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden">
-            {/* Modal Header */}
-            <div className="p-5 bg-[#162a4a] text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-blue-300" />
-                <h3 className="font-bold text-base">
-                  {editingShift
-                    ? (language === 'th' ? 'แก้ไขกะการออกตรวจ' : 'Edit Duty Shift')
-                    : (language === 'th' ? 'เพิ่มกะการออกตรวจ' : 'Add Duty Shift')}
-                </h3>
+        <div className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 shadow-2xl overflow-hidden">
+
+            {/* ===== Header ===== */}
+            <div className="shrink-0 px-6 py-4 bg-[#162a4a] text-white flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                  <CalendarIcon className="w-5 h-5 text-blue-300" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-base leading-snug">
+                    {editingShift ? 'แก้ไขกะการออกตรวจ' : 'เพิ่มกะการออกตรวจ'}
+                  </h3>
+                  <p className="text-[11px] text-slate-300 leading-snug mt-2">
+                    ช่องที่มีเครื่องหมาย <span className="text-rose-300 font-bold">*</span> จำเป็นต้องกรอก
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-lg text-slate-300 hover:bg-slate-800 transition-colors cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleSaveShift} className="p-6 space-y-4">
-              {/* Doctor Account Info Box (Locked by RBAC) */}
-              <div className="p-3 bg-blue-50/80 border border-blue-200 rounded-xl flex items-center justify-between">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 block">
-                    {language === 'th' ? 'บัญชีแพทย์ประจำตาราง' : 'Doctor Account'}
-                  </span>
-                  <span className="text-xs font-extrabold text-slate-900">
-                    {LOGGED_IN_DOCTOR.name}
-                  </span>
-                  <span className="text-[11px] text-slate-500 ml-2">
-                    ({LOGGED_IN_DOCTOR.department})
-                  </span>
+            {/* ===== Form ===== */}
+            <form onSubmit={handleSaveShift} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
+
+                {/* แพทย์เจ้าของตาราง */}
+                <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-2xl flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0">
+                    <UserCheck className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-bold text-blue-700 block leading-tight">บัญชีแพทย์ประจำตาราง</span>
+                    <span className="text-sm font-extrabold text-slate-900">{LOGGED_IN_DOCTOR.name}</span>
+                    <span className="text-xs text-slate-500 ml-1.5">({LOGGED_IN_DOCTOR.department})</span>
+                  </div>
                 </div>
-                <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded">
-                  Locked
-                </span>
+
+                {/* กลุ่ม 1 — ประเภทกะและสถานที่ */}
+                <section className="rounded-2xl border border-slate-200 overflow-hidden">
+                  <header className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+                    <Stethoscope className="w-4 h-4 text-slate-500 shrink-0" />
+                    <h4 className="text-xs font-bold text-slate-700">ประเภทกะและสถานที่</h4>
+                  </header>
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                        ประเภทกะการออกตรวจ <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        value={formShiftType}
+                        onChange={(e) => setFormShiftType(e.target.value as any)}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer"
+                      >
+                        {SHIFT_TYPES.map((type) => (
+                          <option key={type} value={type}>
+                            {type}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                        ห้อง / สถานที่ปฏิบัติงาน <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={formRoomLocation}
+                        onChange={(e) => setFormRoomLocation(e.target.value)}
+                        placeholder="เช่น ห้องตรวจ 1, ห้องหัตถการ 2"
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 placeholder:font-normal placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* กลุ่ม 2 — วันและเวลา */}
+                <section className="rounded-2xl border border-slate-200 overflow-hidden">
+                  <header className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+                    <h4 className="text-xs font-bold text-slate-700">วันและเวลาปฏิบัติงาน</h4>
+                  </header>
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                        วันที่ออกตรวจ <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={formDate}
+                        onChange={(e) => setFormDate(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                        เวลาเริ่ม <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={formStartTime}
+                        onChange={(e) => setFormStartTime(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                        เวลาสิ้นสุด <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="time"
+                        value={formEndTime}
+                        onChange={(e) => setFormEndTime(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* กลุ่ม 3 — รายละเอียดเพิ่มเติม */}
+                <section className="rounded-2xl border border-slate-200 overflow-hidden">
+                  <header className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+                    <Users className="w-4 h-4 text-slate-500 shrink-0" />
+                    <h4 className="text-xs font-bold text-slate-700">รายละเอียดเพิ่มเติม</h4>
+                  </header>
+                  <div className="p-4 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                          จำนวนผู้ป่วยสูงสุดต่อกะ
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={formMaxPatients}
+                          onChange={(e) => setFormMaxPatients(Number(e.target.value))}
+                          className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                          สถานะกะ
+                        </label>
+                        <select
+                          value={formStatus}
+                          onChange={(e) => setFormStatus(e.target.value as any)}
+                          className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer"
+                        >
+                          <option value="Scheduled">Scheduled</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="Completed">Completed</option>
+                          <option value="Cancelled">Cancelled</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                        หมายเหตุ / คำแนะนำสำหรับทีมงาน
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={formNote}
+                        onChange={(e) => setFormNote(e.target.value)}
+                        placeholder="ระบุรายละเอียดเพิ่มเติมสำหรับเจ้าหน้าที่หรือพยาบาล เช่น อุปกรณ์ที่ต้องเตรียม..."
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 outline-none transition resize-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+                </section>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Shift Duty Type *</label>
-                  <select
-                    value={formShiftType}
-                    onChange={(e) => setFormShiftType(e.target.value as any)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white"
-                  >
-                    {SHIFT_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Room / Duty Location *</label>
-                  <input
-                    type="text"
-                    value={formRoomLocation}
-                    onChange={(e) => setFormRoomLocation(e.target.value)}
-                    placeholder="e.g. OPD Room 101, OR Room 3"
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Shift Date *</label>
-                  <input
-                    type="date"
-                    value={formDate}
-                    onChange={(e) => setFormDate(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Start Time *</label>
-                  <input
-                    type="time"
-                    value={formStartTime}
-                    onChange={(e) => setFormStartTime(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">End Time *</label>
-                  <input
-                    type="time"
-                    value={formEndTime}
-                    onChange={(e) => setFormEndTime(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Max Patient Slot</label>
-                  <input
-                    type="number"
-                    value={formMaxPatients}
-                    onChange={(e) => setFormMaxPatients(Number(e.target.value))}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Status</label>
-                  <select
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value as any)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold focus:bg-white"
-                  >
-                    <option value="Scheduled">Scheduled</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Completed">Completed</option>
-                    <option value="Cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1">Notes / Instructions</label>
-                <textarea
-                  rows={2}
-                  value={formNote}
-                  onChange={(e) => setFormNote(e.target.value)}
-                  placeholder="Additional notes for staff or clinic nurses..."
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-100">
+              {/* ===== Footer ===== */}
+              <div className="shrink-0 px-6 py-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  className="px-5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
-                  Cancel
+                  ยกเลิก
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                  className="px-5 py-2.5 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md active:scale-95 transition-all cursor-pointer inline-flex items-center gap-2 whitespace-nowrap"
                 >
-                  <Check className="w-4 h-4" />
-                  <span>{editingShift ? 'Save Changes' : 'Create Duty Shift'}</span>
+                  <Check className="w-4 h-4 shrink-0" />
+                  <span>{editingShift ? 'บันทึกการแก้ไข' : 'สร้างกะการออกตรวจ'}</span>
                 </button>
               </div>
             </form>
@@ -1309,7 +1339,7 @@ export const ScheduleView: React.FC = () => {
 
       {/* MODAL 2: READ-ONLY SHIFT DETAILS (When clicking another doctor's schedule) */}
       {readOnlyShiftModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden">
             {/* Modal Header */}
             <div className="p-5 bg-slate-800 text-white flex items-center justify-between">
@@ -1328,15 +1358,6 @@ export const ScheduleView: React.FC = () => {
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <strong>Role-Based Access Control Notice:</strong>
-                  <br />
-                  This schedule belongs to <strong>{readOnlyShiftModal.doctorName}</strong>. Under clinic RBAC policy, you ({LOGGED_IN_DOCTOR.name}) can view but cannot edit or delete other doctors' schedules.
-                </div>
-              </div>
-
               <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200 text-xs">
                 <div className="flex justify-between border-b border-slate-200 pb-2">
                   <span className="text-slate-500 font-medium">Doctor:</span>

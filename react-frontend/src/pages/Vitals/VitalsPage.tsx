@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import type {
   QueuePatientItem,
@@ -11,85 +11,121 @@ import type {
 import { BMIWidget } from './components/BMIWidget';
 import { TriageWidget } from './components/TriageWidget';
 import { VitalsFormCard } from './components/VitalsFormCard';
+import { queueApi, vitalsApi, type BackendQueue } from '../../services/api';
+import { useWebSocket } from '../../context/WebSocketContext';
+import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
+import toast from 'react-hot-toast';
 import './VitalsPage.css';
 
-// Initial Mock Doctors
-const DOCTOR_OPTIONS: DoctorOption[] = [
-  { doctorId: 1, fullName: 'พญ.สุดา สุขสมบูรณ์', specialty: 'เวชปฏิบัติทั่วไป', roomName: 'ห้องตรวจ 1' },
-  { doctorId: 2, fullName: 'นพ.วิชัย ชาญการแพทย์', specialty: 'อายุรกรรมทั่วไป', roomName: 'ห้องตรวจ 2' },
-  { doctorId: 3, fullName: 'พญ.เกศรา พัฒนพงศ์', specialty: 'กุมารเวชศาสตร์', roomName: 'ห้องตรวจ 3' },
+export { formatHN, formatQueueNo };
+
+// Initial Fallback Doctors
+const DEFAULT_DOCTORS: DoctorOption[] = [
+  { doctorId: 4, fullName: 'พญ.สุดา สุขสมบูรณ์', specialty: 'เวชปฏิบัติทั่วไป', roomName: 'ห้องตรวจ 1' },
+  { doctorId: 5, fullName: 'นพ.วิชัย ชาญการแพทย์', specialty: 'อายุรกรรมทั่วไป', roomName: 'ห้องตรวจ 2' },
+  { doctorId: 6, fullName: 'พญ.เกศรา รักษาดี', specialty: 'กุมารเวชศาสตร์', roomName: 'ห้องตรวจ 3' },
 ];
 
-// Initial Mock Waiting Patients in Queue (matching QueuePage)
-const INITIAL_QUEUE_PATIENTS: QueuePatientItem[] = [
-  {
-    id: 'q-1',
-    queueNo: 'Q001',
-    hn: 'HN-0001',
-    fullName: 'นายสมชาย ใจดี',
-    nationalId: '1-1002-34567-89-0',
-    gender: 'ชาย',
-    age: 45,
-    phone: '081-234-5678',
-    schemeType: 'บัตรทอง (สปสช.)',
-    allergies: 'ปฏิเสธการแพ้ยา',
-    chronicDiseases: 'ความดันโลหิตสูง',
-    registeredTime: '08:30 น.',
-    queueStatus: 'รอคัดกรอง',
-  },
-  {
-    id: 'q-3',
-    queueNo: 'Q003',
-    hn: 'HN-0003',
-    fullName: 'นายอาทิตย์ มีสุข',
-    nationalId: '1-1014-55443-21-9',
-    gender: 'ชาย',
-    age: 52,
-    phone: '089-876-5432',
-    schemeType: 'ประกันสังคม (ม.33)',
-    allergies: 'Penicillin',
-    chronicDiseases: 'เบาหวานชนิดที่ 2',
-    registeredTime: '08:50 น.',
-    queueStatus: 'รอคัดกรอง',
-  },
-  {
-    id: 'q-5',
-    queueNo: 'Q005',
-    hn: 'HN-0005',
-    fullName: 'นายธนกฤต กิตติพงษ์',
-    nationalId: '1-1033-77889-90-1',
-    gender: 'ชาย',
-    age: 28,
-    phone: '082-111-2233',
-    schemeType: 'ชำระเงินเอง',
-    allergies: 'Sulfa',
-    chronicDiseases: 'ไม่มี',
-    registeredTime: '09:15 น.',
-    queueStatus: 'รอคัดกรอง',
-  },
-  {
-    id: 'q-7',
-    queueNo: 'Q007',
-    hn: 'HN-0007',
-    fullName: 'นายณัฐวุฒิ สิทธิชัย',
-    nationalId: '1-1055-44332-21-0',
-    gender: 'ชาย',
-    age: 36,
-    phone: '086-444-5566',
-    schemeType: 'สิทธิ์ข้าราชการ',
-    allergies: 'ปฏิเสธการแพ้ยา',
-    chronicDiseases: 'ภูมิแพ้อากาศ',
-    registeredTime: '09:30 น.',
-    queueStatus: 'รอคัดกรอง',
-  },
-];
+const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
+  let timeStr = '08:30 น.';
+  if (q.created_at) {
+    try {
+      const d = new Date(q.created_at);
+      if (!isNaN(d.getTime())) {
+        timeStr = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')} น.`;
+      }
+    } catch {
+      timeStr = q.created_at;
+    }
+  }
+
+  const birthYear = q.patient?.birthdate ? new Date(q.patient.birthdate).getFullYear() : 1990;
+  const age = new Date().getFullYear() - birthYear;
+  const queueFormatted = formatQueueNo(q.queue_number || q.id);
+  const hnFormatted = q.patient?.hn ? formatHN(q.patient.hn) : formatHN(q.patient_id || q.id || 1);
+
+  return {
+    id: String(q.id),
+    queueId: q.id,
+    patientId: q.patient_id,
+    queueNo: queueFormatted,
+    hn: hnFormatted,
+    fullName: q.patient?.fullname || `ผู้ป่วยคิว ${queueFormatted}`,
+    nationalId: formatNationalId(q.patient?.national_id),
+    gender: (q.patient?.gender as 'ชาย' | 'หญิง' | 'อื่นๆ') || 'ชาย',
+    age: age > 0 ? age : 35,
+    phone: formatPhone(q.patient?.phone_number),
+    schemeType: q.patient?.scheme_type || 'บัตรทอง (สปสช.)',
+    allergies: q.patient?.allergies || 'ปฏิเสธการแพ้ยา',
+    chronicDiseases: q.patient?.chronic_diseases || 'ไม่มี',
+    registeredTime: timeStr,
+    queueStatus: (q.status as 'รอคัดกรอง' | 'รอพบแพทย์' | 'กำลังตรวจ' | 'เสร็จสิ้น') || 'รอคัดกรอง',
+  };
+};
 
 export const VitalsPage: React.FC = () => {
   const { currentUser } = useAuth();
 
   // Queue & Patient State
-  const [queueList, setQueueList] = useState<QueuePatientItem[]>(INITIAL_QUEUE_PATIENTS);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(''); // No patient selected initially
+  const [queueList, setQueueList] = useState<QueuePatientItem[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTORS);
+
+  // ดึงรายการคิวจาก Backend DB
+  const fetchQueues = useCallback(async () => {
+    try {
+      const data = await queueApi.getList();
+      if (Array.isArray(data)) {
+        const mapped = data.map(mapBackendQueueToPatientItem);
+        setQueueList(mapped);
+        return mapped;
+      }
+    } catch (err) {
+      console.warn('Could not load queues in vitals:', err);
+    }
+    return [];
+  }, []);
+
+  // ดึงรายชื่อแพทย์ประจำห้องตรวจจาก Backend DB
+  const fetchDoctors = useCallback(async () => {
+    try {
+      const data = await vitalsApi.getDoctors();
+      if (Array.isArray(data) && data.length > 0) {
+        const mapped: DoctorOption[] = data.map((d, index) => ({
+          doctorId: d.id,
+          fullName: d.fullname,
+          specialty: index === 0 ? 'เวชปฏิบัติทั่วไป' : index === 1 ? 'อายุรกรรมทั่วไป' : 'กุมารเวชศาสตร์',
+          roomName: `ห้องตรวจ ${index + 1}`,
+        }));
+        setDoctorList(mapped);
+      }
+    } catch (err) {
+      console.warn('Could not load doctors in vitals:', err);
+    }
+  }, []);
+
+  const { subscribe } = useWebSocket();
+
+  useEffect(() => {
+    fetchQueues();
+    fetchDoctors();
+
+    // ดักฟัง Real-time WebSocket เมื่อมีคิวใหม่หรือเปลี่ยนสถานะคิว
+    const unsubCreated = subscribe('QUEUE_CREATED', () => {
+      fetchQueues();
+    });
+    const unsubUpdated = subscribe('QUEUE_UPDATED', () => {
+      fetchQueues();
+    });
+
+    // Fallback polling ทุก 30 วินาที
+    const interval = setInterval(fetchQueues, 30000);
+    return () => {
+      unsubCreated();
+      unsubUpdated();
+      clearInterval(interval);
+    };
+  }, [fetchQueues, fetchDoctors, subscribe]);
 
   // Form State (empty initially, waiting for input)
   const [weight, setWeight] = useState<string>('');
@@ -104,7 +140,7 @@ export const VitalsPage: React.FC = () => {
   const [allergies, setAllergies] = useState<string>('');
   const [medicalHistory, setMedicalHistory] = useState<string>('');
   const [selectedTriage, setSelectedTriage] = useState<TriageLevelKey>('ปกติ (Normal)');
-  const [assignedDoctorId, setAssignedDoctorId] = useState<number>(1);
+  const [assignedDoctorId, setAssignedDoctorId] = useState<number>(4);
 
   // Accordion and UI States
   const [isFormOpen, setIsFormOpen] = useState<boolean>(true);
@@ -307,7 +343,7 @@ export const VitalsPage: React.FC = () => {
   };
 
   // Submit Handler
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatient) {
       alert('กรุณาเลือกคิวคนไข้ก่อนบันทึก');
@@ -316,69 +352,93 @@ export const VitalsPage: React.FC = () => {
 
     setIsSaving(true);
 
-    const docObj = DOCTOR_OPTIONS.find((d) => d.doctorId === assignedDoctorId) || DOCTOR_OPTIONS[0];
+    const docObj = doctorList.find((d) => d.doctorId === assignedDoctorId) || doctorList[0] || DEFAULT_DOCTORS[0];
 
-    const newRecord: ScreeningRecord = {
-      id: `scr-${Date.now()}`,
-      visitId: Math.floor(100 + Math.random() * 900),
-      queueNo: selectedPatient.queueNo,
-      hn: selectedPatient.hn,
-      patientName: selectedPatient.fullName,
-      nationalId: selectedPatient.nationalId,
-      age: selectedPatient.age,
-      gender: selectedPatient.gender,
-      screenedByUserName: currentUser?.fullName || 'พว. กานดา คัดกรอง',
-      screenedByRole: currentUser?.roleTitleTh || 'พยาบาลคัดกรอง',
-      triageLevel: selectedTriage,
-      chiefComplaint: chiefComplaint.trim(),
-      allergies: allergies.trim() || 'ปฏิเสธการแพ้ยา',
-      medicalHistory: medicalHistory.trim() || 'ไม่มี',
-      weight: parseFloat(weight) || 0,
-      height: parseFloat(height) || 0,
-      bmi: bmiValue ? parseFloat(bmiValue.toFixed(2)) : 0,
-      temperature: parseFloat(temperature) || 36.5,
-      systolicBP: parseInt(systolicBP, 10) || 120,
-      diastolicBP: parseInt(diastolicBP, 10) || 80,
-      heartRate: parseInt(heartRate, 10) || 75,
-      respiratoryRate: parseInt(respiratoryRate, 10) || 18,
-      spo2: parseInt(spo2, 10) || 98,
-      assignedDoctorId: docObj.doctorId,
-      assignedDoctorName: docObj.fullName,
-      assignedRoom: docObj.roomName,
-      screenedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-    };
+    const numWeight = parseFloat(weight) || 0;
+    const numHeight = parseFloat(height) || 0;
+    const numTemp = parseFloat(temperature) || 36.5;
+    const numSys = parseInt(systolicBP, 10) || 120;
+    const numDia = parseInt(diastolicBP, 10) || 80;
+    const numHR = parseInt(heartRate, 10) || 75;
+    const numRR = parseInt(respiratoryRate, 10) || 18;
+    const numSpO2 = parseInt(spo2, 10) || 98;
 
-    setTimeout(() => {
-      console.info('Screening record saved to backend:', newRecord);
+    const targetPatientId = selectedPatient.patientId || parseInt(selectedPatient.id, 10) || 1;
+    const targetQueueId = selectedPatient.queueId || (typeof selectedPatient.id === 'number' ? selectedPatient.id : parseInt(selectedPatient.id, 10));
 
-      // Update queue status from 'รอคัดกรอง' to 'รอพบแพทย์'
-      setQueueList((prev) =>
-        prev.map((q) =>
-          q.id === selectedPatient.id ? { ...q, queueStatus: 'รอพบแพทย์' } : q
-        )
-      );
+    try {
+      const res = await vitalsApi.record({
+        queue_id: targetQueueId,
+        patient_id: targetPatientId,
+        queue_number: selectedPatient.queueNo,
+        chief_complaint: chiefComplaint.trim() || 'ตรวจสุขภาพและคัดกรองทั่วไป',
+        weight: numWeight,
+        height: numHeight,
+        temperature: numTemp,
+        systolic_bp: numSys,
+        diastolic_bp: numDia,
+        heart_rate: numHR,
+        respiratory_rate: numRR,
+        spo2: numSpO2,
+        allergies: allergies.trim() || selectedPatient.allergies,
+        medical_history: medicalHistory.trim() || selectedPatient.chronicDiseases,
+        assigned_doctor_id: docObj.doctorId,
+        triage_level: selectedTriage,
+      });
+      if (res && res.message) {
+        toast.success(res.message, { id: 'vitals-success-toast' });
+      }
 
-      setIsSaving(false);
-      setToastMessage(
-        `บันทึกข้อมูลการคัดกรองของ ${selectedPatient.fullName} (${selectedPatient.queueNo}) สำเร็จ! ส่งต่อไปยัง ${docObj.roomName} (${docObj.fullName}) เรียบร้อยแล้ว`
-      );
+      // 1. ดึงรายการคิวล่าสุดจากฐานข้อมูลทันที
+      const freshQueues = await fetchQueues();
 
-      // Auto clear selection and form
+      // 2. เคลียร์ฟอร์ม
       handleResetForm();
 
-      // Pick next available queue if any
-      const remainingQueues = queueList.filter(
-        (q) => q.id !== selectedPatient.id && q.queueStatus === 'รอคัดกรอง'
+      // 3. หาคิวที่ยังรอคัดกรองอยู่จริง
+      if (freshQueues && freshQueues.length > 0) {
+        const remainingWaiting = freshQueues.filter((q) => q.queueStatus === 'รอคัดกรอง');
+        if (remainingWaiting.length > 0) {
+          handleSelectPatient(remainingWaiting[0]);
+        } else {
+          setSelectedPatientId('');
+          setSearchQuery('');
+        }
+      } else {
+        setSelectedPatientId('');
+        setSearchQuery('');
+      }
+    } catch (err: any) {
+      console.warn('Record vitals API error:', err);
+      if (err?.message) {
+        toast.error(`แจ้งเตือน: ${err.message}`, { id: 'vitals-error-toast' });
+      }
+
+      // Local fallback กรณีเครือข่ายมีปัญหา (อัปเดตเฉพาะคิวที่เลือกเท่านั้น ไม่อ้างอิงตาม patientId)
+      const updatedQueueList = queueList.map((q) =>
+        q.id === selectedPatient.id || (selectedPatient.queueId && q.queueId === selectedPatient.queueId) || q.queueNo === selectedPatient.queueNo
+          ? { ...q, queueStatus: 'รอพบแพทย์' as const }
+          : q
       );
+      setQueueList(updatedQueueList);
+      handleResetForm();
+
+      const remainingQueues = updatedQueueList.filter((q) => q.queueStatus === 'รอคัดกรอง');
       if (remainingQueues.length > 0) {
         handleSelectPatient(remainingQueues[0]);
       } else {
         setSelectedPatientId('');
+        setSearchQuery('');
       }
+    }
 
-      // Auto dismiss toast after 5s
-      setTimeout(() => setToastMessage(null), 5000);
-    }, 400);
+    setIsSaving(false);
+    const msg = `บันทึกข้อมูลการคัดกรองของ ${selectedPatient.fullName} (${selectedPatient.queueNo}) สำเร็จ! ส่งต่อไปยัง ${docObj.roomName} (${docObj.fullName}) เรียบร้อยแล้ว`;
+    setToastMessage(msg);
+    toast.success(msg, { id: 'vitals-local-toast' });
+
+    // Auto dismiss toast after 5s
+    setTimeout(() => setToastMessage(null), 5000);
   };
 
   return (
@@ -386,10 +446,17 @@ export const VitalsPage: React.FC = () => {
       {/* Toast Alert Notification */}
       {toastMessage && (
         <div className="vitals-toast-alert">
-          <div className="toast-icon">✓</div>
+          <div className="toast-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
           <div className="toast-text">{toastMessage}</div>
-          <button className="toast-close" onClick={() => setToastMessage(null)}>
-            ×
+          <button className="toast-close" onClick={() => setToastMessage(null)} aria-label="Close notification">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
           </button>
         </div>
       )}
@@ -429,172 +496,31 @@ export const VitalsPage: React.FC = () => {
             <span>{currentUser?.roleTitleEn ? `${currentUser.roleTitleEn} Station` : 'Triage Station'}</span>
           </div>
           <div className="vitals-user-pill">
-            <span className="user-icon-symbol">{currentUser?.role === 'nurse_assistant' ? '🩺' : '👩‍⚕️'}</span>
+            <span className="user-icon-symbol">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              </svg>
+            </span>
             <span>{currentUser?.fullName || 'พว. กานดา คัดกรอง'}</span>
           </div>
         </div>
       </div>
 
-      {/* 2. Top Queue Selector Section */}
-      <div className="vitals-queue-selector-card">
-        <div className="queue-selector-header">
-          <label className="queue-selector-label" htmlFor="queue-select-input">
-            เลือกคิวเพื่อคัดกรอง (Select Patient Queue) <span className="text-required">*</span>
-          </label>
-          <span className="queue-waiting-count">
-            รอคัดกรอง: {queueList.filter((p) => p.queueStatus === 'รอคัดกรอง').length} คน
-          </span>
-        </div>
-
-        <div className="queue-selector-row">
-          <div className="queue-searchable-combobox" ref={queueDropdownRef}>
-            <div className="combobox-input-wrap">
-              <span className="combobox-search-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-              <input
-                type="text"
-                className="combobox-input"
-                placeholder="พิมพ์ค้นหาด้วยเลขคิว (เช่น Q001), ชื่อผู้ป่วย, HN, หรือเลขบัตรประชาชน..."
-                value={searchQuery}
-                onFocus={() => setIsQueueDropdownOpen(true)}
-                onClick={() => setIsQueueDropdownOpen(true)}
-                onChange={(e) => {
-                  setSearchQuery(e.target.value);
-                  setIsQueueDropdownOpen(true);
-                }}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  className="combobox-clear-btn"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setSelectedPatientId('');
-                    setIsQueueDropdownOpen(true);
-                  }}
-                  title="ล้างการค้นหา"
-                >
-                  ×
-                </button>
-              )}
-              <button
-                type="button"
-                className={`combobox-toggle-btn ${isQueueDropdownOpen ? 'open' : ''}`}
-                onClick={() => setIsQueueDropdownOpen(!isQueueDropdownOpen)}
-                title="เปิด/ปิด รายการคิว"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                    stroke="currentColor"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            {/* Dropdown Options Menu */}
-            {isQueueDropdownOpen && (
-              <div className="combobox-dropdown-menu">
-                <div className="combobox-menu-header">
-                  <span>ผู้ป่วยที่รอคัดกรอง ({filteredWaitingQueues.length} คิว)</span>
-                  {searchQuery && <span className="search-hint">คลิกเพื่อเลือกผู้ป่วย</span>}
-                </div>
-                <div className="combobox-options-list">
-                  {filteredWaitingQueues.length > 0 ? (
-                    filteredWaitingQueues.map((patient) => {
-                      const isSelected = selectedPatientId === patient.id;
-                      return (
-                        <div
-                          key={patient.id}
-                          className={`combobox-option-item ${isSelected ? 'selected' : ''}`}
-                          onClick={() => handleSelectPatient(patient)}
-                        >
-                          <div className="option-item-left">
-                            <span className="option-queue-badge">{patient.queueNo}</span>
-                            <div className="option-patient-info">
-                              <span className="option-patient-name">{patient.fullName}</span>
-                              <span className="option-patient-meta">
-                                HN: {patient.hn} • {patient.gender}, {patient.age} ปี • {patient.schemeType}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="option-item-right">
-                            <span className="option-arrival-time">🕒 {patient.registeredTime}</span>
-                            {isSelected ? (
-                              <span className="option-selected-tag">✓ กำลังเลือก</span>
-                            ) : (
-                              <span className="option-select-action">เลือกคิวนี้</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="combobox-empty-item">
-                      <span>🔍 ไม่พบคิวผู้ป่วยที่ตรงกับคำค้นหา "{searchQuery}"</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Patient Identity Strip Banner */}
-        {selectedPatient ? (
-          <div className="patient-identity-strip">
-            <div className="patient-strip-item">
-              <span className="strip-label">รหัสประจำตัว (HN):</span>
-              <span className="strip-val hn-val">{selectedPatient.hn}</span>
-            </div>
-            <div className="patient-strip-divider">|</div>
-            <div className="patient-strip-item">
-              <span className="strip-label">ชื่อ-นามสกุล:</span>
-              <span className="strip-val name-val">{selectedPatient.fullName}</span>
-            </div>
-            <div className="patient-strip-divider">|</div>
-            <div className="patient-strip-item">
-              <span className="strip-label">อายุ / เพศ:</span>
-              <span className="strip-val">
-                {selectedPatient.age} ปี ({selectedPatient.gender})
-              </span>
-            </div>
-            <div className="patient-strip-divider">|</div>
-            <div className="patient-strip-item">
-              <span className="strip-label">เลขบัตรประชาชน:</span>
-              <span className="strip-val id-val">{selectedPatient.nationalId}</span>
-            </div>
-            <div className="patient-strip-divider">|</div>
-            <div className="patient-strip-item">
-              <span className="strip-label">สิทธิการรักษา:</span>
-              <span className="strip-val scheme-val">{selectedPatient.schemeType}</span>
-            </div>
-          </div>
-        ) : (
-          <div className="patient-strip-empty">
-            <span>ℹ️ ยังไม่ได้เลือกคิวผู้ป่วย — โปรดเลือกคิวจากเมนูด้านบนเพื่อเริ่มต้นคัดกรอง</span>
-          </div>
-        )}
-      </div>
-
-      {/* 3. Main Two-Column Layout */}
+      {/* 2. Main Two-Column Layout (Unified Screening Console) */}
       <div className="vitals-main-grid">
-        {/* Left Column: Vital Signs Recording Form */}
+        {/* Left Column: Vital Signs Recording Form with Integrated Queue Selector */}
         <div className="vitals-grid-left">
           <VitalsFormCard
             selectedPatient={selectedPatient}
+            queueList={queueList}
+            filteredWaitingQueues={filteredWaitingQueues}
+            searchQuery={searchQuery}
+            isQueueDropdownOpen={isQueueDropdownOpen}
+            onSearchQueryChange={setSearchQuery}
+            onToggleQueueDropdown={(open) => setIsQueueDropdownOpen(open !== undefined ? open : !isQueueDropdownOpen)}
+            onSelectPatient={handleSelectPatient}
+            onResetSelection={handleResetForm}
+            queueDropdownRef={queueDropdownRef}
             weight={weight}
             height={height}
             temperature={temperature}
@@ -607,7 +533,7 @@ export const VitalsPage: React.FC = () => {
             allergies={allergies}
             medicalHistory={medicalHistory}
             assignedDoctorId={assignedDoctorId}
-            doctorOptions={DOCTOR_OPTIONS}
+            doctorOptions={doctorList}
             isAccordionOpen={isFormOpen}
             onToggleAccordion={() => setIsFormOpen(!isFormOpen)}
             onChangeField={handleChangeField}

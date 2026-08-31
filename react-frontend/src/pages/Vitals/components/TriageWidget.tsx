@@ -59,8 +59,6 @@ export const TriageWidget: React.FC<TriageWidgetProps> = ({
   onSelectTriage,
   suggestedLevel,
 }) => {
-  const currentInfo = TRIAGE_LEVELS.find((lvl) => lvl.key === selectedTriage) || TRIAGE_LEVELS[3];
-
   return (
     <div className="vitals-widget-card">
       <div className="vitals-widget-header">
@@ -84,22 +82,13 @@ export const TriageWidget: React.FC<TriageWidgetProps> = ({
       </div>
 
       <div className="vitals-widget-body">
-        {/* Active Selected Main Banner */}
-        <div className={`triage-active-banner ${currentInfo.badgeClass}`}>
-          <div className="triage-banner-left">
-            <span className="triage-level-pill">Level {currentInfo.levelNum}</span>
-            <div>
-              <div className="triage-banner-name">{currentInfo.labelTh}</div>
-              <div className="triage-banner-sub">{currentInfo.labelEn}</div>
-            </div>
-          </div>
-          <div className="triage-check-icon">✓</div>
-        </div>
 
         {/* Suggestion notice if vitals trigger high priority */}
         {suggestedLevel && suggestedLevel !== 'ปกติ (Normal)' && (
           <div className="triage-suggest-notice">
-            <span className="suggest-sparkle">⚡</span>
+            <svg className="suggest-alert-icon" viewBox="0 0 20 20" width="16" height="16" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
             <span>
               ระบบตรวจพบค่าสัญญาณชีพผิดปกติ แนะนำ: <strong>{suggestedLevel}</strong>
             </span>

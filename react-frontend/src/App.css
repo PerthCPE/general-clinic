@@ -20,6 +20,7 @@
 }
 
 .placeholder-page h2 {
+  font-family: var(--font-heading);
   font-size: 24px;
   font-weight: 700;
   margin-bottom: 8px;
@@ -27,21 +28,22 @@
   transition: color 0.5s ease;
 }
 
-/* ===== Dark Mode - Global ===== */
+/* ===== Dark Mode - Global (Dimmed Eye-Comfort Palette) ===== */
 body.dark-mode {
-  background-color: #121212;
+  background-color: #22272E;
+  color: #CDD9E5;
 }
 
 body.dark-mode .app-layout {
-  background: #121212;
+  background: #22272E;
 }
 
 body.dark-mode .placeholder-page {
-  color: #A0A0A0;
+  color: #768390;
 }
 
 body.dark-mode .placeholder-page h2 {
-  color: #F1F5F9;
+  color: #CDD9E5;
 }
 
 /* ===== Body Layout for Sidebar Toggle ===== */

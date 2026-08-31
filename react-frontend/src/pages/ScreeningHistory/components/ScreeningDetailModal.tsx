@@ -87,7 +87,10 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
           </div>
 
           <button type="button" className="scr-modal-close-btn" onClick={onClose} aria-label="Close modal">
-            ✕
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
           </button>
         </div>
 
@@ -118,7 +121,7 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
 
           {/* Vitals Grid Cards */}
           <div className="modal-section-title">
-            <span>🩺 ค่าสัญญาณชีพและสรีรวิทยา (Vital Signs Measurements)</span>
+            <span>ค่าสัญญาณชีพและสรีรวิทยา (Vital Signs Measurements)</span>
           </div>
 
           <div className="modal-vitals-grid">
@@ -220,28 +223,33 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
           {/* Clinical Symptoms & Medical History */}
           <div className="modal-clinical-details-grid">
             <div className="clinical-detail-box">
-              <span className="box-title">📝 อาการสำคัญ ณ วันที่เข้ารับบริการ (Chief Complaint)</span>
+              <span className="box-title">อาการสำคัญ ณ วันที่เข้ารับบริการ (Chief Complaint)</span>
               <p className="box-content cc-text">{record.chiefComplaint}</p>
             </div>
 
             <div className="clinical-detail-box">
-              <span className="box-title">⚠️ ประวัติการแพ้ยา (Allergies)</span>
+              <span className="box-title">ประวัติการแพ้ยา (Allergies)</span>
               <div className="box-content">
                 {hasAllergy ? (
-                  <span className="allergy-alert-tag">⚠️ {record.allergies}</span>
+                  <span className="allergy-alert-tag">{record.allergies}</span>
                 ) : (
-                  <span className="allergy-safe-tag">✓ ปฏิเสธการแพ้ยา</span>
+                  <span className="allergy-safe-tag">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '4px' }}>
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    ปฏิเสธการแพ้ยา
+                  </span>
                 )}
               </div>
             </div>
 
             <div className="clinical-detail-box">
-              <span className="box-title">🩺 โรคประจำตัว (Medical History)</span>
+              <span className="box-title">โรคประจำตัว (Medical History)</span>
               <p className="box-content">{record.medicalHistory || 'ไม่มี'}</p>
             </div>
 
             <div className="clinical-detail-box doc-transfer-box">
-              <span className="box-title">👨‍⚕️ แพทย์และห้องตรวจที่ส่งต่อ</span>
+              <span className="box-title">แพทย์และห้องตรวจที่ส่งต่อ</span>
               <p className="box-content doc-name">
                 <strong>{record.assignedRoom}</strong> — {record.assignedDoctorName}
               </p>
@@ -260,14 +268,19 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
               className={`btn-modal-action btn-copy ${copied ? 'copied' : ''}`}
               onClick={handleCopySummary}
             >
-              {copied ? '✓ คัดลอกแล้ว' : '📋 คัดลอกข้อมูลสรุป'}
+              {copied && (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '4px' }}>
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              )}
+              {copied ? 'คัดลอกแล้ว' : 'คัดลอกข้อมูลสรุป'}
             </button>
             <button
               type="button"
               className="btn-modal-action btn-print"
               onClick={handlePrint}
             >
-              🖨️ พิมพ์ใบคัดกรอง
+              พิมพ์ใบคัดกรอง
             </button>
           </div>
 

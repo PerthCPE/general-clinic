@@ -515,7 +515,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, use
                     onClick={() => setShowVoiceSettings(!showVoiceSettings)}
                     title="เปิดแผงประกาศเรียกคิวด้วยเสียง"
                   >
-                    ⚙️ เสียง
+                    ตั้งค่าเสียง
                   </button>
                 </div>
               </div>
@@ -525,7 +525,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, use
                 <div className="voice-settings-panel">
                   {/* 1. ระบบกำหนดคิวและช่องบริการ (Narakeet Queue Builder) */}
                   <div className="voice-setting-row narakeet-builder-box">
-                    <label className="voice-label">📢 กำหนดหมายเลขคิว และ ห้อง/ช่องบริการ:</label>
+                    <label className="voice-label">กำหนดหมายเลขคิว และ ห้อง/ช่องบริการ:</label>
                     <div className="narakeet-input-group">
                       <div className="narakeet-input-field">
                         <span className="narakeet-field-label">หมายเลขคิว:</span>
@@ -552,38 +552,38 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, use
 
                   {/* 2. ปุ่มกดประกาศด่วนอัตโนมัติ (1-Click Quick Auto Announce - Dynamic based on inputs) */}
                   <div className="voice-setting-row">
-                    <label className="voice-label">⚡ ประกาศด่วนตามห้อง/ช่องที่ระบุข้างต้น (กด 1 ครั้ง):</label>
+                    <label className="voice-label">ประกาศด่วนตามห้อง/ช่องที่ระบุข้างต้น:</label>
                     <div className="quick-auto-btn-grid">
                       <button 
                         className="quick-auto-btn"
                         onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ช่องบริการรับยา ${channelInput || 'ช่อง 1'} ค่ะ`)}
                       >
-                        💊 คิว {queueInput || 'A01'} รับยา {channelInput || 'ช่อง 1'}
+                        คิว {queueInput || 'A01'} รับยา {channelInput || 'ช่อง 1'}
                       </button>
                       <button 
                         className="quick-auto-btn"
                         onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ห้องตรวจ ${channelInput || 'ห้อง 1'} ค่ะ`)}
                       >
-                        🩺 คิว {queueInput || 'A01'} ห้องตรวจ {channelInput || 'ห้อง 1'}
+                        คิว {queueInput || 'A01'} ห้องตรวจ {channelInput || 'ห้อง 1'}
                       </button>
                       <button 
                         className="quick-auto-btn"
                         onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ช่องชำระเงิน ${channelInput || 'ช่อง 1'} ค่ะ`)}
                       >
-                        💳 คิว {queueInput || 'A01'} ชำระเงิน {channelInput || 'ช่อง 1'}
+                        คิว {queueInput || 'A01'} ชำระเงิน {channelInput || 'ช่อง 1'}
                       </button>
                       <button 
                         className="quick-auto-btn"
                         onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ช่องบริการ ${channelInput || 'ช่อง 1'} ค่ะ`)}
                       >
-                        🔔 คิว {queueInput || 'A01'} ช่องบริการ {channelInput || 'ช่อง 1'}
+                        คิว {queueInput || 'A01'} ช่องบริการ {channelInput || 'ช่อง 1'}
                       </button>
                     </div>
                   </div>
 
                   {/* 3. พิมพ์ข้อความอิสระที่ต้องการประกาศ */}
                   <div className="voice-setting-row custom-text-box">
-                    <label className="voice-label">✍️ พิมพ์ข้อความประกาศอิสระเพิ่มเติม:</label>
+                    <label className="voice-label">พิมพ์ข้อความประกาศอิสระเพิ่มเติม:</label>
                     <div className="custom-text-input-group">
                       <input 
                         type="text" 
@@ -596,7 +596,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, use
                         className="custom-text-speak-btn"
                         onClick={() => speakText(customTextInput)}
                       >
-                        🔊 ประกาศ
+                        ประกาศ
                       </button>
                     </div>
                   </div>

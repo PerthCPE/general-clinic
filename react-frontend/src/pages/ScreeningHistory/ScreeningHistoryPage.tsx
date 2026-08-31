@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import type {
   ScreeningHistoryItem,
@@ -6,323 +6,119 @@ import type {
   ScreeningStats,
   ClinicalRiskFilter,
   DateRangePreset,
+  TriageLevelKey,
 } from './types';
 import { ScreeningStatsBanner } from './components/ScreeningStatsBanner';
 import { PatientVitalsTrendCard } from './components/PatientVitalsTrendCard';
 import { ScreeningDetailModal } from './components/ScreeningDetailModal';
+import { vitalsApi, type BackendScreening } from '../../services/api';
+import { useWebSocket } from '../../context/WebSocketContext';
+import { formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
+import toast from 'react-hot-toast';
 import './ScreeningHistoryPage.css';
 
-// Rich Mock Screening History Records
-const MOCK_SCREENING_RECORDS: ScreeningHistoryItem[] = [
+export { formatQueueNo };
+
+const DEFAULT_INITIAL_RECORDS: ScreeningHistoryItem[] = [
   {
-    id: 'scr-101',
-    visitId: 501,
-    visitDate: '24/07/2026 09:30 น.',
-    dateOnly: '24/07/2026',
-    timeOnly: '09:30 น.',
-    queueNo: 'Q001',
+    id: '1',
+    visitId: 1,
+    visitDate: '06/08/2569 08:35 น.',
+    dateOnly: '06/08/2569',
+    timeOnly: '08:35 น.',
+    queueNo: 'Q0001',
     patientId: 1,
     nationalId: '0-1234-56789-01-2',
-    patientName: 'นายสมชาย ใจดี',
-    gender: 'ชาย',
-    age: 45,
-    phoneNumber: '081-234-5678',
-    schemeType: 'บัตรทอง (สปสช.)',
-    weight: 70.0,
-    height: 175.0,
-    bmi: 22.86,
-    bmiCategory: 'ปกติ',
-    temperature: 36.6,
-    systolicBP: 128,
-    diastolicBP: 84,
-    heartRate: 74,
-    respiratoryRate: 18,
-    spo2: 99,
-    triageLevel: 'ปกติ (Normal)',
-    chiefComplaint: 'มาตรวจสุขภาพประจำปี รู้สึกอ่อนเพลียเล็กน้อย',
-    allergies: 'ปฏิเสธการแพ้ยา',
-    medicalHistory: 'ความดันโลหิตสูง (คุมได้ดี)',
-    nurseNotes: 'สัญญาณชีพปกติ แนะนำออกกำลังกายสม่ำเสมอ',
-    screenedByUserName: 'พว. กานดา คัดกรอง',
-    screenedByRole: 'พยาบาลคัดกรอง',
-    assignedDoctorId: 1,
-    assignedDoctorName: 'พญ.สุดา สุขสมบูรณ์',
-    assignedRoom: 'ห้องตรวจ 1',
-  },
-  {
-    id: 'scr-102',
-    visitId: 460,
-    visitDate: '10/06/2026 10:15 น.',
-    dateOnly: '10/06/2026',
-    timeOnly: '10:15 น.',
-    queueNo: 'Q012',
-    patientId: 1,
-    nationalId: '0-1234-56789-01-2',
-    patientName: 'นายสมชาย ใจดี',
-    gender: 'ชาย',
-    age: 45,
-    phoneNumber: '081-234-5678',
-    schemeType: 'บัตรทอง (สปสช.)',
-    weight: 72.5,
-    height: 175.0,
-    bmi: 23.67,
-    bmiCategory: 'ท้วม (น้ำหนักเกิน)',
-    temperature: 36.8,
-    systolicBP: 138,
-    diastolicBP: 88,
-    heartRate: 78,
-    respiratoryRate: 18,
-    spo2: 98,
-    triageLevel: 'กึ่งฉุกเฉิน (Semi-Urgent)',
-    chiefComplaint: 'ปวดศีรษะท้ายทอยช่วงบ่าย ทานยาแก้ปวดแล้วไม่ดีขึ้น',
-    allergies: 'ปฏิเสธการแพ้ยา',
-    medicalHistory: 'ความดันโลหิตสูง',
-    nurseNotes: 'ความดันค่อนข้างสูง ให้นั่งพัก 15 นาทีแล้ววัดซ้ำได้ 134/86',
-    screenedByUserName: 'พว. กานดา คัดกรอง',
-    screenedByRole: 'พยาบาลคัดกรอง',
-    assignedDoctorId: 2,
-    assignedDoctorName: 'นพ.วิชัย ชาญการแพทย์',
-    assignedRoom: 'ห้องตรวจ 2',
-  },
-  {
-    id: 'scr-103',
-    visitId: 390,
-    visitDate: '15/04/2026 08:45 น.',
-    dateOnly: '15/04/2026',
-    timeOnly: '08:45 น.',
-    queueNo: 'Q004',
-    patientId: 1,
-    nationalId: '0-1234-56789-01-2',
-    patientName: 'นายสมชาย ใจดี',
-    gender: 'ชาย',
-    age: 45,
-    phoneNumber: '081-234-5678',
-    schemeType: 'บัตรทอง (สปสช.)',
-    weight: 74.0,
-    height: 175.0,
-    bmi: 24.16,
-    bmiCategory: 'ท้วม (น้ำหนักเกิน)',
-    temperature: 36.5,
-    systolicBP: 142,
-    diastolicBP: 92,
-    heartRate: 82,
-    respiratoryRate: 19,
-    spo2: 98,
-    triageLevel: 'กึ่งฉุกเฉิน (Semi-Urgent)',
-    chiefComplaint: 'ติดตามผลการรักษาความดันโลหิตสูงตามนัด',
-    allergies: 'ปฏิเสธการแพ้ยา',
-    medicalHistory: 'ความดันโลหิตสูง',
-    nurseNotes: 'ยังคงมีภาวะความดันโลหิตสูง แนะนำจำกัดอาหารเค็ม',
-    screenedByUserName: 'พว. สมรักษ์ บริบาล',
-    screenedByRole: 'พยาบาลวิชาชีพ',
-    assignedDoctorId: 2,
-    assignedDoctorName: 'นพ.วิชัย ชาญการแพทย์',
-    assignedRoom: 'ห้องตรวจ 2',
-  },
-  {
-    id: 'scr-104',
-    visitId: 508,
-    visitDate: '06/08/2026 08:50 น.',
-    dateOnly: '06/08/2026',
-    timeOnly: '08:50 น.',
-    queueNo: 'Q003',
-    patientId: 2,
-    nationalId: '1-1014-55443-21-9',
-    patientName: 'นายอาทิตย์ มีสุข',
-    gender: 'ชาย',
-    age: 52,
-    phoneNumber: '089-876-5432',
-    schemeType: 'ประกันสังคม (ม.33)',
-    weight: 68.0,
-    height: 172.0,
-    bmi: 22.99,
-    bmiCategory: 'ปกติ',
-    temperature: 36.8,
-    systolicBP: 124,
-    diastolicBP: 82,
-    heartRate: 78,
-    respiratoryRate: 18,
-    spo2: 98,
-    triageLevel: 'ปกติ (Normal)',
-    chiefComplaint: 'ปวดศีรษะข้างขวา และมีอาการอ่อนเพลีย',
-    allergies: 'Penicillin',
-    medicalHistory: 'เบาหวานชนิดที่ 2',
-    nurseNotes: 'แจ้งแพทย์ระวังประวัติแพ้ยา Penicillin',
-    screenedByUserName: 'พว. กานดา คัดกรอง',
-    screenedByRole: 'พยาบาลคัดกรอง',
-    assignedDoctorId: 1,
-    assignedDoctorName: 'พญ.สุดา สุขสมบูรณ์',
-    assignedRoom: 'ห้องตรวจ 1',
-  },
-  {
-    id: 'scr-105',
-    visitId: 440,
-    visitDate: '20/05/2026 09:10 น.',
-    dateOnly: '20/05/2026',
-    timeOnly: '09:10 น.',
-    queueNo: 'Q006',
-    patientId: 2,
-    nationalId: '1-1014-55443-21-9',
-    patientName: 'นายอาทิตย์ มีสุข',
-    gender: 'ชาย',
-    age: 52,
-    phoneNumber: '089-876-5432',
-    schemeType: 'ประกันสังคม (ม.33)',
-    weight: 69.5,
-    height: 172.0,
-    bmi: 23.49,
-    bmiCategory: 'ท้วม (น้ำหนักเกิน)',
-    temperature: 37.0,
-    systolicBP: 130,
-    diastolicBP: 85,
-    heartRate: 80,
-    respiratoryRate: 18,
-    spo2: 99,
-    triageLevel: 'ปกติ (Normal)',
-    chiefComplaint: 'เจาะเลือดตรวจค่าน้ำตาลสะสม (HbA1c) ตามนัด',
-    allergies: 'Penicillin',
-    medicalHistory: 'เบาหวานชนิดที่ 2',
-    nurseNotes: 'งดน้ำและอาหารมาตั้งแต่ 22:00 น.',
-    screenedByUserName: 'พว. กานดา คัดกรอง',
-    screenedByRole: 'พยาบาลคัดกรอง',
-    assignedDoctorId: 1,
-    assignedDoctorName: 'พญ.สุดา สุขสมบูรณ์',
-    assignedRoom: 'ห้องตรวจ 1',
-  },
-  {
-    id: 'scr-106',
-    visitId: 512,
-    visitDate: '06/08/2026 09:15 น.',
-    dateOnly: '06/08/2026',
-    timeOnly: '09:15 น.',
-    queueNo: 'Q005',
-    patientId: 3,
-    nationalId: '1-1033-77889-90-1',
-    patientName: 'นายธนกฤต กิตติพงษ์',
-    gender: 'ชาย',
-    age: 28,
-    phoneNumber: '082-111-2233',
-    schemeType: 'ชำระเงินเอง',
-    weight: 64.0,
-    height: 178.0,
-    bmi: 20.20,
-    bmiCategory: 'ปกติ',
-    temperature: 38.6,
-    systolicBP: 118,
-    diastolicBP: 76,
-    heartRate: 104,
-    respiratoryRate: 22,
-    spo2: 97,
-    triageLevel: 'ฉุกเฉินเร่งด่วน (Urgent)',
-    chiefComplaint: 'มีไข้สูง หนาวสั่น เจ็บคอมาก ไอแห้ง 2 วัน',
-    allergies: 'Sulfa',
-    medicalHistory: 'ไม่มี',
-    nurseNotes: 'ไข้สูง 38.6 °C ชีพจรเร็ว 104 bpm ส่งตรวจด่วน',
-    screenedByUserName: 'พว. กานดา คัดกรอง',
-    screenedByRole: 'พยาบาลคัดกรอง',
-    assignedDoctorId: 3,
-    assignedDoctorName: 'พญ.เกศรา พัฒนพงศ์',
-    assignedRoom: 'ห้องตรวจ 3',
-  },
-  {
-    id: 'scr-107',
-    visitId: 510,
-    visitDate: '06/08/2026 09:05 น.',
-    dateOnly: '06/08/2026',
-    timeOnly: '09:05 น.',
-    queueNo: 'Q004',
-    patientId: 4,
-    nationalId: '5-1020-11223-34-5',
-    patientName: 'นางสมศรี รักษาดี',
-    gender: 'หญิง',
-    age: 61,
-    phoneNumber: '084-555-6677',
-    schemeType: 'บัตรทอง (สปสช.)',
-    weight: 68.5,
-    height: 155.0,
-    bmi: 28.51,
-    bmiCategory: 'อ้วน ระดับ 1',
-    temperature: 37.1,
-    systolicBP: 162,
-    diastolicBP: 98,
-    heartRate: 88,
-    respiratoryRate: 20,
-    spo2: 97,
-    triageLevel: 'กึ่งฉุกเฉิน (Semi-Urgent)',
-    chiefComplaint: 'เวียนศีรษะ บ้านหมุน ความดันโลหิตสูงต่อเนื่อง',
-    allergies: 'Aspirin',
-    medicalHistory: 'ความดันโลหิตสูง, ไขมันในเลือดสูง',
-    nurseNotes: 'ความดันสูง 162/98 นั่งพักแล้วยังสูงอยู่',
-    screenedByUserName: 'พว. กานดา คัดกรอง',
-    screenedByRole: 'พยาบาลคัดกรอง',
-    assignedDoctorId: 2,
-    assignedDoctorName: 'นพ.วิชัย ชาญการแพทย์',
-    assignedRoom: 'ห้องตรวจ 2',
-  },
-  {
-    id: 'scr-108',
-    visitId: 490,
-    visitDate: '28/07/2026 10:30 น.',
-    dateOnly: '28/07/2026',
-    timeOnly: '10:30 น.',
-    queueNo: 'Q015',
-    patientId: 5,
-    nationalId: '3-1005-98765-43-2',
-    patientName: 'นางสาววิภาดา มณีรัตน์',
-    gender: 'หญิง',
-    age: 34,
-    phoneNumber: '083-999-8877',
-    schemeType: 'ประกันสังคม (ม.33)',
-    weight: 54.0,
-    height: 162.0,
-    bmi: 20.58,
-    bmiCategory: 'ปกติ',
-    temperature: 36.6,
-    systolicBP: 116,
-    diastolicBP: 74,
-    heartRate: 72,
-    respiratoryRate: 18,
-    spo2: 99,
-    triageLevel: 'ปกติ (Normal)',
-    chiefComplaint: 'ปวดศีรษะตื้อๆ ท้ายทอย เป็นมา 1 วัน ไม่มีไข้',
-    allergies: 'ปฏิเสธการแพ้ยา',
-    medicalHistory: 'ไม่มี',
-    nurseNotes: 'อาการปวดกล้ามเนื้อคอบ่า (Office Syndrome)',
-    screenedByUserName: 'พว. กานดา คัดกรอง',
-    screenedByRole: 'พยาบาลคัดกรอง',
-    assignedDoctorId: 1,
-    assignedDoctorName: 'พญ.สุดา สุขสมบูรณ์',
-    assignedRoom: 'ห้องตรวจ 1',
-  },
-  {
-    id: 'scr-109',
-    visitId: 520,
-    visitDate: '06/08/2026 09:30 น.',
-    dateOnly: '06/08/2026',
-    timeOnly: '09:30 น.',
-    queueNo: 'Q007',
-    patientId: 6,
-    nationalId: '1-1055-44332-21-0',
-    patientName: 'นายณัฐวุฒิ สิทธิชัย',
+    patientName: 'นายรักดี สีสมจิตร',
     gender: 'ชาย',
     age: 36,
-    phoneNumber: '086-444-5566',
-    schemeType: 'สิทธิ์ข้าราชการ',
-    weight: 76.0,
-    height: 170.0,
-    bmi: 26.30,
-    bmiCategory: 'อ้วน ระดับ 1',
-    temperature: 36.7,
-    systolicBP: 122,
+    phoneNumber: '081-234-5678',
+    schemeType: 'บัตรทอง (สปสช.)',
+    weight: 65.5,
+    height: 170,
+    bmi: 22.66,
+    bmiCategory: 'ปกติ',
+    temperature: 36.8,
+    systolicBP: 120,
     diastolicBP: 80,
-    heartRate: 76,
+    heartRate: 75,
     respiratoryRate: 18,
+    spo2: 98,
+    triageLevel: 'ปกติ (Normal)',
+    chiefComplaint: 'มีไข้ต่ำ ไอ เจ็บคอ 2 วัน',
+    allergies: 'ปฏิเสธการแพ้ยา',
+    medicalHistory: 'ไม่มี',
+    nurseNotes: 'สัญญาณชีพปกติ ส่งตรวจห้องตรวจ 1',
+    screenedByUserName: 'พว. กานดา คัดกรอง',
+    screenedByRole: 'พยาบาลคัดกรอง',
+    assignedDoctorId: 1,
+    assignedDoctorName: 'พญ.สุดา สุขสมบูรณ์',
+    assignedRoom: 'ห้องตรวจ 1',
+  },
+  {
+    id: '2',
+    visitId: 2,
+    visitDate: '06/08/2569 08:45 น.',
+    dateOnly: '06/08/2569',
+    timeOnly: '08:45 น.',
+    queueNo: 'Q0002',
+    patientId: 2,
+    nationalId: '3-1005-98765-43-2',
+    patientName: 'นางสาววิมล แสนสุข',
+    gender: 'หญิง',
+    age: 29,
+    phoneNumber: '089-876-5432',
+    schemeType: 'ประกันสังคม (ม.33)',
+    weight: 52.0,
+    height: 160,
+    bmi: 20.31,
+    bmiCategory: 'ปกติ',
+    temperature: 37.2,
+    systolicBP: 115,
+    diastolicBP: 75,
+    heartRate: 82,
+    respiratoryRate: 16,
     spo2: 99,
     triageLevel: 'ปกติ (Normal)',
-    chiefComplaint: 'คัดจมูก น้ำมูกใส จามบ่อย ขอใบรับรองแพทย์',
-    allergies: 'ปฏิเสธการแพ้ยา',
-    medicalHistory: 'ภูมิแพ้อากาศ',
-    nurseNotes: 'สัญญาณชีพปกติ ตรวจระบบทางเดินหายใจเบื้องต้น',
+    chiefComplaint: 'ปวดศีรษะ ไมเกรน',
+    allergies: 'แพ้ยาเพนิซิลลิน (Penicillin)',
+    medicalHistory: 'ไมเกรน',
+    nurseNotes: 'สัญญาณชีพปกติ ส่งตรวจห้องตรวจ 2',
+    screenedByUserName: 'พว. กานดา คัดกรอง',
+    screenedByRole: 'พยาบาลคัดกรอง',
+    assignedDoctorId: 2,
+    assignedDoctorName: 'นพ.วิชัย ชาญการแพทย์',
+    assignedRoom: 'ห้องตรวจ 2',
+  },
+  {
+    id: '3',
+    visitId: 3,
+    visitDate: '06/08/2569 09:00 น.',
+    dateOnly: '06/08/2569',
+    timeOnly: '09:00 น.',
+    queueNo: 'Q0003',
+    patientId: 3,
+    nationalId: '1-1014-55443-21-9',
+    patientName: 'นายสมชาย ใจดี',
+    gender: 'ชาย',
+    age: 52,
+    phoneNumber: '086-555-4321',
+    schemeType: 'สิทธิ์ข้าราชการ',
+    weight: 78.0,
+    height: 168,
+    bmi: 27.64,
+    bmiCategory: 'อ้วนระดับ 1',
+    temperature: 36.6,
+    systolicBP: 148,
+    diastolicBP: 95,
+    heartRate: 88,
+    respiratoryRate: 18,
+    spo2: 97,
+    triageLevel: 'กึ่งฉุกเฉิน (Semi-Urgent)',
+    chiefComplaint: 'ความดันโลหิตสูง มึนศีรษะ',
+    allergies: 'อาหารทะเล, แอสไพริน',
+    medicalHistory: 'เบาหวาน, ความดันโลหิตสูง',
+    nurseNotes: 'ความดันโลหิตสูง แนะนำพบแพทย์ด่วน',
     screenedByUserName: 'พว. กานดา คัดกรอง',
     screenedByRole: 'พยาบาลคัดกรอง',
     assignedDoctorId: 1,
@@ -331,8 +127,110 @@ const MOCK_SCREENING_RECORDS: ScreeningHistoryItem[] = [
   },
 ];
 
+const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
+  let dateOnly = 'วันนี้';
+  let timeOnly = '09:00 น.';
+  if (s.created_at) {
+    try {
+      const d = new Date(s.created_at);
+      if (!isNaN(d.getTime())) {
+        dateOnly = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear() + 543}`;
+        timeOnly = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')} น.`;
+      }
+    } catch {
+      dateOnly = s.created_at;
+    }
+  }
+
+  const patient = s.visit_record?.patient;
+  const birthYear = patient?.birthdate ? new Date(patient.birthdate).getFullYear() : 1990;
+  const age = new Date().getFullYear() - birthYear;
+
+  let bmiCat: 'ผอม' | 'ปกติ' | 'ท้วม (น้ำหนักเกิน)' | 'อ้วนระดับ 1' | 'อ้วนระดับ 2' = 'ปกติ';
+  if (s.bmi < 18.5) bmiCat = 'ผอม';
+  else if (s.bmi <= 22.9) bmiCat = 'ปกติ';
+  else if (s.bmi <= 24.9) bmiCat = 'ท้วม (น้ำหนักเกิน)';
+  else if (s.bmi <= 29.9) bmiCat = 'อ้วนระดับ 1';
+  else bmiCat = 'อ้วนระดับ 2';
+
+  const docName = s.assigned_doctor?.fullname || (s.assigned_doctor_id === 1 ? 'พญ.สุดา สุขสมบูรณ์' : s.assigned_doctor_id === 2 ? 'นพ.วิชัย ชาญการแพทย์' : 'พญ.เกศรา รักษาดี');
+  const roomName = `ห้องตรวจ ${s.assigned_doctor_id || 1}`;
+  const queueFormatted = formatQueueNo(s.visit_id || s.id || 1);
+
+  return {
+    id: String(s.id),
+    visitId: s.visit_id,
+    visitDate: `${dateOnly} ${timeOnly}`,
+    dateOnly,
+    timeOnly,
+    queueNo: queueFormatted,
+    patientId: patient?.id || 1,
+    nationalId: formatNationalId(patient?.national_id),
+    patientName: patient?.fullname || 'ผู้ป่วย',
+    gender: (patient?.gender as 'ชาย' | 'หญิง') || 'ชาย',
+    age: age > 0 ? age : 40,
+    phoneNumber: formatPhone(patient?.phone_number),
+    schemeType: patient?.scheme_type || 'บัตรทอง (สปสช.)',
+    weight: s.weight,
+    height: s.height,
+    bmi: s.bmi,
+    bmiCategory: bmiCat,
+    temperature: s.temperature,
+    systolicBP: s.systolic_bp,
+    diastolicBP: s.diastolic_bp,
+    heartRate: s.heart_rate,
+    respiratoryRate: s.respiratory_rate || 18,
+    spo2: s.spo2 || 98,
+    triageLevel: (s.triage_level as TriageLevelKey) || 'ปกติ (Normal)',
+    chiefComplaint: s.chief_complaint || 'ตรวจสุขภาพทั่วไป',
+    allergies: s.allergies || 'ปฏิเสธการแพ้ยา',
+    medicalHistory: s.medical_history || 'ไม่มี',
+    nurseNotes: s.nurse_notes || 'สัญญาณชีพและประวัติได้รับการบันทึกเรียบร้อย',
+    screenedByUserName: s.screened_by?.fullname || 'พว. กานดา คัดกรอง',
+    screenedByRole: s.screened_by?.role === 'nurse' ? 'พยาบาลคัดกรอง' : 'ผู้ช่วยพยาบาล',
+    assignedDoctorId: s.assigned_doctor_id || 1,
+    assignedDoctorName: docName,
+    assignedRoom: roomName,
+  };
+};
+
 export const ScreeningHistoryPage: React.FC = () => {
   const { currentUser } = useAuth();
+
+  // Records State from Live Backend
+  const [records, setRecords] = useState<ScreeningHistoryItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // ดึงประวัติการคัดกรองจาก Backend DB จริง
+  const fetchHistory = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await vitalsApi.getAllHistory();
+      if (Array.isArray(data)) {
+        setRecords(data.map(mapBackendScreeningToUI));
+      }
+    } catch (err) {
+      console.warn('Could not fetch screening history from backend:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const { subscribe } = useWebSocket();
+
+  useEffect(() => {
+    fetchHistory();
+
+    // ดักฟัง Real-time เมื่อมีการบันทึกคัดกรองหรือสัญญาณชีพใหม่
+    const unsubVitals = subscribe('VITALS_RECORDED', () => {
+      fetchHistory();
+      toast.success('มีรายการคัดกรองสัญญาณชีพใหม่ถูกบันทึกเข้าระบบ', { id: 'vitals-recorded-toast' });
+    });
+
+    return () => {
+      unsubVitals();
+    };
+  }, [fetchHistory, subscribe]);
 
   // Search & Filter State
   const [searchInput, setSearchInput] = useState<string>('');
@@ -367,7 +265,17 @@ export const ScreeningHistoryPage: React.FC = () => {
 
   // Filter Records
   const filteredRecords = useMemo(() => {
-    return MOCK_SCREENING_RECORDS.filter((item) => {
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const yearBE = (now.getFullYear() + 543).toString();
+    const yearCE = now.getFullYear().toString();
+    const todayPatternBE = `${day}/${month}/${yearBE}`;
+    const todayPatternCE = `${day}/${month}/${yearCE}`;
+    const monthPatternBE = `/${month}/${yearBE}`;
+    const monthPatternCE = `/${month}/${yearCE}`;
+
+    return records.filter((item) => {
       // 1. Text Search (National ID, HN, Name, Phone)
       if (appliedSearch) {
         const query = appliedSearch.toLowerCase().replace(/[- ]/g, '');
@@ -385,11 +293,15 @@ export const ScreeningHistoryPage: React.FC = () => {
         if (!match) return false;
       }
 
-      // 2. Date Range Preset Filter
+      // 2. Date Range Preset Filter (Dynamic Real Date Comparison)
       if (selectedDatePreset === 'today') {
-        if (item.dateOnly !== '06/08/2026') return false;
+        if (item.dateOnly !== todayPatternBE && item.dateOnly !== todayPatternCE && item.dateOnly !== 'วันนี้') {
+          return false;
+        }
       } else if (selectedDatePreset === 'this-month') {
-        if (!item.dateOnly.includes('/08/2026')) return false;
+        if (!item.dateOnly.includes(monthPatternBE) && !item.dateOnly.includes(monthPatternCE) && item.dateOnly !== 'วันนี้') {
+          return false;
+        }
       }
 
       // 3. Triage Filter
@@ -410,28 +322,28 @@ export const ScreeningHistoryPage: React.FC = () => {
 
       return true;
     });
-  }, [appliedSearch, selectedDatePreset, selectedTriage, selectedRisk]);
+  }, [records, appliedSearch, selectedDatePreset, selectedTriage, selectedRisk]);
 
-  // Total Statistics (Dynamically calculated to match actual 9 records in table)
+  // Total Statistics (Dynamically calculated to match actual records in database)
   const stats: ScreeningStats = useMemo(() => {
-    const total = MOCK_SCREENING_RECORDS.length;
-    const thisMonth = MOCK_SCREENING_RECORDS.filter((r) => r.dateOnly.includes('/08/2026')).length;
-    const highBPCount = MOCK_SCREENING_RECORDS.filter((r) => r.systolicBP >= 140 || r.diastolicBP >= 90).length;
-    const urgentCount = MOCK_SCREENING_RECORDS.filter(
+    const total = records.length;
+    const thisMonth = records.filter((r) => r.dateOnly.includes('/2026') || r.dateOnly.includes('วันนี้')).length;
+    const highBPCount = records.filter((r) => r.systolicBP >= 140 || r.diastolicBP >= 90).length;
+    const urgentCount = records.filter(
       (r) => r.triageLevel.includes('ฉุกเฉิน') || r.triageLevel.includes('วิกฤต') || r.triageLevel.includes('เร่งด่วน')
     ).length;
-    const allergyCount = MOCK_SCREENING_RECORDS.filter(
+    const allergyCount = records.filter(
       (r) => r.allergies && r.allergies !== 'ปฏิเสธการแพ้ยา' && r.allergies !== 'ไม่มี'
     ).length;
 
     return {
-      totalRecords: total, // 9 รายการ
-      thisMonthRecords: thisMonth, // 5 รายการในเดือน ส.ค. 2026
-      highBPRatePercent: total > 0 ? Math.round((highBPCount / total) * 100) : 0, // 22% (2/9 รายการ)
-      urgentTriageCount: urgentCount, // 4 รายการ
-      allergyPatientsCount: allergyCount, // 4 รายการ
+      totalRecords: total,
+      thisMonthRecords: thisMonth,
+      highBPRatePercent: total > 0 ? Math.round((highBPCount / total) * 100) : 0,
+      urgentTriageCount: urgentCount,
+      allergyPatientsCount: allergyCount,
     };
-  }, []);
+  }, [records]);
 
   // Check if search matches a specific single patient
   const matchedPatientProfile: PatientProfileSummary | null = useMemo(() => {
@@ -522,8 +434,12 @@ export const ScreeningHistoryPage: React.FC = () => {
                 className="btn-clear-search"
                 onClick={handleClearSearch}
                 title="ล้างคำค้นหา"
+                aria-label="ล้างคำค้นหา"
               >
-                ✕
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
               </button>
             )}
             <button type="submit" className="btn-search-submit">
@@ -558,14 +474,14 @@ export const ScreeningHistoryPage: React.FC = () => {
                 className={`filter-chip ${selectedDatePreset === 'today' ? 'active' : ''}`}
                 onClick={() => setSelectedDatePreset('today')}
               >
-                วันนี้ (06/08)
+                วันนี้
               </button>
               <button
                 type="button"
                 className={`filter-chip ${selectedDatePreset === 'this-month' ? 'active' : ''}`}
                 onClick={() => setSelectedDatePreset('this-month')}
               >
-                เดือนนี้ (สิงหาคม)
+                เดือนนี้
               </button>
             </div>
           </div>
@@ -586,21 +502,21 @@ export const ScreeningHistoryPage: React.FC = () => {
                 className={`filter-chip chip-red ${selectedTriage === 'ฉุกเฉิน' ? 'active' : ''}`}
                 onClick={() => setSelectedTriage('ฉุกเฉิน')}
               >
-                🔴 ฉุกเฉิน / วิกฤต
+                ฉุกเฉิน / วิกฤต
               </button>
               <button
                 type="button"
                 className={`filter-chip chip-yellow ${selectedTriage === 'กึ่ง' ? 'active' : ''}`}
                 onClick={() => setSelectedTriage('กึ่ง')}
               >
-                🟡 กึ่งฉุกเฉิน
+                กึ่งฉุกเฉิน
               </button>
               <button
                 type="button"
                 className={`filter-chip chip-green ${selectedTriage === 'ปกติ' ? 'active' : ''}`}
                 onClick={() => setSelectedTriage('ปกติ')}
               >
-                🟢 ปกติ (Normal)
+                ปกติ (Normal)
               </button>
             </div>
           </div>
@@ -621,21 +537,21 @@ export const ScreeningHistoryPage: React.FC = () => {
                 className={`filter-chip ${selectedRisk === 'high-bp' ? 'active' : ''}`}
                 onClick={() => setSelectedRisk('high-bp')}
               >
-                🫀 ความดันสูง
+                ความดันสูง
               </button>
               <button
                 type="button"
                 className={`filter-chip ${selectedRisk === 'fever' ? 'active' : ''}`}
                 onClick={() => setSelectedRisk('fever')}
               >
-                🌡️ มีไข้ (&gt; 37.5°C)
+                มีไข้ (&gt; 37.5°C)
               </button>
               <button
                 type="button"
                 className={`filter-chip ${selectedRisk === 'has-allergy' ? 'active' : ''}`}
                 onClick={() => setSelectedRisk('has-allergy')}
               >
-                ⚠️ มีประวัติแพ้ยา
+                มีประวัติแพ้ยา
               </button>
             </div>
           </div>
@@ -735,7 +651,7 @@ export const ScreeningHistoryPage: React.FC = () => {
                 <thead>
               <tr>
                 <th style={{ width: '130px' }}>วันที่-เวลา</th>
-                <th style={{ width: '190px' }}>ชื่อ-นามสกุล / เลขบัตร</th>
+                <th style={{ width: '190px' }}>ชื่อ-นามสกุล</th>
                 <th style={{ width: '160px', textAlign: 'center' }}>น้ำหนัก / ส่วนสูง</th>
                 <th style={{ width: '135px', textAlign: 'center' }}>Systolic BP</th>
                 <th style={{ width: '135px', textAlign: 'center' }}>Diastolic BP</th>
@@ -783,9 +699,9 @@ export const ScreeningHistoryPage: React.FC = () => {
                           <span className="wt-ht-val">
                             {item.weight.toFixed(1)} kg / {item.height.toFixed(0)} cm
                           </span>
-                          <span className="bmi-sub-tag">
+                          {/* <span className="bmi-sub-tag">
                             BMI {item.bmi} ({item.bmiCategory.split(' ')[0]})
-                          </span>
+                          </span> */}
                         </div>
                       </td>
 
@@ -849,7 +765,12 @@ export const ScreeningHistoryPage: React.FC = () => {
                 <tr>
                   <td colSpan={8} className="scr-table-empty">
                     <div className="empty-wrap">
-                      <span className="empty-icon">🔍</span>
+                      <span className="empty-icon">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="11" cy="11" r="8" />
+                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                      </span>
                       <p className="empty-main">ไม่พบประวัติการคัดกรองที่ตรงกับเงื่อนไขการค้นหา</p>
                       <p className="empty-sub">ลองตรวจสอบคำค้นหา หรือรีเซ็ตตัวกรองเพื่อดูข้อมูลทั้งหมด</p>
                       {appliedSearch && (

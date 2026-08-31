@@ -4,6 +4,8 @@ import type { Patient } from '../types';
 interface PatientSearchCardProps {
   onSearch: (query: string) => void;
   searchResult: Patient | null;
+  searchResults?: Patient[];
+  onSelectResult?: (patient: Patient) => void;
   notFoundQuery: string | null;
   onAssignQueue: (patient: Patient) => void;
   onViewMoreInfo: (patient: Patient) => void;
@@ -14,6 +16,8 @@ interface PatientSearchCardProps {
 const PatientSearchCard: React.FC<PatientSearchCardProps> = ({
   onSearch,
   searchResult,
+  searchResults = [],
+  onSelectResult,
   notFoundQuery,
   onAssignQueue,
   onViewMoreInfo,
@@ -23,19 +27,33 @@ const PatientSearchCard: React.FC<PatientSearchCardProps> = ({
   const [isOpen, setIsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // ค้นหาเมื่อกดปุ่ม "ค้นหาคนไข้" หรือกดปุ่ม Enter
   const handleSearchClick = () => {
     if (searchQuery.trim()) {
       onSearch(searchQuery.trim());
+    } else {
+      onClearSearch();
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSearchClick();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSearchClick();
+    }
   };
 
-  const handleQuickChip = (id: string) => {
-    setSearchQuery(id);
-    onSearch(id);
+  const handleQuickChip = (term: string) => {
+    setSearchQuery(term);
+    onSearch(term);
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    if (!val.trim()) {
+      onClearSearch();
+    }
   };
 
   const getSchemeClass = (scheme: string) => {
@@ -62,7 +80,7 @@ const PatientSearchCard: React.FC<PatientSearchCardProps> = ({
           </div>
           <div>
             <h2 className="reg-card-title">ค้นหาข้อมูลคนไข้เดิม (Patient Lookup)</h2>
-            <p className="reg-card-subtitle">ค้นหาด้วยเลขประจำตัวประชาชน 13 หลัก หรือ ชื่อ-นามสกุล เพื่อส่งต่อเข้าคิว</p>
+            <p className="reg-card-subtitle">ค้นหาด้วยเลขประจำตัวประชาชน 13 หลัก, ชื่อ หรือนามสกุล เพื่อส่งต่อเข้าคิว</p>
           </div>
         </div>
         <button className={`reg-card-toggle ${isOpen ? 'open' : ''}`} aria-label="Toggle Accordion">
@@ -87,9 +105,9 @@ const PatientSearchCard: React.FC<PatientSearchCardProps> = ({
               <input
                 type="text"
                 className="reg-search-input"
-                placeholder="ระบุเลขบัตรประชาชน 13 หลัก หรือ ชื่อ-นามสกุล..."
+                placeholder="ระบุเลขบัตรประชาชน 13 หลัก, ชื่อ หรือนามสกุล..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
               />
               {searchQuery && (
@@ -100,8 +118,12 @@ const PatientSearchCard: React.FC<PatientSearchCardProps> = ({
                     setSearchQuery('');
                     onClearSearch();
                   }}
+                  aria-label="ล้างคำค้นหา"
                 >
-                  ✕
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
                 </button>
               )}
             </div>
@@ -117,33 +139,31 @@ const PatientSearchCard: React.FC<PatientSearchCardProps> = ({
               <span>ค้นหาคนไข้</span>
             </button>
           </div>
-
-          {/* Quick Demo Chips */}
-          <div className="reg-quick-chips">
-            <span className="reg-chips-label">ทดสอบค้นหาด่วน:</span>
-            <button
-              type="button"
-              className="reg-chip-btn"
-              onClick={() => handleQuickChip('0123456789012')}
-            >
-              0123456789012 (สมชาย)
-            </button>
-            <button
-              type="button"
-              className="reg-chip-btn"
-              onClick={() => handleQuickChip('3100598765432')}
-            >
-              3100598765432 (วิภาดา)
-            </button>
-            <button
-              type="button"
-              className="reg-chip-btn"
-              onClick={() => handleQuickChip('1101455443219')}
-            >
-              1101455443219 (อาทิตย์)
-            </button>
-          </div>
         </div>
+
+        {/* Multi-result selector when multiple patients matched */}
+        {searchResults.length > 1 && (
+          <div className="reg-multi-results-box">
+            <div className="reg-multi-results-title">
+              พบข้อมูลคนไข้ {searchResults.length} รายการ (คลิกเพื่อเลือกดูข้อมูล):
+            </div>
+            <div className="reg-multi-results-list">
+              {searchResults.map((p) => {
+                const isSelected = searchResult?.id === p.id;
+                return (
+                  <button
+                    key={p.id || p.nationalId}
+                    type="button"
+                    className={`reg-multi-result-btn ${isSelected ? 'selected' : ''}`}
+                    onClick={() => onSelectResult && onSelectResult(p)}
+                  >
+                    {p.fullName} ({p.hn})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Search Result - Found Patient Profile */}
         {searchResult && (
@@ -155,7 +175,7 @@ const PatientSearchCard: React.FC<PatientSearchCardProps> = ({
               <div className="reg-patient-main-info">
                 <div className="reg-patient-name-row">
                   <h3 className="reg-patient-name">{searchResult.fullName}</h3>
-                  <span className="reg-hn-badge">HN: {searchResult.hn}</span>
+                  <span className="reg-hn-badge">{searchResult.hn}</span>
                   <span className={`scheme-pill ${getSchemeClass(searchResult.schemeType)}`}>
                     {searchResult.schemeType}
                   </span>

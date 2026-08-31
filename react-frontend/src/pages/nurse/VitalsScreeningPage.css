@@ -111,26 +111,26 @@ body.dark-mode .vitals-page-container .form-section {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
   color: #FFFFFF;
   font-size: 14px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
   flex-shrink: 0;
 }
 
 .vitals-page-container .section-header h2 {
   font-size: 16px;
   font-weight: 700;
-  color: #10B981;
+  color: #2563EB;
   margin: 0;
 }
 
 body.dark-mode .vitals-page-container .section-header h2 {
-  color: #34D399;
+  color: #60A5FA;
 }
 
 /* Form Grids */
@@ -186,9 +186,9 @@ body.dark-mode .vitals-page-container .input-field-group label {
   align-items: center;
 }
 
-.vitals-page-container input[type="text"],
-.vitals-page-container textarea,
-.vitals-page-container select {
+.vitals-page-container input[type="text"]:not(.combobox-input),
+.vitals-page-container textarea:not(.combobox-input),
+.vitals-page-container select:not(.combobox-input) {
   width: 100%;
   padding: 10px 14px;
   border-radius: 8px;
@@ -218,28 +218,29 @@ body.dark-mode .vitals-page-container .input-field-group label {
 .vitals-page-container input:focus,
 .vitals-page-container textarea:focus,
 .vitals-page-container select:focus {
-  border-color: #10B981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 /* Dark Mode Inputs */
 body.dark-mode .vitals-page-container input[type="text"],
 body.dark-mode .vitals-page-container textarea,
 body.dark-mode .vitals-page-container select {
-  background: #0F172A;
-  border-color: #334155;
-  color: #F1F5F9;
+  background: #22272E;
+  border-color: #444C56;
+  color: #CDD9E5;
 }
 
 body.dark-mode .vitals-page-container .unit-label {
-  color: #64748B;
+  color: #768390;
 }
 
 body.dark-mode .vitals-page-container input:focus,
 body.dark-mode .vitals-page-container textarea:focus,
 body.dark-mode .vitals-page-container select:focus {
-  border-color: #34D399;
-  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
+  background: #22272E;
+  border-color: #539BF5;
+  box-shadow: 0 0 0 3px rgba(83, 155, 245, 0.2);
 }
 
 /* Action Bar Buttons */
@@ -252,19 +253,19 @@ body.dark-mode .vitals-page-container select:focus {
 .save-forward-btn {
   flex: 1;
   padding: 12px 24px;
-  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
   transition: transform 0.15s ease, background-color 0.2s ease;
 }
 
 .save-forward-btn:hover {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%);
   transform: translateY(-1px);
 }
 

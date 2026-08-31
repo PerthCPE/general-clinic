@@ -9,3 +9,19 @@ react-frontend/.env.local
 
 .DS_Store
 Thumbs.db
+aboutmypart.md
+
+# MCP Server, AI Assistant Tooling, Brain & Local State
+mcp-server/
+mcp-qa-server/
+.agents/
+.gemini/
+
+brain/
+*.exe
+*.exe~
+*.tmp
+*.log
+package-lock.json
+
+

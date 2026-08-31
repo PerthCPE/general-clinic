@@ -2,11 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserRole } from '../types/auth';
 import { DEMO_USERS, ROLE_DEFAULT_PAGES, PAGE_PERMISSIONS } from '../config/roles';
 
+import { authApi } from '../services/api';
+
 interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
-  login: (roleOrUsername: string, password?: string) => boolean;
-  switchRole: (role: UserRole) => void;
+  login: (roleOrUsername: string, password?: string) => Promise<boolean>;
+  switchRole: (role: UserRole) => Promise<void>;
   logout: () => void;
   hasAccess: (pageId: string) => boolean;
   defaultPage: string;
@@ -18,7 +20,17 @@ const AUTH_STORAGE_KEY = 'clinic_auth_user';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // ค่าเริ่มต้น: เริ่มต้นที่ null เสมอ เพื่อให้เปิดเข้ามาที่หน้า Login เป็น Default
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
 
   const isAuthenticated = currentUser !== null;
 
@@ -30,15 +42,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [currentUser]);
 
-  // ฟังก์ชัน Login: รับ username หรือ role
-  const login = (roleOrUsername: string, _password?: string): boolean => {
-    let matchedUser: User | undefined;
+  // ฟังก์ชัน Login: เชื่อมต่อ Golang Backend จริงผ่าน authApi
+  const login = async (roleOrUsername: string, password?: string): Promise<boolean> => {
+    try {
+      let usernameToSend = roleOrUsername;
+      // หากส่งมาเป็น role ล้วนๆ ให้แปลงเป็น username เริ่มต้น
+      if (roleOrUsername === 'registrar') usernameToSend = 'registrar1';
+      else if (roleOrUsername === 'nurse') usernameToSend = 'nurse1';
+      else if (roleOrUsername === 'nurse_assistant') usernameToSend = 'assistant1';
+      else if (roleOrUsername === 'doctor') usernameToSend = 'doctor1';
 
-    // เช็คกรณีส่ง role ตรงๆ เช่น "registrar", "nurse"
+      const res = await authApi.login(usernameToSend, password || 'password');
+      if (res && res.user) {
+        const userRole = res.user.role as UserRole;
+        const fallback = DEMO_USERS[userRole] || DEMO_USERS['registrar'];
+        const loggedInUser: User = {
+          id: String(res.user.id),
+          username: res.user.username,
+          fullName: res.user.fullname || fallback.fullName,
+          role: userRole,
+          roleTitleTh: fallback.roleTitleTh,
+          roleTitleEn: fallback.roleTitleEn,
+          department: fallback.department,
+          avatarText: fallback.avatarText,
+          avatarColor: fallback.avatarColor,
+        };
+        setCurrentUser(loggedInUser);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Backend login error, checking fallback:', err);
+    }
+
+    // Fallback: รองรับการเลือก Quick Role Switcher ในกรณีทดสอบ
+    let matchedUser: User | undefined;
     if (roleOrUsername in DEMO_USERS) {
       matchedUser = DEMO_USERS[roleOrUsername as UserRole];
     } else {
-      // เช็คตาม username เช่น "registrar1", "nurse1"
       matchedUser = Object.values(DEMO_USERS).find((u) => u.username === roleOrUsername);
     }
 
@@ -50,7 +90,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // ฟังก์ชันสลับ Role อย่างรวดเร็ว (สำหรับทดสอบ)
-  const switchRole = (role: UserRole) => {
+  const switchRole = async (role: UserRole) => {
+    let username = 'registrar1';
+    if (role === 'nurse') username = 'nurse1';
+    else if (role === 'nurse_assistant') username = 'assistant1';
+    else if (role === 'doctor') username = 'doctor1';
+
+    try {
+      await authApi.login(username, 'password');
+    } catch {
+      // ignore
+    }
+
     const targetUser = DEMO_USERS[role];
     if (targetUser) {
       setCurrentUser(targetUser);
@@ -59,6 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ฟังก์ชันออกจากระบบ
   const logout = () => {
+    authApi.logout();
     setCurrentUser(null);
   };
 
