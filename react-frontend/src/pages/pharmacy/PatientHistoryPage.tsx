@@ -302,7 +302,8 @@ export default function PatientHistoryPage() {
                               color: rights.includes('30') ? '#92400E' : rights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
                               border: `1px solid ${rights.includes('30') ? '#FDE68A' : rights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
                               padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
-                              whiteSpace: 'nowrap', display: 'inline-block'
+                              whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center',
+                              width: '175px', textAlign: 'center', boxSizing: 'border-box'
                             }}>
                               {rights}
                             </span>
