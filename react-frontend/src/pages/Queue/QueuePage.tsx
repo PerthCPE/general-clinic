@@ -702,7 +702,6 @@ const QueuePage: React.FC = () => {
             <thead>
               <tr>
                 <th className="col-queue-no">หมายเลขคิว</th>
-                <th className="col-call-audio" aria-label="เรียกคิว"></th>
                 <th className="col-patient-name">ชื่อ-นามสกุล</th>
                 <th className="col-department">จุดบริการ / ห้องตรวจ</th>
                 <th className="col-status">สถานะ</th>
@@ -714,26 +713,26 @@ const QueuePage: React.FC = () => {
                 currentItems.map((item) => (
                   <tr key={item.id} className="queue-table-row">
                     <td className="col-queue-no">
-                      <span className="queue-mono-tag">{item.queueNo}</span>
-                    </td>
-                    <td className="col-call-audio">
-                      {/* ไม่แสดงปุ่มเรียกคิวในสถานะ: กำลังตรวจ, เสร็จสิ้น, ยกเลิกคิว */}
-                      {!['กำลังตรวจ', 'เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status) ? (
-                        <button
-                          type="button"
-                          className="btn-call-audio"
-                          title={`ประกาศเรียกคิว ${item.queueNo} (${item.patientName}) ด้วยเสียงภาษาไทย`}
-                          aria-label={`ประกาศเรียกคิว ${item.queueNo}`}
-                          onClick={(e) => handleCallQueue(item, e)}
-                        >
-                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
-                          </svg>
-                        </button>
-                      ) : (
-                        <span className="call-audio-placeholder" />
-                      )}
+                      <div className="queue-locked-wrapper">
+                        <span className="queue-mono-tag">{item.queueNo}</span>
+                        {/* ไม่แสดงปุ่มเรียกคิวในสถานะ: กำลังตรวจ, เสร็จสิ้น, ยกเลิกคิว */}
+                        {!['กำลังตรวจ', 'เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status) ? (
+                          <button
+                            type="button"
+                            className="btn-call-audio"
+                            title={`ประกาศเรียกคิว ${item.queueNo} (${item.patientName}) ด้วยเสียงภาษาไทย`}
+                            aria-label={`ประกาศเรียกคิว ${item.queueNo}`}
+                            onClick={(e) => handleCallQueue(item, e)}
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <span className="call-audio-placeholder" />
+                        )}
+                      </div>
                     </td>
                     <td className="col-patient-name">
                       <div className="patient-info-cell">

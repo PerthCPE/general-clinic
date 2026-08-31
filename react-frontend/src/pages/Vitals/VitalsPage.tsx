@@ -493,7 +493,7 @@ export const VitalsPage: React.FC = () => {
         <div className="vitals-header-meta">
           <div className="vitals-role-pill">
             <span className="nurse-dot"></span>
-            <span>{currentUser?.roleTitleEn ? `${currentUser.roleTitleEn} Station` : 'Triage Station'}</span>
+            <span>{currentUser?.roleTitleEn || 'Nurse'}</span>
           </div>
           <div className="vitals-user-pill">
             <span className="user-icon-symbol">

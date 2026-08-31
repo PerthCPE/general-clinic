@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { DEMO_USERS } from '../../config/roles';
 import type { UserRole } from '../../types/auth';
+import clinicLogo from '../../assets/logo.png';
 import './LoginPage.css';
 
 interface LoginPageProps {
@@ -60,10 +61,9 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
         {/* Logo & Header */}
         <div className="login-header">
           <div className="login-logo-icon">
-            <img src="/logo.png" alt="General Clinic Logo" className="login-logo-img" />
+            <img src={clinicLogo} alt="General Clinic Logo" className="login-logo-img" />
           </div>
-          <h1 className="login-clinic-name">General Clinic</h1>
-          <p className="login-tagline">ระบบบริหารจัดการคลินิกเวชกรรมและบริการผู้ป่วย</p>
+          <p className="login-tagline">ระบบบริหารจัดการคลินิกเวชกรรมทั่วไป</p>
         </div>
 
         {/* Quick Role Selection */}

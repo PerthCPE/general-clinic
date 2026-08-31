@@ -140,6 +140,8 @@
   border-radius: 20px;
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .nurse-dot {
@@ -161,6 +163,8 @@
   border-radius: 20px;
   font-size: 13px;
   font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 /* ================================================================
