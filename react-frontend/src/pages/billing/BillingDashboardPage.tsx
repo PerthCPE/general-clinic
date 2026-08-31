@@ -113,10 +113,14 @@ export default function BillingDashboardPage() {
   return (
     <div className="billing-dashboard-container">
       {/* Page Header */}
-      <div className="page-header" style={{ marginBottom: '24px' }}>
+      <div className="dashboard-title-row">
         <div className="header-titles">
-          <h1 className="page-title">แดชบอร์ดสรุปรายรับและการเงินประจำวัน</h1>
-          <p className="page-subtitle">สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน</p>
+          <h1 className="dashboard-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
+            แดชบอร์ดสรุปรายรับและการเงินประจำวัน
+          </h1>
+          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '1.1rem' }}>
+            สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน
+          </p>
         </div>
         {hasSearched && (
           <span className="success-badge">

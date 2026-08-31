@@ -58,9 +58,13 @@ export default function BillingInvoicePage({
   return (
     <div className="billing-invoice-container">
       <div className="page-header-row">
-        <div>
-          <h1 className="page-title">รายการบิล (Billing & Invoice)</h1>
-          <p className="page-subtitle">สรุปค่าบริการ ค่ายา และสร้าง QR Code สำหรับชำระเงิน</p>
+        <div className="header-titles">
+          <h1 className="page-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
+            รายการบิล (Billing & Invoice)
+          </h1>
+          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '1.1rem' }}>
+            สรุปค่าบริการ ค่ายา และสร้าง QR Code สำหรับชำระเงิน
+          </p>
         </div>
 
         <div className="invoice-patient-switcher">
