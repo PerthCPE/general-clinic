@@ -279,11 +279,16 @@ export default function MedicinePage() {
         </div>
 
         <div className="pagination-bar">
-          <span className="pagination-info">แสดง {medicines.length} รายการ</span>
+          <span className="pagination-info">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: '#2563EB' }}>
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+            </svg>
+            แสดง 1 - {filteredMedicines.length} จากทั้งหมด <strong>{medicines.length}</strong> รายการ
+          </span>
           <div className="pagination-buttons">
-            <button className="page-arrow" disabled>&lt;</button>
+            <button className="page-arrow" disabled title="หน้าก่อนหน้า">‹</button>
             <button className="page-num active">1</button>
-            <button className="page-arrow" disabled>&gt;</button>
+            <button className="page-arrow" disabled title="หน้าถัดไป">›</button>
           </div>
         </div>
       </div>
