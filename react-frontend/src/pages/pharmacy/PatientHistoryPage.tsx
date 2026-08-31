@@ -191,51 +191,28 @@ export default function PatientHistoryPage() {
             </div>
           </div>
 
-          {/* Filter Pills matching Image 3 */}
+          {/* Filter Pills matching Image 3 (Urgency Filter Removed) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
-            {/* Row 1: ช่วงเวลา & ระดับความเร่งด่วน */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0F172A', minWidth: '70px' }}>ช่วงเวลา:</span>
-                {(['all', 'today', 'month'] as const).map((key) => {
-                  const labels = { all: 'ทั้งหมด', today: 'วันนี้', month: 'เดือนนี้' };
-                  const active = timeRange === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setTimeRange(key)}
-                      style={{
-                        padding: '6px 16px', borderRadius: '8px', border: active ? 'none' : '1px solid #E2E8F0',
-                        background: active ? '#0F172A' : '#F8FAFC', color: active ? '#FFFFFF' : '#334155',
-                        fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
-                      }}
-                    >
-                      {labels[key]}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0F172A' }}>ระดับความเร่งด่วน:</span>
-                {(['all', 'emergency', 'urgent', 'normal'] as const).map((key) => {
-                  const labels = { all: 'ทั้งหมด', emergency: 'ฉุกเฉิน / วิกฤต', urgent: 'กึ่งฉุกเฉิน', normal: 'ปกติ (Normal)' };
-                  const active = urgencyFilter === key;
-                  return (
-                    <button
-                      key={key}
-                      onClick={() => setUrgencyFilter(key)}
-                      style={{
-                        padding: '6px 16px', borderRadius: '8px', border: active ? 'none' : '1px solid #E2E8F0',
-                        background: active ? '#0F172A' : '#F8FAFC', color: active ? '#FFFFFF' : '#334155',
-                        fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
-                      }}
-                    >
-                      {labels[key]}
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Row 1: ช่วงเวลา */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0F172A', minWidth: '80px' }}>ช่วงเวลา:</span>
+              {(['all', 'today', 'month'] as const).map((key) => {
+                const labels = { all: 'ทั้งหมด', today: 'วันนี้', month: 'เดือนนี้' };
+                const active = timeRange === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setTimeRange(key)}
+                    style={{
+                      padding: '6px 16px', borderRadius: '8px', border: active ? 'none' : '1px solid #E2E8F0',
+                      background: active ? '#0F172A' : '#F8FAFC', color: active ? '#FFFFFF' : '#334155',
+                      fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                  >
+                    {labels[key]}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Row 2: ความเสี่ยงทางคลินิก */}
@@ -299,37 +276,52 @@ export default function PatientHistoryPage() {
                       <th>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
                       <th>อายุ</th>
                       <th>กรุ๊ปเลือด</th>
-                      <th>จำนวนเข้ารักษา</th>
+                      <th style={{ textAlign: 'center' }}>สิทธิการรักษา</th>
+                      <th style={{ textAlign: 'center' }}>จำนวนเข้ารักษา</th>
                       <th>โรคประจำตัว</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredPatients.map((patient, idx) => (
-                      <tr key={patient.id}>
-                        <td className="hn-cell">{patient.hn}</td>
-                        <td 
-                          className="patient-name-cell clickable-patient-history"
-                          onClick={() => setSelectedPatientModal(patient)}
-                        >
-                          <span className="history-name-link">👤 {patient.name}</span>
-                          <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
-                        </td>
-                        <td>{patient.age} ปี</td>
-                        <td><span className="blood-badge">{patient.bloodType}</span></td>
-                        <td>
-                          <span style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '4px 10px', borderRadius: '12px', fontWeight: '700', fontSize: '12px' }}>
-                            เข้ารักษา {((idx * 3 + 4) % 12) + 1} ครั้ง
-                          </span>
-                        </td>
-                        <td>
-                          <div className="disease-badges">
-                            {patient.diseases.map((d, i) => (
-                              <span key={i} className="disease-tag">{d}</span>
-                            ))}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredPatients.map((patient, idx) => {
+                      const rights = idx % 3 === 0 ? 'สิทธิ 30 บาท (สปสช.)' : idx % 3 === 1 ? 'ประกันสังคม' : 'ประกันสุขภาพเอกชน';
+                      return (
+                        <tr key={patient.id}>
+                          <td className="hn-cell" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>{patient.hn.replace(/[-]/g, '')}</td>
+                          <td 
+                            className="patient-name-cell clickable-patient-history"
+                            onClick={() => setSelectedPatientModal(patient)}
+                          >
+                            <span className="history-name-link">👤 {patient.name}</span>
+                            <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
+                          </td>
+                          <td>{patient.age} ปี</td>
+                          <td><span className="blood-badge">{patient.bloodType}</span></td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{ 
+                              background: rights.includes('30') ? '#FEF9C3' : rights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
+                              color: rights.includes('30') ? '#92400E' : rights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
+                              border: `1px solid ${rights.includes('30') ? '#FDE68A' : rights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
+                              padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
+                              whiteSpace: 'nowrap', display: 'inline-block'
+                            }}>
+                              {rights}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '6px 14px', borderRadius: '9999px', fontWeight: '700', fontSize: '13px', display: 'inline-block' }}>
+                              เข้ารักษา {((idx * 3 + 4) % 12) + 1} ครั้ง
+                            </span>
+                          </td>
+                          <td>
+                            <div className="disease-badges">
+                              {patient.diseases.map((d, i) => (
+                                <span key={i} className="disease-tag">{d}</span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
