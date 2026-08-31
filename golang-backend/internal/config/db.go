@@ -89,6 +89,8 @@ func seedDatabase() {
 		var existing models.User
 		if err := DB.Where("username = ?", users[i].Username).First(&existing).Error; err != nil {
 			DB.Create(&users[i])
+		} else {
+			users[i].ID = existing.ID
 		}
 	}
 	log.Println("Users & Doctors verified and seeded successfully.")
@@ -424,5 +426,66 @@ func seedDatabase() {
 			DB.Create(&screenings[i])
 		}
 		log.Println("Screenings and Vitals seeded successfully.")
+
+		// 6. Seed Medicines
+		var medCount int64
+		DB.Model(&models.Medicine{}).Count(&medCount)
+		var medicines []models.Medicine
+		if medCount == 0 {
+			medicines = []models.Medicine{
+				{MedicineCode: "MED-001", Name: "Paracetamol 500mg", StockQuantity: 1000, UnitPrice: 10.0},
+				{MedicineCode: "MED-002", Name: "Amoxicillin 500mg", StockQuantity: 500, UnitPrice: 50.0},
+				{MedicineCode: "MED-003", Name: "Ibuprofen 400mg", StockQuantity: 800, UnitPrice: 30.0},
+				{MedicineCode: "MED-004", Name: "Cetirizine 10mg", StockQuantity: 600, UnitPrice: 15.0},
+				{MedicineCode: "MED-005", Name: "Omeprazole 20mg", StockQuantity: 400, UnitPrice: 25.0},
+				{MedicineCode: "MED-006", Name: "Amlodipine 5mg", StockQuantity: 300, UnitPrice: 20.0},
+				{MedicineCode: "MED-007", Name: "Metformin 500mg", StockQuantity: 700, UnitPrice: 12.0},
+				{MedicineCode: "MED-008", Name: "Losartan 50mg", StockQuantity: 450, UnitPrice: 40.0},
+			}
+			for i := range medicines {
+				DB.Create(&medicines[i])
+			}
+			log.Println("Medicines seeded successfully.")
+		} else {
+			DB.Find(&medicines)
+		}
+
+		// 7. Seed Dispensing & Billing
+		var dispensingCount int64
+		DB.Model(&models.Dispensing{}).Count(&dispensingCount)
+		if dispensingCount == 0 && len(medicines) > 0 {
+			dispensings := []models.Dispensing{
+				{VisitID: visits[0].ID, MedicineID: medicines[0].ID, Quantity: 20, Dosage: "500mg", Instructions: "ทานครั้งละ 1 เม็ด ทุก 4-6 ชั่วโมง เวลามีไข้", DoctorID: users[3].ID},
+				{VisitID: visits[0].ID, MedicineID: medicines[3].ID, Quantity: 10, Dosage: "10mg", Instructions: "ทานครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนนอน", DoctorID: users[3].ID},
+				{VisitID: visits[1].ID, MedicineID: medicines[2].ID, Quantity: 15, Dosage: "400mg", Instructions: "ทานครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร", DoctorID: users[4].ID},
+				{VisitID: visits[3].ID, MedicineID: medicines[5].ID, Quantity: 30, Dosage: "5mg", Instructions: "ทานครั้งละ 1 เม็ด วันละ 1 ครั้ง หลังอาหารเช้า", DoctorID: users[4].ID},
+			}
+			for i := range dispensings {
+				DB.Create(&dispensings[i])
+			}
+			log.Println("Dispensing seeded successfully.")
+		}
+
+		var billingCount int64
+		DB.Model(&models.Billing{}).Count(&billingCount)
+		if billingCount == 0 {
+			billings := []models.Billing{
+				{VisitID: visits[0].ID, TotalAmount: 550.0, DiscountFromEligibility: 50.0, NetAmount: 500.0, PaymentMethod: "QR Code", PaymentStatus: "paid", ReceiptNumber: "REC-2607-001"},
+				{VisitID: visits[1].ID, TotalAmount: 850.0, DiscountFromEligibility: 0.0, NetAmount: 850.0, PaymentMethod: "เงินสด", PaymentStatus: "pending", ReceiptNumber: "REC-2607-002"},
+				{VisitID: visits[3].ID, TotalAmount: 1200.0, DiscountFromEligibility: 1200.0, NetAmount: 0.0, PaymentMethod: "-", PaymentStatus: "paid", ReceiptNumber: "REC-2607-003"},
+			}
+			for i := range billings {
+				DB.Create(&billings[i])
+			}
+			log.Println("Billings seeded successfully.")
+
+			qrPayments := []models.QRPayment{
+				{BillingID: billings[0].ID, QRCodeData: "00020101021129370016A000000677010111011300668999911115802TH53037645405500.006304EE88", PromptPayID: "089-999-1111", Amount: 500.0, Status: "paid"},
+			}
+			for i := range qrPayments {
+				DB.Create(&qrPayments[i])
+			}
+			log.Println("QRPayments seeded successfully.")
+		}
 	}
 }

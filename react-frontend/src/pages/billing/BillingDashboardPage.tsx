@@ -52,6 +52,13 @@ export default function BillingDashboardPage() {
     setHasSearched(true);
   };
 
+  const handleResetFilters = () => {
+    setPatientId('');
+    setStatusFilter('all');
+    setMethodFilter('all');
+    setHasSearched(false);
+  };
+
   const filteredRecords = mockPaymentRecords.filter(record => {
     const query = patientId.trim().toLowerCase();
     const matchSearch = !query || record.id.toLowerCase().includes(query) || record.patientName.toLowerCase().includes(query);
@@ -229,12 +236,26 @@ export default function BillingDashboardPage() {
                 <option value="cash">เงินสด</option>
              </select>
           </div>
-          <button className="search-btn" onClick={handleSearch} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-             <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-               <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-             </svg>
-             ค้นหาข้อมูล
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button className="search-btn" onClick={handleSearch} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+               <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+               </svg>
+               ค้นหาข้อมูล
+            </button>
+            {(patientId || statusFilter !== 'all' || methodFilter !== 'all') && (
+              <button 
+                className="search-btn" 
+                onClick={handleResetFilters} 
+                style={{ 
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  background: 'var(--bg-card, #F1F5F9)', color: 'var(--text-primary, #475569)', border: '1px solid #CBD5E1' 
+                }}
+              >
+                ล้างการค้นหา
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -255,53 +276,79 @@ export default function BillingDashboardPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredRecords.map((record) => (
-                <tr key={record.id}>
-                  <td className="queue-cell">
-                    <span className="queue-badge">
-                      Q{record.id.replace('HN', '0')}
-                    </span>
-                  </td>
-                  <td 
-                    className="patient-name-cell clickable-patient"
-                    onClick={() => setSelectedDetail(getPatientDetail(record.id, record.patientName, record.method, record.time, record.date, record.status))}
-                  >
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{record.id}</span>
-                      <span className="patient-name-link" style={{ fontSize: '13px' }}>{record.patientName}</span>
-                    </div>
-                  </td>
-                  <td className="time-cell" style={{ fontSize: '13.5px', color: '#64748B' }}>{record.time}</td>
-                  <td className={`amount-cell ${record.status === 'completed' ? 'amount-completed' : 'amount-pending'}`}>
-                    {record.amount}
-                  </td>
-                  <td>
-                    <span className={`status-badge ${record.status === 'completed' ? 'status-completed' : 'status-pending'}`}>
-                      {record.status === 'completed' ? 'ชำระสำเร็จ' : 'รอชำระเงิน'}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`method-badge ${record.method === 'QR Code' ? 'badge-qr' : 'badge-cash'}`}>
-                      {record.method}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              {filteredRecords.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary, #64748B)' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                      </svg>
+                      <span style={{ fontSize: '16px', fontWeight: '600' }}>ไม่พบข้อมูลประวัติการชำระเงินที่ตรงกับการค้นหา</span>
+                      <span style={{ fontSize: '13.5px', opacity: 0.8 }}>ลองเปลี่ยนรหัสคิว, HN, ชื่อผู้ป่วย หรือตัวกรองสถานะ</span>
                       <button 
-                        className="action-btn btn-view"
-                        onClick={() => setSelectedDetail(getPatientDetail(record.id, record.patientName, record.method, record.time, record.date, record.status))}
+                        type="button" 
+                        onClick={handleResetFilters}
+                        style={{
+                          marginTop: '8px', padding: '8px 16px', borderRadius: '8px',
+                          background: '#2563EB', color: '#FFFFFF', border: 'none',
+                          fontWeight: '600', cursor: 'pointer'
+                        }}
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                        ดูรายละเอียด
-                      </button>
-                      <button className="action-btn btn-receive">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                        รับชำระเงิน
+                        ล้างการค้นหาทั้งหมด
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ) : (
+                filteredRecords.map((record) => (
+                  <tr key={record.id}>
+                    <td className="queue-cell">
+                      <span className="queue-badge">
+                        Q{record.id.replace('HN', '0')}
+                      </span>
+                    </td>
+                    <td 
+                      className="patient-name-cell clickable-patient"
+                      onClick={() => setSelectedDetail(getPatientDetail(record.id, record.patientName, record.method, record.time, record.date, record.status))}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{record.id}</span>
+                        <span className="patient-name-link" style={{ fontSize: '13px' }}>{record.patientName}</span>
+                      </div>
+                    </td>
+                    <td className="time-cell" style={{ fontSize: '13.5px', color: '#64748B' }}>{record.time}</td>
+                    <td className={`amount-cell ${record.status === 'completed' ? 'amount-completed' : 'amount-pending'}`}>
+                      {record.amount}
+                    </td>
+                    <td>
+                      <span className={`status-badge ${record.status === 'completed' ? 'status-completed' : 'status-pending'}`}>
+                        {record.status === 'completed' ? 'ชำระสำเร็จ' : 'รอชำระเงิน'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`method-badge ${record.method === 'QR Code' ? 'badge-qr' : 'badge-cash'}`}>
+                        {record.method}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <button 
+                          className="action-btn btn-view"
+                          onClick={() => setSelectedDetail(getPatientDetail(record.id, record.patientName, record.method, record.time, record.date, record.status))}
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                          ดูรายละเอียด
+                        </button>
+                        <button className="action-btn btn-receive">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                          รับชำระเงิน
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
