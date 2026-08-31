@@ -129,6 +129,41 @@ export default function BillingDispensePage({
         </div>
       </div>
 
+      {/* Metric Cards Section */}
+      <div className="metrics-grid">
+        <div className="metric-card card">
+          <div className="metric-icon-bg orange-bg">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <div className="metric-info">
+            <span className="metric-label">รอชำระเงิน</span>
+            <div className="metric-val-row">
+              <span className="metric-value">{queueList.length}</span>
+              <span style={{ fontSize: '0.95rem', color: '#64748B' }}>คน</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="metric-card card">
+          <div className="metric-icon-bg green-bg">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+          </div>
+          <div className="metric-info">
+            <span className="metric-label">ชำระเงินสำเร็จแล้ววันนี้</span>
+            <div className="metric-val-row">
+              <span className="metric-value">{CLINIC_CONFIG.patients.length - queueList.length + 45}</span>
+              <span style={{ fontSize: '0.95rem', color: '#64748B' }}>คน</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Patient Search & Collapsible Recent Pharmacy Patients Queue Card */}
       <div className="search-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
         {/* Header Toggle */}
