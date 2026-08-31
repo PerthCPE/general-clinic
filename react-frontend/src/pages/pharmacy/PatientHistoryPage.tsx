@@ -358,84 +358,129 @@ export default function PatientHistoryPage() {
         </div>
       </div>
 
-      {/* Patient Full History Pop-up Modal */}
+      {/* Patient Full History Pop-up Modal (Images 1 & 2 Pattern) */}
       {selectedPatientModal && (
         <div className="modal-overlay" onClick={() => setSelectedPatientModal(null)}>
-          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()}>
-            <div className="history-modal-header">
+          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: 'none' }}>
+            {/* Modal Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <span className="history-modal-badge">👤 รายละเอียดประวัติสุขภาพผู้ป่วย</span>
-                <h2 className="history-modal-name">{selectedPatientModal.name}</h2>
-                <span className="history-modal-hn">รหัสผู้ป่วย: {selectedPatientModal.id} • {selectedPatientModal.hn}</span>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+                  รายละเอียดประวัติสุขภาพ & ข้อมูลการรับยา
+                </h2>
+                <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B' }}>
+                  หมายเลขคิว <span style={{ color: '#2563EB', fontWeight: '700' }}>Q0001</span> • {selectedPatientModal.name}
+                </p>
               </div>
-              <button className="history-modal-close" onClick={() => setSelectedPatientModal(null)}>✕</button>
+              <button 
+                onClick={() => setSelectedPatientModal(null)}
+                style={{ background: 'transparent', border: 'none', fontSize: '18px', color: '#94A3B8', cursor: 'pointer', padding: '4px' }}
+              >
+                ✕
+              </button>
             </div>
 
-            <div className="history-modal-body">
-              {/* Stats Bar */}
-              <div className="history-stats-bar">
-                <div className="h-stat-box">
-                  <span className="h-stat-label">อายุ</span>
-                  <span className="h-stat-val">{selectedPatientModal.age} ปี</span>
+            <div className="history-modal-body" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '75vh', overflowY: 'auto' }}>
+              {/* Summary Information Card (Image 1 Format) */}
+              <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>หมายเลขคิว:</span>
+                  <span style={{ color: '#2563EB', fontWeight: '700', fontSize: '14.5px' }}>Q0001</span>
                 </div>
-                <div className="h-stat-box">
-                  <span className="h-stat-label">กรุ๊ปเลือด</span>
-                  <span className="h-stat-val">{selectedPatientModal.bloodType}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>ชื่อคนไข้:</span>
+                  <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>{selectedPatientModal.name}</span>
                 </div>
-                <div className="h-stat-box">
-                  <span className="h-stat-label">น้ำหนัก / ส่วนสูง</span>
-                  <span className="h-stat-val">{selectedPatientModal.weightHeight || '70 kg / 172 cm'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>เลขบัตรประชาชน / HN:</span>
+                  <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>{selectedPatientModal.hn}</span>
                 </div>
-                <div className="h-stat-box">
-                  <span className="h-stat-label">สิทธิการรักษา</span>
-                  <span className="h-stat-val">{selectedPatientModal.treatmentRights || 'ประกันสังคม'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>เวลารับคิว:</span>
+                  <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>08:45 น.</span>
                 </div>
-              </div>
-
-              {/* Allergies Section */}
-              <div className="history-section-block">
-                <h3 className="section-title text-red">⚠️ ข้อมูลการแพ้ยา (Allergies)</h3>
-                <div className="allergy-list-grid">
-                  {mockAllergies.map((allergy, i) => (
-                    <div key={i} className={`allergy-pill-item ${allergy.severity === 'high' ? 'sev-high' : 'sev-low'}`}>
-                      <div className="allergy-pill-name">{allergy.allergen}</div>
-                      <div className="allergy-pill-symptom">อาการ: {allergy.symptom}</div>
-                    </div>
-                  ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', gridColumn: 'span 2', paddingTop: '6px', borderTop: '1px dashed #E2E8F0' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>สิทธิการรักษา:</span>
+                  <span style={{ background: '#F3E8FF', color: '#6B21A8', border: '1px solid #DDD6FE', padding: '2px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>
+                    {selectedPatientModal.treatmentRights || 'สิทธิ 30 บาท (สปสช.)'}
+                  </span>
                 </div>
               </div>
 
-              {/* Medication History Table */}
-              <div className="history-section-block">
-                <h3 className="section-title">ประวัติการรับยาล่าสุดในระบบ</h3>
-                <div className="table-wrapper">
-                  <table className="med-history-table">
-                    <thead>
-                      <tr>
-                        <th>วันที่รับยา</th>
-                        <th>รายการยา (MEDICINE NAME)</th>
-                        <th>วิธีใช้ (DOSAGE)</th>
-                        <th style={{ textAlign: 'right' }}>จำนวน</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mockMedHistory.map((item, idx) => (
-                        <tr key={idx}>
-                          <td className="date-cell">{item.date} ({item.time})</td>
-                          <td className="med-title">{item.medName}</td>
-                          <td>{item.dosage} ({item.dosageTag})</td>
-                          <td className="qty-cell">{item.quantity}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              {/* Vital Signs Grid (Image 2 Format) */}
+              <div>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A' }}>
+                  📊 ค่าสัญญาณชีพและสรีรวิทยา (Vital Signs Measurements)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>ความดันโลหิต (BP)</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>120/80 <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>mmHg</span></div>
+                    <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
+                  </div>
+                  <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>ชีพจร (Heart Rate)</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>80 <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>bpm</span></div>
+                    <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
+                  </div>
+                  <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>อุณหภูมิ (Temp)</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>36.5 <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>°C</span></div>
+                    <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Department / Room Block (Image 1 Format) */}
+              <div>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>🏠</span> จุดบริการ / ห้องตรวจ:
+                </h4>
+                <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '10px', padding: '12px 16px', color: '#0369A1', fontWeight: '700', fontSize: '14.5px' }}>
+                  ห้องจ่ายยาและเภสัชกรรม (อาคารผู้ป่วยนอก ชั้น 1)
+                </div>
+              </div>
+
+              {/* Prescription & Doctor Advice Block (Image 1 Format) */}
+              <div>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>📄</span> คำสั่งการรักษา & รายการยาที่ได้รับ (ฉบับเต็ม):
+                </h4>
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '13.5px', color: '#334155', lineHeight: '1.5' }}>
+                    <strong>คำสั่งแพทย์:</strong> ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที
+                  </div>
+                  <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
+                    <strong style={{ fontSize: '13px', color: '#0F172A' }}>รายการยา:</strong>
+                    <ul style={{ margin: '4px 0 0 18px', padding: 0, fontSize: '13px', color: '#475569' }}>
+                      <li>Paracetamol 500mg (10 เม็ด) - รับประทาน 1 เม็ด หลังอาหาร 3 เวลา</li>
+                      <li>Amoxicillin 500mg (20 เม็ด) - รับประทาน 1 เม็ด หลังอาหาร เช้า-เย็น (ทานติดต่อกันจนหมด)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Allergies Block (Image 1 & 2 Format) */}
+              <div>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>⚠️</span> ประวัติแพ้ยา (Known Allergies):
+                </h4>
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ background: '#FEE2E2', color: '#991B1B', fontWeight: '700', padding: '4px 12px', borderRadius: '8px', fontSize: '12.5px' }}>
+                    เพนิซิลลิน (Penicillin)
+                  </span>
+                  <span style={{ fontSize: '12.5px', color: '#991B1B' }}>อาการ: เกิดผื่นคัน ปากบวม (ระวังกลุ่ม Beta-lactams)</span>
                 </div>
               </div>
             </div>
 
-            <div className="history-modal-footer">
-              <button className="primary-close-btn" onClick={() => setSelectedPatientModal(null)}>
-                ปิดหน้าต่างประวัติผู้ป่วย
+            {/* Modal Footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'flex-end', background: '#F8FAFC' }}>
+              <button 
+                onClick={() => setSelectedPatientModal(null)}
+                style={{ padding: '8px 24px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#334155', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}
+              >
+                ปิดหน้าต่าง
               </button>
             </div>
           </div>
