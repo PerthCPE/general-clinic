@@ -189,9 +189,9 @@ export default function MedicinePage() {
 
   const renderStatusText = (status: string) => {
     switch (status) {
-      case 'In Stock': return 'มีในคลัง (In Stock)';
-      case 'Low Stock': return 'ใกล้หมด (Low Stock)';
-      case 'Out of Stock': return 'หมดคลัง (Out of Stock)';
+      case 'In Stock': return 'มีในคลัง';
+      case 'Low Stock': return 'ใกล้หมด';
+      case 'Out of Stock': return 'หมดคลัง';
       default: return status;
     }
   };

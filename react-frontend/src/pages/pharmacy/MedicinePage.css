@@ -363,6 +363,9 @@ body.dark-mode .medicine-page-container .page-arrow:disabled {
   font-weight: 700;
   display: inline-block;
   white-space: nowrap;
+  min-width: 110px;
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .medicine-page-container .status-in-stock {

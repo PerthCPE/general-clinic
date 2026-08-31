@@ -518,13 +518,13 @@ export default function DetailPage({
                               <span 
                                 style={{ 
                                   background: med.stockStatus === 'out-stock' ? '#FEE2E2' : '#DCFCE7', 
-                                  color: med.stockStatus === 'out-stock' ? '#991B1B' : '#166534', 
+                                  color: med.stockStatus === 'out-stock' ? '#DC2626' : '#15803D', 
                                   border: `1px solid ${med.stockStatus === 'out-stock' ? '#FCA5A5' : '#86EFAC'}`,
-                                  padding: '4px 12px', borderRadius: '12px', fontSize: '12.5px', fontWeight: 'bold',
-                                  display: 'inline-flex', alignItems: 'center', gap: '4px'
+                                  padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
+                                  display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap'
                                 }}
                               >
-                                {med.stockStatus === 'out-stock' ? '✕ สต็อกหมด (0)' : `✓ มีในคลัง (${med.stock})`}
+                                {med.stockStatus === 'out-stock' ? 'หมดคลัง (0)' : `มีในคลัง (${med.stock})`}
                               </span>
                             </td>
                           </tr>
