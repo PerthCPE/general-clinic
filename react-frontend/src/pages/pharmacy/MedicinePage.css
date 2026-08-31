@@ -1,7 +1,8 @@
 /* ===== MedicinePage - All scoped under container ===== */
 
 .medicine-page-container {
-  padding: 32px 48px;: 1440px;
+  padding: 32px 48px;
+  max-width: 1440px;
   margin: 0 auto;
   width: 100%;
   font-family: var(--font-primary);

@@ -1,3 +1,5 @@
+node_modules/
+**/node_modules/
 golang-backend/.env
 golang-backend/golang-backend
 golang-backend/*.exe

@@ -79,6 +79,8 @@ func seedDatabase() {
 		{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
 		{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
 		{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
+		{Username: "pharmacist1", Password: passStr, Role: "pharmacist", FullName: "ภก.บุญชู เภสัชกร", Phone: "081-333-0001"},
+		{Username: "cashier1", Password: passStr, Role: "cashier", FullName: "นส.รวย การเงิน", Phone: "081-444-0001"},
 		{Username: "doctor1", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
 		{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
 		{Username: "doctor3", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},

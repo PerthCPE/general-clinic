@@ -268,10 +268,11 @@ export default function BillingDispensePage({
                           <span style={{ 
                             background: p.treatmentRights.includes('30') ? '#FEF3C7' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
                             color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6B21A8',
-                            padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '500',
-                            whiteSpace: 'nowrap', display: 'inline-block', minWidth: '130px', textAlign: 'center'
+                            border: `1px solid ${p.treatmentRights.includes('30') ? '#FDE68A' : p.treatmentRights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
+                            padding: '6px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '600',
+                            whiteSpace: 'nowrap', display: 'inline-block', minWidth: '150px', textAlign: 'center', boxSizing: 'border-box'
                           }}>
-                            {p.treatmentRights.split(' ')[0]} {p.treatmentRights.includes('บัตรทอง') ? '(สปสช.)' : ''}
+                            {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
                           </span>
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>

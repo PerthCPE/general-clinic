@@ -31,7 +31,7 @@ import './App.css';
 
 function MainApp() {
   const { currentUser, isAuthenticated, hasAccess } = useAuth();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('isDarkMode') === 'true';
   });
