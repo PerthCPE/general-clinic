@@ -227,8 +227,7 @@ export default function BillingDispensePage({
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ชื่อ-นามสกุล คนไข้</th>
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>เลขบัตรประชาชน</th>
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>สถานะการชำระ</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>การดำเนินการ</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -284,19 +283,7 @@ export default function BillingDispensePage({
                             {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                          <span style={{ 
-                            background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5',
-                            padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
-                            whiteSpace: 'nowrap', display: 'inline-block'
-                          }}>
-                            ยังไม่ชำระเงิน
-                          </span>
-                        </td>
-                        <td className="patient-table-sub" style={{ padding: '12px', fontSize: '13px', whiteSpace: 'nowrap' }}>
-                          <div style={{ fontWeight: '600' }}>{p.visitDate}</div>
-                          <div style={{ fontSize: '12px', marginTop: '2px' }}>{p.visitTime}</div>
-                        </td>
+
                         <td style={{ padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <button 
                             onClick={() => handleSelectPatient(p.id)}
