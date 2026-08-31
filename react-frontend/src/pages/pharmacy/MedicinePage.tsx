@@ -322,15 +322,16 @@ export default function MedicinePage() {
 
       <div className="stock-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
         <div 
+          className="collapsible-card-header"
           onClick={() => setIsStockTableExpanded(!isStockTableExpanded)}
           style={{ 
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-            padding: '18px 24px', background: '#F8FAFC', borderBottom: isStockTableExpanded ? '1px solid #E2E8F0' : 'none',
+            padding: '18px 24px', borderBottom: isStockTableExpanded ? '1px solid #E2E8F0' : 'none',
             cursor: 'pointer', userSelect: 'none' 
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: '700', color: '#0F172A' }}>
+            <h3 className="card-header-title" style={{ margin: 0, fontSize: '16.5px', fontWeight: '700' }}>
               สถานะคลังยา & สรุปการจ่ายยาประจำวัน
             </h3>
           </div>

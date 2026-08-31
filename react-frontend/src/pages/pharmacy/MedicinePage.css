@@ -816,3 +816,21 @@ body.dark-mode .medicine-page-container .stat-card-box span {
 body.dark-mode .medicine-page-container .stat-card-box div {
   color: #F8FAFC !important;
 }
+
+/* Collapsible Card Header in Dark Mode */
+.medicine-page-container .collapsible-card-header {
+  background: #F8FAFC;
+}
+
+.medicine-page-container .card-header-title {
+  color: #0F172A;
+}
+
+body.dark-mode .medicine-page-container .collapsible-card-header {
+  background: #0F172A !important;
+  border-bottom-color: #334155 !important;
+}
+
+body.dark-mode .medicine-page-container .card-header-title {
+  color: #F8FAFC !important;
+}

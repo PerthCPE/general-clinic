@@ -241,15 +241,16 @@ export default function PatientHistoryPage() {
 
         <div className="patient-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
           <div 
+            className="collapsible-card-header"
             onClick={() => setIsPatientListExpanded(!isPatientListExpanded)}
             style={{ 
               display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-              padding: '18px 24px', background: '#F8FAFC', borderBottom: isPatientListExpanded ? '1px solid #E2E8F0' : 'none',
+              padding: '18px 24px', borderBottom: isPatientListExpanded ? '1px solid #E2E8F0' : 'none',
               cursor: 'pointer', userSelect: 'none' 
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <h3 style={{ margin: 0, fontSize: '16.5px', fontWeight: '700', color: '#0F172A' }}>
+              <h3 className="card-header-title" style={{ margin: 0, fontSize: '16.5px', fontWeight: '700' }}>
                 รายชื่อผู้ป่วยที่เข้ารับการรักษา
               </h3>
             </div>
@@ -334,25 +335,28 @@ export default function PatientHistoryPage() {
               </div>
 
               {/* Pagination Bar matching Image 4 */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', background: '#FFFFFF', borderTop: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '12px' }}>
-                <span style={{ fontSize: '13.5px', color: '#64748B', fontWeight: '500' }}>
+              <div className="table-pagination-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderTop: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '12px' }}>
+                <span className="pagination-info" style={{ fontSize: '13.5px', fontWeight: '500' }}>
                   แสดง 1 ถึง {filteredPatients.length} จาก {mockPatients.length} รายการ
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <button 
                     disabled={currentPage === 1}
-                    style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#64748B', fontSize: '13.5px', cursor: 'not-allowed' }}
+                    className="pagination-btn"
+                    style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13.5px', cursor: 'not-allowed' }}
                   >
                     ย้อนกลับ
                   </button>
                   <button 
+                    className="pagination-btn active"
                     style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: '#2563EB', color: '#FFFFFF', fontWeight: '700', fontSize: '13.5px', cursor: 'pointer' }}
                   >
                     1
                   </button>
                   <button 
                     disabled
-                    style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#64748B', fontSize: '13.5px', cursor: 'not-allowed' }}
+                    className="pagination-btn"
+                    style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13.5px', cursor: 'not-allowed' }}
                   >
                     ถัดไป
                   </button>

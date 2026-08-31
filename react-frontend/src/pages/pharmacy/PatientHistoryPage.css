@@ -612,3 +612,62 @@ body.dark-mode .patient-history-container .history-name-link {
 body.dark-mode .patient-history-container .history-hint-tag {
   color: #60A5FA !important;
 }
+
+/* Dark Mode Search Cards & Headers */
+body.dark-mode .patient-history-container .search-card {
+  background: #1E293B !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode .patient-history-container label,
+body.dark-mode .patient-history-container span {
+  color: #F8FAFC;
+}
+
+body.dark-mode .patient-history-container input[type="text"] {
+  background: #0F172A !important;
+  border-color: #334155 !important;
+  color: #F8FAFC !important;
+}
+
+.patient-history-container .collapsible-card-header {
+  background: #F8FAFC;
+}
+
+.patient-history-container .card-header-title {
+  color: #0F172A;
+}
+
+body.dark-mode .patient-history-container .collapsible-card-header {
+  background: #0F172A !important;
+  border-bottom-color: #334155 !important;
+}
+
+body.dark-mode .patient-history-container .card-header-title {
+  color: #F8FAFC !important;
+}
+
+/* Dark Mode Pagination Footer */
+.patient-history-container .table-pagination-footer {
+  background: #FFFFFF;
+}
+
+body.dark-mode .patient-history-container .table-pagination-footer {
+  background: #0F172A !important;
+  border-top-color: #334155 !important;
+}
+
+body.dark-mode .patient-history-container .pagination-info {
+  color: #CBD5E1 !important;
+}
+
+body.dark-mode .patient-history-container .pagination-btn {
+  background: #1E293B !important;
+  color: #94A3B8 !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode .patient-history-container .pagination-btn.active {
+  background: #2563EB !important;
+  color: #FFFFFF !important;
+}
