@@ -182,7 +182,8 @@
 .stat-sub-text {
   font-family: var(--font-primary);
   font-size: 13.5px;
-  color: #94A3B8;
+  font-weight: 500;
+  color: #64748B;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

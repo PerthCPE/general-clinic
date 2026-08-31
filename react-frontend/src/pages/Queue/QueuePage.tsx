@@ -537,163 +537,255 @@ const QueuePage: React.FC = () => {
             )}
           </div>
 
-          {selectedCategory !== 'all' && (
-            <div className="status-filter-pills-bar">
-              {selectedCategory === 'in_service' && (
-                <>
-                  <button
-                    type="button"
-                    className={`filter-pill-btn ${statusFilter === 'in_service_all' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('in_service_all');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span>ทั้งหมดในกลุ่มนี้</span>
-                    <span className="pill-count">
-                      {stats.waitingScreening + stats.waitingDoctor + stats.inExamination + stats.waitingTreatment}
-                    </span>
-                  </button>
+          <div className="status-filter-pills-bar">
+            {selectedCategory === 'all' && (
+              <>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${statusFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('all');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span>ทั้งหมดในระบบ</span>
+                  <span className="pill-count">{stats.active}</span>
+                </button>
 
-                  <button
-                    type="button"
-                    className={`filter-pill-btn pill-screening ${statusFilter === 'รอคัดกรอง' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('รอคัดกรอง');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span className="pill-dot dot-screening"></span>
-                    <span>รอคัดกรอง</span>
-                    <span className="pill-count">{stats.waitingScreening}</span>
-                  </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-screening ${statusFilter === 'รอคัดกรอง' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอคัดกรอง');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-screening"></span>
+                  <span>รอคัดกรอง</span>
+                  <span className="pill-count">{stats.waitingScreening}</span>
+                </button>
 
-                  <button
-                    type="button"
-                    className={`filter-pill-btn pill-doctor ${statusFilter === 'รอพบแพทย์' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('รอพบแพทย์');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span className="pill-dot dot-doctor"></span>
-                    <span>รอพบแพทย์</span>
-                    <span className="pill-count">{stats.waitingDoctor}</span>
-                  </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-doctor ${statusFilter === 'รอพบแพทย์' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอพบแพทย์');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-doctor"></span>
+                  <span>รอพบแพทย์</span>
+                  <span className="pill-count">{stats.waitingDoctor}</span>
+                </button>
 
-                  <button
-                    type="button"
-                    className={`filter-pill-btn pill-examination ${statusFilter === 'กำลังตรวจ' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('กำลังตรวจ');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span className="pill-dot dot-examination"></span>
-                    <span>กำลังตรวจ</span>
-                    <span className="pill-count">{stats.inExamination}</span>
-                  </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-examination ${statusFilter === 'กำลังตรวจ' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('กำลังตรวจ');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-examination"></span>
+                  <span>กำลังตรวจ</span>
+                  <span className="pill-count">{stats.inExamination}</span>
+                </button>
 
-                  <button
-                    type="button"
-                    className={`filter-pill-btn pill-treatment ${statusFilter === 'รอทำหัตถการ' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('รอทำหัตถการ');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span className="pill-dot dot-treatment"></span>
-                    <span>รอทำหัตถการ</span>
-                    <span className="pill-count">{stats.waitingTreatment}</span>
-                  </button>
-                </>
-              )}
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-treatment ${statusFilter === 'รอทำหัตถการ' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอทำหัตถการ');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-treatment"></span>
+                  <span>รอทำหัตถการ</span>
+                  <span className="pill-count">{stats.waitingTreatment}</span>
+                </button>
 
-              {selectedCategory === 'cash_pharmacy' && (
-                <>
-                  <button
-                    type="button"
-                    className={`filter-pill-btn ${statusFilter === 'cash_pharmacy_all' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('cash_pharmacy_all');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span>ทั้งหมดในกลุ่มนี้</span>
-                    <span className="pill-count">{stats.waitingBilling + stats.waitingPharmacy}</span>
-                  </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-billing ${statusFilter === 'รอชำระเงิน' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอชำระเงิน');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-billing"></span>
+                  <span>รอชำระเงิน</span>
+                  <span className="pill-count">{stats.waitingBilling}</span>
+                </button>
 
-                  <button
-                    type="button"
-                    className={`filter-pill-btn pill-billing ${statusFilter === 'รอชำระเงิน' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('รอชำระเงิน');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span className="pill-dot dot-billing"></span>
-                    <span>รอชำระเงิน</span>
-                    <span className="pill-count">{stats.waitingBilling}</span>
-                  </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-pharmacy ${statusFilter === 'รอรับยา' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอรับยา');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-pharmacy"></span>
+                  <span>รอรับยา</span>
+                  <span className="pill-count">{stats.waitingPharmacy}</span>
+                </button>
+              </>
+            )}
 
-                  <button
-                    type="button"
-                    className={`filter-pill-btn pill-pharmacy ${statusFilter === 'รอรับยา' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('รอรับยา');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span className="pill-dot dot-pharmacy"></span>
-                    <span>รอรับยา</span>
-                    <span className="pill-count">{stats.waitingPharmacy}</span>
-                  </button>
-                </>
-              )}
+            {selectedCategory === 'in_service' && (
+              <>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${statusFilter === 'in_service_all' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('in_service_all');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span>ทั้งหมดในกลุ่มนี้</span>
+                  <span className="pill-count">
+                    {stats.waitingScreening + stats.waitingDoctor + stats.inExamination + stats.waitingTreatment}
+                  </span>
+                </button>
 
-              {selectedCategory === 'completed_cancelled' && (
-                <>
-                  <button
-                    type="button"
-                    className={`filter-pill-btn ${statusFilter === 'completed_cancelled_all' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('completed_cancelled_all');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span>ทั้งหมดในกลุ่มนี้</span>
-                    <span className="pill-count">{stats.completed + stats.cancelled}</span>
-                  </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-screening ${statusFilter === 'รอคัดกรอง' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอคัดกรอง');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-screening"></span>
+                  <span>รอคัดกรอง</span>
+                  <span className="pill-count">{stats.waitingScreening}</span>
+                </button>
 
-                  <button
-                    type="button"
-                    className={`filter-pill-btn pill-completed ${statusFilter === 'เสร็จสิ้น' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('เสร็จสิ้น');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span className="pill-dot dot-completed"></span>
-                    <span>เสร็จสิ้นการบริการ</span>
-                    <span className="pill-count">{stats.completed}</span>
-                  </button>
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-doctor ${statusFilter === 'รอพบแพทย์' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอพบแพทย์');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-doctor"></span>
+                  <span>รอพบแพทย์</span>
+                  <span className="pill-count">{stats.waitingDoctor}</span>
+                </button>
 
-                  <button
-                    type="button"
-                    className={`filter-pill-btn pill-cancelled ${statusFilter === 'ยกเลิกคิว' ? 'active' : ''}`}
-                    onClick={() => {
-                      setStatusFilter('ยกเลิกคิว');
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <span className="pill-dot dot-cancelled"></span>
-                    <span>ยกเลิกคิว</span>
-                    <span className="pill-count">{stats.cancelled}</span>
-                  </button>
-                </>
-              )}
-            </div>
-          )}
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-examination ${statusFilter === 'กำลังตรวจ' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('กำลังตรวจ');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-examination"></span>
+                  <span>กำลังตรวจ</span>
+                  <span className="pill-count">{stats.inExamination}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-treatment ${statusFilter === 'รอทำหัตถการ' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอทำหัตถการ');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-treatment"></span>
+                  <span>รอทำหัตถการ</span>
+                  <span className="pill-count">{stats.waitingTreatment}</span>
+                </button>
+              </>
+            )}
+
+            {selectedCategory === 'cash_pharmacy' && (
+              <>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${statusFilter === 'cash_pharmacy_all' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('cash_pharmacy_all');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span>ทั้งหมดในกลุ่มนี้</span>
+                  <span className="pill-count">{stats.waitingBilling + stats.waitingPharmacy}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-billing ${statusFilter === 'รอชำระเงิน' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอชำระเงิน');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-billing"></span>
+                  <span>รอชำระเงิน</span>
+                  <span className="pill-count">{stats.waitingBilling}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-pharmacy ${statusFilter === 'รอรับยา' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอรับยา');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-pharmacy"></span>
+                  <span>รอรับยา</span>
+                  <span className="pill-count">{stats.waitingPharmacy}</span>
+                </button>
+              </>
+            )}
+
+            {selectedCategory === 'completed_cancelled' && (
+              <>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${statusFilter === 'completed_cancelled_all' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('completed_cancelled_all');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span>ทั้งหมดในกลุ่มนี้</span>
+                  <span className="pill-count">{stats.completed + stats.cancelled}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-completed ${statusFilter === 'เสร็จสิ้น' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('เสร็จสิ้น');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-completed"></span>
+                  <span>เสร็จสิ้นการบริการ</span>
+                  <span className="pill-count">{stats.completed}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-cancelled ${statusFilter === 'ยกเลิกคิว' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('ยกเลิกคิว');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-cancelled"></span>
+                  <span>ยกเลิกคิว</span>
+                  <span className="pill-count">{stats.cancelled}</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Responsive Queue Table */}
