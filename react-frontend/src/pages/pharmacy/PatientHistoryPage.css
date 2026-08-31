@@ -583,3 +583,32 @@ body.dark-mode .patient-history-container .severity-low {
   text-align: right !important;
   padding-right: 24px !important;
 }
+
+/* Dark Mode Table Enhancements Matching Queue Management */
+body.dark-mode .patient-history-container .patient-table th {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-bottom: 2px solid #334155 !important;
+}
+
+body.dark-mode .patient-history-container .patient-table tr {
+  background-color: #1E293B !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+body.dark-mode .patient-history-container .patient-table tr:hover {
+  background-color: #283548 !important;
+}
+
+body.dark-mode .patient-history-container .hn-cell {
+  color: #60A5FA !important;
+  font-weight: 700 !important;
+}
+
+body.dark-mode .patient-history-container .history-name-link {
+  color: #FFFFFF !important;
+}
+
+body.dark-mode .patient-history-container .history-hint-tag {
+  color: #60A5FA !important;
+}

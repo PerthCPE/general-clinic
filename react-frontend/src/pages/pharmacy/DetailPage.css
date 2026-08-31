@@ -914,3 +914,33 @@ body.dark-mode .detail-page-container .column-title {
   color: #F8FAFC !important;
 }
 
+/* Table Headers & Rows in Dark Mode matching Queue Management */
+body.dark-mode .detail-page-container table thead tr {
+  background: #0F172A !important;
+  color: #F8FAFC !important;
+  border-bottom: 2px solid #334155 !important;
+}
+
+body.dark-mode .detail-page-container table thead th {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .detail-page-container table tbody tr {
+  background-color: #1E293B !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+body.dark-mode .detail-page-container table tbody tr:hover {
+  background-color: #283548 !important;
+}
+
+body.dark-mode .detail-page-container .patient-table-name {
+  color: #FFFFFF !important;
+}
+
+body.dark-mode .detail-page-container input[type="text"] {
+  background-color: #0F172A !important;
+  border-color: #334155 !important;
+  color: #F8FAFC !important;
+}
+

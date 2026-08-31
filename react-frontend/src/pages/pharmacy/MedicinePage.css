@@ -781,3 +781,23 @@ body.dark-mode .medicine-page-container {
   --preview-border: #334155;
   --preview-text: #94A3B8;
 }
+
+/* Dark Mode Table & Card Enhancements Matching Queue Management */
+body.dark-mode .medicine-page-container .stock-table th {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-bottom: 2px solid #334155 !important;
+}
+
+body.dark-mode .medicine-page-container .stock-table tr {
+  background-color: #1E293B !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+body.dark-mode .medicine-page-container .stock-table tr:hover {
+  background-color: #283548 !important;
+}
+
+body.dark-mode .medicine-page-container .patient-table-name {
+  color: #FFFFFF !important;
+}
