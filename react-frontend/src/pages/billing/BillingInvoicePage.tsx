@@ -42,7 +42,7 @@ export default function BillingInvoicePage({
   };
 
   const handleSendDigitalReceipt = () => {
-    setReceiptSent('📱 ส่งใบเสร็จดิจิทัลไปยัง SMS/Email ของผู้ป่วยเรียบร้อยแล้ว');
+    setReceiptSent('ส่งใบเสร็จดิจิทัลไปยัง SMS/Email ของผู้ป่วยเรียบร้อยแล้ว');
     setTimeout(() => setReceiptSent(null), 3000);
   };
 
@@ -112,7 +112,7 @@ export default function BillingInvoicePage({
               border: `1.5px solid ${isPaymentConfirmed ? '#34D399' : '#F87171'}`, 
               padding: '5px 14px', borderRadius: '16px', fontSize: '13.5px', fontWeight: 'bold' 
             }}>
-              {isPaymentConfirmed ? '✓ ชำระเงินแล้ว' : '🔴 ยังไม่ชำระเงิน'}
+              {isPaymentConfirmed ? '✓ ชำระเงินแล้ว' : 'ยังไม่ชำระเงิน'}
             </span>
           </div>
         </div>
@@ -227,13 +227,13 @@ export default function BillingInvoicePage({
                 className={`toggle-tab-btn ${paymentMethod === 'qr' ? 'active-qr' : ''}`}
                 onClick={() => setPaymentMethod('qr')}
               >
-                📱 สแกน QR
+                สแกน QR
               </button>
               <button
                 className={`toggle-tab-btn ${paymentMethod === 'cash' ? 'active-cash' : ''}`}
                 onClick={() => setPaymentMethod('cash')}
               >
-                💵 เงินสด
+                เงินสด
               </button>
             </div>
 
@@ -341,7 +341,7 @@ export default function BillingInvoicePage({
                         🖨 พิมพ์ใบเสร็จรับเงิน
                       </button>
                       <button className="receipt-btn digital-btn" onClick={handleSendDigitalReceipt}>
-                        📱 ส่งใบเสร็จดิจิทัล (SMS/Email)
+                        ส่งใบเสร็จดิจิทัล (SMS/Email)
                       </button>
                     </div>
                   </div>

@@ -111,11 +111,11 @@ export default function BillingDashboardPage() {
         )}
       </div>
 
-      {/* Metric Cards Section */}
+      {/* Metric Cards Section - Pharmacy-style framed cards */}
       <div className="metrics-grid">
         <div className="metric-card card">
           <div className="metric-icon-bg blue-bg">
-            <span className="icon">💰</span>
+            <span className="icon" style={{ fontSize: '1.6rem' }}></span>
           </div>
           <div className="metric-info">
             <span className="metric-label">รายได้รวมวันนี้ (Total Revenue)</span>
@@ -128,7 +128,7 @@ export default function BillingDashboardPage() {
 
         <div className="metric-card card">
           <div className="metric-icon-bg orange-bg">
-            <span className="icon">⏳</span>
+            <span className="icon" style={{ fontSize: '1.6rem' }}></span>
           </div>
           <div className="metric-info">
             <span className="metric-label">รอชำระเงิน (Pending Payment)</span>
@@ -138,7 +138,7 @@ export default function BillingDashboardPage() {
 
         <div className="metric-card card">
           <div className="metric-icon-bg green-bg">
-            <span className="icon">✅</span>
+            <span className="icon" style={{ fontSize: '1.6rem' }}></span>
           </div>
           <div className="metric-info">
             <span className="metric-label">ชำระเงินสำเร็จแล้ว (Completed)</span>
@@ -151,7 +151,7 @@ export default function BillingDashboardPage() {
       <div className="search-card card" style={{ marginBottom: '20px' }}>
         <div className="search-inputs">
           <div className="input-group">
-            <label>🔍 ค้นหารหัสผู้ป่วย หรือ ชื่อผู้ป่วย (Patient ID / Name)</label>
+            <label>ค้นหารหัสผู้ป่วย หรือ ชื่อผู้ป่วย (Patient ID / Name)</label>
             <input
               type="text"
               placeholder="เช่น HN-2023-045 หรือ HN-2023-112 หรือ พิมพ์ชื่อ..."
@@ -196,14 +196,14 @@ export default function BillingDashboardPage() {
                       </span>
                       <span className="patient-name-link">👤 {record.patientName}</span>
                     </div>
-                    <span className="view-detail-hint">🔍 คลิกดูประวัติยาและหมอ</span>
+                    <span className="view-detail-hint">คลิกดูประวัติยาและหมอ</span>
                   </td>
                   <td className="date-cell" style={{ fontWeight: '600', fontSize: '13.5px' }}>{record.date}</td>
                   <td className="time-cell" style={{ fontSize: '13.5px' }}>{record.time}</td>
                   <td className="amount-cell">{record.amount}</td>
                   <td style={{ textAlign: 'right' }}>
                     <span className={`method-badge ${record.method === 'QR Code' ? 'badge-qr' : 'badge-cash'}`}>
-                      {record.method === 'QR Code' && '📱 '}{record.method}
+                      {record.method === 'QR Code' && ''}{record.method}
                     </span>
                   </td>
                 </tr>
@@ -229,7 +229,7 @@ export default function BillingDashboardPage() {
               {/* Doctor & Diagnosis Section */}
               <div className="dash-block doctor-block">
                 <div className="block-header">
-                  <span className="block-icon">🩺</span>
+                  <span className="block-icon"></span>
                   <div>
                     <h3 className="block-title">{selectedDetail.doctorName}</h3>
                     <span className="vitals-tag">สัญญาณชีพล่าสุด: {selectedDetail.vitals}</span>
@@ -243,7 +243,7 @@ export default function BillingDashboardPage() {
 
               {/* Meds List Section */}
               <div className="dash-block med-block">
-                <h3 className="block-title">💊 รายการยาที่สั่งจ่าย ({selectedDetail.medications.length} รายการ)</h3>
+                <h3 className="block-title">รายการยาที่สั่งจ่าย ({selectedDetail.medications.length} รายการ)</h3>
                 <div className="dash-med-grid">
                   {selectedDetail.medications.map((m, idx) => (
                     <div key={idx} className="dash-med-item">
@@ -259,7 +259,7 @@ export default function BillingDashboardPage() {
 
               {/* Financial & Payment Summary */}
               <div className="dash-block finance-block">
-                <h3 className="block-title">💳 สรุปรายละเอียดทางการเงินและบิลชำระ</h3>
+                <h3 className="block-title">สรุปรายละเอียดทางการเงินและบิลชำระ</h3>
                 <div className="fee-row-item">
                   <span>ค่าตรวจรักษาแพทย์:</span>
                   <span>฿ {selectedDetail.doctorFee}</span>

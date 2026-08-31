@@ -199,7 +199,7 @@ export default function PatientHistoryPage() {
                       onClick={() => setSelectedPatientModal(patient)}
                     >
                       <span className="history-name-link">👤 {patient.name}</span>
-                      <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา 🔍</span>
+                      <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
                     </td>
                     <td>{patient.age} ปี</td>
                     <td><span className="blood-badge">{patient.bloodType}</span></td>
@@ -258,7 +258,7 @@ export default function PatientHistoryPage() {
                 <div className="allergy-list-grid">
                   {mockAllergies.map((allergy, i) => (
                     <div key={i} className={`allergy-pill-item ${allergy.severity === 'high' ? 'sev-high' : 'sev-low'}`}>
-                      <div className="allergy-pill-name">💊 {allergy.allergen}</div>
+                      <div className="allergy-pill-name">{allergy.allergen}</div>
                       <div className="allergy-pill-symptom">อาการ: {allergy.symptom}</div>
                     </div>
                   ))}
@@ -267,7 +267,7 @@ export default function PatientHistoryPage() {
 
               {/* Medication History Table */}
               <div className="history-section-block">
-                <h3 className="section-title">💊 ประวัติการรับยาล่าสุดในระบบ</h3>
+                <h3 className="section-title">ประวัติการรับยาล่าสุดในระบบ</h3>
                 <div className="table-wrapper">
                   <table className="med-history-table">
                     <thead>

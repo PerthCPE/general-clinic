@@ -1,5 +1,5 @@
 /* ===== Global Reset & Base Styles ===== */
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Prompt:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Kanit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Prompt:wght@400;500;600;700&display=swap');
 
 /* ===========================================================================
    Tailwind CSS — ใช้กับหน้าจอฝั่งแพทย์ที่ย้ายมาจากระบบ clinicms
@@ -16,15 +16,11 @@
 @import "tailwindcss/utilities";
 
 @theme {
-  /* กำหนด font-sans ของ Tailwind ให้ตรงกับระบบหลัก (IBM Plex Sans Thai + Plus Jakarta Sans + Inter) */
-  --font-sans: 'IBM Plex Sans Thai', 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
-  --font-heading: 'Plus Jakarta Sans', 'Prompt', 'Kanit', sans-serif;
+  /* 3-Tier Clinical Typography System */
+  --font-sans: var(--font-primary);
 
-  /* ต้องระบุ font-mono เป็นชื่อฟอนต์จริง ห้ามปล่อยให้เหลือคำว่า monospace เดี่ยว ๆ
-     เพราะ Chrome จะสลับไปใช้ "ขนาดฟอนต์ความกว้างคงที่" ที่ตั้งไว้ในเบราว์เซอร์ (13px)
-     ทำให้ช่องที่ใส่ font-mono (เช่น ค่าสัญญาณชีพ) เล็กกว่าช่องอื่นทั้งที่เขียน text-sm เท่ากัน */
-  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas,
-    'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace;
+  /* Monospace: สำหรับ HN, เลขบัตรประชาชน, เบอร์โทร, ค่าสัญญาณชีพ */
+  --font-mono: var(--font-mono);
 
   /* ระบบเดิมตั้ง :root { font-size: 14px } แต่ระบบ clinicms ต้นฉบับใช้ค่ามาตรฐาน 16px
      ค่า spacing/ขนาดตัวอักษร/มุมโค้ง ของ Tailwind เป็นหน่วย rem ซึ่งอิงจาก root
@@ -61,11 +57,6 @@
   --radius-2xl: 16px;
   --radius-3xl: 24px;
   --radius-4xl: 32px;
-
-  /* ความกว้างสูงสุดของหน้าในโมดูลแพทย์
-     คลาส max-w-7xl ของ Tailwind (ค่ามาตรฐาน 80rem = 1280px) ถูกใช้เฉพาะใน pages/doctor/
-     จึงปรับ token ตรงนี้ที่เดียว ไม่กระทบ container ของโมดูลอื่นที่ตั้ง max-width ของตัวเองไว้ */
-  --container-7xl: 1600px;
 }
 
 /* ===========================================================================
@@ -97,7 +88,7 @@
    ---------------------------------------------------------------------------
    RegistrationPage.css (หน้าเวชระเบียน) ประกาศคลาสชื่อ .font-mono เอาไว้แบบสากล
    ไม่ได้ผูกกับหน้าตัวเอง เช่น
-       .font-mono { font-family: monospace; font-size: 13px; letter-spacing: .3px }
+       .font-mono { font-family: var(--font-mono); font-size: 13px; letter-spacing: .3px }
    ซึ่งบังเอิญชื่อชนกับ utility ของ Tailwind พอไฟล์นั้นถูกโหลด (CSS เป็น global)
    กฎนี้จึงรั่วมาทับทุกหน้า และเพราะมันล็อก font-size ไว้ที่ 13px
    ช่องที่ใส่ font-mono ในหน้าแพทย์ (เช่น ค่าสัญญาณชีพ) จึงเล็กกว่าช่องอื่น
@@ -176,17 +167,12 @@
 }
 
 :root {
-  /* Modern Medical Typography System */
-  /* ฟอนต์หลัก (Primary): IBM Plex Sans Thai (ไทย) + Plus Jakarta Sans / Inter (อังกฤษ) — อ่านง่ายที่สุด คมชัดระดับโปรแกรมการแพทย์ */
-  --font-primary: 'IBM Plex Sans Thai', 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-
-  /* ฟอนต์รอง / หัวข้อ (Secondary / Headings): Plus Jakarta Sans (อังกฤษ) + Prompt / Kanit (ไทย) — โมเดิร์น พรีเมียม หนักแน่น */
-  --font-heading: 'Plus Jakarta Sans', 'Prompt', 'Kanit', sans-serif;
-
-  /* ฟอนต์ตัวเลข / รหัส (Monospace / Identifiers): JetBrains Mono — เหมาะกับ HN, เลขบัตร ปชช., เลขคิว, สัญญาณชีพ */
+  /* 1. Primary Font (Body & Forms): Thai + English */
+  --font-primary: "IBM Plex Sans Thai", "Plus Jakarta Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', 'Kanit', 'Prompt', sans-serif;
+  /* 3. Monospace Font (Identifiers & Codes: HN, National ID, Queue No, BP) */
   --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
-  font-family: var(--font-primary);
   font-size: 14px;
   line-height: 1.5;
   color: #1E293B;
@@ -198,13 +184,18 @@
   --font-size-md: 1rem;
   --font-size-lg: 1.08rem;
   --font-size-xl: 1.25rem;
+}
 
+body.legacy-font {
+  --font-primary: "IBM Plex Sans Thai", "Plus Jakarta Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: 'Prompt', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace;
 }
 
 body {
+  font-family: var(--font-primary);
   margin: 0;
   min-height: 100vh;
-  font-family: var(--font-primary);
   font-size: var(--font-size-base);
   line-height: 1.5;
 }
@@ -216,7 +207,6 @@ a {
 
 button {
   cursor: pointer;
-  font-family: var(--font-heading);
 }
 
 button,
@@ -236,8 +226,7 @@ li {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
-  font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 
 h1 {
@@ -252,43 +241,22 @@ h3 {
   font-size: 1.05rem;
 }
 
-/* Global Dark Mode High-Luminance Typography & Contrast */
+/* Global Dark Mode Base Overrides */
 body.dark-mode {
   background-color: #0F172A !important;
-  color: #FFFFFF !important;
-}
-
-body.dark-mode h1,
-body.dark-mode h2,
-body.dark-mode h3,
-body.dark-mode h4,
-body.dark-mode h5,
-body.dark-mode h6 {
-  color: #FFFFFF !important;
-}
-
-body.dark-mode p {
-  color: #F1F5F9;
-}
-
-body.dark-mode label {
-  color: #E2E8F0;
+  color: #F8FAFC !important;
 }
 
 body.dark-mode input,
 body.dark-mode textarea,
 body.dark-mode select {
   background-color: #1E293B;
-  color: #FFFFFF !important;
+  color: #F1F5F9;
   border-color: #334155;
 }
 
 body.dark-mode input::placeholder,
 body.dark-mode textarea::placeholder {
-  color: #94A3B8 !important;
-}
-
-body.dark-mode thead th {
-  color: #F8FAFC !important;
+  color: #64748B;
 }
 

@@ -1,11 +1,11 @@
 /* ===== BillingDispensePage - Scoped CSS ===== */
 
 .billing-dispense-container {
-  padding: 0;
-  max-width: 1280px;
+  padding: 32px 48px;
+  max-width: 1440px;
   margin: 0 auto;
   width: 100%;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   color: #1E293B;
   box-sizing: border-box;
 }
@@ -95,7 +95,7 @@ body.dark-mode .billing-dispense-container .input-group label {
 }
 
 .billing-dispense-container .input-group input {
-  padding: 10px 14px;
+  padding: 32px 48px;
   border: 1px solid #CBD5E1;
   border-radius: 8px;
   font-size: 0.875rem;
@@ -124,7 +124,7 @@ body.dark-mode .billing-dispense-container .input-group input {
 
 .billing-dispense-container .page-title {
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   margin: 0 0 20px 0;
 }
@@ -148,7 +148,7 @@ body.dark-mode .billing-dispense-container .page-title {
 
 .billing-dispense-container .card-heading {
   font-size: 1.1rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   margin: 0;
 }
@@ -216,7 +216,7 @@ body.dark-mode .billing-dispense-container .stock-alert-box {
 .billing-dispense-container .dispense-table th {
   padding: 12px 14px;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #64748B;
   background: #F8FAFC;
   border-bottom: 1px solid #E2E8F0;
@@ -250,7 +250,7 @@ body.dark-mode .billing-dispense-container .font-bold {
 
 .billing-dispense-container .summary-card .card-heading {
   font-size: 1.25rem;
-  font-weight: 800;
+  font-weight: 600;
   color: #0F172A;
   margin: 0 0 18px 0;
   padding-bottom: 4px;
@@ -279,7 +279,7 @@ body.dark-mode .billing-dispense-container .summary-rights-box {
 
 .billing-dispense-container .summary-rights-label {
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0284C7;
   display: flex;
   align-items: center;
@@ -298,7 +298,7 @@ body.dark-mode .billing-dispense-container .summary-rights-label {
   border: 1.5px solid #0284C7;
   background: #FFFFFF;
   font-size: 0.98rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   outline: none;
   cursor: pointer;
@@ -328,7 +328,7 @@ body.dark-mode .billing-dispense-container .summary-rights-select {
 }
 
 .billing-dispense-container .item-title {
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   font-size: 0.95rem;
 }
@@ -343,7 +343,7 @@ body.dark-mode .billing-dispense-container .item-title {
 }
 
 .billing-dispense-container .item-price {
-  font-weight: 700;
+  font-weight: 500;
   color: #1E293B;
 }
 
@@ -366,7 +366,7 @@ body.dark-mode .billing-dispense-container .summary-divider {
   justify-content: space-between;
   align-items: center;
   font-size: 1.1rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   margin-bottom: 24px;
 }
@@ -392,7 +392,7 @@ body.dark-mode .billing-dispense-container .total-price {
   border-radius: 12px;
   padding: 16px 24px;
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;

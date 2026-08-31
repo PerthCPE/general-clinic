@@ -5,14 +5,12 @@
 .vitals-page-container {
   display: flex;
   flex-direction: column;
-  gap: 24px;
-  width: 100%;
-  max-width: 1600px;
+  gap: 20px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 10px 0 40px;
-  box-sizing: border-box;
+  padding-bottom: 40px;
   animation: fadeIn 0.3s ease;
-  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+
 }
 
 @keyframes fadeIn {
@@ -34,7 +32,6 @@
   border-radius: 12px;
   box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.2);
   animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
 }
 
 @keyframes slideDown {
@@ -90,9 +87,7 @@
   border-radius: 16px;
   border: 1px solid #E2E8F0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  margin: 0;
-  width: 100%;
-  box-sizing: border-box;
+  margin-top: 20px;
 }
 
 .vitals-title-group {
@@ -116,16 +111,15 @@
 
 .vitals-main-title {
   margin: 0;
-  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
-  font-size: 26px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 700;
   color: #0F172A;
   line-height: 1.3;
 }
 
 .vitals-main-subtitle {
   margin: 2px 0 0 0;
-  font-size: 15px;
+  font-size: 13px;
   color: #64748B;
 }
 
@@ -133,35 +127,6 @@
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.btn-refresh-data {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid #E2E8F0;
-  background-color: #F8FAFC;
-  color: #475569;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-refresh-data:hover {
-  background-color: #F1F5F9;
-  color: #0F172A;
-}
-
-.btn-refresh-data.spinning svg {
-  animation: spin-refresh 1s linear infinite;
-}
-
-@keyframes spin-refresh {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
 }
 
 .vitals-role-pill {
@@ -173,7 +138,7 @@
   color: #059669;
   border: 1px solid #A7F3D0;
   border-radius: 20px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   white-space: nowrap;
   flex-shrink: 0;
@@ -196,7 +161,7 @@
   color: #334155;
   border: 1px solid #E2E8F0;
   border-radius: 20px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   flex-shrink: 0;
@@ -208,50 +173,55 @@
 .vitals-queue-selector-card {
   background: #FFFFFF;
   border: 1px solid #E2E8F0;
-  border-radius: 14px;
-  padding: 16px 20px;
+  border-radius: 16px;
+  padding: 20px 24px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 16px;
 }
 
 .queue-selector-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
 }
 
 .queue-selector-label {
-  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
-  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
   font-weight: 700;
-  color: #1E293B;
-  margin: 0;
+  color: #0F172A;
   cursor: pointer;
 }
 
-.queue-waiting-badge {
-  font-size: 13.5px;
-  color: #2563EB;
-  background: #EFF6FF;
-  border: 1px solid #DBEAFE;
-  padding: 2px 10px;
-  border-radius: 12px;
-  font-weight: 500;
+.selector-icon {
+  font-size: 18px;
 }
 
-.queue-waiting-badge strong {
-  font-weight: 700;
+.queue-waiting-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: #EFF6FF;
+  color: #2563EB;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.queue-selector-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
 }
 
 /* ================================================================
    ===== SEARCHABLE COMBOBOX DROPDOWN =====
    ================================================================ */
-.queue-searchable-combobox,
-.vitals-queue-selector-box {
+.queue-searchable-combobox {
   position: relative;
   width: 100%;
   z-index: 40;
@@ -260,57 +230,43 @@
 .combobox-input-wrap {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   height: 48px;
   padding: 0 14px;
-  background: #FFFFFF;
+  background: #F8FAFC;
   border: 1.5px solid #CBD5E1;
-  border-radius: 10px;
+  border-radius: 12px;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .combobox-input-wrap:focus-within {
   background: #FFFFFF;
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 .combobox-search-icon {
   display: flex;
   align-items: center;
-  color: #2563EB;
+  color: #10B981;
   font-size: 18px;
 }
 
-.combobox-input,
-.vitals-form-section .combobox-input,
-.vitals-page-container .combobox-input {
+.combobox-input {
   flex: 1;
-  height: 100% !important;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  outline: none !important;
-  padding: 0 !important;
-  border-radius: 0 !important;
-  font-size: 15.5px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 14px;
   font-weight: 500;
   color: #0F172A;
-  font-family: inherit;
-}
-
-.combobox-input:focus,
-.vitals-form-section .combobox-input:focus,
-.vitals-page-container .combobox-input:focus {
-  border: none !important;
-  box-shadow: none !important;
-  outline: none !important;
-  background: transparent !important;
+  font-family: var(--font-primary);
 }
 
 .combobox-input::placeholder {
   color: #94A3B8;
-  font-size: 15px;
+  font-size: 13.5px;
 }
 
 .combobox-clear-btn {
@@ -348,7 +304,7 @@
 
 .combobox-toggle-btn.open {
   transform: rotate(180deg);
-  color: #2563EB;
+  color: #10B981;
 }
 
 /* Combobox Dropdown Menu */
@@ -378,14 +334,14 @@
   padding: 10px 16px;
   background: #F8FAFC;
   border-bottom: 1px solid #E2E8F0;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: #64748B;
 }
 
 .search-hint {
-  color: #2563EB;
-  font-size: 12px;
+  color: #10B981;
+  font-size: 11.5px;
   font-weight: 600;
 }
 
@@ -413,8 +369,8 @@
 }
 
 .combobox-option-item.selected {
-  background: #EFF6FF;
-  border-left: 4px solid #2563EB;
+  background: #ECFDF5;
+  border-left: 4px solid #10B981;
 }
 
 .option-item-left {
@@ -429,7 +385,7 @@
   color: #2563EB;
   border: 1px solid #BFDBFE;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -440,13 +396,13 @@
 }
 
 .option-patient-name {
-  font-size: 15.5px;
+  font-size: 14px;
   font-weight: 700;
   color: #0F172A;
 }
 
 .option-patient-meta {
-  font-size: 13.5px;
+  font-size: 12px;
   color: #64748B;
 }
 
@@ -466,7 +422,7 @@
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  background: #2563EB;
+  background: #10B981;
   color: #FFFFFF;
   border-radius: 6px;
   font-size: 11.5px;
@@ -486,118 +442,79 @@
 }
 
 .combobox-option-item:hover .option-select-action {
-  background: #2563EB;
+  background: #10B981;
   color: #FFFFFF;
 }
 
 .combobox-empty-item {
-  padding: 20px;
+  padding: 24px;
   text-align: center;
   font-size: 13px;
   color: #64748B;
 }
 
-/* Compact Selected Patient Banner — Minimalist Transparent Style (No Background) */
-.patient-compact-strip,
-.vitals-patient-compact-banner {
+/* Patient Identity Strip */
+.patient-identity-strip {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
-  gap: 12px;
-  padding: 6px 2px 2px;
-  margin-top: 4px;
-  margin-bottom: 2px;
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  animation: fadeIn 0.2s ease;
+  gap: 16px;
+  background: #F8FAFC;
+  border: 1px dashed #CBD5E1;
+  border-radius: 10px;
+  padding: 12px 18px;
   flex-wrap: wrap;
+  animation: fadeIn 0.25s ease;
 }
 
-.patient-compact-left {
+.patient-strip-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  font-size: 15px;
-}
-
-.patient-compact-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 3px 10px;
-  background: #2563EB;
-  color: #FFFFFF;
-  border-radius: 6px;
-  font-weight: 700;
+  gap: 6px;
   font-size: 13.5px;
-  font-family: var(--font-heading);
-  letter-spacing: 0.3px;
-  line-height: 1.2;
 }
 
-.patient-compact-name {
-  font-weight: 700;
-  color: #0F172A;
-  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
-  font-size: 16px;
-}
-
-.patient-compact-divider {
-  color: #CBD5E1;
-  font-size: 13px;
-  user-select: none;
-  font-weight: 300;
-}
-
-.patient-compact-hn {
-  font-weight: 600;
-  color: #2563EB;
-  font-family: var(--font-heading);
-  font-size: 15px;
-  letter-spacing: 0.3px;
-}
-
-.patient-compact-meta {
-  color: #475569;
-  font-size: 14.5px;
+.strip-label {
+  color: #64748B;
   font-weight: 500;
 }
 
-.patient-compact-scheme {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 10px;
-  background: #ECFDF5;
+.strip-val {
+  color: #0F172A;
+  font-weight: 600;
+}
+
+.strip-val.hn-val {
+  color: #2563EB;
+  background: #EFF6FF;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.strip-val.name-val {
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.strip-val.scheme-val {
   color: #059669;
-  border: 1px solid #A7F3D0;
+  background: #ECFDF5;
+  padding: 2px 8px;
   border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.4;
 }
 
-.patient-compact-clear-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  background: #FFFFFF;
-  border: 1px solid #CBD5E1;
+.patient-strip-divider {
+  color: #CBD5E1;
+  font-size: 14px;
+}
+
+.patient-strip-empty {
+  background: #F8FAFC;
+  border: 1px dashed #CBD5E1;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 13px;
   color: #64748B;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  font-family: inherit;
-}
-
-.patient-compact-clear-btn:hover {
-  border-color: #EF4444;
-  color: #EF4444;
-  background: #FEF2F2;
+  text-align: center;
 }
 
 /* ================================================================
@@ -605,13 +522,12 @@
    ================================================================ */
 .vitals-main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 24px;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
   align-items: start;
-  width: 100%;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 1100px) {
   .vitals-main-grid {
     grid-template-columns: 1fr;
   }
@@ -669,16 +585,14 @@
 
 .vitals-card-title {
   margin: 0;
-  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
-  font-size: 19px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
   color: #0F172A;
-  line-height: 1.35;
 }
 
 .vitals-card-subtitle {
   margin: 2px 0 0 0;
-  font-size: 14.5px;
+  font-size: 12.5px;
   color: #64748B;
 }
 
@@ -694,7 +608,7 @@
   gap: 6px;
   padding: 4px 10px;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -708,22 +622,6 @@
   background: #FEF3C7;
   color: #D97706;
   border: 1px solid #FDE68A;
-}
-
-.vitals-queue-blue-box {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 5px 12px;
-  background: #2563EB;
-  color: #FFFFFF;
-  border-radius: 8px;
-  font-size: 14.5px;
-  font-weight: 700;
-  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
-  letter-spacing: 0.2px;
 }
 
 .pulse-dot {
@@ -758,7 +656,7 @@
 
 .vitals-card-body.expanded {
   max-height: 2000px;
-  padding: 28px 36px 36px;
+  padding: 20px 24px 28px;
 }
 
 /* ================================================================
@@ -767,20 +665,20 @@
 .vitals-form {
   display: flex;
   flex-direction: column;
-  gap: 30px;
+  gap: 24px;
 }
 
 .vitals-form-section {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
 }
 
 .vitals-section-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid #F1F5F9;
 }
 
@@ -788,23 +686,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  background: #2563EB;
+  width: 22px;
+  height: 22px;
+  background: #10B981;
   color: #FFFFFF;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   border-radius: 50%;
 }
 
 .vitals-section-title {
-  font-size: 17px;
+  font-size: 14px;
   font-weight: 700;
   color: #1E293B;
-}
-
-.vitals-section-header .vitals-queue-blue-box {
-  margin-left: auto;
 }
 
 .vitals-grid-3 {
@@ -830,48 +724,26 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  justify-content: flex-start;
 }
 
 .vitals-form-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  min-height: 24px;
-  height: 24px;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
   color: #334155;
-  white-space: nowrap;
-  box-sizing: border-box;
 }
-
-.vitals-label-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-
 
 .text-required {
   color: #EF4444;
 }
 
 .clinical-badge {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 2px 7px;
+  padding: 1px 6px;
   border-radius: 4px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  line-height: 16px;
-  display: inline-flex;
-  align-items: center;
 }
 
 .badge-high-fever,
@@ -903,40 +775,25 @@
   position: relative;
   display: flex;
   align-items: center;
-  width: 100%;
-  background: transparent;
-  border: none;
-}
-
-.vitals-input-suffix-wrap:focus-within .vitals-input:not(.input-danger):not(.input-warning):not(.input-allergy) {
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
 
 .vitals-input {
   width: 100%;
-  height: 48px;
-  padding: 0 48px 0 14px;
+  height: 42px;
+  padding: 0 46px 0 14px;
   border: 1.5px solid #CBD5E1;
   border-radius: 8px;
-  font-size: 15.5px;
+  font-size: 14px;
   color: #0F172A;
   background: #FFFFFF;
   outline: none;
   font-family: var(--font-primary);
   transition: all 0.2s ease;
-  -moz-appearance: textfield;
-}
-
-.vitals-input::-webkit-outer-spin-button,
-.vitals-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
 }
 
 .vitals-input:focus {
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 .vitals-input.input-danger {
@@ -944,21 +801,9 @@
   background: #FEF2F2;
 }
 
-.vitals-input.input-danger:focus,
-.vitals-input-suffix-wrap:focus-within .vitals-input.input-danger {
-  border-color: #EF4444;
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
-}
-
 .vitals-input.input-warning {
   border-color: #F59E0B;
   background: #FFFBEB;
-}
-
-.vitals-input.input-warning:focus,
-.vitals-input-suffix-wrap:focus-within .vitals-input.input-warning {
-  border-color: #F59E0B;
-  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.15);
 }
 
 .vitals-input.input-allergy {
@@ -968,16 +813,10 @@
   color: #DC2626;
 }
 
-.vitals-input.input-allergy:focus,
-.vitals-input-suffix-wrap:focus-within .vitals-input.input-allergy {
-  border-color: #DC2626;
-  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
-}
-
 .vitals-input-suffix {
   position: absolute;
   right: 12px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: #94A3B8;
   pointer-events: none;
@@ -988,7 +827,7 @@
   padding: 12px 14px;
   border: 1.5px solid #CBD5E1;
   border-radius: 8px;
-  font-size: 15.5px;
+  font-size: 14px;
   color: #0F172A;
   background: #FFFFFF;
   outline: none;
@@ -998,17 +837,17 @@
 }
 
 .vitals-textarea:focus {
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  border-color: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 .vitals-select {
   width: 100%;
-  height: 48px;
+  height: 42px;
   padding: 0 14px;
   border: 1.5px solid #CBD5E1;
   border-radius: 8px;
-  font-size: 15.5px;
+  font-size: 14px;
   color: #0F172A;
   background: #F8FAFC;
   outline: none;
@@ -1018,9 +857,9 @@
 }
 
 .vitals-select:focus {
-  border-color: #2563EB;
+  border-color: #10B981;
   background: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
 }
 
 .vitals-form-actions {
@@ -1033,25 +872,25 @@
 
 .vitals-btn-submit {
   flex: 1;
-  height: 50px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
   transition: all 0.2s ease;
 }
 
 .vitals-btn-submit:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
 }
 
 .vitals-btn-submit:disabled {
@@ -1060,7 +899,7 @@
 }
 
 .vitals-btn-reset {
-  height: 50px;
+  height: 44px;
   padding: 0 18px;
   display: inline-flex;
   align-items: center;
@@ -1070,7 +909,7 @@
   color: #475569;
   border: 1px solid #CBD5E1;
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1137,14 +976,14 @@
 
 .vitals-widget-title {
   margin: 0;
-  font-size: 17px;
+  font-size: 14.5px;
   font-weight: 700;
   color: #0F172A;
 }
 
 .vitals-widget-subtitle {
   margin: 1px 0 0 0;
-  font-size: 13.5px;
+  font-size: 11.5px;
   color: #64748B;
 }
 
@@ -1153,7 +992,7 @@
   background: #ECFDF5;
   color: #059669;
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 11.5px;
   font-weight: 700;
 }
 
@@ -1166,32 +1005,30 @@
 .bmi-display-container {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
-.bmi-hero-display {
+.bmi-number-row {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .bmi-big-value {
   display: flex;
   align-items: baseline;
-  gap: 5px;
+  gap: 4px;
 }
 
 .bmi-num {
-  font-size: 34px;
+  font-size: 32px;
   font-weight: 800;
   color: #0F172A;
   letter-spacing: -0.5px;
-  line-height: 1;
 }
 
 .bmi-unit {
-  font-size: 14px;
+  font-size: 13px;
   color: #64748B;
   font-weight: 600;
 }
@@ -1201,65 +1038,52 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 13.5px;
+  border-radius: 20px;
+  font-size: 12.5px;
   font-weight: 700;
-  white-space: nowrap;
-  border: 1px solid transparent;
-  width: fit-content;
 }
 
 .bmi-status-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.bmi-status-label {
-  white-space: nowrap;
 }
 
 .bmi-badge-underweight {
   background: #E0F2FE;
   color: #0284C7;
-  border-color: #BAE6FD;
 }
 .bmi-badge-underweight .bmi-status-dot {
   background: #0284C7;
 }
 
 .bmi-badge-normal {
-  background: #ECFDF5;
+  background: #D1FAE5;
   color: #059669;
-  border-color: #A7F3D0;
 }
 .bmi-badge-normal .bmi-status-dot {
   background: #10B981;
 }
 
 .bmi-badge-overweight {
-  background: #FFFBEB;
+  background: #FEF3C7;
   color: #D97706;
-  border-color: #FDE68A;
 }
 .bmi-badge-overweight .bmi-status-dot {
   background: #F59E0B;
 }
 
 .bmi-badge-obese1 {
-  background: #FFF7ED;
+  background: #FFEDD5;
   color: #EA580C;
-  border-color: #FFEDD5;
 }
 .bmi-badge-obese1 .bmi-status-dot {
   background: #F97316;
 }
 
 .bmi-badge-obese2 {
-  background: #FEF2F2;
+  background: #FEE2E2;
   color: #DC2626;
-  border-color: #FECACA;
 }
 .bmi-badge-obese2 .bmi-status-dot {
   background: #EF4444;
@@ -1268,8 +1092,7 @@
 /* BMI Scale Bar */
 .bmi-scale-bar-wrap {
   position: relative;
-  margin-top: 8px;
-  padding: 0 2px;
+  margin-top: 6px;
 }
 
 .bmi-scale-bar {
@@ -1293,7 +1116,6 @@
   top: -6px;
   transform: translateX(-50%);
   transition: left 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  pointer-events: none;
 }
 
 .pointer-needle {
@@ -1308,14 +1130,14 @@
 .bmi-scale-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 11.5px;
+  font-size: 10.5px;
   color: #94A3B8;
   font-weight: 600;
   padding: 0 2px;
 }
 
 .bmi-info-footer {
-  font-size: 13px;
+  font-size: 11.5px;
   color: #64748B;
   background: #F8FAFC;
   padding: 6px 10px;
@@ -1338,7 +1160,7 @@
 
 .bmi-empty-text {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 12.5px;
   color: #64748B;
 }
 
@@ -1350,7 +1172,7 @@
   background: #F1F5F9;
   color: #94A3B8;
   border-radius: 12px;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 
@@ -1380,18 +1202,18 @@
 .triage-level-pill {
   padding: 2px 8px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   background: rgba(0, 0, 0, 0.08);
 }
 
 .triage-banner-name {
-  font-size: 15px;
+  font-size: 13.5px;
   font-weight: 700;
 }
 
 .triage-banner-sub {
-  font-size: 12.5px;
+  font-size: 11px;
   opacity: 0.8;
 }
 
@@ -1404,7 +1226,7 @@
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.1);
   font-weight: 800;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .triage-badge-red {
@@ -1440,7 +1262,7 @@
   color: #92400E;
   padding: 6px 10px;
   border-radius: 8px;
-  font-size: 12.5px;
+  font-size: 11.5px;
   margin-bottom: 12px;
 }
 
@@ -1779,32 +1601,20 @@
 }
 
 /* ================================================================
-   ===== 10. DARK MODE SUPPORT (GITHUB DARK DIMMED EYE-COMFORT PALETTE) =====
+   ===== 10. DARK MODE SUPPORT (ELEVATED DARK SLATE #212836) =====
    ================================================================ */
 
 /* Page Header & Container */
 body.dark-mode .vitals-page-header {
-  background: #2D333B;
-  border: 1px solid #444C56;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-body.dark-mode .btn-refresh-data {
-  background: #373E47;
-  border: 1px solid #444C56;
-  color: #CDD9E5;
-}
-
-body.dark-mode .btn-refresh-data:hover {
-  background: #444C56;
-  color: #FFFFFF;
-  border-color: #545D68;
+  background: #212836;
+  border-color: #333F53;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 body.dark-mode .vitals-title-icon {
-  background: rgba(16, 185, 129, 0.2);
+  background: rgba(16, 185, 129, 0.18);
   color: #34D399;
-  border-color: rgba(52, 211, 153, 0.4);
+  border-color: rgba(52, 211, 153, 0.35);
 }
 
 body.dark-mode .vitals-main-title {
@@ -1812,53 +1622,50 @@ body.dark-mode .vitals-main-title {
 }
 
 body.dark-mode .vitals-main-subtitle {
-  color: #CBD5E1;
+  color: #94A3B8;
 }
 
 body.dark-mode .vitals-role-pill {
-  background: rgba(16, 185, 129, 0.18);
-  border-color: rgba(52, 211, 153, 0.45);
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
   color: #34D399;
 }
 
 body.dark-mode .vitals-user-pill {
-  background: #252A33;
-  border: 1px solid #444C56;
-  color: #CDD9E5;
+  background: #171C26;
+  border-color: #3B485E;
+  color: #CBD5E1;
 }
 
 /* Toast Alert in Dark Mode */
 body.dark-mode .vitals-toast-alert {
-  background: rgba(16, 185, 129, 0.18);
+  background: rgba(16, 185, 129, 0.15);
   border-color: #10B981;
-  color: #34D399;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  color: #6EE7B7;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
 }
 
 body.dark-mode .toast-close {
-  color: #34D399;
+  color: #6EE7B7;
 }
 
 /* Cards & Containers */
 body.dark-mode .vitals-queue-selector-card,
 body.dark-mode .vitals-card,
 body.dark-mode .vitals-widget-card {
-  background: #2D333B;
-  border: 1px solid #444C56;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  background: #212836;
+  border-color: #333F53;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 body.dark-mode .vitals-card-header,
 body.dark-mode .vitals-widget-header {
-  background: #2D333B;
+  background: #1C2230;
+  border-bottom: 1px solid #2F3B4E;
 }
 
-/* body.dark-mode .vitals-widget-body {
-  background: #2D333B;
-} */
-
 body.dark-mode .vitals-card-header:hover {
-  background: #2D333B;
+  background: #232C3D;
 }
 
 body.dark-mode .vitals-card-title,
@@ -1868,15 +1675,15 @@ body.dark-mode .vitals-widget-title {
 
 body.dark-mode .vitals-card-subtitle,
 body.dark-mode .vitals-widget-subtitle {
-  color: #CBD5E1;
+  color: #94A3B8;
 }
 
 body.dark-mode .vitals-card-toggle {
-  color: #ADBAC7;
+  color: #94A3B8;
 }
 
 body.dark-mode .vitals-card-toggle:hover {
-  background-color: #373E47;
+  background-color: #2A3547;
   color: #FFFFFF;
 }
 
@@ -1901,50 +1708,37 @@ body.dark-mode .vitals-widget-icon-box.purple-box {
 
 /* Status Pills */
 body.dark-mode .vitals-status-pill.green-pill {
-  background: rgba(16, 185, 129, 0.18);
-  border: 1.5px solid rgba(52, 211, 153, 0.45);
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
   color: #34D399;
-  font-weight: 600;
 }
 
 body.dark-mode .vitals-status-pill.yellow-pill {
-  background: rgba(245, 158, 11, 0.18);
-  border: 1.5px solid rgba(251, 191, 36, 0.45);
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
   color: #FBBF24;
-  font-weight: 600;
 }
 
 body.dark-mode .vitals-status-pill.red-pill {
-  background: rgba(239, 68, 68, 0.18);
-  border: 1.5px solid rgba(248, 113, 113, 0.45);
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
   color: #F87171;
-  font-weight: 600;
-}
-
-body.dark-mode .vitals-queue-blue-box {
-  background: #316DCA;
-  color: #FFFFFF;
-  box-shadow: 0 2px 8px rgba(49, 109, 202, 0.3);
 }
 
 /* Combobox Search in Dark Mode */
 body.dark-mode .queue-selector-label {
-  color: #CDD9E5;
+  color: #CBD5E1;
 }
 
 body.dark-mode .combobox-input-wrap {
-  background: #22272E;
-  border: 1px solid #444C56;
+  background: #171C26;
+  border: 1.5px solid #3B485E;
 }
 
 body.dark-mode .combobox-input-wrap:focus-within {
-  background: #22272E;
-  border-color: #539BF5;
-  box-shadow: 0 0 0 3px rgba(83, 155, 245, 0.15);
-}
-
-body.dark-mode .vitals-label-title {
-  color: #CBD5E1;
+  background: #1C2230;
+  border-color: #34D399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
 }
 
 body.dark-mode .combobox-input {
@@ -1952,50 +1746,50 @@ body.dark-mode .combobox-input {
 }
 
 body.dark-mode .combobox-input::placeholder {
-  color: #768390;
+  color: #94A3B8;
 }
 
 body.dark-mode .combobox-clear-btn {
-  background: #373E47;
-  color: #CDD9E5;
+  background: #283143;
+  color: #CBD5E1;
 }
 
 body.dark-mode .combobox-clear-btn:hover {
-  background: #444C56;
+  background: #333F53;
   color: #FFFFFF;
 }
 
 body.dark-mode .combobox-toggle-btn {
-  color: #ADBAC7;
+  color: #94A3B8;
 }
 
 body.dark-mode .combobox-dropdown-menu {
-  background: #2D333B;
-  border: 1px solid #444C56;
-  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.4);
+  background: #1C2230;
+  border: 1px solid #333F53;
+  box-shadow: 0 16px 36px -6px rgba(0, 0, 0, 0.6);
 }
 
 body.dark-mode .combobox-menu-header {
-  background: #22272E;
-  border-bottom: 1px solid #373E47;
-  color: #ADBAC7;
+  background: #171C26;
+  border-bottom: 1px solid #2F3B4E;
+  color: #94A3B8;
 }
 
 body.dark-mode .combobox-option-item {
-  border-bottom: 1px solid #373E47;
+  border-bottom: 1px solid #2F3B4E;
 }
 
 body.dark-mode .combobox-option-item:hover {
-  background: #373E47;
+  background: #252F42;
 }
 
 body.dark-mode .combobox-option-item.selected {
-  background: rgba(16, 185, 129, 0.18);
+  background: rgba(16, 185, 129, 0.15);
 }
 
 body.dark-mode .option-queue-badge {
   background: rgba(37, 99, 235, 0.2);
-  border: 1px solid rgba(96, 165, 250, 0.4);
+  border: 1px solid rgba(96, 165, 250, 0.35);
   color: #60A5FA;
 }
 
@@ -2004,87 +1798,33 @@ body.dark-mode .option-patient-name {
 }
 
 body.dark-mode .option-patient-meta {
-  color: #ADBAC7;
+  color: #94A3B8;
 }
 
 body.dark-mode .option-select-action {
-  background: #373E47;
-  color: #CDD9E5;
+  background: #283143;
+  color: #CBD5E1;
 }
 
 body.dark-mode .combobox-option-item:hover .option-select-action {
-  background: #316DCA;
+  background: #10B981;
   color: #FFFFFF;
 }
 
 body.dark-mode .combobox-empty-item {
-  color: #ADBAC7;
+  color: #94A3B8;
 }
 
-body.dark-mode .combobox-empty-icon-wrap {
-  background: #22272E;
-  color: #768390;
+/* Patient Identity Strip in Dark Mode */
+body.dark-mode .patient-identity-strip {
+  background: #171C26;
+  border: 1.5px solid #2F3B4E;
 }
 
-body.dark-mode .queue-selector-icon-badge {
-  background: rgba(37, 99, 235, 0.2);
-  border-color: rgba(96, 165, 250, 0.4);
-  color: #60A5FA;
-}
-
-body.dark-mode .queue-waiting-badge {
-  background: rgba(37, 99, 235, 0.18);
-  border-color: rgba(96, 165, 250, 0.4);
-  color: #60A5FA;
-}
-
-body.dark-mode .queue-waiting-pulse {
-  background: #60A5FA;
-  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25);
-}
-
-/* Patient Compact Strip in Dark Mode */
-/* Patient Compact Strip in Dark Mode */
-body.dark-mode .patient-compact-strip,
-body.dark-mode .vitals-patient-compact-banner {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-body.dark-mode .patient-compact-name {
-  color: #FFFFFF;
-}
-
-body.dark-mode .patient-compact-divider {
-  color: #444C56;
-}
-
-body.dark-mode .patient-compact-hn {
-  color: #60A5FA;
-}
-
-body.dark-mode .patient-compact-meta {
-  color: #ADBAC7;
-}
-
-body.dark-mode .patient-compact-scheme {
-  background: rgba(16, 185, 129, 0.15);
-  color: #34D399;
-  border: 1px solid rgba(52, 211, 153, 0.35);
-  font-weight: 600;
-}
-
-body.dark-mode .patient-compact-clear-btn {
-  background: #2D333B;
-  border-color: #444C56;
-  color: #CDD9E5;
-}
-
-body.dark-mode .patient-compact-clear-btn:hover {
-  border-color: #F87171;
-  color: #F87171;
-  background: rgba(239, 68, 68, 0.18);
+body.dark-mode .patient-strip-empty {
+  background: #171C26;
+  border: 1.5px dashed #3B485E;
+  color: #94A3B8;
 }
 
 body.dark-mode .pt-avatar-box {
@@ -2097,11 +1837,11 @@ body.dark-mode .pt-main-name {
 }
 
 body.dark-mode .pt-sub-details {
-  color: #ADBAC7;
+  color: #94A3B8;
 }
 
 body.dark-mode .strip-label {
-  color: #ADBAC7;
+  color: #94A3B8;
 }
 
 body.dark-mode .strip-val {
@@ -2109,234 +1849,157 @@ body.dark-mode .strip-val {
 }
 
 body.dark-mode .pt-meta-pill {
-  background: #2D333B;
-  border: 1px solid #444C56;
-  color: #CDD9E5;
+  background: #212836;
+  border: 1px solid #333F53;
+  color: #CBD5E1;
 }
 
 body.dark-mode .pt-meta-pill.allergy-pill {
-  background: rgba(239, 68, 68, 0.18);
-  border: 1.5px solid rgba(248, 113, 113, 0.45);
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
   color: #F87171;
-  font-weight: 600;
 }
 
 body.dark-mode .pt-meta-pill.chronic-pill {
-  background: rgba(245, 158, 11, 0.18);
-  border: 1.5px solid rgba(251, 191, 36, 0.45);
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.35);
   color: #FBBF24;
-  font-weight: 600;
 }
 
 /* Form Sections & Fields in Dark Mode */
 body.dark-mode .vitals-form-section {
-  border-bottom: 1px solid #373E47;
+  border-bottom: 1px solid #2F3B4E;
 }
 
 body.dark-mode .vitals-section-header {
-  border-bottom: 1px solid #373E47;
-}
-
-body.dark-mode .vitals-section-num {
-  background: #316DCA;
-  color: #FFFFFF;
+  border-bottom: 1px solid #2F3B4E;
 }
 
 body.dark-mode .vitals-section-title {
   color: #FFFFFF;
-  font-weight: 600;
 }
 
 body.dark-mode .vitals-form-label {
   color: #CBD5E1;
-  font-weight: 500;
 }
 
-body.dark-mode .text-required {
-  color: #F87171 !important;
+body.dark-mode .vitals-input-wrap {
+  background: #171C26;
+  border: 1.5px solid #3B485E;
 }
 
-body.dark-mode .vitals-input-wrap,
-body.dark-mode .vitals-input-suffix-wrap {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+body.dark-mode .vitals-input-wrap:focus-within {
+  background: #1C2230;
+  border-color: #34D399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
 }
 
-body.dark-mode .vitals-input-wrap:focus-within,
-body.dark-mode .vitals-input-suffix-wrap:focus-within {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+body.dark-mode .vitals-input-wrap.has-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: #F59E0B;
 }
 
-body.dark-mode .vitals-input-wrap.has-warning,
 body.dark-mode .vitals-input-wrap.has-danger {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #EF4444;
 }
 
 body.dark-mode .vitals-select,
 body.dark-mode .vitals-input,
-body.dark-mode .vitals-textarea,
-body.dark-mode .vitals-page-container .vitals-select,
-body.dark-mode .vitals-page-container .vitals-input,
-body.dark-mode .vitals-page-container .vitals-textarea,
-body.dark-mode .vitals-page-container textarea {
-  background: #22272E !important;
-  border: 1px solid #444C56 !important;
-  color: #FFFFFF !important;
+body.dark-mode .vitals-textarea {
+  background: #171C26;
+  border: 1.5px solid #3B485E;
+  color: #FFFFFF;
 }
 
 body.dark-mode .vitals-input::placeholder,
-body.dark-mode .vitals-textarea::placeholder,
-body.dark-mode .vitals-page-container textarea::placeholder {
-  color: #768390 !important;
+body.dark-mode .vitals-textarea::placeholder {
+  color: #94A3B8;
 }
 
 body.dark-mode .vitals-select:focus,
 body.dark-mode .vitals-input:focus,
-body.dark-mode .vitals-textarea:focus,
-body.dark-mode .vitals-page-container textarea:focus {
-  background: #22272E !important;
-  border-color: #539BF5 !important;
-  box-shadow: 0 0 0 3px rgba(83, 155, 245, 0.2) !important;
-}
-
-body.dark-mode .vitals-input-suffix {
-  /* background: #252A33; */
-  /* border-left: 1px solid #444C56; */
-  color: #ADBAC7;
+body.dark-mode .vitals-textarea:focus {
+  background: #1C2230;
+  border-color: #34D399;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
 }
 
 body.dark-mode .vitals-unit-tag {
-  background: #252A33;
-  /* border-left: 1px solid #444C56; */
-  color: #ADBAC7;
+  background: #212836;
+  border-left: 1px solid #3B485E;
+  color: #94A3B8;
 }
 
 /* Clinical Flags & Alert Chips in Dark Mode */
 body.dark-mode .bp-flag-chip.flag-normal {
-  background: rgba(22, 163, 74, 0.3);
-  color: #86EFAC;
-  border: 1.5px solid #4ADE80;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+  background: rgba(16, 185, 129, 0.15);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
 }
 
 body.dark-mode .bp-flag-chip.flag-high {
-  background: rgba(217, 119, 6, 0.3);
-  color: #FDE047;
-  border: 1.5px solid #FBBF24;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
 body.dark-mode .bp-flag-chip.flag-crisis {
-  background: rgba(220, 38, 38, 0.3);
-  color: #FCA5A5;
-  border: 1.5px solid #F87171;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 body.dark-mode .vitals-flag-tag.tag-fever {
-  background: rgba(220, 38, 38, 0.3);
-  color: #FCA5A5;
-  border: 1.5px solid #F87171;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 body.dark-mode .vitals-flag-tag.tag-tachy {
-  background: rgba(217, 119, 6, 0.3);
-  color: #FDE047;
-  border: 1.5px solid #FBBF24;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+  background: rgba(245, 158, 11, 0.15);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
 }
 
 body.dark-mode .vitals-flag-tag.tag-brady {
-  background: rgba(37, 99, 235, 0.3);
-  color: #93C5FD;
-  border: 1.5px solid #60A5FA;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  background: rgba(96, 165, 250, 0.15);
+  color: #60A5FA;
+  border: 1px solid rgba(96, 165, 250, 0.35);
 }
 
 body.dark-mode .vitals-flag-tag.tag-lowspo2 {
-  background: rgba(220, 38, 38, 0.3);
-  color: #FCA5A5;
-  border: 1.5px solid #F87171;
-  font-weight: 700;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
-body.dark-mode .clinical-badge.badge-high-fever,
-body.dark-mode .clinical-badge.badge-crisis {
-  background: rgba(220, 38, 38, 0.3);
-  color: #FCA5A5;
-  border: 1.5px solid #F87171;
-  font-weight: 700;
-}
-
-body.dark-mode .clinical-badge.badge-fever,
-body.dark-mode .clinical-badge.badge-warning {
-  background: rgba(217, 119, 6, 0.3);
-  color: #FDE047;
-  border: 1.5px solid #FBBF24;
-  font-weight: 700;
-}
-
-body.dark-mode .clinical-badge.badge-info {
-  background: rgba(37, 99, 235, 0.3);
-  color: #93C5FD;
-  border: 1.5px solid #60A5FA;
-  font-weight: 700;
-}
-
-body.dark-mode .clinical-badge.badge-allergy-alert {
-  background: rgba(220, 38, 38, 0.3);
-  color: #FCA5A5;
-  border: 1.5px solid #F87171;
-  font-weight: 700;
+body.dark-mode .vitals-flag-tag.tag-allergy {
+  background: rgba(239, 68, 68, 0.15);
+  color: #F87171;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 /* Form Actions in Dark Mode */
 body.dark-mode .vitals-form-actions {
-  border-top: 1px solid #373E47;
-}
-
-body.dark-mode .vitals-btn-submit {
-  background: #2563EB;
-  border: 1.5px solid #60A5FA;
-  color: #FFFFFF;
-  font-weight: 700;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
-}
-
-body.dark-mode .vitals-btn-submit:hover:not(:disabled) {
-  background: #1D4ED8;
-  border-color: #93C5FD;
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.6);
+  border-top: 1px solid #2F3B4E;
 }
 
 body.dark-mode .vitals-btn-reset {
-  background: #373E47;
-  border: 1px solid #444C56;
+  background: #283143;
+  border: 1px solid #3E4D64;
   color: #E2E8F0;
 }
 
 body.dark-mode .vitals-btn-reset:hover {
-  background: #444C56;
+  background: #333F53;
   color: #FFFFFF;
 }
 
 /* BMI Widget in Dark Mode */
 body.dark-mode .bmi-display-container {
-  background: #252A33;
-  border: 1px solid #373E47;
+  background: #171C26;
+  border: 1px solid #2F3B4E;
 }
 
 body.dark-mode .bmi-num {
@@ -2344,169 +2007,126 @@ body.dark-mode .bmi-num {
 }
 
 body.dark-mode .bmi-unit {
-  color: #ADBAC7;
-}
-
-body.dark-mode .bmi-badge-underweight {
-  background: rgba(2, 132, 199, 0.2);
-  color: #38BDF8;
-  border-color: rgba(56, 189, 248, 0.4);
-}
-body.dark-mode .bmi-badge-normal {
-  background: rgba(16, 185, 129, 0.2);
-  color: #34D399;
-  border-color: rgba(52, 211, 153, 0.4);
-}
-body.dark-mode .bmi-badge-overweight {
-  background: rgba(245, 158, 11, 0.2);
-  color: #FBBF24;
-  border-color: rgba(251, 191, 36, 0.4);
-}
-body.dark-mode .bmi-badge-obese1 {
-  background: rgba(249, 115, 22, 0.2);
-  color: #FB923C;
-  border-color: rgba(251, 146, 60, 0.4);
-}
-body.dark-mode .bmi-badge-obese2 {
-  background: rgba(239, 68, 68, 0.2);
-  color: #F87171;
-  border-color: rgba(248, 113, 113, 0.4);
+  color: #94A3B8;
 }
 
 body.dark-mode .bmi-scale-bar {
-  border: 1px solid #444C56;
+  border: 1px solid #333F53;
 }
 
 body.dark-mode .bmi-scale-labels span {
-  color: #ADBAC7;
+  color: #94A3B8;
 }
 
 body.dark-mode .bmi-info-footer {
-  background: #22272E;
-  border-top: 1px solid #373E47;
-  color: #ADBAC7;
+  background: #1C2230;
+  border-top: 1px solid #2F3B4E;
+  color: #94A3B8;
 }
 
 body.dark-mode .bmi-empty-state {
-  background: rgb(40, 45, 51);
-  border: 1.5px dashed #444C56;
-}
-
-body.dark-mode .bmi-empty-icon {
-  color: #60A5FA;
+  background: #171C26;
+  border: 1.5px dashed #3B485E;
 }
 
 body.dark-mode .bmi-empty-text {
-  color: #CDD9E5;
-  font-weight: 500;
+  color: #94A3B8;
 }
 
 body.dark-mode .bmi-preview-badge {
-  background: #2D333B;
-  border: 1px solid #444C56;
-  color: #ADBAC7;
+  background: #212836;
+  border: 1px solid #333F53;
+  color: #94A3B8;
 }
 
 /* Triage Widget in Dark Mode */
 body.dark-mode .triage-active-banner.triage-badge-green {
-  background: rgba(16, 185, 129, 0.25);
-  border: 1.5px solid #10B981;
+  background: rgba(16, 185, 129, 0.18);
+  border: 1px solid #10B981;
+  color: #34D399;
 }
 
 body.dark-mode .triage-active-banner.triage-badge-yellow {
-  background: rgba(245, 158, 11, 0.25);
-  border: 1.5px solid #F59E0B;
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid #F59E0B;
+  color: #FBBF24;
 }
 
 body.dark-mode .triage-active-banner.triage-badge-orange {
-  background: rgba(249, 115, 22, 0.25);
-  border: 1.5px solid #F97316;
+  background: rgba(249, 115, 22, 0.18);
+  border: 1px solid #F97316;
+  color: #FB923C;
 }
 
 body.dark-mode .triage-active-banner.triage-badge-red {
-  background: rgba(239, 68, 68, 0.25);
-  border: 1.5px solid #EF4444;
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid #EF4444;
+  color: #F87171;
 }
 
 body.dark-mode .triage-banner-name {
-  color: #FFFFFF !important;
-  font-weight: 700;
-  font-size: 15px;
+  color: #FFFFFF;
 }
 
 body.dark-mode .triage-banner-sub {
-  color: #F0F6FC !important;
-  opacity: 0.95;
+  color: #CBD5E1;
 }
 
 body.dark-mode .triage-suggest-notice {
-  background: rgba(245, 158, 11, 0.18);
-  border: 1px solid rgba(251, 191, 36, 0.45);
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
   color: #FBBF24;
-  font-weight: 600;
 }
 
 body.dark-mode .triage-option-btn {
-  background: #252A33;
-  border: 1.5px solid #373E47;
+  background: #171C26;
+  border: 1.5px solid #2F3B4E;
   color: #FFFFFF;
 }
 
 body.dark-mode .triage-option-btn:hover {
-  background: #2D333B;
-  border-color: #545D68;
+  background: #212836;
+  border-color: #3B485E;
 }
 
 body.dark-mode .triage-option-btn.active.triage-badge-green {
-  background: rgba(16, 185, 129, 0.22);
+  background: rgba(16, 185, 129, 0.18);
   border-color: #10B981;
 }
 
 body.dark-mode .triage-option-btn.active.triage-badge-yellow {
-  background: rgba(245, 158, 11, 0.22);
+  background: rgba(245, 158, 11, 0.18);
   border-color: #F59E0B;
 }
 
 body.dark-mode .triage-option-btn.active.triage-badge-orange {
-  background: rgba(249, 115, 22, 0.22);
+  background: rgba(249, 115, 22, 0.18);
   border-color: #F97316;
 }
 
 body.dark-mode .triage-option-btn.active.triage-badge-red {
-  background: rgba(239, 68, 68, 0.22);
+  background: rgba(239, 68, 68, 0.18);
   border-color: #EF4444;
 }
 
 body.dark-mode .triage-opt-title {
-  color: #FFFFFF !important;
-  font-weight: 600;
-  font-size: 14px;
+  color: #FFFFFF;
 }
 
 body.dark-mode .triage-opt-desc {
-  color: #FFFFFF !important;
-  font-size: 12.5px;
-  line-height: 1.45;
-  opacity: 0.95;
-}
-
-body.dark-mode .triage-opt-badge-tag {
-  background: rgba(255, 255, 255, 0.2);
-  color: #FFFFFF;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  font-weight: 600;
+  color: #94A3B8;
 }
 
 /* Waiting Queue List Widget in Dark Mode */
 body.dark-mode .vitals-count-badge {
-  background: rgba(176, 131, 240, 0.18);
+  background: #2D1B4E;
   color: #C084FC;
-  border: 1px solid rgba(176, 131, 240, 0.35);
+  border: 1px solid #4A2B7F;
 }
 
 body.dark-mode .queue-widget-search {
-  background: #22272E;
-  border: 1px solid #444C56;
+  background: #171C26;
+  border: 1.5px solid #3B485E;
 }
 
 body.dark-mode .queue-search-input {
@@ -2514,27 +2134,27 @@ body.dark-mode .queue-search-input {
 }
 
 body.dark-mode .queue-search-input::placeholder {
-  color: #768390;
+  color: #94A3B8;
 }
 
 body.dark-mode .queue-quick-item {
-  background: #252A33;
-  border: 1px solid #373E47;
+  background: #171C26;
+  border: 1px solid #2F3B4E;
 }
 
 body.dark-mode .queue-quick-item:hover {
-  background: #373E47;
-  border-color: #444C56;
+  background: #212836;
+  border-color: #3B485E;
 }
 
 body.dark-mode .queue-quick-item.selected {
-  background: rgba(16, 185, 129, 0.18);
+  background: rgba(16, 185, 129, 0.15);
   border-color: #10B981;
 }
 
 body.dark-mode .queue-num-chip {
   background: rgba(37, 99, 235, 0.2);
-  border: 1px solid rgba(96, 165, 250, 0.4);
+  border: 1px solid rgba(96, 165, 250, 0.35);
   color: #60A5FA;
 }
 
@@ -2543,21 +2163,21 @@ body.dark-mode .queue-patient-name {
 }
 
 body.dark-mode .queue-patient-sub {
-  color: #ADBAC7;
+  color: #94A3B8;
 }
 
 body.dark-mode .queue-time-tag {
-  color: #ADBAC7;
+  color: #94A3B8;
 }
 
 body.dark-mode .queue-select-btn {
-  background: #373E47;
-  border: 1px solid #444C56;
-  color: #CDD9E5;
+  background: #283143;
+  border: 1px solid #3E4D64;
+  color: #CBD5E1;
 }
 
 body.dark-mode .queue-select-btn:hover {
-  background: #444C56;
+  background: #333F53;
   color: #FFFFFF;
 }
 
@@ -2568,27 +2188,27 @@ body.dark-mode .queue-select-btn.btn-selected {
 }
 
 body.dark-mode .queue-empty-notice {
-  background: #252A33;
-  border: 1.5px dashed #444C56;
-  color: #ADBAC7;
+  background: #171C26;
+  border: 1.5px dashed #3B485E;
+  color: #94A3B8;
 }
 
 /* History Table in Dark Mode (if displayed) */
 body.dark-mode .vitals-table-container {
-  border-color: #444C56;
+  border-color: #333F53;
 }
 
 body.dark-mode .vitals-history-table th {
-  background: #22272E;
-  border-bottom: 1.5px solid #373E47;
-  color: #ADBAC7;
+  background: #191E29;
+  border-bottom: 1.5px solid #333F53;
+  color: #E2E8F0;
 }
 
 body.dark-mode .vitals-history-table td {
-  border-bottom: 1px solid #373E47;
-  color: #CDD9E5;
+  border-bottom: 1px solid #2B3546;
+  color: #E2E8F0;
 }
 
 body.dark-mode .vitals-history-table tr:hover td {
-  background: #373E47;
+  background: #2A3345;
 }

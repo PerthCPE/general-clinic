@@ -35,6 +35,9 @@ function MainApp() {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('isDarkMode') === 'true';
   });
+  const [useClinicalFont, setUseClinicalFont] = useState<boolean>(() => {
+    return localStorage.getItem('useClinicalFont') !== 'false';
+  });
   const [activePage, setActivePage] = useState<string>(() => {
     return localStorage.getItem('activePage') || 'registration';
   });
@@ -60,6 +63,16 @@ function MainApp() {
     }
   }, [isDarkMode]);
 
+  // สลับ Font (Clinical vs Legacy)
+  useEffect(() => {
+    localStorage.setItem('useClinicalFont', String(useClinicalFont));
+    if (!useClinicalFont) {
+      document.body.classList.add('legacy-font');
+    } else {
+      document.body.classList.remove('legacy-font');
+    }
+  }, [useClinicalFont]);
+
   // เมื่อสลับ Role: ถ้าหน้าที่เปิดอยู่ไม่มีสิทธิ์ ให้ Redirect ไปที่หน้าเริ่มต้นของ Role นั้นอัตโนมัติ
   useEffect(() => {
     if (currentUser) {
@@ -71,6 +84,10 @@ function MainApp() {
 
   const toggleTheme = () => {
     setIsDarkMode((prev) => !prev);
+  };
+
+  const toggleFont = () => {
+    setUseClinicalFont((prev) => !prev);
   };
 
   // หากยังไม่ได้ Login ให้แสดงหน้า LoginPage
@@ -186,6 +203,8 @@ function MainApp() {
           onToggleSidebar={() => setIsSidebarOpen(true)}
           isDarkMode={isDarkMode}
           onToggleTheme={toggleTheme}
+          useClinicalFont={useClinicalFont}
+          onToggleFont={toggleFont}
           onNavigate={setActivePage}
         />
 

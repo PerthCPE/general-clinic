@@ -1,11 +1,11 @@
 /* ===== DetailPage - Scoped CSS ===== */
 
 .detail-page-container {
-  padding: 0;
-  max-width: 1280px;
+  padding: 32px 48px;
+  max-width: 1440px;
   margin: 0 auto;
   width: 100%;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   color: #1E293B;
   box-sizing: border-box;
 }
@@ -24,7 +24,7 @@ body.dark-mode .detail-page-container {
 
 .detail-page-container .header-titles h1 {
   font-size: 28px;
-  font-weight: 700;
+  font-weight: 500;
   color: #0D3B66;
   margin: 0;
 }
@@ -48,7 +48,7 @@ body.dark-mode .detail-page-container .header-titles h1 {
   background: #ECFDF5;
   color: #047857;
   border: 1px solid #A7F3D0;
-  padding: 4px 12px;
+  padding: 32px 48px;
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -204,7 +204,7 @@ body.dark-mode .detail-page-container .patient-pill {
 /* Patient Summary Header */
 .detail-page-container .section-title {
   font-size: 1.55rem;
-  font-weight: 800;
+  font-weight: 600;
   margin: 0 0 16px 0;
   color: #0F172A;
 }
@@ -239,7 +239,7 @@ body.dark-mode .detail-page-container .section-title {
   align-items: center;
   justify-content: center;
   font-size: 1.65rem;
-  font-weight: 700;
+  font-weight: 500;
   flex-shrink: 0;
   border: 2px solid rgba(255, 255, 255, 0.3);
 }
@@ -258,7 +258,7 @@ body.dark-mode .detail-page-container .section-title {
 .detail-page-container .patient-name {
   margin: 0;
   font-size: 1.7rem;
-  font-weight: 800;
+  font-weight: 600;
   color: #FFFFFF;
 }
 
@@ -271,7 +271,7 @@ body.dark-mode .detail-page-container .section-title {
   padding: 4px 12px;
   border-radius: 6px;
   font-size: 0.85rem;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .detail-page-container .ticket-badge {
@@ -311,14 +311,14 @@ body.dark-mode .detail-page-container .section-title {
 
 .detail-page-container .info-label {
   color: #CBD5E1;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 0.85rem;
   letter-spacing: 0.02em;
 }
 
 .detail-page-container .info-val {
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #FFFFFF;
 }
 
@@ -328,7 +328,7 @@ body.dark-mode .detail-page-container .section-title {
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 0.88rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   cursor: pointer;
   outline: none;
@@ -351,7 +351,7 @@ body.dark-mode .detail-page-container .section-title {
 .detail-page-container .allergy-badge {
   background: #FEE2E2;
   color: #DC2626;
-  font-weight: 700;
+  font-weight: 500;
   padding: 2px 8px;
   border-radius: 6px;
   font-size: 0.78rem;
@@ -360,7 +360,7 @@ body.dark-mode .detail-page-container .section-title {
 .detail-page-container .status-badge-examining {
   background: rgba(59, 130, 246, 0.25);
   color: #93C5FD;
-  font-weight: 700;
+  font-weight: 500;
   padding: 2px 8px;
   border-radius: 6px;
   font-size: 0.78rem;
@@ -393,7 +393,7 @@ body.dark-mode .detail-page-container .doctor-advice-card {
 
 .detail-page-container .doctor-advice-title {
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0369A1;
   margin: 0 0 6px 0;
 }
@@ -425,7 +425,7 @@ body.dark-mode .detail-page-container .doctor-advice-text {
 .detail-page-container .column-title {
   margin: 0 0 16px 0;
   font-size: 1.25rem;
-  font-weight: 800;
+  font-weight: 600;
   color: #0F172A;
   border-bottom: 1px solid #E2E8F0;
   padding-bottom: 12px;
@@ -476,7 +476,7 @@ body.dark-mode .detail-page-container .med-item-card {
 
 .detail-page-container .med-item-name {
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   margin: 0 0 4px 0;
 }
@@ -531,7 +531,7 @@ body.dark-mode .detail-page-container .status-card-in {
 
 .detail-page-container .status-card-in .status-main-text {
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #166534;
 }
 
@@ -558,7 +558,7 @@ body.dark-mode .detail-page-container .status-card-in .status-sub-count {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 0.9rem;
 }
 
@@ -575,7 +575,7 @@ body.dark-mode .detail-page-container .status-card-out {
 
 .detail-page-container .status-card-out .status-main-text {
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #991B1B;
 }
 
@@ -609,7 +609,7 @@ body.dark-mode .detail-page-container .status-card-out .status-sub-count {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 0.8rem;
 }
 
@@ -649,7 +649,7 @@ body.dark-mode .detail-page-container .alert-text strong {
   padding: 16px 36px;
   border-radius: 10px;
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
   transition: transform 0.2s, background-color 0.2s;
@@ -755,7 +755,7 @@ body.dark-mode .detail-page-container table {
 
 .detail-page-container table th {
   font-size: 0.92rem !important;
-  font-weight: 700 !important;
+  font-weight: 500 !important;
 }
 
 body.dark-mode .detail-page-container table th {

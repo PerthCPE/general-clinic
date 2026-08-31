@@ -57,5 +57,26 @@ func SetUpRoutes(r *gin.Engine) {
 		queueRoutes.GET("/list", controllers.GetQueueList)
 		queueRoutes.POST("/create", controllers.CreateQueue)
 		queueRoutes.PUT("/:id/status", controllers.UpdateQueueStatus)
-	}	
+	}
+
+	// ===== ระบบย่อยที่ 1: คลังยา (Pharmacy / Dispensing) - Boonkum (B6741990) =====
+	pharmacyRoutes := api.Group("/pharmacy")
+	pharmacyRoutes.Use(middleware.RoleRequired("pharmacist", "doctor", "registrar"))
+	{
+		pharmacyRoutes.GET("/medicines", controllers.GetMedicines)
+		pharmacyRoutes.GET("/medicines/:code", controllers.GetMedicineByCode)
+		pharmacyRoutes.POST("/medicines/stock", controllers.UpdateMedicineStock)
+		pharmacyRoutes.GET("/dispensing/:visit_id", controllers.GetDispensingByVisit)
+		pharmacyRoutes.POST("/dispensing", controllers.RecordDispense)
+	}
+
+	// ===== ระบบย่อยที่ 2: การเงิน (Billing / QRPayment) - Boonkum (B6741990) =====
+	billingRoutes := api.Group("/billing")
+	billingRoutes.Use(middleware.RoleRequired("cashier", "pharmacist", "registrar"))
+	{
+		billingRoutes.GET("/visit/:visit_id", controllers.GetBillingByVisit)
+		billingRoutes.POST("/calculate", controllers.CalculateBilling)
+		billingRoutes.POST("/qr/generate", controllers.GenerateQRPayment)
+		billingRoutes.POST("/confirm", controllers.ConfirmPayment)
+	}
 }
