@@ -273,10 +273,10 @@ export default function BillingDispensePage({
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
                           <span style={{ 
-                            background: p.treatmentRights.includes('30') ? '#FEF3C7' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
-                            color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6B21A8',
+                            background: p.treatmentRights.includes('30') ? '#FEF9C3' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
+                            color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
                             border: `1px solid ${p.treatmentRights.includes('30') ? '#FDE68A' : p.treatmentRights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
-                            padding: '6px 14px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '600',
+                            padding: '6px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '700',
                             whiteSpace: 'nowrap', display: 'inline-block', minWidth: '150px', textAlign: 'center', boxSizing: 'border-box'
                           }}>
                             {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
@@ -299,12 +299,13 @@ export default function BillingDispensePage({
                           <button 
                             onClick={() => handleSelectPatient(p.id)}
                             style={{ 
-                              padding: '8px 16px', 
+                              padding: '8px 20px', 
                               background: localPatientId === p.id ? '#10B981' : '#2563EB', 
-                              color: 'white', border: 'none', borderRadius: '8px', 
-                              cursor: 'pointer', fontWeight: 'bold', fontSize: '13.5px',
+                              color: 'white', border: 'none', borderRadius: '10px', 
+                              cursor: 'pointer', fontWeight: '700', fontSize: '14px',
                               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                              whiteSpace: 'nowrap', minWidth: '95px'
+                              whiteSpace: 'nowrap', minWidth: '100px',
+                              boxShadow: localPatientId === p.id ? '0 2px 6px rgba(16, 185, 129, 0.25)' : '0 2px 6px rgba(37, 99, 235, 0.25)'
                             }}
                           >
                             {localPatientId === p.id ? 'เลือกอยู่' : 'ชำระเงิน'}
