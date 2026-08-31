@@ -106,7 +106,7 @@ export default function DetailPage({
     <div className="detail-page-container">
 
       {/* Action Bar (Top) */}
-      <div className="page-header" style={{ marginBottom: '20px' }}>
+      <div className="page-header" style={{ marginBottom: '24px' }}>
         <div className="header-titles">
           <div className="title-row">
             <h1>รายละเอียดการจ่ายยา</h1>
@@ -121,13 +121,13 @@ export default function DetailPage({
       </div>
 
       {/* Patient Search & Collapsible Recent Patients Card */}
-      <div className="search-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '20px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
+      <div className="search-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
         {/* Header */}
         <div 
           onClick={() => setIsSearchExpanded(!isSearchExpanded)}
           style={{ 
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-            padding: '16px 20px', background: '#F8FAFC', borderBottom: isSearchExpanded ? '1px solid #E2E8F0' : 'none',
+            padding: '18px 24px', background: '#F8FAFC', borderBottom: isSearchExpanded ? '1px solid #E2E8F0' : 'none',
             cursor: 'pointer', userSelect: 'none' 
           }}
         >
@@ -168,7 +168,7 @@ export default function DetailPage({
         </div>
         
         {isSearchExpanded && (
-          <div style={{ padding: '16px 20px' }}>
+          <div style={{ padding: '20px 24px' }}>
             {/* Filter Search Input */}
             <div style={{ marginBottom: '15px', display: 'flex', gap: '10px' }}>
               <input 
