@@ -282,15 +282,13 @@ export default function DetailPage({
                 <h3 className="patient-name">{activePatient.name}</h3>
                 <div className="patient-badges">
                   <span className="badge ticket-badge">{activePatient.ticket}</span>
-                  <span className="badge hn-badge">HN: {activePatient.hn}</span>
+                  <span className="badge hn-badge">HN: {activePatient.hn.replace(/[-]/g, '')}</span>
                 </div>
               </div>
-              <div className="patient-details" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '24px', alignItems: 'center', fontSize: '1.05rem' }}>
+              <div className="patient-details" style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', fontSize: '0.95rem', color: '#CBD5E1' }}>
                 <span>เพศ {activePatient.gender}</span>
                 <span>อายุ {activePatient.age} ปี</span>
-                <span>วันเกิด: {activePatient.dob}</span>
                 <span>เบอร์โทร: {activePatient.phone}</span>
-                <span>อาชีพ: {activePatient.occupation}</span>
               </div>
             </div>
           </div>
