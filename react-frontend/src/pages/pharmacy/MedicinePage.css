@@ -360,59 +360,70 @@ body.dark-mode .medicine-page-container .page-arrow:disabled {
   padding: 6px 14px;
   border-radius: 9999px;
   font-size: 13px;
-  font-weight: 500;
-  font-weight: 600;
+  font-weight: 700;
   display: inline-block;
+  white-space: nowrap;
 }
 
 .medicine-page-container .status-in-stock {
   background-color: #DCFCE7;
-  color: #166534;
+  color: #15803D;
+  border: 1px solid #86EFAC;
 }
 
 body.dark-mode .medicine-page-container .status-in-stock {
   background-color: rgba(34, 197, 94, 0.15);
   color: #4ADE80;
+  border-color: rgba(74, 222, 128, 0.3);
 }
 
 .medicine-page-container .status-low-stock {
-  background-color: #FEF3C7;
+  background-color: #FEF9C3;
   color: #92400E;
+  border: 1px solid #FDE68A;
 }
 
 body.dark-mode .medicine-page-container .status-low-stock {
   background-color: rgba(245, 158, 11, 0.15);
   color: #FBBF24;
+  border-color: rgba(251, 191, 36, 0.3);
 }
 
 .medicine-page-container .status-out-stock {
   background-color: #FEE2E2;
-  color: #B91C1C;
+  color: #DC2626;
+  border: 1px solid #FCA5A5;
 }
 
 body.dark-mode .medicine-page-container .status-out-stock {
   background-color: rgba(239, 68, 68, 0.15);
   color: #F87171;
+  border-color: rgba(248, 113, 113, 0.3);
 }
 
 .medicine-page-container .update-stock-btn {
-  background: transparent;
-  border: 1px solid #22C55E;
-  color: #16A34A;
-  padding: 8px 16px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
+  background: #FFFFFF;
+  border: 1.5px solid #10B981;
+  color: #10B981;
+  padding: 7px 18px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  white-space: nowrap;
 }
 
 .medicine-page-container .update-stock-btn:hover {
-  background: #22C55E;
-  color: white;
+  background: #ECFDF5;
+  color: #059669;
+  border-color: #059669;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.2);
 }
 
 body.dark-mode .medicine-page-container .update-stock-btn {
+  background: transparent;
   border-color: #4ADE80;
   color: #4ADE80;
 }

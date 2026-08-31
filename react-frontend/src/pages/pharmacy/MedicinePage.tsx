@@ -166,10 +166,16 @@ export default function MedicinePage() {
     setTimeout(() => setShowSuccessBadge(false), 3000);
   };
 
+  const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all');
+
   const filteredMedicines = medicines.filter(med => {
     const matchId = !searchMedId.trim() || med.id.toLowerCase().includes(searchMedId.trim().toLowerCase());
     const matchName = !searchMedName.trim() || med.name.toLowerCase().includes(searchMedName.trim().toLowerCase());
-    return matchId && matchName;
+    let matchStatus = true;
+    if (stockStatusFilter === 'in-stock') matchStatus = med.status === 'In Stock';
+    else if (stockStatusFilter === 'low-stock') matchStatus = med.status === 'Low Stock';
+    else if (stockStatusFilter === 'out-of-stock') matchStatus = med.status === 'Out of Stock';
+    return matchId && matchName && matchStatus;
   });
   
   const getStatusClass = (status: string) => {
@@ -194,10 +200,95 @@ export default function MedicinePage() {
 
   return (
     <div className="medicine-page-container">
-      <div className="page-header">
+      <div className="page-header" style={{ marginBottom: '24px' }}>
         <div className="header-titles">
           <h1 className="page-title">รายการยา</h1>
-          <p className="page-subtitle">ค้นหาและจัดการระบบสินค้าคงคลัง</p>
+          <p className="page-subtitle">ค้นหาและจัดการระบบสินค้าคงคลัง คัดกรองยาใกล้หมด และเติมสต็อกยา</p>
+        </div>
+      </div>
+
+      {/* Stock Inventory Executive Stat Block Cards (Image 2 Pattern) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div 
+          onClick={() => setStockStatusFilter('all')}
+          style={{
+            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            border: stockStatusFilter === 'all' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
+            boxShadow: stockStatusFilter === 'all' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>รายการยาทั้งหมดในคลัง</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#0F172A', lineHeight: '38px' }}>{medicines.length} <span style={{ fontSize: '14px', color: '#64748B', fontWeight: '500' }}>ชนิด</span></div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>รายการยาส่งมอบคลังทั้งหมด</div>
+        </div>
+
+        <div 
+          onClick={() => setStockStatusFilter('in-stock')}
+          style={{
+            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            border: stockStatusFilter === 'in-stock' ? '2px solid #10B981' : '1.5px solid #E2E8F0',
+            boxShadow: stockStatusFilter === 'in-stock' ? '0 0 0 2px rgba(16, 185, 129, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>ยาในคลังปกติ (In Stock)</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#F0FDF4', color: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#16A34A', lineHeight: '38px' }}>
+            {medicines.filter(m => m.status === 'In Stock').length} <span style={{ fontSize: '14px', color: '#64748B', fontWeight: '500' }}>ชนิด</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>มีสต็อกเพียงพอจ่ายให้ผู้ป่วย</div>
+        </div>
+
+        <div 
+          onClick={() => setStockStatusFilter('low-stock')}
+          style={{
+            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            border: stockStatusFilter === 'low-stock' ? '2px solid #D97706' : '1.5px solid #E2E8F0',
+            boxShadow: stockStatusFilter === 'low-stock' ? '0 0 0 2px rgba(217, 119, 6, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>ยาใกล้หมด / เติมยา</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#FFFBEB', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#D97706', lineHeight: '38px' }}>
+            {medicines.filter(m => m.status === 'Low Stock').length} <span style={{ fontSize: '14px', color: '#64748B', fontWeight: '500' }}>ชนิด</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>ต้องสั่งซื้อ / เติมสต็อกเพิ่ม</div>
+        </div>
+
+        <div 
+          onClick={() => setStockStatusFilter('out-of-stock')}
+          style={{
+            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            border: stockStatusFilter === 'out-of-stock' ? '2px solid #DC2626' : '1.5px solid #E2E8F0',
+            boxShadow: stockStatusFilter === 'out-of-stock' ? '0 0 0 2px rgba(220, 38, 38, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>ยาหมดคลัง (Out of Stock)</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#FEF2F2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#DC2626', lineHeight: '38px' }}>
+            {medicines.filter(m => m.status === 'Out of Stock').length} <span style={{ fontSize: '14px', color: '#64748B', fontWeight: '500' }}>ชนิด</span>
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>หมดสต็อก! งดจ่ายชั่วคราว</div>
         </div>
       </div>
 
