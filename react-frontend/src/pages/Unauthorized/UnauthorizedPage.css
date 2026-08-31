@@ -37,7 +37,7 @@
 
 .unauthorized-code {
   display: inline-block;
-  font-family: var(--font-primary);
+  font-family: 'Inter', sans-serif;
   font-size: 12px;
   font-weight: 700;
   color: #EF4444;
@@ -50,7 +50,7 @@
 }
 
 .unauthorized-title {
-  font-family: var(--font-primary);
+  font-family: 'Inter', sans-serif;
   font-size: 22px;
   font-weight: 700;
   color: #1E293B;
@@ -59,7 +59,7 @@
 }
 
 .unauthorized-desc {
-  font-family: var(--font-primary);
+  font-family: 'Inter', sans-serif;
   font-size: 14px;
   line-height: 22px;
   color: #64748B;
@@ -85,7 +85,7 @@
 }
 
 .info-label {
-  font-family: var(--font-primary);
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   color: #64748B;
   transition: color 0.5s ease;
@@ -99,7 +99,7 @@
 .role-tag {
   background: #EFF6FF;
   color: #2563EB;
-  font-family: var(--font-primary);
+  font-family: 'Inter', sans-serif;
   font-size: 12px;
   font-weight: 600;
   padding: 2px 8px;
@@ -118,7 +118,7 @@
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
-  font-family: var(--font-primary);
+  font-family: 'Inter', sans-serif;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
