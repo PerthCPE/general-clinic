@@ -801,3 +801,18 @@ body.dark-mode .medicine-page-container .stock-table tr:hover {
 body.dark-mode .medicine-page-container .patient-table-name {
   color: #FFFFFF !important;
 }
+
+/* Stat Cards in Dark Mode */
+body.dark-mode .medicine-page-container .stat-card-box {
+  background: #1E293B !important;
+  border-color: #334155 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.dark-mode .medicine-page-container .stat-card-box span {
+  color: #CBD5E1 !important;
+}
+
+body.dark-mode .medicine-page-container .stat-card-box div {
+  color: #F8FAFC !important;
+}

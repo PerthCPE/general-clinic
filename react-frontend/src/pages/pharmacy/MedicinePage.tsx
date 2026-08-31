@@ -210,9 +210,10 @@ export default function MedicinePage() {
       {/* Stock Inventory Executive Stat Block Cards (Image 2 Pattern) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div 
+          className={`stat-card-box ${stockStatusFilter === 'all' ? 'active-stat' : ''}`}
           onClick={() => setStockStatusFilter('all')}
           style={{
-            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            borderRadius: '14px', padding: '18px 20px',
             border: stockStatusFilter === 'all' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
             boxShadow: stockStatusFilter === 'all' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
             cursor: 'pointer', transition: 'all 0.2s ease'
@@ -229,9 +230,10 @@ export default function MedicinePage() {
         </div>
 
         <div 
+          className={`stat-card-box ${stockStatusFilter === 'in-stock' ? 'active-stat' : ''}`}
           onClick={() => setStockStatusFilter('in-stock')}
           style={{
-            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            borderRadius: '14px', padding: '18px 20px',
             border: stockStatusFilter === 'in-stock' ? '2px solid #10B981' : '1.5px solid #E2E8F0',
             boxShadow: stockStatusFilter === 'in-stock' ? '0 0 0 2px rgba(16, 185, 129, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
             cursor: 'pointer', transition: 'all 0.2s ease'
@@ -250,9 +252,10 @@ export default function MedicinePage() {
         </div>
 
         <div 
+          className={`stat-card-box ${stockStatusFilter === 'low-stock' ? 'active-stat' : ''}`}
           onClick={() => setStockStatusFilter('low-stock')}
           style={{
-            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            borderRadius: '14px', padding: '18px 20px',
             border: stockStatusFilter === 'low-stock' ? '2px solid #D97706' : '1.5px solid #E2E8F0',
             boxShadow: stockStatusFilter === 'low-stock' ? '0 0 0 2px rgba(217, 119, 6, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
             cursor: 'pointer', transition: 'all 0.2s ease'
@@ -271,9 +274,10 @@ export default function MedicinePage() {
         </div>
 
         <div 
+          className={`stat-card-box ${stockStatusFilter === 'out-of-stock' ? 'active-stat' : ''}`}
           onClick={() => setStockStatusFilter('out-of-stock')}
           style={{
-            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            borderRadius: '14px', padding: '18px 20px',
             border: stockStatusFilter === 'out-of-stock' ? '2px solid #DC2626' : '1.5px solid #E2E8F0',
             boxShadow: stockStatusFilter === 'out-of-stock' ? '0 0 0 2px rgba(220, 38, 38, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
             cursor: 'pointer', transition: 'all 0.2s ease'

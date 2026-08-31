@@ -125,9 +125,10 @@ export default function DetailPage({
       {/* Executive Pharmacy Stat Cards (Image 2 Format) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div 
+          className={`stat-card-box ${statFilter === 'all' ? 'active-stat' : ''}`}
           onClick={() => setStatFilter('all')}
           style={{
-            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            borderRadius: '14px', padding: '18px 20px',
             border: statFilter === 'all' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
             boxShadow: statFilter === 'all' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
             cursor: 'pointer', transition: 'all 0.2s ease'
@@ -144,9 +145,10 @@ export default function DetailPage({
         </div>
 
         <div 
+          className={`stat-card-box ${statFilter === 'pending' ? 'active-stat' : ''}`}
           onClick={() => setStatFilter('pending')}
           style={{
-            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            borderRadius: '14px', padding: '18px 20px',
             border: statFilter === 'pending' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
             boxShadow: statFilter === 'pending' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
             cursor: 'pointer', transition: 'all 0.2s ease'
@@ -165,9 +167,10 @@ export default function DetailPage({
         </div>
 
         <div 
+          className={`stat-card-box ${statFilter === 'dispensed' ? 'active-stat' : ''}`}
           onClick={() => setStatFilter('dispensed')}
           style={{
-            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            borderRadius: '14px', padding: '18px 20px',
             border: statFilter === 'dispensed' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
             boxShadow: statFilter === 'dispensed' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
             cursor: 'pointer', transition: 'all 0.2s ease'
@@ -186,9 +189,10 @@ export default function DetailPage({
         </div>
 
         <div 
+          className={`stat-card-box ${statFilter === 'completed' ? 'active-stat' : ''}`}
           onClick={() => setStatFilter('completed')}
           style={{
-            background: '#FFFFFF', borderRadius: '14px', padding: '18px 20px',
+            borderRadius: '14px', padding: '18px 20px',
             border: statFilter === 'completed' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
             boxShadow: statFilter === 'completed' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
             cursor: 'pointer', transition: 'all 0.2s ease'
@@ -441,7 +445,7 @@ export default function DetailPage({
             </div>
 
             {isPrescriptionExpanded && (
-              <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px', background: '#FFFFFF' }}>
+              <div className="card-body-content" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {/* Doctor Advice Card */}
                 {activePatient.doctorAdvice && (
                   <div className="doctor-advice-card" style={{ marginBottom: 0 }}>
@@ -457,7 +461,7 @@ export default function DetailPage({
                 )}
 
                 {/* Medication + Stock Combined List Table */}
-                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
+                <div className="med-table-container" style={{ border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
                   <h4 className="column-title" style={{ marginBottom: '16px', fontSize: '15px', fontWeight: '700', color: '#0F172A', borderBottom: '1px solid #E2E8F0', paddingBottom: '10px' }}>
                     รายการยาที่สั่งจ่าย ({activePatient.medications.length} รายการ)
                   </h4>
