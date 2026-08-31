@@ -1,4 +1,4 @@
-node_modules/
+﻿node_modules/
 **/node_modules/
 golang-backend/.env
 golang-backend/golang-backend
@@ -26,4 +26,4 @@ brain/
 *.log
 package-lock.json
 
-
+GEMINI.md
