@@ -108,9 +108,8 @@ export default function DetailPage({
       {/* Action Bar (Top) */}
       <div className="page-header" style={{ marginBottom: '24px' }}>
         <div className="header-titles">
-          <div className="title-row">
-            <h1>รายละเอียดการจ่ายยา</h1>
-          </div>
+          <h1 className="page-title">รายละเอียดการจ่ายยา</h1>
+          <p className="page-subtitle">บันทึกและตรวจสอบคำสั่งจ่ายยา คัดกรองรายการยา และตัดสต็อกยา</p>
         </div>
         <button className="doctor-submit-sim-btn" onClick={handleSimulateDoctorSubmit}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -133,11 +132,11 @@ export default function DetailPage({
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             
-            <div>
-              <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#0F172A' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: '700', color: '#0F172A', lineHeight: '1.3' }}>
                 รายชื่อผู้ป่วยที่ลงทะเบียนล่าสุด (Recent Patients)
               </h3>
-              <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>
+              <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B', lineHeight: '1.4' }}>
                 รายการผู้ป่วยที่บันทึกข้อมูลส่งมาจากห้องตรวจแพทย์
               </p>
             </div>

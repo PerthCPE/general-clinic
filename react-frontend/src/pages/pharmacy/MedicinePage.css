@@ -25,23 +25,25 @@ body.dark-mode .medicine-page-container {
 
 .medicine-page-container .header-titles h1,
 .medicine-page-container .page-title {
-  font-size: 26px;
-  font-weight: 500;
-  color: #0D3B66;
+  font-size: 28px;
+  font-weight: 700;
+  color: #0F172A;
   margin: 0 0 4px 0;
+  line-height: 1.25;
   transition: color 0.5s ease;
 }
 
 body.dark-mode .medicine-page-container .header-titles h1,
 body.dark-mode .medicine-page-container .page-title {
-  color: #60A5FA;
+  color: #F8FAFC;
 }
 
 .medicine-page-container .header-titles p,
 .medicine-page-container .page-subtitle {
-  font-size: 14px;
+  font-size: 14.5px;
   color: #64748B;
   margin: 0;
+  line-height: 1.4;
   transition: color 0.5s ease;
 }
 

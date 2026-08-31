@@ -138,10 +138,14 @@ export default function PatientHistoryPage() {
   return (
     <div className="patient-history-container">
       <div className="list-view-container">
-        <h1 className="page-title">ประวัติผู้ป่วย</h1>
-        <p className="page-subtitle" style={{ color: '#64748B', marginBottom: '20px' }}>
-          ค้นหาและคลิกที่ชื่อผู้ป่วยเพื่อดูประวัติการรักษา ยาที่ได้รับ และประวัติแพ้ยา
-        </p>
+        <div className="page-header" style={{ marginBottom: '24px' }}>
+          <div className="header-titles">
+            <h1 className="page-title">ประวัติผู้ป่วย</h1>
+            <p className="page-subtitle">
+              ค้นหาและคลิกที่ชื่อผู้ป่วยเพื่อดูประวัติการรักษา ยาที่ได้รับ และประวัติแพ้ยา
+            </p>
+          </div>
+        </div>
 
         <div className="search-card">
           <div className="search-inputs">

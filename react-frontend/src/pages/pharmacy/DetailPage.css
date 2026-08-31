@@ -22,15 +22,29 @@ body.dark-mode .detail-page-container {
   margin-bottom: 24px;
 }
 
+.detail-page-container .page-title,
 .detail-page-container .header-titles h1 {
   font-size: 28px;
-  font-weight: 500;
-  color: #0D3B66;
-  margin: 0;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 4px 0;
+  line-height: 1.25;
 }
 
+body.dark-mode .detail-page-container .page-title,
 body.dark-mode .detail-page-container .header-titles h1 {
-  color: #60A5FA;
+  color: #F8FAFC;
+}
+
+.detail-page-container .page-subtitle {
+  font-size: 14.5px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.4;
+}
+
+body.dark-mode .detail-page-container .page-subtitle {
+  color: #94A3B8;
 }
 
 .detail-page-container .title-row {

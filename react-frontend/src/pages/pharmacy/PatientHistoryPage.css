@@ -1,8 +1,8 @@
 /* ===== PatientHistoryPage - Scoped CSS ===== */
 
 .patient-history-container {
-  padding: 0;
-  max-width: 1280px;
+  padding: 24px 32px;
+  max-width: 1440px;
   margin: 0 auto;
   width: 100%;
   font-family: var(--font-primary);
@@ -14,15 +14,34 @@ body.dark-mode .patient-history-container {
   color: #E2E8F0;
 }
 
+.patient-history-container .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
 .patient-history-container .page-title {
-  color: #0D3B66;
-  font-size: 26px;
+  color: #0F172A;
+  font-size: 28px;
   font-weight: 700;
-  margin: 0 0 24px 0;
+  margin: 0 0 4px 0;
+  line-height: 1.25;
 }
 
 body.dark-mode .patient-history-container .page-title {
-  color: #60A5FA;
+  color: #F8FAFC;
+}
+
+.patient-history-container .page-subtitle {
+  font-size: 14.5px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.4;
+}
+
+body.dark-mode .patient-history-container .page-subtitle {
+  color: #94A3B8;
 }
 
 .patient-history-container .search-card {
