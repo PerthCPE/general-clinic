@@ -169,7 +169,20 @@ export default function MedicinePage() {
   const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all');
 
   const filteredMedicines = medicines.filter(med => {
-    const matchId = !searchMedId.trim() || med.id.toLowerCase().includes(searchMedId.trim().toLowerCase());
+    const rawIdQuery = searchMedId.trim().toLowerCase();
+    let matchId = !rawIdQuery;
+    if (rawIdQuery) {
+      const codeStr = (med.medicine_code || med.id).toLowerCase();
+      const codeDigits = codeStr.replace(/\D/g, '');
+      const queryDigits = rawIdQuery.replace(/\D/g, '');
+
+      matchId = codeStr.includes(rawIdQuery) || 
+        (queryDigits !== '' && (
+          codeDigits.includes(queryDigits) || 
+          (parseInt(codeDigits, 10) > 0 && parseInt(codeDigits, 10) === parseInt(queryDigits, 10))
+        ));
+    }
+
     const matchName = !searchMedName.trim() || med.name.toLowerCase().includes(searchMedName.trim().toLowerCase());
     let matchStatus = true;
     if (stockStatusFilter === 'in-stock') matchStatus = med.status === 'In Stock';
@@ -308,7 +321,7 @@ export default function MedicinePage() {
             <label>รหัสยา</label>
             <input
               type="text"
-              placeholder="เช่น MED-0231"
+              placeholder="เช่น 001, 231 หรือ MED-0231"
               value={searchMedId}
               onChange={(e) => setSearchMedId(e.target.value)}
             />
