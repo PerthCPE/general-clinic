@@ -1689,7 +1689,14 @@ body.dark-mode .modal-footer {
 }
 
 body.dark-mode .online-status-badge {
-  color: #57AB5A;
-  background: rgba(87, 171, 90, 0.15);
-  border: 1px solid rgba(87, 171, 90, 0.3);
+  color: #86EFAC;
+  background: rgba(22, 163, 74, 0.3);
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+}
+
+body.dark-mode .status-dot {
+  background: #4ADE80;
+  box-shadow: 0 0 8px #4ADE80;
 }

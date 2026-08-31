@@ -39,9 +39,9 @@
 
 /* Group 81 / Rectangle 32 - Logo Icon */
 .sidebar-logo-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -58,12 +58,12 @@
 
 /* General Clinic text */
 .sidebar-logo-text {
-  margin-left: 8px;
+  margin-left: 10px;
   font-family: var(--font-heading);
   font-style: normal;
   font-weight: 700;
-  font-size: 18px;
-  line-height: 16px;
+  font-size: 18.5px;
+  line-height: 20px;
   display: flex;
   align-items: center;
   color: #FFFFFF;

@@ -1,5 +1,6 @@
 import React from 'react';
 import './Sidebar.css';
+import clinicLogo from '../../assets/logo.png';
 import { useAuth } from '../../context/AuthContext';
 import { ROLE_MENUS } from '../../config/roles';
 import type { NavItem } from '../../types/auth';
@@ -104,7 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activePage, onNaviga
       {/* TOP Logo */}
       <div className="sidebar-logo">
         <div className="sidebar-logo-icon">
-          <img src="/logo.png" alt="General Clinic Logo" className="sidebar-logo-img" />
+          <img src={clinicLogo} alt="General Clinic Logo" className="sidebar-logo-img" />
         </div>
         <span className="sidebar-logo-text">General Clinic</span>
         {/* ปุ่มกากบาทปิด Sidebar */}
