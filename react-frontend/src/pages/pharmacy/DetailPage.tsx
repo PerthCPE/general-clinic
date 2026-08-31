@@ -475,7 +475,18 @@ export default function DetailPage({
                         {activePatient.medications.map((med, index) => (
                           <tr key={index} style={{ borderBottom: '1px solid #F1F5F9' }}>
                             <td style={{ padding: '12px' }}>
-                              <span style={{ fontSize: '13px', fontWeight: '600', color: '#475569' }}>
+                              <span style={{ 
+                                background: '#EFF6FF', 
+                                color: '#1D4ED8', 
+                                border: '1px solid #BFDBFE', 
+                                padding: '4px 10px', 
+                                borderRadius: '8px', 
+                                fontWeight: '700', 
+                                fontFamily: 'monospace', 
+                                fontSize: '13px',
+                                letterSpacing: '0.3px',
+                                display: 'inline-block'
+                              }}>
                                 {med.medId}
                               </span>
                             </td>

@@ -274,7 +274,22 @@ export default function MedicinePage() {
                 <tbody>
                   {filteredMedicines.map((med) => (
                     <tr key={med.id}>
-                      <td className="med-id-cell">{med.id}</td>
+                      <td style={{ padding: '14px 20px', whiteSpace: 'nowrap' }}>
+                        <span style={{ 
+                          background: '#EFF6FF', 
+                          color: '#1D4ED8', 
+                          border: '1px solid #BFDBFE', 
+                          padding: '4px 10px', 
+                          borderRadius: '8px', 
+                          fontWeight: '700', 
+                          fontFamily: 'monospace', 
+                          fontSize: '13px',
+                          letterSpacing: '0.3px',
+                          display: 'inline-block'
+                        }}>
+                          {med.id}
+                        </span>
+                      </td>
                       <td 
                         className="med-name-cell clickable-med-name"
                         onClick={() => setDetailModalMed(med)}
