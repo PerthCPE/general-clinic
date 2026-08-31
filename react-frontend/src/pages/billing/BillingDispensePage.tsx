@@ -239,7 +239,7 @@ export default function BillingDispensePage({
                         className={localPatientId === p.id ? 'active-row' : ''}
                         style={{ borderBottom: '1px solid #F1F5F9', whiteSpace: 'nowrap' }}
                       >
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <span style={{ 
                             color: '#2563EB', 
                             fontWeight: '700', 
@@ -255,7 +255,7 @@ export default function BillingDispensePage({
                             {p.hn.replace(/[-]/g, '')}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <span style={{ 
                             background: p.patientType.includes('OPD') ? '#EFF6FF' : '#F3E8FF', 
                             color: p.patientType.includes('OPD') ? '#1D4ED8' : '#6D28D9', 
@@ -272,7 +272,7 @@ export default function BillingDispensePage({
                         <td className="patient-table-sub" style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap' }}>
                           {p.nationalId}
                         </td>
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <span style={{ 
                             background: p.treatmentRights.includes('30') ? '#FEF9C3' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
                             color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
@@ -283,7 +283,7 @@ export default function BillingDispensePage({
                             {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <span style={{ 
                             background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5',
                             padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
