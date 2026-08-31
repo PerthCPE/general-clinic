@@ -120,7 +120,7 @@ body.dark-mode .billing-dashboard-container .dashboard-title {
 /* ===== Metric Cards - Pharmacy-style framed cards ===== */
 .billing-dashboard-container .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 20px;
   margin-bottom: 28px;
 }
@@ -264,6 +264,7 @@ body.dark-mode .billing-dashboard-container .metric-label {
   font-size: 1.55rem;
   font-weight: 600;
   color: #0F172A;
+  white-space: nowrap;
 }
 
 body.dark-mode .billing-dashboard-container .metric-value {
