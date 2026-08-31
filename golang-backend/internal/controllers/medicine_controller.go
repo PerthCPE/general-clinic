@@ -23,7 +23,12 @@ func GetMedicines(c *gin.Context) {
 
 	dbQuery := config.DB
 	if query != "" {
-		dbQuery = dbQuery.Where("LOWER(medicine_code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?)", "%"+query+"%", "%"+query+"%")
+		dbQuery = dbQuery.Where(
+			"LOWER(medicine_code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?) OR LOWER(medicine_code) LIKE LOWER(?)",
+			"%"+query+"%",
+			"%"+query+"%",
+			"%MED-%"+query+"%",
+		)
 	}
 
 	if err := dbQuery.Find(&medicines).Error; err != nil {
