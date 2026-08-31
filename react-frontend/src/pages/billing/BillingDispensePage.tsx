@@ -260,13 +260,13 @@ export default function BillingDispensePage({
               <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead>
                   <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>HN</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ประเภท</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}></th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>ลำดับคิว</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>HN</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>ประเภท</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'left' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>สิทธิการรักษา</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>ดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -288,7 +288,7 @@ export default function BillingDispensePage({
                             {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <span style={{ fontSize: '14.5px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
                             {p.hn.replace(/[-]/g, '')}
                           </span>
@@ -304,10 +304,10 @@ export default function BillingDispensePage({
                             {p.patientType.includes('OPD') ? 'OPD (ผู้ป่วยนอก)' : 'IPD (ผู้ป่วยใน)'}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'left' }}>
                           <div className="patient-table-name" style={{ whiteSpace: 'nowrap' }}>{p.name}</div>
                         </td>
-                        <td className="patient-table-sub" style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap' }}>
+                        <td className="patient-table-sub" style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           {p.nationalId}
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
