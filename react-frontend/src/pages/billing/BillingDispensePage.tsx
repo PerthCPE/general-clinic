@@ -258,9 +258,10 @@ export default function BillingDispensePage({
                         <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
                           <span style={{ 
                             background: p.patientType.includes('OPD') ? '#EFF6FF' : '#F3E8FF', 
-                            color: p.patientType.includes('OPD') ? '#2563EB' : '#7C3AED', 
-                            padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: 'bold',
-                            whiteSpace: 'nowrap'
+                            color: p.patientType.includes('OPD') ? '#1D4ED8' : '#6D28D9', 
+                            border: `1px solid ${p.patientType.includes('OPD') ? '#BFDBFE' : '#DDD6FE'}`,
+                            padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
+                            whiteSpace: 'nowrap', display: 'inline-block'
                           }}>
                             {p.patientType.includes('OPD') ? 'OPD (ผู้ป่วยนอก)' : 'IPD (ผู้ป่วยใน)'}
                           </span>
@@ -276,7 +277,7 @@ export default function BillingDispensePage({
                             background: p.treatmentRights.includes('30') ? '#FEF9C3' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
                             color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
                             border: `1px solid ${p.treatmentRights.includes('30') ? '#FDE68A' : p.treatmentRights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
-                            padding: '6px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '700',
+                            padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
                             whiteSpace: 'nowrap', display: 'inline-block', minWidth: '150px', textAlign: 'center', boxSizing: 'border-box'
                           }}>
                             {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
@@ -284,9 +285,9 @@ export default function BillingDispensePage({
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
                           <span style={{ 
-                            background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA',
-                            padding: '4px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold',
-                            whiteSpace: 'nowrap'
+                            background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5',
+                            padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
+                            whiteSpace: 'nowrap', display: 'inline-block'
                           }}>
                             ยังไม่ชำระเงิน
                           </span>

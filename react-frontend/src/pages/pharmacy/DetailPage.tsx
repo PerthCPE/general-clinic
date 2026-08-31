@@ -323,7 +323,7 @@ export default function DetailPage({
                           background: p.treatmentRights.includes('30') ? '#FEF9C3' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
                           color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
                           border: `1px solid ${p.treatmentRights.includes('30') ? '#FDE68A' : p.treatmentRights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
-                          padding: '6px 14px', borderRadius: '10px', fontSize: '13px', fontWeight: '700',
+                          padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
                           whiteSpace: 'nowrap', display: 'inline-block', minWidth: '150px', textAlign: 'center', boxSizing: 'border-box'
                         }}>
                           {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
