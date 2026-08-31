@@ -449,3 +449,31 @@ body.dark-mode .billing-dispense-container .total-price {
   border: 1px solid #FCA5A5;
 }
 
+/* Dark Mode Table Styling Matching Queue Management */
+body.dark-mode .billing-dispense-container table thead tr {
+  background: #22272E !important;
+  color: #F8FAFC !important;
+  border-bottom: 2px solid #373E47 !important;
+}
+
+body.dark-mode .billing-dispense-container table thead th {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .billing-dispense-container table tbody tr {
+  background-color: #2D333B;
+  border-bottom: 1px solid #373E47;
+}
+
+body.dark-mode .billing-dispense-container table tbody tr:hover {
+  background-color: #373E47;
+}
+
+body.dark-mode .billing-dispense-container .patient-table-name {
+  color: #FFFFFF !important;
+}
+
+body.dark-mode .billing-dispense-container .patient-table-sub {
+  color: #CBD5E1 !important;
+}
+
