@@ -80,12 +80,12 @@ export default function DetailPage({
     const nextPatient = allPatients.find(p => !queueList.some(q => q.id === p.id));
     if (nextPatient) {
       setQueueList(prev => [...prev, nextPatient]);
-      triggerToast(`🩺 แพทย์ส่งใบสั่งยาเข้ามาใหม่: ${nextPatient.name} (เพิ่มเข้าคิว)`, 'doctor');
+      triggerToast(`แพทย์ส่งใบสั่งยาเข้ามาใหม่: ${nextPatient.name} (เพิ่มเข้าคิว)`, 'doctor');
     } else {
       // ถ้าคนไข้อยู่ในคิวหมดแล้ว เพิ่มซ้ำจากต้น
       const cyclePatient = allPatients[queueList.length % allPatients.length];
       setQueueList(prev => [...prev, { ...cyclePatient, id: cyclePatient.id + '_' + Date.now(), hn: 'HN-' + Math.floor(Math.random() * 1000).toString().padStart(4,'0') }]);
-      triggerToast(`🩺 แพทย์ส่งคนไข้เข้าคิวใหม่`, 'doctor');
+      triggerToast(`แพทย์ส่งคนไข้เข้าคิวใหม่`, 'doctor');
     }
   };
 
@@ -132,7 +132,7 @@ export default function DetailPage({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: '#F1F5F9', padding: '8px 10px', borderRadius: '8px', fontSize: '18px' }}>📋</div>
+            
             <div>
               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#0F172A' }}>
                 รายชื่อผู้ป่วยที่ลงทะเบียนล่าสุด (Recent Patients)
@@ -149,7 +149,7 @@ export default function DetailPage({
                 background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', 
                 padding: '4px 12px', borderRadius: '16px', fontSize: '13px', border: '1px solid #93C5FD' 
               }}>
-                🔔 ถึงคิวที่ {activePatient.queueNumber} ({activePatient.name})
+                ถึงคิวที่ {activePatient.queueNumber} ({activePatient.name})
               </span>
             )}
             <span style={{ 
@@ -268,7 +268,7 @@ export default function DetailPage({
                             whiteSpace: 'nowrap', minWidth: '95px'
                           }}
                         >
-                          ⚡ {localPatientId === p.id ? 'เลือกอยู่' : 'เข้าคิว'}
+                          {localPatientId === p.id ? 'เลือกอยู่' : 'เข้าคิว'}
                         </button>
                       </td>
                     </tr>
@@ -360,7 +360,7 @@ export default function DetailPage({
               {/* Doctor Advice Card */}
               {activePatient.doctorAdvice && (
                 <div className="doctor-advice-card">
-                  <div className="doctor-advice-icon">🩺</div>
+                  <div className="doctor-advice-icon"></div>
                   <div className="doctor-advice-content">
                     <h4 className="doctor-advice-title">คำแนะนำจากแพทย์ (Doctor's Note & Clinical Advice)</h4>
                     <p className="doctor-advice-text">{activePatient.doctorAdvice}</p>
@@ -399,7 +399,7 @@ export default function DetailPage({
                               onClick={() => setSelectedMedInfo({ name: med.name, medId: med.medId, properties: med.properties })}
                               title="คลิกเพื่อดูรายละเอียดสรรพคุณ"
                             >
-                              💊 {med.name}
+                              {med.name}
                             </div>
                             <div>
                               <span 
@@ -409,7 +409,7 @@ export default function DetailPage({
                                 }}
                                 onClick={() => setSelectedMedInfo({ name: med.name, medId: med.medId, properties: med.properties })}
                               >
-                                🔍 คลิกเพื่อดูรายละเอียดสรรพคุณ
+                                คลิกเพื่อดูรายละเอียดสรรพคุณ
                               </span>
                             </div>
                           </td>
@@ -461,7 +461,7 @@ export default function DetailPage({
           </>
         ) : (
           <div className="not-found-card card" style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
-            <div className="not-found-icon" style={{ fontSize: '40px', marginBottom: '10px' }}>🏥</div>
+            <div className="not-found-icon" style={{ fontSize: '40px', marginBottom: '10px' }}></div>
             <h3>ยังไม่ได้เลือกผู้ป่วย</h3>
             <p>กรุณาเลือกลำดับคิวจาก Dropdown หรือพิมพ์ค้นหาเพื่อดำเนินการต่อ</p>
           </div>
@@ -473,7 +473,7 @@ export default function DetailPage({
         <div className={`bottom-left-toast toast-${toast.type} ${isToastFading ? 'toast-fading' : ''}`}>
           <div className="toast-icon">
             {toast.type === 'success' && '✓'}
-            {toast.type === 'doctor' && '🩺'}
+            {toast.type === 'doctor' && ''}
             {toast.type === 'error' && '✕'}
           </div>
           <div className="toast-message">{toast.message}</div>
@@ -510,7 +510,7 @@ export default function DetailPage({
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <span style={{ fontSize: '28px' }}>💊</span>
+                
                 <div>
                   <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748B' }}>{selectedMedInfo.medId}</span>
                   <h3 style={{ margin: 0, fontSize: '18px', color: '#0F172A', fontWeight: 'bold' }}>{selectedMedInfo.name}</h3>
@@ -530,7 +530,7 @@ export default function DetailPage({
 
             <div style={{ background: '#F0F9FF', padding: '18px 20px', borderRadius: '12px', border: '1.5px solid #BAE6FD', marginBottom: '22px' }}>
               <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0284C7', fontWeight: '800' }}>
-                📋 สรรพคุณและข้อมูลยา (Medication Properties & Indications):
+                สรรพคุณและข้อมูลยา (Medication Properties & Indications):
               </h4>
               <p style={{ margin: 0, fontSize: '15px', color: '#0F172A', lineHeight: '1.65', fontWeight: '500' }}>
                 {selectedMedInfo.properties || 'ยารักษาโรคทั่วไปตามคำสั่งแพทย์ ควรรับประทานยาตามวิธีใช้ที่ระบุบนฉลากยาอย่างเคร่งครัด'}

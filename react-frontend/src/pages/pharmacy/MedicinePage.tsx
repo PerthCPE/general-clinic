@@ -254,8 +254,8 @@ export default function MedicinePage() {
                     className="med-name-cell clickable-med-name"
                     onClick={() => setDetailModalMed(med)}
                   >
-                    <span className="med-name-link">💊 {med.name}</span>
-                    <span className="med-hint-tag">คลิกเพื่อดูรายละเอียดสรรพคุณ 🔍</span>
+                    <span className="med-name-link">{med.name}</span>
+                    <span className="med-hint-tag">คลิกเพื่อดูรายละเอียดสรรพคุณ </span>
                   </td>
                   <td className="stock-num-cell">{med.stock} เม็ด</td>
                   <td>
@@ -366,7 +366,7 @@ export default function MedicinePage() {
           <div className="med-detail-modal-card card" onClick={(e) => e.stopPropagation()}>
             <div className="med-detail-header">
               <div className="med-detail-title-box">
-                <span className="med-detail-badge">💊 รายละเอียดตัวยาและสรรพคุณ</span>
+                <span className="med-detail-badge">รายละเอียดตัวยาและสรรพคุณ</span>
                 <h2 className="med-detail-name">{detailModalMed.name}</h2>
                 <span className="med-detail-generic">ชื่อสามัญทางยา: {detailModalMed.genericName} (รหัส: {detailModalMed.id})</span>
               </div>
@@ -381,12 +381,12 @@ export default function MedicinePage() {
 
               <div className="med-info-grid">
                 <div className="med-info-box">
-                  <h4 className="info-box-title">✨ สรรพคุณและข้อบ่งใช้</h4>
+                  <h4 className="info-box-title">สรรพคุณและข้อบ่งใช้</h4>
                   <p className="info-box-desc">{detailModalMed.properties}</p>
                 </div>
 
                 <div className="med-info-box">
-                  <h4 className="info-box-title">📋 ขนาดและวิธีรับประทาน</h4>
+                  <h4 className="info-box-title">ขนาดและวิธีรับประทาน</h4>
                   <p className="info-box-desc">{detailModalMed.dosage}</p>
                 </div>
 
@@ -396,7 +396,7 @@ export default function MedicinePage() {
                 </div>
 
                 <div className="med-info-box">
-                  <h4 className="info-box-title">🏭 ผู้ผลิตและราคาจำหน่าย</h4>
+                  <h4 className="info-box-title">ผู้ผลิตและราคาจำหน่าย</h4>
                   <p className="info-box-desc">
                     ผู้ผลิต: {detailModalMed.manufacturer}<br />
                     ราคาจำหน่าย: <strong>{detailModalMed.price}</strong>
