@@ -768,3 +768,124 @@ body.dark-mode .billing-dashboard-container .btn-secondary {
   gap: 8px;
 }
 
+/* ===== Search Inputs ===== */
+.billing-dashboard-container .filter-select {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #CBD5E1;
+  background: #F8FAFC;
+  color: #0F172A;
+}
+
+body.dark-mode .billing-dashboard-container .filter-select {
+  background: #1E293B;
+  border-color: #334155;
+  color: #F8FAFC;
+}
+
+/* ===== Table Badges & Status ===== */
+.billing-dashboard-container .queue-badge {
+  background: #EFF6FF;
+  color: #2563EB;
+  border: 1px solid #BFDBFE;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-weight: bold;
+  font-size: 13px;
+  display: inline-block;
+}
+
+body.dark-mode .billing-dashboard-container .queue-badge {
+  background: rgba(37, 99, 235, 0.15);
+  border-color: #1D4ED8;
+  color: #60A5FA;
+}
+
+.billing-dashboard-container .amount-completed {
+  font-weight: bold;
+  color: #059669;
+}
+
+body.dark-mode .billing-dashboard-container .amount-completed {
+  color: #34D399;
+}
+
+.billing-dashboard-container .amount-pending {
+  font-weight: bold;
+  color: #D97706;
+}
+
+body.dark-mode .billing-dashboard-container .amount-pending {
+  color: #FBBF24;
+}
+
+.billing-dashboard-container .status-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.billing-dashboard-container .status-completed {
+  background: #ECFDF5;
+  color: #059669;
+}
+
+body.dark-mode .billing-dashboard-container .status-completed {
+  background: rgba(5, 150, 105, 0.15);
+  color: #34D399;
+}
+
+.billing-dashboard-container .status-pending {
+  background: #FFFBEB;
+  color: #D97706;
+}
+
+body.dark-mode .billing-dashboard-container .status-pending {
+  background: rgba(217, 119, 6, 0.15);
+  color: #FBBF24;
+}
+
+/* ===== Table Action Buttons ===== */
+.billing-dashboard-container .action-btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.billing-dashboard-container .btn-view {
+  background: #E0F2FE;
+  color: #0284C7;
+}
+
+body.dark-mode .billing-dashboard-container .btn-view {
+  background: rgba(2, 132, 199, 0.2);
+  color: #38BDF8;
+}
+
+.billing-dashboard-container .btn-receive {
+  background: #059669;
+  color: #FFFFFF;
+}
+
+body.dark-mode .billing-dashboard-container .btn-receive {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+body.dark-mode .billing-dashboard-container .badge-qr {
+  background: rgba(37, 99, 235, 0.15);
+  color: #60A5FA;
+}
+
+body.dark-mode .billing-dashboard-container .badge-cash {
+  background: #334155;
+  color: #E2E8F0;
+}

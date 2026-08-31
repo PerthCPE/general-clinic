@@ -202,6 +202,7 @@ export default function BillingDashboardPage() {
               placeholder="ค้นหาด้วยรหัสคิว, HN, หรือชื่อผู้ป่วย..."
               value={patientId}
               onChange={(e) => setPatientId(e.target.value)}
+              className="search-input"
             />
           </div>
           <div className="input-group" style={{ flex: 1 }}>
@@ -210,7 +211,6 @@ export default function BillingDashboardPage() {
                className="filter-select" 
                value={statusFilter} 
                onChange={(e) => setStatusFilter(e.target.value)}
-               style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', background: 'var(--input-bg, #F8FAFC)', color: 'inherit' }}
              >
                 <option value="all">ทั้งหมด</option>
                 <option value="pending">รอชำระเงิน</option>
@@ -223,7 +223,6 @@ export default function BillingDashboardPage() {
                className="filter-select"
                value={methodFilter}
                onChange={(e) => setMethodFilter(e.target.value)}
-               style={{ padding: '10px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', background: 'var(--input-bg, #F8FAFC)', color: 'inherit' }}
              >
                 <option value="all">ทั้งหมด</option>
                 <option value="qr">QR Code</option>
@@ -259,10 +258,7 @@ export default function BillingDashboardPage() {
               {filteredRecords.map((record) => (
                 <tr key={record.id}>
                   <td className="queue-cell">
-                    <span style={{ 
-                      background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE',
-                      padding: '4px 10px', borderRadius: '9999px', fontWeight: 'bold', fontSize: '13px'
-                    }}>
+                    <span className="queue-badge">
                       Q{record.id.replace('HN', '0')}
                     </span>
                   </td>
@@ -276,18 +272,11 @@ export default function BillingDashboardPage() {
                     </div>
                   </td>
                   <td className="time-cell" style={{ fontSize: '13.5px', color: '#64748B' }}>{record.time}</td>
-                  <td className="amount-cell" style={{ 
-                    fontWeight: 'bold', 
-                    color: record.status === 'completed' ? '#059669' : '#D97706' 
-                  }}>
+                  <td className={`amount-cell ${record.status === 'completed' ? 'amount-completed' : 'amount-pending'}`}>
                     {record.amount}
                   </td>
                   <td>
-                    <span style={{
-                      padding: '4px 10px', borderRadius: '6px', fontSize: '12.5px', fontWeight: '600',
-                      background: record.status === 'completed' ? '#ECFDF5' : '#FFFBEB',
-                      color: record.status === 'completed' ? '#059669' : '#D97706'
-                    }}>
+                    <span className={`status-badge ${record.status === 'completed' ? 'status-completed' : 'status-pending'}`}>
                       {record.status === 'completed' ? 'ชำระสำเร็จ' : 'รอชำระเงิน'}
                     </span>
                   </td>
@@ -299,23 +288,13 @@ export default function BillingDashboardPage() {
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                       <button 
+                        className="action-btn btn-view"
                         onClick={() => setSelectedDetail(getPatientDetail(record.id, record.patientName, record.method, record.time, record.date, record.status))}
-                        style={{ 
-                          background: '#E0F2FE', color: '#0284C7', border: 'none', padding: '6px 12px', 
-                          borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-                          display: 'flex', alignItems: 'center', gap: '4px'
-                        }}
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                         ดูรายละเอียด
                       </button>
-                      <button 
-                        style={{ 
-                          background: '#059669', color: '#FFFFFF', border: 'none', padding: '6px 12px', 
-                          borderRadius: '6px', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
-                          display: 'flex', alignItems: 'center', gap: '4px'
-                        }}
-                      >
+                      <button className="action-btn btn-receive">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
                         รับชำระเงิน
                       </button>
