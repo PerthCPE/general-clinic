@@ -433,19 +433,23 @@ func seedDatabase() {
 		var medicines []models.Medicine
 		if medCount == 0 {
 			medicines = []models.Medicine{
-				{MedicineCode: "MED-001", Name: "Paracetamol 500mg", StockQuantity: 1000, UnitPrice: 10.0},
-				{MedicineCode: "MED-002", Name: "Amoxicillin 500mg", StockQuantity: 500, UnitPrice: 50.0},
-				{MedicineCode: "MED-003", Name: "Ibuprofen 400mg", StockQuantity: 800, UnitPrice: 30.0},
-				{MedicineCode: "MED-004", Name: "Cetirizine 10mg", StockQuantity: 600, UnitPrice: 15.0},
-				{MedicineCode: "MED-005", Name: "Omeprazole 20mg", StockQuantity: 400, UnitPrice: 25.0},
-				{MedicineCode: "MED-006", Name: "Amlodipine 5mg", StockQuantity: 300, UnitPrice: 20.0},
-				{MedicineCode: "MED-007", Name: "Metformin 500mg", StockQuantity: 700, UnitPrice: 12.0},
-				{MedicineCode: "MED-008", Name: "Losartan 50mg", StockQuantity: 450, UnitPrice: 40.0},
+				{MedicineCode: "MED-001", Name: "Paracetamol 500mg", GenericName: "Paracetamol (Acetaminophen)", Category: "ยาลดไข้ บรรเทาปวด", Properties: "บรรเทาอาการปวดเล็กน้อยถึงปานกลาง และลดไข้", Dosage: "ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.", Manufacturer: "สยามเภสัช", StockQuantity: 1000, UnitPrice: 10.0},
+				{MedicineCode: "MED-002", Name: "Amoxicillin 500mg", GenericName: "Amoxicillin Trihydrate", Category: "ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย", Properties: "รักษาการติดเชื้อแบคทีเรียระบบทางเดินหายใจ ทางเดินปัสสาวะ", Dosage: "ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร", Manufacturer: "องค์การเภสัชกรรม (GPO)", StockQuantity: 48, UnitPrice: 50.0},
+				{MedicineCode: "MED-003", Name: "Ibuprofen 400mg", GenericName: "Ibuprofen (NSAID)", Category: "ยาต้านการอักเสบ (NSAIDs)", Properties: "ลดการอักเสบ ปวดข้อ ปวดกล้ามเนื้อ ปวดฟัน", Dosage: "ครั้งละ 1 เม็ด วันละ 2-3 ครั้ง หลังอาหารทันที", Manufacturer: "เบอร์ลินซัพพลาย", StockQuantity: 0, UnitPrice: 30.0},
+				{MedicineCode: "MED-004", Name: "Cetirizine 10mg", GenericName: "Cetirizine Dihydrochloride", Category: "ยาแก้อาการแพ้ ต้านฮิสตามีน", Properties: "รักษาอาการแพ้อากาศ ลมพิษ น้ำมูกไหล จาม คันตา", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนนอน", Manufacturer: "เมดฮับ ฟาร์มาซูติคอล", StockQuantity: 600, UnitPrice: 15.0},
+				{MedicineCode: "MED-005", Name: "Omeprazole 20mg", GenericName: "Omeprazole Magnesium", Category: "ยาลดกรดในกระเพาะอาหาร", Properties: "รักษาโรคกรดไหลย้อน แผลในกระเพาะอาหาร", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนอาหารเช้า 30 นาที", Manufacturer: "แอสตร้าเซนเนก้า", StockQuantity: 400, UnitPrice: 25.0},
+				{MedicineCode: "MED-006", Name: "Amlodipine 5mg", GenericName: "Amlodipine Besylate", Category: "ยาลดความดันโลหิต", Properties: "ควบคุมระดับความดันโลหิต ป้องกันภาวะเจ็บหน้าอก", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ตอนเช้า", Manufacturer: "ไฟเซอร์ (Pfizer)", StockQuantity: 30, UnitPrice: 20.0},
+				{MedicineCode: "MED-007", Name: "Metformin 500mg", GenericName: "Metformin Hydrochloride", Category: "ยาควบคุมระดับน้ำตาล (เบาหวาน)", Properties: "ลดการสร้างน้ำตาลที่ตับ และเพิ่มความไวต่ออินซูลิน", Dosage: "ครั้งละ 1 เม็ด พร้อมอาหารเช้า-เย็น", Manufacturer: "สยามเภสัช", StockQuantity: 700, UnitPrice: 12.0},
+				{MedicineCode: "MED-008", Name: "Losartan 50mg", GenericName: "Losartan Potassium", Category: "ยาลดความดันโลหิต", Properties: "ขยายหลอดเลือด ลดความดันโลหิตและปกป้องไต", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง", Manufacturer: "เอ็มเอสดี (MSD)", StockQuantity: 450, UnitPrice: 40.0},
+				{MedicineCode: "MED-009", Name: "Bromhexine 8mg", GenericName: "Bromhexine Hydrochloride", Category: "ยาละลายเสมหะ", Properties: "ช่วยขับเสมหะ ละลายเสมหะที่เหนียวข้นในทางเดินหายใจ", Dosage: "ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร", Manufacturer: "เมดฮับ ฟาร์มาซูติคอล", StockQuantity: 350, UnitPrice: 18.0},
+				{MedicineCode: "MED-010", Name: "Dextromethorphan 15mg", GenericName: "Dextromethorphan HBr", Category: "ยากดอาการไอ", Properties: "บรรเทาอาการไอแห้ง ไอไม่มีเสมหะ", Dosage: "ครั้งละ 1 เม็ด ทุก 6-8 ชั่วโมง เมื่อมีอาการ", Manufacturer: "สยามเภสัช", StockQuantity: 25, UnitPrice: 15.0},
+				{MedicineCode: "MED-011", Name: "ORSLyte Oral Rehydration Salts", GenericName: "Oral Rehydration Salts (ORS)", Category: "เกลือแร่ทดแทนน้ำ", Properties: "ชดเชยการสูญเสียน้ำและเกลือแร่จากอาการท้องเสีย ท้องร่วง", Dosage: "ละลายน้ำสะอาด 250ml จิบเรื่อยๆ เมื่อถ่ายเหลว", Manufacturer: "องค์การเภสัชกรรม (GPO)", StockQuantity: 800, UnitPrice: 8.0},
+				{MedicineCode: "MED-012", Name: "Simethicone 80mg", GenericName: "Simethicone Chewable", Category: "ยาขับลม ขับแก๊ส", Properties: "บรรเทาอาการท้องอืด ท้องเฟ้อ แน่นท้อง จากแก๊สในกระเพาะ", Dosage: "เคี้ยวครั้งละ 1 เม็ด หลังอาหาร 3 เวลา", Manufacturer: "เบอร์ลินซัพพลาย", StockQuantity: 500, UnitPrice: 10.0},
 			}
 			for i := range medicines {
 				DB.Create(&medicines[i])
 			}
-			log.Println("Medicines seeded successfully.")
+			log.Println("Medicines seeded successfully with full metadata.")
 		} else {
 			DB.Find(&medicines)
 		}

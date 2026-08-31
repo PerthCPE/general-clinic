@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './MedicinePage.css';
 
 interface Medicine {
@@ -112,9 +112,52 @@ export default function MedicinePage() {
 
   const [searchMedId, setSearchMedId] = useState('');
   const [searchMedName, setSearchMedName] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all');
   
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
   const [isStockTableExpanded, setIsStockTableExpanded] = useState(true);
+
+  // Sync with Backend API
+  useEffect(() => {
+    fetch('/api/pharmacy/medicines')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.medicines && Array.isArray(data.medicines) && data.medicines.length > 0) {
+          const formatted: Medicine[] = data.medicines.map((m: any) => {
+            const stock = m.stock_quantity ?? 0;
+            let status: 'In Stock' | 'Low Stock' | 'Out of Stock' = 'In Stock';
+            if (stock === 0) status = 'Out of Stock';
+            else if (stock < 50) status = 'Low Stock';
+
+            return {
+              id: m.medicine_code || `MED-${m.id}`,
+              medicine_code: m.medicine_code || `MED-${m.id}`,
+              name: m.name,
+              genericName: m.generic_name || m.name,
+              category: m.category || 'ยารักษาโรคทั่วไป',
+              properties: m.properties || 'ยารักษาโรคและบรรเทาอาการตามแพทย์สั่ง',
+              dosage: m.dosage || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
+              precautions: 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
+              price: `฿ ${(m.unit_price || 0).toFixed(2)}`,
+              unit_price: m.unit_price || 0,
+              manufacturer: m.manufacturer || 'บริษัท เภสัชกรรม จำกัด',
+              stock: stock,
+              stock_quantity: stock,
+              status: status,
+              dispensedToday: 0,
+            };
+          });
+          setMedicines(formatted);
+        }
+      })
+      .catch(() => {
+        // Fallback to initialMedicines on network error
+      });
+  }, []);
+
+  // Extract unique categories
+  const categories = Array.from(new Set(medicines.map(m => m.category).filter(Boolean)));
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -161,12 +204,21 @@ export default function MedicinePage() {
       return med;
     }));
     
+    // Sync update to backend API if needed
+    fetch('/api/pharmacy/medicines/stock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        medicine_code: selectedMedicine.medicine_code || selectedMedicine.id,
+        action: updateMode,
+        quantity: qty
+      })
+    }).catch(() => {});
+
     handleCloseModal();
     setShowSuccessBadge(true);
     setTimeout(() => setShowSuccessBadge(false), 3000);
   };
-
-  const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all');
 
   const filteredMedicines = medicines.filter(med => {
     const rawIdQuery = searchMedId.trim().toLowerCase();
@@ -183,17 +235,27 @@ export default function MedicinePage() {
         ));
     }
 
-    const matchName = !searchMedName.trim() || med.name.toLowerCase().includes(searchMedName.trim().toLowerCase());
+    const matchName = !searchMedName.trim() || 
+      med.name.toLowerCase().includes(searchMedName.trim().toLowerCase()) ||
+      med.genericName.toLowerCase().includes(searchMedName.trim().toLowerCase());
+      
+    let matchCategory = true;
+    if (categoryFilter !== 'all') {
+      matchCategory = med.category.toLowerCase().includes(categoryFilter.toLowerCase());
+    }
+
     let matchStatus = true;
     if (stockStatusFilter === 'in-stock') matchStatus = med.status === 'In Stock';
     else if (stockStatusFilter === 'low-stock') matchStatus = med.status === 'Low Stock';
     else if (stockStatusFilter === 'out-of-stock') matchStatus = med.status === 'Out of Stock';
-    return matchId && matchName && matchStatus;
+
+    return matchId && matchName && matchCategory && matchStatus;
   });
   
   const handleResetFilters = () => {
     setSearchMedId('');
     setSearchMedName('');
+    setCategoryFilter('all');
     setStockStatusFilter('all');
   };
 
@@ -335,6 +397,24 @@ export default function MedicinePage() {
               onChange={(e) => setSearchMedName(e.target.value)}
             />
           </div>
+          <div className="input-group">
+            <label>ชนิด / หมวดหมู่ยา</label>
+            <select
+              className="filter-select"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              style={{
+                padding: '10px 14px', borderRadius: '8px',
+                border: '1px solid #CBD5E1', background: 'var(--bg-card, #F8FAFC)',
+                color: 'var(--text-primary, #0F172A)', fontSize: '14px'
+              }}
+            >
+              <option value="all">ทั้งหมดทุกชนิด</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="search-btn" type="button">ค้นหา</button>
@@ -392,6 +472,7 @@ export default function MedicinePage() {
                   <tr>
                     <th>รหัสยา (ID)</th>
                     <th>ชื่อยา (คลิกเพื่อดูรายละเอียด)</th>
+                    <th>ชนิด / หมวดหมู่ยา</th>
                     <th>คงเหลือในคลัง (STOCK)</th>
                     <th>สถานะ (STATUS)</th>
                     <th>จ่ายวันนี้ (DISPENSED TODAY)</th>
@@ -401,7 +482,7 @@ export default function MedicinePage() {
                 <tbody>
                   {filteredMedicines.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary, #64748B)' }}>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary, #64748B)' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                           <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
                             <circle cx="11" cy="11" r="8"></circle>
@@ -444,6 +525,19 @@ export default function MedicinePage() {
                         >
                           <span className="med-name-link">{med.name}</span>
                           <span className="med-hint-tag">คลิกเพื่อดูรายละเอียดสรรพคุณ </span>
+                        </td>
+                        <td>
+                          <span style={{ 
+                            fontSize: '13px', 
+                            padding: '4px 10px', 
+                            borderRadius: '6px', 
+                            background: 'var(--bg-card, #F1F5F9)', 
+                            color: 'var(--text-primary, #334155)',
+                            fontWeight: '500',
+                            display: 'inline-block'
+                          }}>
+                            {med.category}
+                          </span>
                         </td>
                         <td className="stock-num-cell">{med.stock} เม็ด</td>
                         <td>

@@ -20,15 +20,21 @@ type UpdateStockRequest struct {
 func GetMedicines(c *gin.Context) {
 	var medicines []models.Medicine
 	query := c.Query("query")
+	category := c.Query("category")
 
 	dbQuery := config.DB
 	if query != "" {
 		dbQuery = dbQuery.Where(
-			"LOWER(medicine_code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?) OR LOWER(medicine_code) LIKE LOWER(?)",
+			"LOWER(medicine_code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?) OR LOWER(generic_name) LIKE LOWER(?) OR LOWER(medicine_code) LIKE LOWER(?)",
+			"%"+query+"%",
 			"%"+query+"%",
 			"%"+query+"%",
 			"%MED-%"+query+"%",
 		)
+	}
+
+	if category != "" && category != "all" {
+		dbQuery = dbQuery.Where("LOWER(category) LIKE LOWER(?)", "%"+category+"%")
 	}
 
 	if err := dbQuery.Find(&medicines).Error; err != nil {
