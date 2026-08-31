@@ -94,7 +94,7 @@ export default function BillingDispensePage({
 
   const handleConfirmPayment = () => {
     if (!activePatient) return;
-    triggerToast(`💳 ชำระเงินเรียบร้อยแล้วสำหรับ ${activePatient.name} (ออกใบเสร็จชำระเงินสำเร็จ)`, 'success');
+    triggerToast(`ชำระเงินเรียบร้อยแล้วสำหรับ ${activePatient.name} (ออกใบเสร็จชำระเงินสำเร็จ)`, 'success');
     
     if (onSelectPatientId) {
       onSelectPatientId(activePatient.id);
@@ -129,7 +129,7 @@ export default function BillingDispensePage({
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ background: '#F1F5F9', padding: '8px 10px', borderRadius: '8px', fontSize: '18px' }}>📋</div>
+            
             <div>
               <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 'bold', color: '#0F172A' }}>
                 คิวรอชำระเงิน
@@ -146,7 +146,7 @@ export default function BillingDispensePage({
                 background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', 
                 padding: '4px 12px', borderRadius: '16px', fontSize: '13px', border: '1px solid #93C5FD' 
               }}>
-                🔔 ถึงคิวที่ {activePatient.queueNumber} ({activePatient.name})
+                ถึงคิวที่ {activePatient.queueNumber} ({activePatient.name})
               </span>
             )}
             <span style={{ 
@@ -186,7 +186,7 @@ export default function BillingDispensePage({
                   }}
                 />
                 <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontSize: '15px', color: '#64748B' }}>
-                  🔍
+                  
                 </span>
               </div>
               {searchQueueInput && (
@@ -240,7 +240,7 @@ export default function BillingDispensePage({
                             padding: '6px 12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '13px',
                             whiteSpace: 'nowrap', display: 'inline-block', minWidth: '85px', textAlign: 'center'
                           }}>
-                            {localPatientId === p.id ? '► ' : ''}คิว {p.queueNumber || index + 1}
+                            คิว {p.queueNumber || index + 1}
                           </span>
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap' }}>
@@ -268,8 +268,8 @@ export default function BillingDispensePage({
                           <span style={{ 
                             background: p.treatmentRights.includes('30') ? '#FEF3C7' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
                             color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6B21A8',
-                            padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '500',
-                            whiteSpace: 'nowrap'
+                            padding: '6px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '500',
+                            whiteSpace: 'nowrap', display: 'inline-block', minWidth: '130px', textAlign: 'center'
                           }}>
                             {p.treatmentRights.split(' ')[0]} {p.treatmentRights.includes('บัตรทอง') ? '(สปสช.)' : ''}
                           </span>
@@ -280,7 +280,7 @@ export default function BillingDispensePage({
                             padding: '4px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold',
                             whiteSpace: 'nowrap'
                           }}>
-                            🔴 ยังไม่ชำระเงิน
+                            ยังไม่ชำระเงิน
                           </span>
                         </td>
                         <td className="patient-table-sub" style={{ padding: '12px', fontSize: '13px', whiteSpace: 'nowrap' }}>
@@ -299,7 +299,7 @@ export default function BillingDispensePage({
                               whiteSpace: 'nowrap', minWidth: '95px'
                             }}
                           >
-                            ⚡ {localPatientId === p.id ? 'เลือกอยู่' : 'ชำระเงิน'}
+                            {localPatientId === p.id ? 'เลือกอยู่' : 'ชำระเงิน'}
                           </button>
                         </td>
                       </tr>
@@ -307,7 +307,7 @@ export default function BillingDispensePage({
                   ) : (
                     <tr>
                       <td colSpan={9} style={{ padding: '24px', textAlign: 'center', color: '#EF4444', background: '#FEF2F2' }}>
-                        ❌ ไม่พบข้อมูลผู้ป่วยที่ตรงกับคำค้นหา "{searchQueueInput}"
+                        ไม่พบข้อมูลผู้ป่วยที่ตรงกับคำค้นหา "{searchQueueInput}"
                       </td>
                     </tr>
                   )}
@@ -367,7 +367,7 @@ export default function BillingDispensePage({
 
             {/* Treatment Rights Selector Dropdown */}
             <div className="summary-rights-box">
-              <label className="summary-rights-label">🛡️ สิทธิการรักษา:</label>
+              <label className="summary-rights-label">สิทธิการรักษา:</label>
               <select 
                 className="summary-rights-select"
                 value={currentRights}
@@ -416,7 +416,7 @@ export default function BillingDispensePage({
         </div>
       ) : (
         <div className="card" style={{ textAlign: 'center', padding: '40px', color: '#64748B' }}>
-          <div style={{ fontSize: '40px', marginBottom: '10px' }}>🏥</div>
+          <div style={{ fontSize: '40px', marginBottom: '10px' }}></div>
           <h3>ยังไม่ได้เลือกผู้ป่วยในคิว</h3>
           <p>กรุณาเลือกลำดับคิวจาก Dropdown หรือกดปุ่มคิวผู้ป่วยด้านบนเพื่อดำเนินการต่อ</p>
         </div>
@@ -427,7 +427,7 @@ export default function BillingDispensePage({
         <div className={`bottom-left-toast toast-${toast.type} ${isToastFading ? 'toast-fading' : ''}`}>
           <div className="toast-icon">
             {toast.type === 'success' && '✓'}
-            {toast.type === 'doctor' && '💳'}
+            {toast.type === 'doctor' && ''}
             {toast.type === 'error' && '✕'}
           </div>
           <div className="toast-message">{toast.message}</div>

@@ -68,6 +68,25 @@ const renderNavIcon = (iconType: NavItem['iconType']) => {
           <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zm0 11h7v7h-7v-7zm-11 0h7v7H3v-7z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       );
+    case 'examination':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4.5 3v6.5a5.5 5.5 0 0011 0V3M8 3H3m5 0v-.5M15.5 3H21m-5.5 0v-.5M12 14.5v3.5a3 3 0 006 0V16a3 3 0 00-2-2.83" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+          <circle cx="18.5" cy="10.5" r="2" strokeWidth="1.66667"/>
+        </svg>
+      );
+    case 'schedule':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 2v3m8-3v3M3.5 9h17M4 5h16a1 1 0 011 1v13a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+    case 'records':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 12h6m-6 4h4M7 3.5h10a2 2 0 012 2V19a2 2 0 01-2 2H7a2 2 0 01-2-2V5.5a2 2 0 012-2z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
     default:
       return null;
   }

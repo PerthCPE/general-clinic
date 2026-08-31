@@ -1,5 +1,162 @@
 /* ===== Global Reset & Base Styles ===== */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Prompt:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Kanit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Prompt:wght@400;500;600;700&display=swap');
+
+/* ===========================================================================
+   Tailwind CSS — ใช้กับหน้าจอฝั่งแพทย์ที่ย้ายมาจากระบบ clinicms
+   ---------------------------------------------------------------------------
+   1) ไม่ import "tailwindcss/preflight" เพื่อไม่ให้ไป reset สไตล์หน้าอื่นในระบบเดิม
+      (ใช้ preflight แบบย่อที่ scope เฉพาะ .doctor-module ด้านล่างแทน)
+   2) utilities ต้อง "ไม่อยู่ใน layer" เพราะกฎ CSS ที่ไม่ได้อยู่ใน layer
+      จะชนะกฎที่อยู่ใน layer เสมอ ไม่ว่า specificity จะเป็นอย่างไร —
+      ถ้าใส่ layer ไว้ กฎ global ด้านล่าง (* { padding: 0 } และ
+      div/span/p { font-size: inherit }) จะไปล้าง padding และขนาดตัวอักษร
+      ของ Tailwind ทั้งหมด ทำให้หน้าจอแพทย์แน่นและตัวหนังสือเล็กผิดปกติ
+   =========================================================================== */
+@import "tailwindcss/theme" layer(theme);
+@import "tailwindcss/utilities";
+
+@theme {
+  /* 3-Tier Clinical Typography System */
+  --font-sans: var(--font-primary);
+
+  /* Monospace: สำหรับ HN, เลขบัตรประชาชน, เบอร์โทร, ค่าสัญญาณชีพ */
+  --font-mono: var(--font-mono);
+
+  /* ระบบเดิมตั้ง :root { font-size: 14px } แต่ระบบ clinicms ต้นฉบับใช้ค่ามาตรฐาน 16px
+     ค่า spacing/ขนาดตัวอักษร/มุมโค้ง ของ Tailwind เป็นหน่วย rem ซึ่งอิงจาก root
+     จึงถูกย่อเหลือ 87.5% โดยไม่ตั้งใจ — แปลงเป็น px ตามสเกล 16px เพื่อให้
+     หน้าจอแพทย์มีสัดส่วนเท่าต้นฉบับ โดยไม่ต้องแก้ root ที่หน้าอื่นใช้อยู่ */
+  --spacing: 4px;
+
+  /* line-height เพิ่มจากค่ามาตรฐาน Tailwind ประมาณ 15% เพื่อให้ข้อความโปร่งขึ้น
+     (ค่าในวงเล็บคือค่ามาตรฐานเดิม เผื่อต้องการย้อนกลับ) */
+  --text-xs: 12px;
+  --text-xs--line-height: 18px;   /* เดิม 16px */
+  --text-sm: 14px;
+  --text-sm--line-height: 23px;   /* เดิม 20px */
+  --text-base: 16px;
+  --text-base--line-height: 27px; /* เดิม 24px */
+  --text-lg: 18px;
+  --text-lg--line-height: 31px;   /* เดิม 28px */
+  --text-xl: 20px;
+  --text-xl--line-height: 32px;   /* เดิม 28px */
+  --text-2xl: 24px;
+  --text-2xl--line-height: 36px;  /* เดิม 32px */
+  --text-3xl: 30px;
+  --text-3xl--line-height: 40px;  /* เดิม 36px */
+  --text-4xl: 36px;
+  --text-4xl--line-height: 44px;  /* เดิม 40px */
+  --text-5xl: 48px;
+  --text-5xl--line-height: 1.1;
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-3xl: 24px;
+  --radius-4xl: 32px;
+}
+
+/* ===========================================================================
+   กู้คืน space-y-* ของ Tailwind ในโมดูลแพทย์
+   ---------------------------------------------------------------------------
+   Tailwind v4 สร้างคลาส space-y-* ออกมาในรูปแบบ
+       :where(.space-y-8 > :not(:last-child)) { margin-block-end: ... }
+   ซึ่งการครอบด้วย :where() ทำให้ specificity เป็น 0 ทั้งกฎ
+   จึงแพ้กฎ global ของระบบเดิม  * { margin: 0 }  ที่เขียนไว้ด้านล่างในไฟล์นี้
+   (specificity เท่ากันคือ 0 แต่มาทีหลังจึงชนะ)
+
+   ผลคือ space-y-* ทั้ง 121 จุดในโมดูลแพทย์ไม่ทำงานเลย ทำให้ทุกกล่องดูติดกัน
+   ด้านล่างคือการประกาศซ้ำโดยใช้ specificity ระดับคลาส (0,2,0) ให้ชนะ * reset
+   เฉพาะภายใน .doctor-module เท่านั้น จึงไม่กระทบ role อื่น
+   =========================================================================== */
+.doctor-module .space-y-0\.5 > :not(:last-child) { margin-block-end: 2px; }
+.doctor-module .space-y-1 > :not(:last-child)    { margin-block-end: 4px; }
+.doctor-module .space-y-1\.5 > :not(:last-child) { margin-block-end: 6px; }
+.doctor-module .space-y-2 > :not(:last-child)    { margin-block-end: 8px; }
+.doctor-module .space-y-2\.5 > :not(:last-child) { margin-block-end: 10px; }
+.doctor-module .space-y-3 > :not(:last-child)    { margin-block-end: 12px; }
+.doctor-module .space-y-4 > :not(:last-child)    { margin-block-end: 16px; }
+.doctor-module .space-y-5 > :not(:last-child)    { margin-block-end: 20px; }
+.doctor-module .space-y-6 > :not(:last-child)    { margin-block-end: 24px; }
+.doctor-module .space-y-8 > :not(:last-child)    { margin-block-end: 32px; }
+
+/* ===========================================================================
+   แก้คลาส .font-mono ที่ชนกัน (เฉพาะโมดูลแพทย์)
+   ---------------------------------------------------------------------------
+   RegistrationPage.css (หน้าเวชระเบียน) ประกาศคลาสชื่อ .font-mono เอาไว้แบบสากล
+   ไม่ได้ผูกกับหน้าตัวเอง เช่น
+       .font-mono { font-family: var(--font-mono); font-size: 13px; letter-spacing: .3px }
+   ซึ่งบังเอิญชื่อชนกับ utility ของ Tailwind พอไฟล์นั้นถูกโหลด (CSS เป็น global)
+   กฎนี้จึงรั่วมาทับทุกหน้า และเพราะมันล็อก font-size ไว้ที่ 13px
+   ช่องที่ใส่ font-mono ในหน้าแพทย์ (เช่น ค่าสัญญาณชีพ) จึงเล็กกว่าช่องอื่น
+   ทั้งที่เขียน text-sm เท่ากัน
+
+   ด้านล่างเขียนทับเฉพาะใน .doctor-module โดยระบุคู่ .font-mono + ขนาด
+   ให้ specificity (0,3,0) ชนะกฎเดิม (0,1,0) — ไม่แตะไฟล์ของ role อื่น
+   =========================================================================== */
+.doctor-module .font-mono {
+  font-family: var(--font-mono);
+  letter-spacing: normal;
+}
+
+.doctor-module .font-mono.text-xs        { font-size: 12px; }
+.doctor-module .font-mono.text-sm        { font-size: 14px; }
+.doctor-module .font-mono.text-\[10px\]  { font-size: 10px; }
+.doctor-module .font-mono.text-\[11px\]  { font-size: 11px; }
+.doctor-module .font-mono.text-\[14px\]  { font-size: 14px; }
+
+/* ===== ระยะห่างระหว่างบรรทัด เฉพาะโมดูลแพทย์ =====
+   ตั้งไว้ที่นี่แทนการแก้ :root/body เพื่อไม่ให้กระทบหน้าของ role อื่น
+   (ค่ามาตรฐานของระบบเดิมคือ 1.5) */
+.doctor-module {
+  line-height: 1.75;
+}
+
+/* ===== Preflight แบบย่อ เฉพาะโมดูลแพทย์ =====
+   ครอบทั้ง selector ด้วย :where() เพื่อให้ specificity เป็น 0 ทั้งก้อน
+   (ถ้าเขียน .doctor-module :where(button) จะได้ (0,1,0) ซึ่งเสมอกับคลาส
+   Tailwind อย่าง .bg-blue-600 แล้วชนะเพราะอยู่ทีหลังในไฟล์ ทำให้ปุ่ม
+   เสียสีพื้นหลังไป) — เลียนแบบวิธีที่ Tailwind Preflight ใช้จริง */
+:where(.doctor-module button) {
+  background-color: transparent;
+  background-image: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+:where(.doctor-module input, .doctor-module textarea, .doctor-module select) {
+  border: 0;
+  color: inherit;
+  font: inherit;
+  background-color: transparent;
+}
+
+:where(.doctor-module table) {
+  border-collapse: collapse;
+  border-spacing: 0;
+  text-indent: 0;
+}
+
+:where(.doctor-module ul, .doctor-module ol) {
+  list-style: none;
+}
+
+:where(.doctor-module h1, .doctor-module h2, .doctor-module h3,
+       .doctor-module h4, .doctor-module h5, .doctor-module h6) {
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+:where(.doctor-module svg) {
+  display: block;
+  vertical-align: middle;
+}
 
 *,
 *::before,
@@ -10,7 +167,12 @@
 }
 
 :root {
-  font-family: 'Prompt', 'Inter', system-ui, -apple-system, sans-serif;
+  /* 1. Primary Font (Body & Forms): Thai + English */
+  --font-primary: "IBM Plex Sans Thai", "Plus Jakarta Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: 'Plus Jakarta Sans', 'Kanit', 'Prompt', sans-serif;
+  /* 3. Monospace Font (Identifiers & Codes: HN, National ID, Queue No, BP) */
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
   font-size: 14px;
   line-height: 1.5;
   color: #1E293B;
@@ -24,7 +186,14 @@
   --font-size-xl: 1.25rem;
 }
 
+body.legacy-font {
+  --font-primary: "IBM Plex Sans Thai", "Plus Jakarta Sans", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-heading: 'Prompt', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 'DejaVu Sans Mono', 'Courier New', monospace;
+}
+
 body {
+  font-family: var(--font-primary);
   margin: 0;
   min-height: 100vh;
   font-size: var(--font-size-base);
@@ -38,7 +207,6 @@ a {
 
 button {
   cursor: pointer;
-  font-family: inherit;
 }
 
 button,
@@ -53,9 +221,11 @@ td,
 th,
 li {
   font-size: inherit;
+  font-family: inherit;
 }
 
 h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
   line-height: 1.2;
 }
 

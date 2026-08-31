@@ -1,11 +1,10 @@
 /* ===== MedicinePage - All scoped under container ===== */
 
 .medicine-page-container {
-  padding: 0;
-  max-width: 1280px;
+  padding: 32px 48px;: 1440px;
   margin: 0 auto;
   width: 100%;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   color: #1E293B;
   box-sizing: border-box;
   transition: color 0.5s ease;
@@ -26,7 +25,7 @@ body.dark-mode .medicine-page-container {
 .medicine-page-container .header-titles h1,
 .medicine-page-container .page-title {
   font-size: 26px;
-  font-weight: 700;
+  font-weight: 500;
   color: #0D3B66;
   margin: 0 0 4px 0;
   transition: color 0.5s ease;
@@ -53,7 +52,7 @@ body.dark-mode .medicine-page-container .page-subtitle {
 .medicine-page-container .success-badge {
   background-color: #DCFCE7;
   color: #166534;
-  padding: 10px 16px;
+  padding: 32px 48px;
   border-radius: 8px;
   font-weight: 500;
   font-size: 14px;
@@ -200,7 +199,7 @@ body.dark-mode .medicine-page-container .table-title {
 .medicine-page-container .stock-table th {
   padding: 16px;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 500;
   color: #334155;
   background-color: #F8FAFC;
   border-bottom: 1px solid #E2E8F0;
@@ -238,7 +237,7 @@ body.dark-mode .medicine-page-container .stock-table tbody tr:hover td {
   padding: 6px 14px;
   border-radius: 9999px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   font-weight: 600;
   display: inline-block;
 }
@@ -337,7 +336,7 @@ body.dark-mode .medicine-page-container .modal-card {
 
 .medicine-page-container .modal-title {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 500;
   margin: 0;
   color: #0F172A;
 }
@@ -435,7 +434,7 @@ body.dark-mode .medicine-page-container .clickable-med-name:hover {
 }
 
 .medicine-page-container .med-name-link {
-  font-weight: 700;
+  font-weight: 500;
   color: #2563EB;
   display: block;
 }
@@ -486,7 +485,7 @@ body.dark-mode .medicine-page-container .med-detail-header {
   background: #EFF6FF;
   color: #2563EB;
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 500;
   padding: 5px 12px;
   border-radius: 999px;
   margin-bottom: 6px;
@@ -499,7 +498,7 @@ body.dark-mode .medicine-page-container .med-detail-badge {
 
 .medicine-page-container .med-detail-name {
   font-size: 1.75rem;
-  font-weight: 800;
+  font-weight: 600;
   color: #0F172A;
   margin: 0 0 4px 0;
 }
@@ -538,7 +537,7 @@ body.dark-mode .medicine-page-container .category-section {
 }
 
 .medicine-page-container .category-tag {
-  font-weight: 800;
+  font-weight: 600;
   color: #0284C7;
   margin-left: 6px;
 }
@@ -578,7 +577,7 @@ body.dark-mode .medicine-page-container .warning-box {
 
 .medicine-page-container .info-box-title {
   font-size: 1.15rem;
-  font-weight: 800;
+  font-weight: 600;
   color: #0F172A;
   margin: 0 0 8px 0;
 }
@@ -614,7 +613,7 @@ body.dark-mode .medicine-page-container .med-stock-summary-bar {
 }
 
 .medicine-page-container .stat-val {
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   margin-left: 4px;
 }
@@ -634,7 +633,7 @@ body.dark-mode .medicine-page-container .stat-val {
   border: none;
   padding: 10px 24px;
   border-radius: 8px;
-  font-weight: 700;
+  font-weight: 500;
   font-size: 0.88rem;
   cursor: pointer;
 }

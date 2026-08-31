@@ -18,6 +18,12 @@ import BillingDashboardPage from './pages/billing/BillingDashboardPage';
 import BillingDispensePage from './pages/billing/BillingDispensePage';
 import BillingInvoicePage from './pages/billing/BillingInvoicePage';
 import VitalsScreeningPage from './pages/nurse/VitalsScreeningPage';
+import { DoctorDataProvider } from './pages/doctor/DoctorDataContext';
+import DoctorDashboardPage from './pages/doctor/DoctorDashboardPage';
+import DoctorQueuePage from './pages/doctor/DoctorQueuePage';
+import DoctorExaminationPage from './pages/doctor/DoctorExaminationPage';
+import DoctorSchedulePage from './pages/doctor/DoctorSchedulePage';
+import DoctorRecordsPage from './pages/doctor/DoctorRecordsPage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
 import './App.css';
 
@@ -26,6 +32,9 @@ function MainApp() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('isDarkMode') === 'true';
+  });
+  const [useClinicalFont, setUseClinicalFont] = useState<boolean>(() => {
+    return localStorage.getItem('useClinicalFont') !== 'false';
   });
   const [activePage, setActivePage] = useState<string>(() => {
     return localStorage.getItem('activePage') || 'registration';
@@ -52,6 +61,16 @@ function MainApp() {
     }
   }, [isDarkMode]);
 
+  // สลับ Font (Clinical vs Legacy)
+  useEffect(() => {
+    localStorage.setItem('useClinicalFont', String(useClinicalFont));
+    if (!useClinicalFont) {
+      document.body.classList.add('legacy-font');
+    } else {
+      document.body.classList.remove('legacy-font');
+    }
+  }, [useClinicalFont]);
+
   // เมื่อสลับ Role: ถ้าหน้าที่เปิดอยู่ไม่มีสิทธิ์ ให้ Redirect ไปที่หน้าเริ่มต้นของ Role นั้นอัตโนมัติ
   useEffect(() => {
     if (currentUser) {
@@ -63,6 +82,10 @@ function MainApp() {
 
   const toggleTheme = () => {
     setIsDarkMode((prev) => !prev);
+  };
+
+  const toggleFont = () => {
+    setUseClinicalFont((prev) => !prev);
   };
 
   // หากยังไม่ได้ Login ให้แสดงหน้า LoginPage
@@ -144,34 +167,57 @@ function MainApp() {
       case 'billing-dashboard':
         return <BillingDashboardPage />;
 
+      // ===== Doctor Pages =====
+      case 'doctor-dashboard':
+        return <DoctorDashboardPage onNavigate={setActivePage} />;
+      case 'doctor-queue':
+        return <DoctorQueuePage onNavigate={setActivePage} />;
+      case 'doctor-examination':
+        return <DoctorExaminationPage onNavigate={setActivePage} />;
+      case 'doctor-schedule':
+        return <DoctorSchedulePage />;
+      case 'doctor-records':
+        return <DoctorRecordsPage onNavigate={setActivePage} />;
+
       default:
         return <PageShowcase roleBadge="System" roleBadgeColor="#6B7280" title="หน้าแรก" subtitle="ยินดีต้อนรับ" description="กรุณาเลือกเมนูจากแถบด้านซ้าย" features={[]} />;
     }
   };
 
   return (
-    <div className="app-layout">
-      {/* 1. Left Sidebar - Menu filtered dynamically for Registrar & Nurse */}
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        activePage={activePage}
-        onNavigate={setActivePage}
-      />
+    <DoctorDataProvider>
+      <div className="app-layout">
+        {/* 1. Left Sidebar - Menu filtered dynamically for Registrar & Nurse */}
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          activePage={activePage}
+          onNavigate={setActivePage}
+        />
 
-      {/* 2. Top Navigation Bar */}
-      <Topbar
-        isSidebarOpen={isSidebarOpen}
-        onToggleSidebar={() => setIsSidebarOpen(true)}
-        isDarkMode={isDarkMode}
-        onToggleTheme={toggleTheme}
-      />
+        {/* 2. Top Navigation Bar */}
+        <Topbar
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={() => setIsSidebarOpen(true)}
+          isDarkMode={isDarkMode}
+          onToggleTheme={toggleTheme}
+          useClinicalFont={useClinicalFont}
+          onToggleFont={toggleFont}
+          onNavigate={setActivePage}
+        />
 
-      {/* 3. Main Body Content */}
-      <main className={`body-content ${isSidebarOpen ? 'body-with-sidebar' : 'body-full'}`}>
-        {renderContent()}
-      </main>
-    </div>
+        {/* 3. Main Body Content
+            เพิ่มคลาส doctor-module เมื่ออยู่หน้าของแพทย์ เพื่อเปิด preflight แบบย่อ
+            (reset ปุ่ม/ตาราง/หัวข้อ) ให้เฉพาะหน้าที่ใช้ Tailwind เท่านั้น */}
+        <main
+          className={`body-content ${isSidebarOpen ? 'body-with-sidebar' : 'body-full'}${
+            activePage.startsWith('doctor-') ? ' doctor-module' : ''
+          }`}
+        >
+          {renderContent()}
+        </main>
+      </div>
+    </DoctorDataProvider>
   );
 }
 
