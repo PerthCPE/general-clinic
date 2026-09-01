@@ -907,9 +907,9 @@ export default function MedicinePage() {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="input-group">
-                  <label style={{ fontSize: '13px', fontWeight: '600' }}>จำนวนรับเข้า (เม็ด)</label>
+                  <label style={{ fontSize: '13.5px', fontWeight: '600', color: '#334155' }}>จำนวนสต็อกรับเข้าแรกเริ่ม (เม็ด)</label>
                   <input
                     type="number"
                     min="0"
@@ -919,7 +919,7 @@ export default function MedicinePage() {
                   />
                 </div>
                 <div className="input-group">
-                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ราคา/หน่วย (บาท)</label>
+                  <label style={{ fontSize: '13.5px', fontWeight: '600', color: '#334155' }}>ราคาจำหน่ายต่อหน่วย (บาท)</label>
                   <input
                     type="number"
                     min="0"
@@ -929,15 +929,16 @@ export default function MedicinePage() {
                     onChange={(e) => setAddUnitPrice(e.target.value === '' ? '' : Number(e.target.value))}
                   />
                 </div>
-                <div className="input-group">
-                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ผู้ผลิต/บริษัท</label>
-                  <input
-                    type="text"
-                    placeholder="เช่น สยามเภสัช"
-                    value={addManufacturer}
-                    onChange={(e) => setAddManufacturer(e.target.value)}
-                  />
-                </div>
+              </div>
+
+              <div className="input-group">
+                <label style={{ fontSize: '13.5px', fontWeight: '600', color: '#334155' }}>บริษัทผู้ผลิต / ผู้จัดจำหน่าย (Manufacturer)</label>
+                <input
+                  type="text"
+                  placeholder="เช่น บริษัท สยามเภสัช จำกัด, องค์การเภสัชกรรม (GPO)"
+                  value={addManufacturer}
+                  onChange={(e) => setAddManufacturer(e.target.value)}
+                />
               </div>
             </div>
 
