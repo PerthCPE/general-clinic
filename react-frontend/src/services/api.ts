@@ -317,3 +317,316 @@ export const vitalsApi = {
   getPatientHistory: (patientId: number | string) =>
     request<{ patient_id: string; history: BackendScreening[] }>(`/api/nurse/vitals/history/${patientId}`),
 };
+
+
+// ==============================================================================
+// 6. Doctor API - คิวตรวจของแพทย์, รายละเอียดเคส, เปลี่ยนสถานะการตรวจ
+// ==============================================================================
+// รูปแบบที่ backend ส่งมาถูกจัดให้ตรงกับ types.ts ของโมดูลแพทย์แล้ว
+// (status เป็นชุด QueueStatus, id เป็น string, bp เป็น "120/80",
+//  triage เป็น Level 1-5) จึงแทบไม่ต้องแปลงอะไรเพิ่มที่ฝั่งนี้
+
+export interface BackendDoctorPatient {
+  id: number;
+  hn: string;
+  national_id: string;
+  fullname: string;
+  gender: string;
+  birthdate: string;
+  age: number;
+  phone_number: string;
+  scheme_type: string;
+  allergies: string;
+  chronic_diseases: string;
+}
+
+export interface BackendDoctorScreening {
+  id: number;
+  chief_complaint: string;
+  allergies: string;
+  medical_history: string;
+  nurse_notes: string;
+  triage_level: string;
+  triage_code: string;
+  triage_priority: string;
+  bp: string;
+  systolic_bp: number;
+  diastolic_bp: number;
+  weight: number;
+  height: number;
+  bmi: number;
+  temperature: number;
+  heart_rate: number;
+  respiratory_rate: number;
+  spo2: number;
+  screened_by_name: string;
+  screened_at: string;
+}
+
+export interface BackendDoctorQueueItem {
+  id: string;
+  status: string;
+  queue_id: number;
+  queue_number: string;
+  queue_status: string;
+  department: string;
+  note: string;
+  queued_at: string;
+  visit_date: string;
+  visit_time: string;
+  waiting_minutes: number;
+  visit_id: number;
+  vn: string;
+  assigned_doctor_id: number;
+  assigned_doctor_name: string;
+  patient: BackendDoctorPatient;
+  screening: BackendDoctorScreening | null;
+
+  // การวินิจฉัยหลักของครั้งนั้น — มีเฉพาะรายการที่แพทย์บันทึกผลตรวจแล้ว
+  diagnosis?: string;
+  icd_code?: string;
+}
+
+export interface BackendDoctorQueueSummary {
+  total_today: number;
+  waiting: number;
+  examining: number;
+  completed_today: number;
+  avg_wait_minutes: number;
+}
+
+export interface BackendDoctorQueueResponse {
+  doctor_id: number;
+  doctor_name: string;
+  summary: BackendDoctorQueueSummary;
+  items: BackendDoctorQueueItem[];
+}
+
+export interface BackendDoctorVisitDetail {
+  id: string;
+  status: string;
+  visit_id: number;
+  vn: string;
+  visit_date: string;
+  visit_time: string;
+  visit_at: string;
+  visit_type: string;
+  department: string;
+  started_at: string | null;
+  ended_at: string | null;
+  doctor_id: number;
+  doctor_name: string;
+  queue_id: number;
+  queue_number: string;
+  queue_status: string;
+  patient: BackendDoctorPatient;
+  eligibility: {
+    scheme_type: string;
+    coverage_details: string;
+    hospital_name: string;
+    status: string;
+    expire_date: string;
+  } | null;
+  screening: BackendDoctorScreening | null;
+}
+
+export interface BackendPatientRecordsResponse {
+  query: string;
+  total: number;
+  items: BackendDoctorQueueItem[];
+}
+
+export interface BackendDoctorProfile {
+  user_id: number;
+  username: string;
+  fullname: string;
+  phone: string;
+  role: string;
+  doctor_id?: number;
+  license_number?: string;
+  specialty?: string;
+  room?: string;
+  email?: string;
+  is_active?: boolean;
+}
+
+export const doctorApi = {
+  getProfile: () => request<BackendDoctorProfile>('/api/doctor/me'),
+
+  // scope 'all' = ดูคิวของแพทย์ทุกคน (ค่าเริ่มต้นคือเฉพาะคิวของตัวเอง)
+  getQueue: (scope?: 'all') =>
+    request<BackendDoctorQueueResponse>(`/api/doctor/queue${scope ? `?scope=${scope}` : ''}`),
+
+  getVisit: (visitId: number | string) =>
+    request<BackendDoctorVisitDetail>(`/api/doctor/visits/${visitId}`),
+
+  // ประวัติเวชระเบียน: ไม่จำกัดวันและสถานะ จึงเจอผู้ป่วยที่ตรวจเสร็จไปแล้วด้วย
+  // ต่างจาก getQueue ที่คืนเฉพาะคิวที่ยังเดินอยู่ กับคิวที่ปิดไปแล้ววันนี้
+  getPatientRecords: (query?: string, limit = 200) => {
+    const params = new URLSearchParams();
+    if (query && query.trim()) params.set('q', query.trim());
+    params.set('limit', String(limit));
+    return request<BackendPatientRecordsResponse>(`/api/doctor/patient-records?${params.toString()}`);
+  },
+
+  // status ใช้ค่าเดียวกับ QueueStatus: Waiting | Examining | Pending Pharmacy | Completed | Cancelled
+  updateVisitStatus: (visitId: number | string, status: string, note?: string) =>
+    request<{ message: string; status: string; vn: string }>(
+      `/api/doctor/visits/${visitId}/status`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ status, note: note ?? '' }),
+      }
+    ),
+};
+
+
+// ==============================================================================
+// 7. Examination API - บันทึกผลการตรวจและวินิจฉัยโรค (ระบบย่อยที่ 1 ของแพทย์)
+// ==============================================================================
+// object ย่อย (physicalExam, counseling, followUp, diagnosis, patientHistory)
+// backend ตั้งชื่อฟิลด์ให้ตรงกับ types.ts ของโมดูลแพทย์แล้ว จึงนำไปใส่ Patient
+// ได้เกือบตรงๆ ส่วนฟิลด์ระดับบนสุดยังเป็น snake_case เหมือน endpoint อื่น
+
+export interface BackendPhysicalExam {
+  generalAppearance: string;
+  heent: string;
+  cardiovascular: string;
+  respiratory: string;
+  abdomen: string;
+  musculoskeletal: string;
+  neurological: string;
+  skin: string;
+}
+
+export interface BackendCounseling {
+  medicationAdvice: string;
+  dietAdvice: string;
+  exerciseAdvice: string;
+  lifestyleAdvice: string;
+  diseaseEducation: string;
+}
+
+export interface BackendFollowUp {
+  followUpDate: string;
+  reason: string;
+  instructions: string;
+}
+
+export interface BackendDiagnosisItem {
+  code: string;
+  name: string;
+  localName: string;
+}
+
+export interface BackendSubstanceHistory {
+  isUser: boolean;
+  status: string;
+  frequency: string;
+  duration: string;
+}
+
+export interface BackendPatientHistory {
+  pastMedicalHistory: string;
+  pastSurgery: string;
+  hospitalAdmissionHistory: string;
+  familyHistory: string;
+  socialHistory: string;
+  smokingHistory: BackendSubstanceHistory | null;
+  alcoholHistory: BackendSubstanceHistory | null;
+  currentMedications: string[] | null;
+}
+
+export interface BackendExaminationDetail {
+  visit_id: number;
+  vn: string;
+
+  // Draft = ยังแก้ไขได้, Signed = เซ็นปิดการตรวจแล้ว, "" = ยังไม่เคยบันทึก
+  status: string;
+  signed_at: string;
+  editable: boolean;
+
+  doctor_id: number;
+  doctor_name: string;
+
+  presentIllness: string;
+  chiefComplaintDuration: string;
+  physicalExam: BackendPhysicalExam;
+  assessmentNotes: string;
+  clinicalNotes: string;
+  treatmentPlan: string;
+  proceduresPerformed: string;
+  counseling: BackendCounseling;
+  followUp: BackendFollowUp;
+
+  primaryDiagnosis: BackendDiagnosisItem | null;
+  secondaryDiagnoses: BackendDiagnosisItem[] | null;
+
+  patient: BackendDoctorPatient;
+  screening: BackendDoctorScreening | null;
+  patientHistory: BackendPatientHistory | null;
+}
+
+export interface SaveExaminationPayload {
+  // draft = บันทึกร่าง (แก้ต่อได้), sign = เซ็นปิดการตรวจ (ต้องมีวินิจฉัยหลัก)
+  action: 'draft' | 'sign';
+
+  presentIllness: string;
+  chiefComplaintDuration: string;
+  physicalExam: BackendPhysicalExam;
+  assessmentNotes: string;
+  clinicalNotes: string;
+  treatmentPlan: string;
+  proceduresPerformed: string;
+  counseling: BackendCounseling;
+  followUp: BackendFollowUp;
+
+  primaryDiagnosis: BackendDiagnosisItem | null;
+  secondaryDiagnoses: BackendDiagnosisItem[];
+
+  patientHistory: BackendPatientHistory | null;
+}
+
+export interface SaveExaminationResult {
+  message: string;
+  examination_id: number;
+  status: string;
+  visit_status: string;
+  diagnosis_count: number;
+}
+
+export interface BackendPastVisit {
+  id: number;
+  vn: string;
+  visitDate: string;
+  visitTime: string;
+  doctorName: string;
+  department: string;
+  diagnosis: string;
+  icdCode: string;
+  vitals?: {
+    bp?: string;
+    pulse?: number;
+    temp?: number;
+    weight?: number;
+    spo2?: number;
+  } | null;
+  followUpDate: string;
+  status: string;
+}
+
+export const examinationApi = {
+  get: (visitId: number | string) =>
+    request<BackendExaminationDetail>(`/api/doctor/visits/${visitId}/examination`),
+
+  save: (visitId: number | string, payload: SaveExaminationPayload) =>
+    request<SaveExaminationResult>(`/api/doctor/visits/${visitId}/examination`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+
+  getPatientVisits: (patientId: number | string) =>
+    request<{ patient_id: number; history: BackendPastVisit[] }>(
+      `/api/doctor/patients/${patientId}/visits`
+    ),
+};

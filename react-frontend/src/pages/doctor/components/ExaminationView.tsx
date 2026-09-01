@@ -3,7 +3,7 @@ import type { Patient, QueueStatus, PrescriptionItem, LabOrderItem, ImagingOrder
 import { CopyableText } from './CopyableText';
 import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
-import { generateVN } from '../utils/vnGenerator';
+import { displayVN } from '../utils/vnGenerator';
 import {
   Stethoscope,
   HeartPulse,
@@ -750,8 +750,13 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       isOpen: true,
       title: language === 'th' ? 'บันทึกฉบับร่างแล้ว' : 'Draft Saved',
       message: language === 'th'
-        ? `เก็บข้อมูลการตรวจของ ${patient.name} (HN: ${patient.hn}) ไว้เรียบร้อย สถานะยังเป็น "กำลังตรวจ" กลับมาทำต่อได้ทุกเมื่อ`
-        : `Examination data for ${patient.name} (HN: ${patient.hn}) has been saved. The visit remains "Examining" so you can continue later.`
+        ? `เก็บข้อมูลการตรวจของ ${patient.name} (HN: ${patient.hn}) ไว้เรียบร้อย สถานะยังเป็น "กำลังตรวจ" กดปุ่ม "ตรวจต่อ" ในหน้าคิวผู้ป่วยเพื่อกลับมาทำต่อได้ทุกเมื่อ`
+        : `Examination data for ${patient.name} (HN: ${patient.hn}) has been saved. The visit remains "Examining" — use the "Continue Exam" button in the patient queue to resume.`,
+      // กลับไปหน้าคิวผู้ป่วยเหมือนตอนกดบันทึกผลการตรวจ
+      // เพื่อให้แพทย์เรียกคิวถัดไปได้ทันที แล้วค่อยกด "ตรวจต่อ" กลับมาทีหลัง
+      onConfirm: () => {
+        onBackToQueue();
+      }
     });
   };
 
@@ -843,8 +848,8 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       isOpen: true,
       title: language === 'th' ? 'บันทึกสำเร็จ!' : 'Success!',
       message: language === 'th'
-        ? `บันทึกและเสร็จสิ้นการตรวจเรียบร้อยแล้วสำหรับผู้ป่วย ${patient.name} (HN: ${patient.hn}, VN: ${patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)})${rxNotice}`
-        : `Examination completed successfully for patient ${patient.name} (HN: ${patient.hn}, VN: ${patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)})${rxNotice}`,
+        ? `บันทึกและเสร็จสิ้นการตรวจเรียบร้อยแล้วสำหรับผู้ป่วย ${patient.name} (HN: ${patient.hn}, VN: ${displayVN(patient.vn)})${rxNotice}`
+        : `Examination completed successfully for patient ${patient.name} (HN: ${patient.hn}, VN: ${displayVN(patient.vn)})${rxNotice}`,
       onConfirm: () => {
         onBackToQueue();
       }
@@ -1052,7 +1057,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? `คิว #${patient.queueNo}` : `Queue #${patient.queueNo}`}
                   </span>
                   <CopyableText label="HN" value={patient.hn} className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
-                  <CopyableText label="VN" value={patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)} className="bg-purple-50 text-purple-700 border border-purple-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
+                  <CopyableText label="VN" value={displayVN(patient.vn)} className="bg-purple-50 text-purple-700 border border-purple-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
                   <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={nationalId} className="bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
                   <span className="bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold px-2.5 py-0.5 rounded-full">
                     {language === 'th'

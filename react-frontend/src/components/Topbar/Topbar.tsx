@@ -1,8 +1,9 @@
 import './Topbar.css';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useDoctorData } from '../../pages/doctor/DoctorDataContext';
 import { matchPatientSearch } from '../../pages/doctor/utils/searchUtils';
+import { displayVN } from '../../pages/doctor/utils/vnGenerator';
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -22,7 +23,12 @@ interface NotificationItem {
 
 function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onNavigate }: TopbarProps) {
   const { currentUser, logout } = useAuth();
-  const { patients: doctorPatients, setSelectedRecordPatient } = useDoctorData();
+  const {
+    patients: doctorPatients,
+    recordPatients,
+    refreshRecords,
+    setSelectedRecordPatient,
+  } = useDoctorData();
   const isDoctor = currentUser?.role === 'doctor';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
@@ -30,12 +36,35 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // ค้นหาผู้ป่วยแบบ Live Search (เฉพาะ role หมอที่มีข้อมูลคิวผู้ป่วยให้ค้นหา)
+  // โหลดผู้ป่วยย้อนหลังไว้ให้ช่องค้นหาด้านบนใช้ด้วย ไม่งั้นจะค้นเจอเฉพาะคิววันนี้
+  useEffect(() => {
+    if (isDoctor) {
+      void refreshRecords();
+    }
+  }, [isDoctor, refreshRecords]);
+
+  // ค้นหาผู้ป่วยแบบ Live Search (เฉพาะ role หมอ)
+  //
+  // รวม 2 ชุด: คิวที่ยังเดินอยู่ + ผู้ป่วยที่เคยมาตรวจ (ไม่จำกัดวัน)
+  // ถ้าคนเดียวกันอยู่ทั้งสองชุด ยึดของคิวเพราะสถานะเป็นปัจจุบันกว่า
+  const searchablePatients = useMemo(() => {
+    if (!isDoctor) return [];
+    const merged = [...doctorPatients];
+    const seen = new Set(doctorPatients.map((p) => p.hn));
+    for (const p of recordPatients) {
+      if (!seen.has(p.hn)) {
+        seen.add(p.hn);
+        merged.push(p);
+      }
+    }
+    return merged;
+  }, [isDoctor, doctorPatients, recordPatients]);
+
   const matchingPatients = isDoctor && searchQuery.trim()
-    ? doctorPatients.filter((p) => matchPatientSearch(p, searchQuery))
+    ? searchablePatients.filter((p) => matchPatientSearch(p, searchQuery))
     : [];
 
-  const handleSelectSearchResult = (patient: (typeof doctorPatients)[number]) => {
+  const handleSelectSearchResult = (patient: (typeof searchablePatients)[number]) => {
     setSelectedRecordPatient(patient);
     setSearchQuery('');
     setIsSearchDropdownOpen(false);
@@ -467,7 +496,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                     <div className="search-result-info">
                       <span className="search-result-name">{patient.name}</span>
                       <span className="search-result-meta">
-                        HN: {patient.hn} &bull; VN: {patient.vn}
+                        HN: {patient.hn} &bull; VN: {displayVN(patient.vn)}
                       </span>
                     </div>
                   </div>

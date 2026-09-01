@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// API Routes Auth And Set Up Role 
+// API Routes Auth And Set Up Role
 func SetUpRoutes(r *gin.Engine) {
 	// เปิดใช้งาน CORS Middleware
 	r.Use(middleware.CORSMiddleware())
@@ -22,7 +22,7 @@ func SetUpRoutes(r *gin.Engine) {
 	api := r.Group("api")
 	// check jwt bearer token และแจก role
 	api.Use(middleware.AuthRequired())
-	
+
 	// Common Endpoints
 	api.GET("/doctors", controllers.GetDoctors)
 
@@ -34,12 +34,12 @@ func SetUpRoutes(r *gin.Engine) {
 		registrarRoutes.POST("/patients", controllers.RegisterPatient)
 		registrarRoutes.GET("/patients/search", controllers.SearchPatient)
 		registrarRoutes.GET("/patients/search/:query", controllers.SearchPatient)
-		
+
 		registrarRoutes.GET("/eligibility/check/:national_id", controllers.CheckExternalEligibility)
 		registrarRoutes.POST("/eligibility/save", controllers.SavePatientEligibility)
 		registrarRoutes.GET("/eligibility/history", controllers.GetEligibilityHistory)
 	}
-		
+
 	// 2. Nurse & Nurse Assistant Module (คัดกรอง, วัดสัญญาณชีพ, ประวัติคัดกรอง)
 	nurseRoutes := api.Group("/nurse")
 	nurseRoutes.Use(middleware.RoleRequired("nurse", "nurse_assistant"))
@@ -50,12 +50,36 @@ func SetUpRoutes(r *gin.Engine) {
 		nurseRoutes.GET("/vitals/history/:patient_id", controllers.GetScreeningHistory)
 	}
 
-	// 3. Queue Management Module (จัดการคิว สำหรับ Registrar, Nurse, Nurse Assistant)
+	// 3. Doctor Module (คิวตรวจ, เปิดเคสตรวจ, เปลี่ยนสถานะการตรวจ)
+	doctorRoutes := api.Group("/doctor")
+	doctorRoutes.Use(middleware.RoleRequired("doctor"))
+	{
+		doctorRoutes.GET("/me", controllers.GetMyDoctorProfile)
+		doctorRoutes.GET("/queue", controllers.GetDoctorQueue)
+		doctorRoutes.GET("/visits/:id", controllers.GetDoctorVisitDetail)
+		doctorRoutes.PUT("/visits/:id/status", controllers.UpdateVisitStatus)
+
+		// บันทึกผลการตรวจและวินิจฉัยโรค
+		doctorRoutes.GET("/visits/:id/examination", controllers.GetExamination)
+		doctorRoutes.PUT("/visits/:id/examination", controllers.SaveExamination)
+
+		// ค้นหาประวัติเวชระเบียน (รวมผู้ป่วยที่ตรวจเสร็จไปแล้ว ไม่จำกัดวัน)
+		//
+		// ตั้งเป็น /patient-records ไม่ใช่ /patients/records เพราะกลุ่มนี้มี
+		// /patients/:id/visits อยู่แล้ว การมี segment คงที่ปนกับ :id ในตำแหน่ง
+		// เดียวกัน เสี่ยงทำให้ router ชนกันตอนเริ่มเซิร์ฟเวอร์
+		doctorRoutes.GET("/patient-records", controllers.GetPatientRecords)
+
+		// ประวัติการมาตรวจย้อนหลังของผู้ป่วย
+		doctorRoutes.GET("/patients/:id/visits", controllers.GetPatientVisitHistory)
+	}
+
+	// 4. Queue Management Module (จัดการคิว สำหรับ Registrar, Nurse, Nurse Assistant)
 	queueRoutes := api.Group("/queue")
 	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant"))
 	{
 		queueRoutes.GET("/list", controllers.GetQueueList)
 		queueRoutes.POST("/create", controllers.CreateQueue)
 		queueRoutes.PUT("/:id/status", controllers.UpdateQueueStatus)
-	}	
+	}
 }

@@ -87,6 +87,13 @@ export interface AttachmentItem {
 
 export interface Patient {
   id: string;
+
+  // รหัสจากฐานข้อมูลจริง ใช้ตอนเรียก API ของแพทย์
+  // (id ด้านบนเป็นสตริงสำหรับ React key เท่านั้น เช่น "q-2")
+  visitId?: number;
+  queueId?: number;
+  patientId?: number;
+
   queueNo: string;
   hn: string;
   vn: string;
