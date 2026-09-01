@@ -54,38 +54,85 @@
 .search-container {
   position: relative;
   flex: 1;
-  max-width: 600px;
-  height: 42px;
-  background: #F0F4F8;
-  border-radius: 35px;
+  max-width: 480px;
+  height: 44px;
+  background: #F8FAFC;
+  border: 1px solid #CBD5E1;
+  border-radius: 12px;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 14px;
   margin-right: auto;
-  transition: background-color 0.5s ease;
+  transition: all 0.2s ease;
 }
 
-/* ===== สถานะ Focus ของช่องค้นหา (เฉพาะ role แพทย์) =====
-   ใช้ :focus-within เพื่อให้กรอบขึ้นตอนคลิกที่ช่อง แม้ตัวที่ได้ focus จริงคือ <input> ข้างใน
-   ใช้ box-shadow ทำกรอบแทน border เพราะไม่กินพื้นที่ layout จึงไม่ทำให้ช่องขยับตอนคลิก
-   ให้โทนเดียวกับช่องค้นหาในตารางคิว (ขอบฟ้า #2563EB + วงเรืองแสงจาง ๆ) */
-.search-container-interactive {
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
-}
-
-.search-container-interactive:hover {
-  background: #E8EEF5;
-}
-
-.search-container-interactive:focus-within {
+.search-container:hover {
+  border-color: #94A3B8;
   background: #FFFFFF;
-  box-shadow: 0 0 0 1px #2563EB, 0 0 0 4px rgba(37, 99, 235, 0.15);
 }
 
-/* ไอคอนแว่นขยายเปลี่ยนเป็นสีฟ้าตอน focus เพื่อย้ำว่าช่องกำลังถูกใช้งาน */
-.search-container-interactive:focus-within .search-icon path {
-  stroke: #2563EB;
+.search-container:focus-within {
+  background: #FFFFFF;
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.search-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748B;
+  transition: color 0.2s ease;
+}
+
+.search-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.search-container:focus-within .search-icon {
+  color: #2563EB;
+}
+
+.search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', sans-serif);
+  font-style: normal;
+  font-weight: 500;
+  font-size: 14.5px;
+  line-height: 24px;
+  color: #0F172A;
+  transition: color 0.2s ease;
+}
+
+.search-input::placeholder {
+  color: #64748B;
+  font-weight: 400;
+  transition: color 0.2s ease;
+}
+
+.search-topbar-clear-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.search-topbar-clear-btn:hover {
+  color: #0F172A;
 }
 
 /* ===== Search Live-Results Dropdown (เฉพาะ role หมอ) ===== */
@@ -186,43 +233,6 @@
   color: #94A3B8;
 }
 
-.search-icon {
-  width: 24px;
-  height: 24px;
-  flex-shrink: 0;
-  margin-right: 8px;
-}
-
-.search-icon svg {
-  width: 24px;
-  height: 24px;
-}
-
-.search-icon path {
-  stroke: #90A1B9;
-  stroke-width: 2px;
-  fill: none;
-  transition: stroke 0.5s ease;
-}
-
-.search-input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-family: var(--font-primary);
-  font-style: normal;
-  font-weight: 400;
-  font-size: 13px;
-  line-height: 24px;
-  color: #334155;
-  transition: color 0.5s ease;
-}
-
-.search-input::placeholder {
-  color: #90A1B9;
-  transition: color 0.5s ease;
-}
 
 /* ===== Group 84 - Actions ===== */
 .actions-group {
@@ -571,93 +581,95 @@
    ===== DARK MODE STYLES (ตอนเปิดโหมดมืด) =====
    ================================================================ */
 
-/* Topbar - Dark (Dimmed Eye-Comfort) */
+/* Topbar - Dark (Elevated Dark Slate per TEAM_RULES.md) */
 body.dark-mode .top-nav-header {
-  background: #2D333B;
-  box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid #444C56;
+  background: #1C2230;
+  box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.25);
+  border-bottom: 1px solid #333F53;
 }
 
-/* Search bar - Dark (Seamless & Blended) */
+/* Search bar - Dark */
 body.dark-mode .search-container {
-  background: #22272E;
-  border: 1px solid #373E47;
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  background: #212836;
+  border: 1px solid #333F53;
 }
 
 body.dark-mode .search-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-body.dark-mode .search-icon path {
-  stroke: #768390;
-  transition: stroke 0.2s ease;
+  color: #94A3B8;
 }
 
 body.dark-mode .search-input {
   background: transparent !important;
-  color: #CDD9E5 !important;
+  color: #F8FAFC !important;
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
 }
 
 body.dark-mode .search-input::placeholder {
-  color: #768390 !important;
+  color: #94A3B8 !important;
 }
 
-body.dark-mode .search-container-interactive:hover,
 body.dark-mode .search-container:hover {
-  background: #262C35;
-  border-color: #444C56;
+  background: #283143;
+  border-color: #475569;
 }
 
-body.dark-mode .search-container-interactive:focus-within,
 body.dark-mode .search-container:focus-within {
-  background: #22272E;
-  box-shadow: 0 0 0 1px #539BF5, 0 0 0 3px rgba(83, 155, 245, 0.2);
-  border-color: #539BF5;
+  background: #1C2230;
+  box-shadow: 0 0 0 1px #2563EB, 0 0 0 3px rgba(37, 99, 235, 0.25);
+  border-color: #2563EB;
 }
 
-body.dark-mode .search-container-interactive:focus-within .search-icon path,
-body.dark-mode .search-container:focus-within .search-icon path {
-  stroke: #539BF5;
+body.dark-mode .search-container:focus-within .search-icon {
+  color: #60A5FA;
 }
 
-body.dark-mode .search-container-interactive:focus-within .search-input,
-body.dark-mode .search-container:focus-within .search-input {
-  background: transparent !important;
-  color: #CDD9E5 !important;
+body.dark-mode .search-topbar-clear-btn {
+  color: #94A3B8;
+}
+
+body.dark-mode .search-topbar-clear-btn:hover {
+  color: #F8FAFC;
 }
 
 body.dark-mode .search-results-dropdown {
-  background: #2D333B;
-  border-color: #444C56;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+  background: #212836;
+  border-color: #333F53;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
 }
 
 body.dark-mode .search-results-header {
-  background: #22272E;
-  border-bottom-color: #444C56;
-  color: #768390;
+  background: #1C2230;
+  border-bottom-color: #333F53;
+  color: #94A3B8;
 }
 
 body.dark-mode .search-results-hint {
-  color: #636E7B;
+  color: #64748B;
 }
 
 body.dark-mode .search-result-item {
-  border-bottom-color: #373E47;
+  border-bottom-color: #2F3B4E;
 }
 
 body.dark-mode .search-result-item:hover {
-  background: rgba(83, 155, 245, 0.12);
+  background: rgba(37, 99, 235, 0.15);
 }
 
 body.dark-mode .search-result-name {
-  color: #CDD9E5;
+  color: #F8FAFC;
+}
+
+body.dark-mode .search-result-meta {
+  color: #94A3B8;
+}
+
+body.dark-mode .search-results-empty {
+  color: #94A3B8;
 }
 
 body.dark-mode .search-result-meta {
