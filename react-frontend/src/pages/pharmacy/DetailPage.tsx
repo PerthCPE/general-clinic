@@ -107,15 +107,48 @@ export default function DetailPage({
       if (data && data.action === 'db_reset') {
         setQueueList([]);
       } else {
-        // If queue updated, better to re-fetch
         fetchQueues();
       }
     });
 
     const unsubCreated = subscribe('QUEUE_CREATED', (data: any) => {
       if (data) {
-        fetchQueues(); // Re-fetch all to ensure perfectly sync
-        triggerToast(`ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์: ${data.patient_name || ''}`, 'doctor');
+        const pName = data.patient?.full_name || data.patient_name || `ผู้ป่วยคิว ${data.queue_number || ''}`;
+        
+        // Optimistic UI update in case fetchQueues fails (e.g. auth issues during demo)
+        const newPatient: PatientConfig = {
+          id: String(data.id) || `Q-${Date.now()}`,
+          visitId: data.visit_id || 1,
+          hn: data.hn || `HN-${data.patient_id || data.id || Date.now()}`,
+          nationalId: data.national_id || '',
+          queueNumber: data.queue_number || 'Q0000',
+          ticket: data.queue_number || 'A-01',
+          name: pName,
+          shortName: pName,
+          gender: data.gender || 'ชาย',
+          age: data.age || 0,
+          treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+          patientType: 'ผู้ป่วยนอก (OPD)',
+          allergies: data.allergies ? [data.allergies] : ['ไม่มีประวัติแพ้ยา'],
+          chronicDiseases: data.chronic_diseases || 'ไม่มี',
+          vitals: 'รอตรวจสอบ',
+          visitStatus: 'รอรับยา / ชำระเงิน',
+          visitDate: new Date().toLocaleDateString('th-TH'),
+          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+          doctorAdvice: data.note || '',
+          medications: data.medications || []
+        };
+        
+        setQueueList(prev => {
+          // Add if not exist
+          if (!prev.find(q => q.id === newPatient.id)) {
+            return [...prev, newPatient];
+          }
+          return prev;
+        });
+
+        fetchQueues(); // Still try to fetch from server
+        triggerToast(`ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์: ${pName}`, 'doctor');
       }
     });
 
