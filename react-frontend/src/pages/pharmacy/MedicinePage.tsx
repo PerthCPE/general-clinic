@@ -353,7 +353,7 @@ export default function MedicinePage() {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>ยาในคลังปกติ (In Stock)</span>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>ยาในคลังปกติ</span>
             <div className="stat-icon-wrap icon-green">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
@@ -397,7 +397,7 @@ export default function MedicinePage() {
           }}
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>ยาหมดคลัง (Out of Stock)</span>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>ยาหมดคลัง</span>
             <div className="stat-icon-wrap icon-red">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </div>
@@ -502,12 +502,12 @@ export default function MedicinePage() {
               <table className="stock-table">
                 <thead>
                   <tr>
-                    <th>รหัสยา (ID)</th>
-                    <th>ชื่อยา (คลิกเพื่อดูรายละเอียด)</th>
+                    <th style={{ textAlign: 'center' }}>รหัสยา</th>
+                    <th>ชื่อยา</th>
                     <th>ชนิด / หมวดหมู่ยา</th>
-                    <th>คงเหลือในคลัง (STOCK)</th>
-                    <th>สถานะ (STATUS)</th>
-                    <th>จ่ายวันนี้ (DISPENSED TODAY)</th>
+                    <th style={{ textAlign: 'center' }}>คงเหลือในคลัง</th>
+                    <th style={{ textAlign: 'center' }}>สถานะคลังยา</th>
+                    <th style={{ textAlign: 'center' }}>จ่ายวันนี้</th>
                     <th style={{ textAlign: 'right' }}>การจัดการ</th>
                   </tr>
                 </thead>
@@ -539,7 +539,7 @@ export default function MedicinePage() {
                   ) : (
                     filteredMedicines.map((med) => (
                       <tr key={med.id}>
-                        <td style={{ padding: '14px 20px', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <span style={{ 
                             color: '#2563EB', 
                             fontWeight: '700', 
@@ -558,7 +558,7 @@ export default function MedicinePage() {
                           <span className="med-name-link">{med.name}</span>
                           <span className="med-hint-tag">คลิกเพื่อดูรายละเอียดสรรพคุณ </span>
                         </td>
-                        <td>
+                        <td style={{ padding: '14px 16px' }}>
                           <span style={{ 
                             fontSize: '13px', 
                             padding: '4px 10px', 
@@ -568,16 +568,16 @@ export default function MedicinePage() {
                             fontWeight: '500',
                             display: 'inline-block'
                           }}>
-                            {med.category}
+                            {med.category ? med.category.replace(/\s*\([^)]*\)/g, '').trim() : 'ยารักษาโรคทั่วไป'}
                           </span>
                         </td>
-                        <td className="stock-num-cell">{med.stock} เม็ด</td>
-                        <td>
-                          <span className={`status-badge ${getStatusClass(med.status)}`}>
+                        <td className="stock-num-cell" style={{ textAlign: 'center' }}>{med.stock} เม็ด</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <span className={`status-badge ${getStatusClass(med.status)}`} style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', minWidth: '90px', textAlign: 'center' }}>
                             {renderStatusText(med.status)}
                           </span>
                         </td>
-                        <td className="dispensed-cell">{med.dispensedToday} เม็ด</td>
+                        <td className="dispensed-cell" style={{ textAlign: 'center' }}>{med.dispensedToday} เม็ด</td>
                         <td style={{ textAlign: 'right' }}>
                           <button
                             className="update-stock-btn"

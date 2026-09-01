@@ -469,17 +469,17 @@ export default function DetailPage({
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                       <thead>
                         <tr style={{ color: '#0F172A', background: '#F1F5F9', borderBottom: '2px solid #CBD5E1', height: '44px' }}>
-                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>รหัสยา</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>รหัสยา</th>
                           <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ชื่อรายการยา & สรรพคุณ</th>
                           <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ขนาด / วิธีรับประทาน</th>
-                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'right' }}>ราคา</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>ราคา</th>
                           <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>สถานะคลังยา</th>
                         </tr>
                       </thead>
                       <tbody>
                         {activePatient.medications.map((med, index) => (
                           <tr key={index} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                            <td style={{ padding: '12px' }}>
+                            <td style={{ padding: '12px', textAlign: 'center' }}>
                               <span style={{ 
                                 color: '#2563EB', 
                                 fontWeight: '700', 
@@ -516,7 +516,7 @@ export default function DetailPage({
                               <div style={{ fontWeight: '600', color: '#1E293B' }}>{med.dosage}</div>
                               <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>คำแนะนำ: {med.instructions}</div>
                             </td>
-                            <td style={{ padding: '12px', textAlign: 'right', fontWeight: '700', fontSize: '14.5px', color: '#0F172A' }}>
+                            <td style={{ padding: '12px', textAlign: 'center', fontWeight: '700', fontSize: '14.5px', color: '#0F172A' }}>
                               ฿ {med.price.toLocaleString()}
                             </td>
                             <td style={{ padding: '12px', textAlign: 'center' }}>
@@ -526,7 +526,8 @@ export default function DetailPage({
                                   color: med.stockStatus === 'out-stock' ? '#DC2626' : '#15803D', 
                                   border: `1px solid ${med.stockStatus === 'out-stock' ? '#FCA5A5' : '#86EFAC'}`,
                                   padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
-                                  display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap'
+                                  display: 'inline-flex', justifyContent: 'center', alignItems: 'center', minWidth: '110px',
+                                  textAlign: 'center', whiteSpace: 'nowrap'
                                 }}
                               >
                                 {med.stockStatus === 'out-stock' ? 'หมดคลัง (0)' : `มีในคลัง (${med.stock})`}
