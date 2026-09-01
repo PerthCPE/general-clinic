@@ -173,7 +173,38 @@ export default function DetailPage({
       });
       if (res.ok) {
         const data = await res.json();
-        triggerToast(`แพทย์ส่งใบสั่งยาลง DB จริงสำเร็จ: ${data.patient_name || 'ผู้ป่วยใหม่'} (${data.hn || ''})`, 'doctor');
+        const pName = data.patient_name || 'ผู้ป่วยใหม่';
+        const qNo = data.queue?.queue_number || 'Q0001';
+        const qId = String(data.queue?.id || Date.now());
+
+        const newPatient: PatientConfig = {
+          id: qId,
+          visitId: data.visit_id || 1,
+          hn: data.hn || `HN-${Date.now()}`,
+          nationalId: data.patient?.national_id || '',
+          queueNumber: qNo,
+          ticket: qNo,
+          name: pName,
+          shortName: pName,
+          gender: data.patient?.gender || 'ชาย',
+          age: data.patient?.birthdate ? (new Date().getFullYear() - new Date(data.patient.birthdate).getFullYear()) : 35,
+          treatmentRights: data.patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+          patientType: 'ผู้ป่วยนอก (OPD)',
+          allergies: data.patient?.allergies ? [data.patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
+          chronicDiseases: data.patient?.chronic_diseases || 'ไม่มี',
+          vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+          visitStatus: 'รอรับยา / ชำระเงิน',
+          visitDate: new Date().toLocaleDateString('th-TH'),
+          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+          doctorAdvice: data.queue?.note || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
+          medications: data.medications || []
+        };
+
+        setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
+        setLocalPatientId(newPatient.id);
+        if (onSelectPatientId) onSelectPatientId(newPatient.id);
+
+        triggerToast(`แพทย์ส่งใบสั่งยาลง DB จริงสำเร็จ: ${pName} (${data.hn || ''})`, 'doctor');
       } else {
         fallbackSimulate();
       }

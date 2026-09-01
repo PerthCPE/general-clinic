@@ -179,5 +179,7 @@ func SimulateDoctorPrescription(c *gin.Context) {
 		"patient_name": patient.FullName,
 		"hn":           patient.HN,
 		"visit_id":     visit.ID,
+		"patient":      patient,
+		"medications":  dispensedMeds,
 	})
 }
