@@ -182,7 +182,8 @@
 .stat-sub-text {
   font-family: var(--font-primary);
   font-size: 13.5px;
-  color: #94A3B8;
+  font-weight: 500;
+  color: #64748B;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -412,39 +413,58 @@
 }
 
 .col-queue-no {
-  width: 10%;
-  text-align: center;
+  width: 125px;
+  min-width: 125px;
+  max-width: 125px;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .col-patient-name {
-  width: 33%;
+  width: 26%;
+  max-width: 280px;
   text-align: left;
+  overflow: hidden;
 }
 
 .col-department {
-  width: 23%;
+  width: 32%;
+  max-width: 360px;
   text-align: left;
+  overflow: hidden;
 }
 
 .col-status {
-  width: 17%;
+  width: 16%;
   text-align: center;
 }
 
 .col-action {
-  width: 17%;
+  width: 14%;
   text-align: center;
 }
 
-.modern-queue-table thead th.col-queue-no,
+.modern-queue-table thead th.col-queue-no {
+  text-align: left;
+  padding-left: 20px;
+  padding-right: 8px;
+}
+
+.modern-queue-table thead th.col-patient-name {
+  text-align: left;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.modern-queue-table thead th.col-department {
+  text-align: left;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
 .modern-queue-table thead th.col-status,
 .modern-queue-table thead th.col-action {
   text-align: center;
-}
-
-.modern-queue-table thead th.col-patient-name,
-.modern-queue-table thead th.col-department {
-  text-align: left;
 }
 
 .queue-table-row {
@@ -462,27 +482,64 @@
   transition: border-color 0.5s ease;
 }
 
-.queue-table-row td.col-queue-no,
+.queue-table-row td.col-queue-no {
+  text-align: left;
+  padding-left: 20px;
+  padding-right: 8px;
+}
+
+.queue-table-row td.col-patient-name {
+  text-align: left;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.queue-table-row td.col-department {
+  text-align: left;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
 .queue-table-row td.col-status,
 .queue-table-row td.col-action {
   text-align: center;
 }
 
-.queue-table-row td.col-patient-name,
-.queue-table-row td.col-department {
-  text-align: left;
+.call-audio-placeholder {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
 }
 
-/* ===== Column Specifics ===== */
+/* ===== Locked Queue & Audio Button Wrapper ===== */
+.queue-locked-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
 .queue-mono-tag {
+  width: 58px;
+  min-width: 58px;
+  max-width: 58px;
+  flex-shrink: 0;
   font-family: var(--font-heading);
   font-size: 16px;
   font-weight: 700;
   color: #2563EB;
-  background: transparent;
-  border: none;
-  padding: 0;
   letter-spacing: 0.5px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+/* ===== Column Specifics ===== */
+.queue-no-cell-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   white-space: nowrap;
 }
 
@@ -490,7 +547,9 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .patient-name-text {
@@ -500,6 +559,9 @@
   line-height: 22px;
   color: #1E293B;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
   transition: color 0.5s ease;
 }
 
@@ -509,6 +571,9 @@
   line-height: 18px;
   color: #64748B;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
   letter-spacing: 0.3px;
   transition: color 0.5s ease;
 }
@@ -517,7 +582,9 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  white-space: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .dept-room-text {
@@ -527,6 +594,9 @@
   line-height: 20px;
   color: #1E293B;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
   transition: color 0.5s ease;
 }
 
@@ -536,6 +606,9 @@
   line-height: 18px;
   color: #64748B;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
   transition: color 0.5s ease;
 }
 
@@ -621,27 +694,71 @@
   border: 1px solid #FECACA;
 }
 
+/* ===== Circular Call Audio Button ===== */
+.btn-call-audio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563EB;
+  border: 1.5px solid rgba(37, 99, 235, 0.25);
+  cursor: pointer;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.08);
+  padding: 0;
+  margin: 0;
+}
+
+.btn-call-audio svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.btn-call-audio:hover {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+  transform: scale(1.08);
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+}
+
+.btn-call-audio:hover svg {
+  transform: scale(1.1);
+}
+
+.btn-call-audio:active {
+  transform: scale(0.95);
+}
+
 /* ===== Edit Status Button ===== */
 .btn-edit-status {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 16px;
-  min-width: 120px;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  min-width: 110px;
   background: #2563EB;
   color: #FFFFFF;
   border: 1.5px solid transparent;
   border-radius: 8px;
   font-family: var(--font-primary);
   font-weight: 600;
-  font-size: 14.5px;
+  font-size: 13.5px;
   line-height: 20px;
   white-space: nowrap;
   flex-shrink: 0;
   cursor: pointer;
   box-sizing: border-box;
+  margin: 0 auto;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(37, 99, 235, 0.18);
 }
@@ -1041,7 +1158,7 @@ body.dark-mode .queue-title {
 }
 
 body.dark-mode .queue-subtitle {
-  color: #768390;
+  color: #CDD9E5;
 }
 
 body.dark-mode .stat-card {
@@ -1063,7 +1180,7 @@ body.dark-mode .stat-card.active {
 }
 
 body.dark-mode .stat-label {
-  color: #ADBAC7;
+  color: #E2E8F0;
 }
 
 body.dark-mode .stat-value {
@@ -1071,7 +1188,7 @@ body.dark-mode .stat-value {
 }
 
 body.dark-mode .stat-sub-text {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .stat-icon-wrap.icon-blue {
@@ -1109,34 +1226,39 @@ body.dark-mode .table-controls {
 
 body.dark-mode .filter-pill-btn {
   background: #22272E;
-  border-color: #444C56;
-  color: #ADBAC7;
+  border: 1.5px solid #444C56;
+  color: #F1F5F9;
+  font-weight: 600;
 }
 
 body.dark-mode .filter-pill-btn:hover {
   background: #373E47;
-  border-color: #545D68;
-  color: #CDD9E5;
-}
-
-body.dark-mode .filter-pill-btn.active {
-  background: #316DCA;
-  border-color: #539BF5;
+  border-color: #60A5FA;
   color: #FFFFFF;
 }
 
+body.dark-mode .filter-pill-btn.active {
+  background: #2563EB;
+  border-color: #60A5FA;
+  color: #FFFFFF;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+}
+
 body.dark-mode .pill-count {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+  font-weight: 700;
 }
 
 body.dark-mode .table-search-input {
   background: #22272E;
   border: 1px solid #444C56;
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .table-search-input::placeholder {
-  color: #768390;
+  color: #94A3B8;
 }
 
 body.dark-mode .table-search-input:focus {
@@ -1148,7 +1270,7 @@ body.dark-mode .table-search-input:focus {
 body.dark-mode .status-select-filter {
   background: #22272E;
   border: 1px solid #444C56;
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .status-select-filter:focus {
@@ -1159,10 +1281,10 @@ body.dark-mode .status-select-filter:focus {
 /* Table Headers in Dark Mode */
 body.dark-mode .modern-queue-table thead th {
   background: #22272E;
-  color: #ADBAC7;
+  color: #F8FAFC;
   border-bottom: 1.5px solid #373E47;
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 14px;
 }
 
 /* Table Rows in Dark Mode */
@@ -1180,140 +1302,175 @@ body.dark-mode .queue-mono-tag {
 }
 
 body.dark-mode .patient-name-text {
-  color: #CDD9E5;
+  color: #FFFFFF;
   font-weight: 600;
 }
 
 body.dark-mode .patient-sub-text {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .dept-room-text {
-  color: #CDD9E5;
+  color: #F8FAFC;
   font-weight: 600;
 }
 
 body.dark-mode .dept-note-text {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 /* ================================================================
-   ===== DARK MODE STATUS PILLS (Vibrant, Crisp & Distinct) =====
+   ===== DARK MODE STATUS PILLS (Ultra-Vibrant, High-Contrast & Glow) =====
    ================================================================ */
 
 /* 1. รอคัดกรอง (Blue Pill) */
 body.dark-mode .badge-screening {
-  background: rgba(59, 130, 246, 0.18);
-  color: #60A5FA;
-  border: 1.5px solid rgba(96, 165, 250, 0.45);
-  font-weight: 600;
+  background: rgba(37, 99, 235, 0.28);
+  color: #93C5FD;
+  border: 1.5px solid #60A5FA;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 /* 2. รอพบแพทย์ (Purple Pill) */
 body.dark-mode .badge-doctor {
-  background: rgba(139, 92, 246, 0.18);
-  color: #A78BFA;
-  border: 1.5px solid rgba(167, 139, 250, 0.45);
-  font-weight: 600;
+  background: rgba(147, 51, 234, 0.28);
+  color: #D8B4FE;
+  border: 1.5px solid #A855F7;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(147, 51, 234, 0.25);
 }
 
-/* 3. กำลังตรวจ (Amber Pill) */
+/* 3. กำลังตรวจ (Amber/Yellow Pill) */
 body.dark-mode .badge-examination {
-  background: rgba(245, 158, 11, 0.18);
-  color: #FBBF24;
-  border: 1.5px solid rgba(251, 191, 36, 0.45);
-  font-weight: 600;
+  background: rgba(217, 119, 6, 0.3);
+  color: #FDE047;
+  border: 1.5px solid #FBBF24;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
 }
 
 /* 4. รอทำหัตถการ (Orange Pill) */
 body.dark-mode .badge-treatment {
-  background: rgba(234, 88, 12, 0.18);
-  color: #FB923C;
-  border: 1.5px solid rgba(251, 146, 60, 0.45);
-  font-weight: 600;
+  background: rgba(234, 88, 12, 0.3);
+  color: #FDBA74;
+  border: 1.5px solid #FB923C;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.25);
 }
 
-/* 5. รอชำระเงิน (Sky Blue Pill) */
+/* 5. รอชำระเงิน (Teal/Emerald Pill) */
 body.dark-mode .badge-billing {
-  background: rgba(2, 132, 199, 0.18);
-  color: #38BDF8;
-  border: 1.5px solid rgba(56, 189, 248, 0.45);
-  font-weight: 600;
+  background: rgba(13, 148, 136, 0.3);
+  color: #5EEAD4;
+  border: 1.5px solid #2DD4BF;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
 }
 
-/* 6. รอรับยา (Teal Pill) */
+/* 6. รอรับยา (Cyan/Sky Pill) */
 body.dark-mode .badge-pharmacy {
-  background: rgba(13, 148, 136, 0.18);
-  color: #2DD4BF;
-  border: 1.5px solid rgba(45, 212, 191, 0.45);
-  font-weight: 600;
+  background: rgba(2, 132, 199, 0.3);
+  color: #7DD3FC;
+  border: 1.5px solid #38BDF8;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.25);
 }
 
-/* 7. เสร็จสิ้น (Emerald Pill) */
+/* 7. เสร็จสิ้น (Green Pill) */
 body.dark-mode .badge-completed {
-  background: rgba(34, 197, 94, 0.18);
-  color: #4ADE80;
-  border: 1.5px solid rgba(74, 222, 128, 0.45);
-  font-weight: 600;
+  background: rgba(22, 163, 74, 0.3);
+  color: #86EFAC;
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
 }
 
 /* 8. ยกเลิกคิว (Red Pill) */
 body.dark-mode .badge-cancelled {
-  background: rgba(239, 68, 68, 0.18);
-  color: #F87171;
-  border: 1.5px solid rgba(248, 113, 113, 0.45);
-  font-weight: 600;
+  background: rgba(220, 38, 38, 0.3);
+  color: #FCA5A5;
+  border: 1.5px solid #F87171;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
 }
 
-/* ===== Dark Mode Action Button ===== */
+/* ===== Action Buttons in Dark Mode ===== */
+body.dark-mode .btn-call-audio {
+  background: rgba(37, 99, 235, 0.25);
+  color: #93C5FD;
+  border: 1.5px solid #60A5FA;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+body.dark-mode .btn-call-audio:hover {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #93C5FD;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.55);
+}
+
 body.dark-mode .btn-edit-status {
-  background: rgba(34, 197, 94, 0.16);
-  border: 1.5px solid #22C55E;
-  color: #4ADE80;
+  background: #2563EB;
+  border: 1.5px solid #60A5FA;
+  color: #FFFFFF;
   font-weight: 600;
-  box-shadow: 0 0 8px rgba(34, 197, 94, 0.2);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
 }
 
 body.dark-mode .btn-edit-status:hover {
-  background: #22C55E;
-  color: #0F172A;
-  border-color: #22C55E;
-  font-weight: 700;
+  background: #1D4ED8;
+  border-color: #93C5FD;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.55);
 }
 
-/* Pagination Footer in Dark Mode */
+/* Pagination in Dark Mode */
 body.dark-mode .table-pagination-footer {
   background: #252A33;
   border-top: 1px solid #373E47;
 }
 
 body.dark-mode .pagination-info {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .pagination-btn {
   background: #22272E;
-  border: 1px solid #444C56;
-  color: #CDD9E5;
+  border-color: #444C56;
+  color: #E2E8F0;
 }
 
 body.dark-mode .pagination-btn:hover:not(:disabled) {
   background: #373E47;
-  border-color: #539BF5;
+  border-color: #545D68;
   color: #FFFFFF;
+}
+
+body.dark-mode .pagination-btn:disabled {
+  color: #64748B;
+  border-color: #373E47;
 }
 
 body.dark-mode .pagination-num.active {
   background: #316DCA;
-  border-color: #316DCA;
+  border-color: #539BF5;
   color: #FFFFFF;
+}
+
+/* Empty Table State in Dark Mode */
+body.dark-mode .empty-table-cell {
+  background: #2D333B;
+  color: #CBD5E1;
+}
+
+body.dark-mode .empty-state svg {
+  color: #64748B;
 }
 
 /* Modal in Dark Mode */
 body.dark-mode .modal-content {
   background: #2D333B;
-  border: 1px solid #444C56;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
 }
 
 body.dark-mode .modal-header {
@@ -1321,11 +1478,15 @@ body.dark-mode .modal-header {
 }
 
 body.dark-mode .modal-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .modal-subtitle {
-  color: #768390;
+  color: #CBD5E1;
+}
+
+body.dark-mode .modal-close-btn {
+  color: #ADBAC7;
 }
 
 body.dark-mode .modal-close-btn:hover {
@@ -1339,24 +1500,24 @@ body.dark-mode .modal-info-card {
 }
 
 body.dark-mode .info-label {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .info-val {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .queue-highlight {
-  color: #539BF5;
+  color: #60A5FA;
 }
 
 body.dark-mode .dept-highlight {
-  color: #539BF5;
+  color: #60A5FA;
   font-weight: 700;
 }
 
 body.dark-mode .modal-label {
-  color: #CDD9E5;
+  color: #F1F5F9;
 }
 
 body.dark-mode .status-option-card {
@@ -1375,14 +1536,14 @@ body.dark-mode .status-option-card.selected {
 }
 
 body.dark-mode .option-desc-th {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .modal-select {
   background-color: #22272E;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23768390' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23CBD5E1' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
   border-color: #444C56;
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .modal-select:focus {
@@ -1392,18 +1553,18 @@ body.dark-mode .modal-select:focus {
 
 body.dark-mode .modal-select optgroup {
   background: #2D333B;
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .modal-select option {
   background: #22272E;
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .modal-input {
   background: #22272E;
   border-color: #444C56;
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .modal-input:focus {
@@ -1419,11 +1580,145 @@ body.dark-mode .modal-footer {
 body.dark-mode .modal-btn-cancel {
   background: #373E47;
   border-color: #444C56;
-  color: #CDD9E5;
+  color: #E2E8F0;
 }
 
 body.dark-mode .modal-btn-cancel:hover {
   background: #444C56;
   border-color: #545D68;
   color: #FFFFFF;
+}
+
+/* ===== Clickable Department Cell ===== */
+.dept-info-cell.clickable {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  transition: all 0.15s ease;
+}
+
+.dept-info-cell.clickable:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.dept-info-cell.clickable:hover .dept-room-text {
+  color: #2563EB;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.dept-info-cell.clickable:hover .dept-note-text {
+  color: #1E293B;
+}
+
+body.dark-mode .dept-info-cell.clickable:hover {
+  background: rgba(59, 130, 246, 0.14);
+}
+
+body.dark-mode .dept-info-cell.clickable:hover .dept-room-text {
+  color: #60A5FA;
+}
+
+body.dark-mode .dept-info-cell.clickable:hover .dept-note-text {
+  color: #E2E8F0;
+}
+
+/* ===== Detail Modal Styles ===== */
+.detail-modal-content {
+  max-width: 580px;
+}
+
+.detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detail-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-field-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-primary);
+  font-weight: 600;
+  font-size: 14px;
+  color: #475569;
+}
+
+.detail-field-label svg {
+  color: #2563EB;
+}
+
+.detail-field-box {
+  background: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-family: var(--font-primary);
+  font-size: 14.5px;
+  color: #1E293B;
+  line-height: 22px;
+  word-break: break-word;
+  white-space: normal;
+  transition: all 0.2s ease;
+}
+
+.room-box {
+  font-weight: 600;
+  color: #0F172A;
+  background: #EFF6FF;
+  border-color: #BFDBFE;
+}
+
+.note-box {
+  background: #F8FAFC;
+  border-color: #E2E8F0;
+  min-height: 60px;
+}
+
+.detail-note-full-text {
+  margin: 0;
+  color: #334155;
+  font-size: 14.5px;
+  line-height: 22px;
+  white-space: pre-wrap;
+}
+
+.detail-empty-text {
+  color: #94A3B8;
+  font-style: italic;
+  font-size: 13.5px;
+}
+
+body.dark-mode .detail-field-label {
+  color: #8B949E;
+}
+
+body.dark-mode .detail-field-label svg {
+  color: #58A6FF;
+}
+
+body.dark-mode .room-box {
+  background: rgba(56, 139, 253, 0.12);
+  border-color: rgba(56, 139, 253, 0.35);
+  color: #E6EDF3;
+}
+
+body.dark-mode .note-box {
+  background: #21262D;
+  border-color: #30363D;
+}
+
+body.dark-mode .detail-note-full-text {
+  color: #C9D1D9;
+}
+
+body.dark-mode .detail-empty-text {
+  color: #6E7681;
 }

@@ -66,21 +66,23 @@ func RegisterPatient(c *gin.Context) {
 		return
 	}
 
-	// Auto generate HN if empty
+	// Auto generate HN if empty (strictly HN + 4-digit hexadecimal format without hyphen)
 	hn := req.HN
 	if strings.TrimSpace(hn) == "" {
 		var lastPatient models.Patient
 		if err := config.DB.Order("id desc").First(&lastPatient).Error; err == nil {
 			var lastNum int
-			if _, scanErr := fmt.Sscanf(lastPatient.HN, "HN-%d", &lastNum); scanErr == nil && lastNum > 0 {
-				hn = fmt.Sprintf("HN-%04d", lastNum+1)
+			cleanHex := strings.TrimPrefix(strings.TrimPrefix(strings.ToUpper(lastPatient.HN), "HN-"), "HN")
+			fmt.Sscanf(cleanHex, "%X", &lastNum)
+			if lastNum > 0 {
+				hn = fmt.Sprintf("HN%04X", lastNum+1)
 			} else {
-				hn = fmt.Sprintf("HN-%04d", lastPatient.ID+1)
+				hn = fmt.Sprintf("HN%04X", lastPatient.ID+1)
 			}
 		} else {
 			var count int64
 			config.DB.Model(&models.Patient{}).Count(&count)
-			hn = fmt.Sprintf("HN-%04d", count+1)
+			hn = fmt.Sprintf("HN%04X", count+1)
 		}
 	}
 
@@ -171,12 +173,12 @@ func SearchPatient(c *gin.Context) {
 	} else if len(words) > 1 {
 		// 2. ค้นหาหลายคำ เช่น "สมชาย ใจดี" หรือ "นาย สมชาย"
 		for _, w := range words {
-			tx = tx.Where("fullname ILIKE ?", "%"+w+"%")
+			tx = tx.Where("full_name ILIKE ?", "%"+w+"%")
 		}
 	} else {
 		// 3. คำค้นหาเดี่ยว: ชื่อ หรือ นามสกุล หรือ เลขบัตรบางส่วน หรือ HN หรือ เบอร์โทร
 		tx = tx.Where(
-			"fullname ILIKE ? OR national_id LIKE ? OR hn ILIKE ? OR phone_number LIKE ?",
+			"full_name ILIKE ? OR national_id LIKE ? OR hn ILIKE ? OR phone_number LIKE ?",
 			"%"+query+"%",
 			"%"+cleanDigits+"%",
 			"%"+query+"%",

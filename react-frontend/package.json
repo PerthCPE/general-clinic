@@ -10,9 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
+    "lucide-react": "^0.546.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "lucide-react": "^0.546.0"
+    "react-hot-toast": "^2.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

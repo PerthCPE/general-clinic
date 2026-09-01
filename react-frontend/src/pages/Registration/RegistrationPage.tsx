@@ -5,6 +5,7 @@ import type { Patient, SchemeType } from './types';
 import { patientApi, queueApi, type BackendPatient, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
+import toast from 'react-hot-toast';
 import './RegistrationPage.css';
 
 export { formatHN, formatQueueNo, formatNationalId, formatPhone };
@@ -343,6 +344,7 @@ function RegistrationPage() {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
+    toast.success(msg, { id: msg });
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);

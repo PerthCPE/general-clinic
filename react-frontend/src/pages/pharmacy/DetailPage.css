@@ -1,11 +1,11 @@
 /* ===== DetailPage - Scoped CSS ===== */
 
 .detail-page-container {
-  padding: 0;
-  max-width: 1280px;
+  padding: 24px 32px;
+  max-width: 1440px;
   margin: 0 auto;
   width: 100%;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   color: #1E293B;
   box-sizing: border-box;
 }
@@ -18,19 +18,33 @@ body.dark-mode .detail-page-container {
 .detail-page-container .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
+  align-items: center;
+  margin-bottom: 24px;
 }
 
+.detail-page-container .page-title,
 .detail-page-container .header-titles h1 {
   font-size: 28px;
   font-weight: 700;
-  color: #0D3B66;
-  margin: 0;
+  color: #0F172A;
+  margin: 0 0 4px 0;
+  line-height: 1.25;
 }
 
+body.dark-mode .detail-page-container .page-title,
 body.dark-mode .detail-page-container .header-titles h1 {
-  color: #60A5FA;
+  color: #F8FAFC;
+}
+
+.detail-page-container .page-subtitle {
+  font-size: 14.5px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.4;
+}
+
+body.dark-mode .detail-page-container .page-subtitle {
+  color: #94A3B8;
 }
 
 .detail-page-container .title-row {
@@ -48,7 +62,7 @@ body.dark-mode .detail-page-container .header-titles h1 {
   background: #ECFDF5;
   color: #047857;
   border: 1px solid #A7F3D0;
-  padding: 4px 12px;
+  padding: 32px 48px;
   border-radius: 999px;
   font-size: 0.8rem;
   font-weight: 600;
@@ -204,7 +218,7 @@ body.dark-mode .detail-page-container .patient-pill {
 /* Patient Summary Header */
 .detail-page-container .section-title {
   font-size: 1.55rem;
-  font-weight: 800;
+  font-weight: 600;
   margin: 0 0 16px 0;
   color: #0F172A;
 }
@@ -213,35 +227,50 @@ body.dark-mode .detail-page-container .section-title {
   color: #F8FAFC;
 }
 
-/* Patient Card */
+/* Patient Card Header Banner - Modern Light White Theme */
 .detail-page-container .patient-card {
-  background: linear-gradient(135deg, #0D3B66 0%, #1565C0 100%);
-  border-radius: 14px;
+  background: #FFFFFF;
+  border-radius: 12px;
   overflow: hidden;
-  color: #FFFFFF;
-  margin-bottom: 28px;
-  box-shadow: 0 8px 20px -4px rgba(13, 59, 102, 0.3);
+  color: #0F172A;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #E2E8F0;
+}
+
+body.dark-mode .detail-page-container .patient-card {
+  background: #1E293B;
+  border-color: #334155;
+  color: #F8FAFC;
 }
 
 .detail-page-container .patient-card-main {
-  padding: 22px 26px;
+  padding: 20px 24px;
   display: flex;
   align-items: flex-start;
-  gap: 18px;
+  gap: 16px;
+  background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%);
+  border-bottom: 1px solid #E2E8F0;
+}
+
+body.dark-mode .detail-page-container .patient-card-main {
+  background: #0F172A;
+  border-bottom-color: #334155;
 }
 
 .detail-page-container .patient-avatar {
-  width: 58px;
-  height: 58px;
-  background: #2A9D8F;
+  width: 52px;
+  height: 52px;
+  background: #2563EB;
+  color: #FFFFFF;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.65rem;
+  font-size: 1.5rem;
   font-weight: 700;
   flex-shrink: 0;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
 }
 
 .detail-page-container .patient-info-container {
@@ -253,82 +282,112 @@ body.dark-mode .detail-page-container .section-title {
   align-items: center;
   gap: 12px;
   margin-bottom: 6px;
+  flex-wrap: wrap;
 }
 
 .detail-page-container .patient-name {
   margin: 0;
-  font-size: 1.7rem;
-  font-weight: 800;
-  color: #FFFFFF;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+body.dark-mode .detail-page-container .patient-name {
+  color: #F8FAFC;
 }
 
 .detail-page-container .patient-badges {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .detail-page-container .badge {
-  padding: 4px 12px;
+  padding: 4px 10px;
   border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .detail-page-container .ticket-badge {
-  background: rgba(34, 197, 94, 0.25);
-  color: #A7F3D0;
+  background: #DCFCE7;
+  color: #166534;
+  border: 1px solid #86EFAC;
 }
 
 .detail-page-container .hn-badge {
-  background: rgba(59, 130, 246, 0.25);
-  color: #BFDBFE;
+  background: #EFF6FF;
+  color: #1E40AF;
+  border: 1px solid #BFDBFE;
 }
 
 .detail-page-container .patient-details {
-  font-size: 1.15rem;
-  font-weight: 600;
-  color: #FFFFFF;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #475569;
   margin-top: 4px;
 }
 
+body.dark-mode .detail-page-container .patient-details {
+  color: #94A3B8;
+}
+
 .detail-page-container .patient-card-footer {
-  background: rgba(0, 0, 0, 0.22);
-  padding: 20px 26px;
+  background: #FFFFFF;
+  padding: 18px 24px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 14px 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 12px 16px;
+}
+
+body.dark-mode .detail-page-container .patient-card-footer {
+  background: #1E293B;
 }
 
 .detail-page-container .info-box {
-  background: rgba(255, 255, 255, 0.1);
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
   border-radius: 8px;
-  padding: 12px 16px;
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+}
+
+body.dark-mode .detail-page-container .info-box {
+  background: #0F172A;
+  border-color: #334155;
 }
 
 .detail-page-container .info-label {
-  color: #CBD5E1;
-  font-weight: 700;
-  font-size: 0.85rem;
-  letter-spacing: 0.02em;
+  color: #64748B;
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+body.dark-mode .detail-page-container .info-label {
+  color: #94A3B8;
 }
 
 .detail-page-container .info-val {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: #FFFFFF;
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+body.dark-mode .detail-page-container .info-val {
+  color: #F8FAFC;
 }
 
 .detail-page-container .rights-select-dropdown {
-  background: rgba(255, 255, 255, 0.95);
+  background: #FFFFFF;
   border: 1.5px solid #2563EB;
   border-radius: 6px;
   padding: 6px 10px;
   font-size: 0.88rem;
-  font-weight: 700;
+  font-weight: 600;
   color: #0F172A;
   cursor: pointer;
   outline: none;
@@ -338,8 +397,8 @@ body.dark-mode .detail-page-container .section-title {
 }
 
 .detail-page-container .rights-select-dropdown:hover {
-  background: #FFFFFF;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  background: #F8FAFC;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
 }
 
 .detail-page-container .rights-select-dropdown option {
@@ -350,20 +409,22 @@ body.dark-mode .detail-page-container .section-title {
 
 .detail-page-container .allergy-badge {
   background: #FEE2E2;
-  color: #DC2626;
-  font-weight: 700;
-  padding: 2px 8px;
+  color: #991B1B;
+  border: 1px solid #FCA5A5;
+  font-weight: 600;
+  padding: 2px 10px;
   border-radius: 6px;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
 }
 
 .detail-page-container .status-badge-examining {
-  background: rgba(59, 130, 246, 0.25);
-  color: #93C5FD;
-  font-weight: 700;
-  padding: 2px 8px;
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+  font-weight: 600;
+  padding: 2px 10px;
   border-radius: 6px;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
 }
 
 /* Doctor Advice Card */
@@ -372,11 +433,11 @@ body.dark-mode .detail-page-container .section-title {
   border: 1px solid #BAE6FD;
   border-left: 5px solid #0284C7;
   border-radius: 12px;
-  padding: 18px 22px;
+  padding: 20px 24px;
   display: flex;
   align-items: flex-start;
   gap: 16px;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   box-shadow: 0 2px 6px rgba(2, 132, 199, 0.08);
 }
 
@@ -395,7 +456,7 @@ body.dark-mode .detail-page-container .doctor-advice-card {
   font-size: 0.95rem;
   font-weight: 700;
   color: #0369A1;
-  margin: 0 0 6px 0;
+  margin: 0 0 8px 0;
 }
 
 body.dark-mode .detail-page-container .doctor-advice-title {
@@ -425,7 +486,7 @@ body.dark-mode .detail-page-container .doctor-advice-text {
 .detail-page-container .column-title {
   margin: 0 0 16px 0;
   font-size: 1.25rem;
-  font-weight: 800;
+  font-weight: 600;
   color: #0F172A;
   border-bottom: 1px solid #E2E8F0;
   padding-bottom: 12px;
@@ -476,7 +537,7 @@ body.dark-mode .detail-page-container .med-item-card {
 
 .detail-page-container .med-item-name {
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   margin: 0 0 4px 0;
 }
@@ -531,7 +592,7 @@ body.dark-mode .detail-page-container .status-card-in {
 
 .detail-page-container .status-card-in .status-main-text {
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #166534;
 }
 
@@ -558,7 +619,7 @@ body.dark-mode .detail-page-container .status-card-in .status-sub-count {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 0.9rem;
 }
 
@@ -575,7 +636,7 @@ body.dark-mode .detail-page-container .status-card-out {
 
 .detail-page-container .status-card-out .status-main-text {
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #991B1B;
 }
 
@@ -609,7 +670,7 @@ body.dark-mode .detail-page-container .status-card-out .status-sub-count {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 800;
+  font-weight: 600;
   font-size: 0.8rem;
 }
 
@@ -649,7 +710,7 @@ body.dark-mode .detail-page-container .alert-text strong {
   padding: 16px 36px;
   border-radius: 10px;
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
   transition: transform 0.2s, background-color 0.2s;
@@ -755,7 +816,7 @@ body.dark-mode .detail-page-container table {
 
 .detail-page-container table th {
   font-size: 0.92rem !important;
-  font-weight: 700 !important;
+  font-weight: 500 !important;
 }
 
 body.dark-mode .detail-page-container table th {
@@ -850,6 +911,87 @@ body.dark-mode .detail-page-container .card {
 }
 
 body.dark-mode .detail-page-container .column-title {
+  color: #F8FAFC !important;
+}
+
+/* Executive Stat Cards in Dark Mode */
+body.dark-mode .detail-page-container .stat-card-box {
+  background: #1E293B !important;
+  border-color: #334155 !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.dark-mode .detail-page-container .stat-card-box span {
+  color: #CBD5E1 !important;
+}
+
+body.dark-mode .detail-page-container .stat-card-box div {
+  color: #F8FAFC !important;
+}
+
+/* Card Body Content & Med Table Container in Dark Mode */
+body.dark-mode .detail-page-container .card-body-content {
+  background: #1E293B !important;
+}
+
+body.dark-mode .detail-page-container .med-table-container {
+  background: #0F172A !important;
+  border-color: #334155 !important;
+}
+
+/* Badges in Dark Mode matching Queue Management */
+body.dark-mode .detail-page-container .ticket-badge {
+  background: rgba(22, 163, 74, 0.28) !important;
+  color: #86EFAC !important;
+  border-color: #4ADE80 !important;
+}
+
+body.dark-mode .detail-page-container .hn-badge {
+  background: transparent !important;
+  color: #60A5FA !important;
+  border: none !important;
+  font-weight: 700 !important;
+}
+
+body.dark-mode .detail-page-container .allergy-badge {
+  background: rgba(220, 38, 38, 0.28) !important;
+  color: #FCA5A5 !important;
+  border-color: #F87171 !important;
+}
+
+body.dark-mode .detail-page-container .status-badge-examining {
+  background: rgba(217, 119, 6, 0.28) !important;
+  color: #FDE047 !important;
+  border-color: #FBBF24 !important;
+}
+
+/* Table Headers & Rows in Dark Mode matching Queue Management */
+body.dark-mode .detail-page-container table thead tr {
+  background: #0F172A !important;
+  color: #F8FAFC !important;
+  border-bottom: 2px solid #334155 !important;
+}
+
+body.dark-mode .detail-page-container table thead th {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .detail-page-container table tbody tr {
+  background-color: #1E293B !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+body.dark-mode .detail-page-container table tbody tr:hover {
+  background-color: #283548 !important;
+}
+
+body.dark-mode .detail-page-container .patient-table-name {
+  color: #FFFFFF !important;
+}
+
+body.dark-mode .detail-page-container input[type="text"] {
+  background-color: #0F172A !important;
+  border-color: #334155 !important;
   color: #F8FAFC !important;
 }
 

@@ -14,6 +14,7 @@ import { ScreeningDetailModal } from './components/ScreeningDetailModal';
 import { vitalsApi, type BackendScreening } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
+import toast from 'react-hot-toast';
 import './ScreeningHistoryPage.css';
 
 export { formatQueueNo };
@@ -197,19 +198,19 @@ export const ScreeningHistoryPage: React.FC = () => {
   const { currentUser } = useAuth();
 
   // Records State from Live Backend
-  const [records, setRecords] = useState<ScreeningHistoryItem[]>(DEFAULT_INITIAL_RECORDS);
+  const [records, setRecords] = useState<ScreeningHistoryItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // ดึงประวัติการคัดกรองจาก Backend DB
+  // ดึงประวัติการคัดกรองจาก Backend DB จริง
   const fetchHistory = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await vitalsApi.getAllHistory();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setRecords(data.map(mapBackendScreeningToUI));
       }
     } catch (err) {
-      console.warn('Could not fetch screening history:', err);
+      console.warn('Could not fetch screening history from backend:', err);
     } finally {
       setIsLoading(false);
     }
@@ -223,6 +224,7 @@ export const ScreeningHistoryPage: React.FC = () => {
     // ดักฟัง Real-time เมื่อมีการบันทึกคัดกรองหรือสัญญาณชีพใหม่
     const unsubVitals = subscribe('VITALS_RECORDED', () => {
       fetchHistory();
+      toast.success('มีรายการคัดกรองสัญญาณชีพใหม่ถูกบันทึกเข้าระบบ', { id: 'vitals-recorded-toast' });
     });
 
     return () => {
@@ -263,6 +265,16 @@ export const ScreeningHistoryPage: React.FC = () => {
 
   // Filter Records
   const filteredRecords = useMemo(() => {
+    const now = new Date();
+    const day = now.getDate().toString().padStart(2, '0');
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const yearBE = (now.getFullYear() + 543).toString();
+    const yearCE = now.getFullYear().toString();
+    const todayPatternBE = `${day}/${month}/${yearBE}`;
+    const todayPatternCE = `${day}/${month}/${yearCE}`;
+    const monthPatternBE = `/${month}/${yearBE}`;
+    const monthPatternCE = `/${month}/${yearCE}`;
+
     return records.filter((item) => {
       // 1. Text Search (National ID, HN, Name, Phone)
       if (appliedSearch) {
@@ -281,11 +293,15 @@ export const ScreeningHistoryPage: React.FC = () => {
         if (!match) return false;
       }
 
-      // 2. Date Range Preset Filter
+      // 2. Date Range Preset Filter (Dynamic Real Date Comparison)
       if (selectedDatePreset === 'today') {
-        if (item.dateOnly !== '06/08/2026') return false;
+        if (item.dateOnly !== todayPatternBE && item.dateOnly !== todayPatternCE && item.dateOnly !== 'วันนี้') {
+          return false;
+        }
       } else if (selectedDatePreset === 'this-month') {
-        if (!item.dateOnly.includes('/08/2026')) return false;
+        if (!item.dateOnly.includes(monthPatternBE) && !item.dateOnly.includes(monthPatternCE) && item.dateOnly !== 'วันนี้') {
+          return false;
+        }
       }
 
       // 3. Triage Filter
@@ -306,7 +322,7 @@ export const ScreeningHistoryPage: React.FC = () => {
 
       return true;
     });
-  }, [appliedSearch, selectedDatePreset, selectedTriage, selectedRisk]);
+  }, [records, appliedSearch, selectedDatePreset, selectedTriage, selectedRisk]);
 
   // Total Statistics (Dynamically calculated to match actual records in database)
   const stats: ScreeningStats = useMemo(() => {
@@ -458,14 +474,14 @@ export const ScreeningHistoryPage: React.FC = () => {
                 className={`filter-chip ${selectedDatePreset === 'today' ? 'active' : ''}`}
                 onClick={() => setSelectedDatePreset('today')}
               >
-                วันนี้ (06/08)
+                วันนี้
               </button>
               <button
                 type="button"
                 className={`filter-chip ${selectedDatePreset === 'this-month' ? 'active' : ''}`}
                 onClick={() => setSelectedDatePreset('this-month')}
               >
-                เดือนนี้ (สิงหาคม)
+                เดือนนี้
               </button>
             </div>
           </div>

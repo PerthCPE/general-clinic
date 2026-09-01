@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { queueApi, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatQueueNo, formatNationalId } from '../../utils/formatters';
+import { callQueueAudio, getSpokenDepartmentText } from '../../utils/audioQueue';
+import toast from 'react-hot-toast';
 import './QueuePage.css';
 
 export { formatQueueNo };
@@ -37,7 +39,7 @@ export interface ClinicDepartment {
 export const CLINIC_DEPARTMENTS: ClinicDepartment[] = [
   {
     id: 'triage',
-    name: 'แผนกคัดกรอง',
+    name: 'จุดคัดกรอง',
     category: 'screening',
     defaultNote: 'รอซักประวัติและวัดสัญญาณชีพ',
   },
@@ -61,7 +63,7 @@ export const CLINIC_DEPARTMENTS: ClinicDepartment[] = [
   },
   {
     id: 'treatment',
-    name: 'ห้องทำแผลและฉีดยา (หัตถการ)',
+    name: 'ห้องหัตถการ (ทำแผล/ฉีดยา)',
     category: 'treatment',
     defaultNote: 'ส่งทำแผล / ฉีดยา / พ่นยา ตามคำสั่งแพทย์',
   },
@@ -94,13 +96,26 @@ const mapBackendQueueToUI = (q: BackendQueue): QueueItem => {
 
   const queueFormatted = formatQueueNo(q.queue_number || q.id);
 
+  let defaultDept = 'จุดคัดกรอง';
+  if (q.department) {
+    defaultDept = q.department;
+  } else if (q.status === 'รอพบแพทย์') {
+    defaultDept = 'ห้องตรวจ 1 (พญ.สุดา)';
+  } else if (q.status === 'รอทำหัตถการ') {
+    defaultDept = 'ห้องหัตถการ (ทำแผล/ฉีดยา)';
+  } else if (q.status === 'รอชำระเงิน') {
+    defaultDept = 'ห้องการเงิน (แคชเชียร์)';
+  } else if (q.status === 'รอรับยา') {
+    defaultDept = 'ห้องจ่ายยาและเภสัชกรรม';
+  }
+
   return {
     id: String(q.id),
     queueNo: queueFormatted,
     patientName: q.patient?.fullname || `ผู้ป่วยคิว ${queueFormatted}`,
     idCard: formatNationalId(q.patient?.national_id),
     status: (q.status as QueueStatus) || 'รอคัดกรอง',
-    department: q.department || 'แผนกคัดกรอง',
+    department: defaultDept,
     time: timeStr,
     note: q.note || '',
   };
@@ -122,7 +137,7 @@ const QueuePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'in_service' | 'cash_pharmacy' | 'completed'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'in_service' | 'cash_pharmacy' | 'completed_cancelled'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 8;
 
@@ -133,6 +148,9 @@ const QueuePage: React.FC = () => {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [statusNote, setStatusNote] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // State สำหรับดูข้อความเต็มของจุดบริการ & การคัดกรอง
+  const [detailModalQueue, setDetailModalQueue] = useState<QueueItem | null>(null);
 
   const { subscribe } = useWebSocket();
 
@@ -178,6 +196,7 @@ const QueuePage: React.FC = () => {
   // คำนวณสรุปสถิติจำนวนคิวแต่ละสถานะ
   const stats = {
     total: queueList.length,
+    active: queueList.filter((q) => !['เสร็จสิ้น', 'ยกเลิกคิว'].includes(q.status)).length,
     waitingScreening: queueList.filter((q) => q.status === 'รอคัดกรอง').length,
     waitingDoctor: queueList.filter((q) => q.status === 'รอพบแพทย์').length,
     inExamination: queueList.filter((q) => q.status === 'กำลังตรวจ').length,
@@ -197,19 +216,39 @@ const QueuePage: React.FC = () => {
         item.idCard.includes(searchQuery);
 
       let matchStatus = true;
-      if (statusFilter === 'all') {
-        matchStatus = true;
-      } else if (statusFilter === 'in_service_all') {
-        matchStatus = ['รอคัดกรอง', 'รอพบแพทย์', 'กำลังตรวจ', 'รอทำหัตถการ'].includes(item.status);
-      } else if (statusFilter === 'cash_pharmacy_all') {
-        matchStatus = ['รอชำระเงิน', 'รอรับยา'].includes(item.status);
+      if (selectedCategory === 'all') {
+        if (statusFilter === 'all') {
+          // คิวรอรับบริการทั้งหมด (แยกเสร็จสิ้นและยกเลิกออก)
+          matchStatus = !['เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status);
+        } else {
+          matchStatus = item.status === statusFilter;
+        }
+      } else if (selectedCategory === 'in_service') {
+        if (statusFilter === 'in_service_all') {
+          matchStatus = ['รอคัดกรอง', 'รอพบแพทย์', 'กำลังตรวจ', 'รอทำหัตถการ'].includes(item.status);
+        } else {
+          matchStatus = item.status === statusFilter;
+        }
+      } else if (selectedCategory === 'cash_pharmacy') {
+        if (statusFilter === 'cash_pharmacy_all') {
+          matchStatus = ['รอชำระเงิน', 'รอรับยา'].includes(item.status);
+        } else {
+          matchStatus = item.status === statusFilter;
+        }
+      } else if (selectedCategory === 'completed_cancelled') {
+        if (statusFilter === 'completed_cancelled_all') {
+          // รวมเสร็จสิ้นและยกเลิกคิวมาอยู่ด้วยกัน
+          matchStatus = ['เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status);
+        } else {
+          matchStatus = item.status === statusFilter;
+        }
       } else {
-        matchStatus = item.status === statusFilter;
+        matchStatus = statusFilter === 'all' ? true : item.status === statusFilter;
       }
 
       return matchSearch && matchStatus;
     });
-  }, [queueList, searchQuery, statusFilter]);
+  }, [queueList, searchQuery, statusFilter, selectedCategory]);
 
   // การตัดหน้า (Pagination)
   const totalPages = Math.ceil(filteredQueue.length / itemsPerPage) || 1;
@@ -221,7 +260,7 @@ const QueuePage: React.FC = () => {
   const handleOpenEditModal = (item: QueueItem) => {
     setSelectedQueue(item);
     setNewStatus(item.status);
-    setSelectedDepartment(item.department || 'แผนกคัดกรอง');
+    setSelectedDepartment(item.department || 'จุดคัดกรอง');
     setStatusNote(item.note || '');
     setIsModalOpen(true);
   };
@@ -231,7 +270,7 @@ const QueuePage: React.FC = () => {
     setNewStatus(status);
 
     if (status === 'รอคัดกรอง') {
-      setSelectedDepartment('แผนกคัดกรอง');
+      setSelectedDepartment('จุดคัดกรอง');
       if (!statusNote || statusNote.includes('ตรวจ') || statusNote.includes('ยา') || statusNote.includes('หัตถการ') || statusNote.includes('ชำระ')) {
         setStatusNote('รอซักประวัติและวัดสัญญาณชีพ');
       }
@@ -246,7 +285,7 @@ const QueuePage: React.FC = () => {
       }
       setStatusNote('กำลังรับการตรวจกับแพทย์');
     } else if (status === 'รอทำหัตถการ') {
-      setSelectedDepartment('ห้องทำแผลและฉีดยา (หัตถการ)');
+      setSelectedDepartment('ห้องหัตถการ (ทำแผล/ฉีดยา)');
       setStatusNote('ส่งทำแผล / ฉีดยา / พ่นยา');
     } else if (status === 'รอชำระเงิน') {
       setSelectedDepartment('ห้องการเงิน (แคชเชียร์)');
@@ -301,8 +340,16 @@ const QueuePage: React.FC = () => {
     showToast(`อัปเดตสถานะคิว ${selectedQueue.queueNo} เป็น "${newStatus}" (${shortDept}) เรียบร้อยแล้ว`);
   };
 
+  const handleCallQueue = (item: QueueItem, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    callQueueAudio(item.queueNo, item.department, item.status);
+    const spokenDept = getSpokenDepartmentText(item.department, item.status).replace('ค่ะ', '').trim();
+    toast.success(`กำลังเรียกคิว ${item.queueNo} (${item.patientName}) ${spokenDept}`);
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
+    toast.success(msg, { id: msg });
     setTimeout(() => {
       setToastMessage(null);
     }, 3500);
@@ -367,7 +414,7 @@ const QueuePage: React.FC = () => {
           }}
         >
           <div className="stat-card-header">
-            <span className="stat-label">คิวทั้งหมดวันนี้</span>
+            <span className="stat-label">คิวรอรับบริการทั้งหมด</span>
             <div className="stat-icon-wrap icon-blue">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -377,8 +424,8 @@ const QueuePage: React.FC = () => {
               </svg>
             </div>
           </div>
-          <div className="stat-value">{stats.total}</div>
-          <div className="stat-sub-text">ลงทะเบียนในระบบทั้งหมด</div>
+          <div className="stat-value">{stats.active}</div>
+          <div className="stat-sub-text">กำลังรับบริการในระบบทั้งหมด</div>
         </div>
 
         <div
@@ -433,15 +480,15 @@ const QueuePage: React.FC = () => {
         </div>
 
         <div
-          className={`stat-card stat-completed ${selectedCategory === 'completed' ? 'active' : ''}`}
+          className={`stat-card stat-completed ${selectedCategory === 'completed_cancelled' ? 'active' : ''}`}
           onClick={() => {
-            setSelectedCategory('completed');
-            setStatusFilter('เสร็จสิ้น');
+            setSelectedCategory('completed_cancelled');
+            setStatusFilter('completed_cancelled_all');
             setCurrentPage(1);
           }}
         >
           <div className="stat-card-header">
-            <span className="stat-label">เสร็จสิ้นการบริการ</span>
+            <span className="stat-label">เสร็จสิ้น & ยกเลิกคิว</span>
             <div className="stat-icon-wrap icon-green">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
@@ -449,8 +496,10 @@ const QueuePage: React.FC = () => {
               </svg>
             </div>
           </div>
-          <div className="stat-value">{stats.completed}</div>
-          <div className="stat-sub-text">รับบริการครบถ้วนเรียบร้อย</div>
+          <div className="stat-value">{stats.completed + stats.cancelled}</div>
+          <div className="stat-sub-text">
+            เสร็จสิ้น {stats.completed} • ยกเลิกคิว {stats.cancelled}
+          </div>
         </div>
       </div>
 
@@ -499,21 +548,86 @@ const QueuePage: React.FC = () => {
                     setCurrentPage(1);
                   }}
                 >
-                  <span>คิวทั้งหมด</span>
-                  <span className="pill-count">{stats.total}</span>
+                  <span>ทั้งหมดในระบบ</span>
+                  <span className="pill-count">{stats.active}</span>
                 </button>
 
                 <button
                   type="button"
-                  className={`filter-pill-btn pill-cancelled ${statusFilter === 'ยกเลิกคิว' ? 'active' : ''}`}
+                  className={`filter-pill-btn pill-screening ${statusFilter === 'รอคัดกรอง' ? 'active' : ''}`}
                   onClick={() => {
-                    setStatusFilter('ยกเลิกคิว');
+                    setStatusFilter('รอคัดกรอง');
                     setCurrentPage(1);
                   }}
                 >
-                  <span className="pill-dot dot-cancelled"></span>
-                  <span>ยกเลิกคิว</span>
-                  <span className="pill-count">{stats.cancelled}</span>
+                  <span className="pill-dot dot-screening"></span>
+                  <span>รอคัดกรอง</span>
+                  <span className="pill-count">{stats.waitingScreening}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-doctor ${statusFilter === 'รอพบแพทย์' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอพบแพทย์');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-doctor"></span>
+                  <span>รอพบแพทย์</span>
+                  <span className="pill-count">{stats.waitingDoctor}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-examination ${statusFilter === 'กำลังตรวจ' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('กำลังตรวจ');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-examination"></span>
+                  <span>กำลังตรวจ</span>
+                  <span className="pill-count">{stats.inExamination}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-treatment ${statusFilter === 'รอทำหัตถการ' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอทำหัตถการ');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-treatment"></span>
+                  <span>รอทำหัตถการ</span>
+                  <span className="pill-count">{stats.waitingTreatment}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-billing ${statusFilter === 'รอชำระเงิน' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอชำระเงิน');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-billing"></span>
+                  <span>รอชำระเงิน</span>
+                  <span className="pill-count">{stats.waitingBilling}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-pharmacy ${statusFilter === 'รอรับยา' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('รอรับยา');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-pharmacy"></span>
+                  <span>รอรับยา</span>
+                  <span className="pill-count">{stats.waitingPharmacy}</span>
                 </button>
               </>
             )}
@@ -630,19 +744,46 @@ const QueuePage: React.FC = () => {
               </>
             )}
 
-            {selectedCategory === 'completed' && (
-              <button
-                type="button"
-                className={`filter-pill-btn pill-completed active`}
-                onClick={() => {
-                  setStatusFilter('เสร็จสิ้น');
-                  setCurrentPage(1);
-                }}
-              >
-                <span className="pill-dot dot-completed"></span>
-                <span>เสร็จสิ้นการบริการ</span>
-                <span className="pill-count">{stats.completed}</span>
-              </button>
+            {selectedCategory === 'completed_cancelled' && (
+              <>
+                <button
+                  type="button"
+                  className={`filter-pill-btn ${statusFilter === 'completed_cancelled_all' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('completed_cancelled_all');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span>ทั้งหมดในกลุ่มนี้</span>
+                  <span className="pill-count">{stats.completed + stats.cancelled}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-completed ${statusFilter === 'เสร็จสิ้น' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('เสร็จสิ้น');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-completed"></span>
+                  <span>เสร็จสิ้นการบริการ</span>
+                  <span className="pill-count">{stats.completed}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className={`filter-pill-btn pill-cancelled ${statusFilter === 'ยกเลิกคิว' ? 'active' : ''}`}
+                  onClick={() => {
+                    setStatusFilter('ยกเลิกคิว');
+                    setCurrentPage(1);
+                  }}
+                >
+                  <span className="pill-dot dot-cancelled"></span>
+                  <span>ยกเลิกคิว</span>
+                  <span className="pill-count">{stats.cancelled}</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -664,20 +805,49 @@ const QueuePage: React.FC = () => {
                 currentItems.map((item) => (
                   <tr key={item.id} className="queue-table-row">
                     <td className="col-queue-no">
-                      <span className="queue-mono-tag">{item.queueNo}</span>
+                      <div className="queue-locked-wrapper">
+                        <span className="queue-mono-tag">{item.queueNo}</span>
+                        {/* ไม่แสดงปุ่มเรียกคิวในสถานะ: กำลังตรวจ, เสร็จสิ้น, ยกเลิกคิว */}
+                        {!['กำลังตรวจ', 'เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status) ? (
+                          <button
+                            type="button"
+                            className="btn-call-audio"
+                            title={`ประกาศเรียกคิว ${item.queueNo} (${item.patientName}) ด้วยเสียงภาษาไทย`}
+                            aria-label={`ประกาศเรียกคิว ${item.queueNo}`}
+                            onClick={(e) => handleCallQueue(item, e)}
+                          >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
+                            </svg>
+                          </button>
+                        ) : (
+                          <span className="call-audio-placeholder" />
+                        )}
+                      </div>
                     </td>
                     <td className="col-patient-name">
                       <div className="patient-info-cell">
-                        <span className="patient-name-text">{item.patientName}</span>
-                        <span className="patient-sub-text">
+                        <span className="patient-name-text" title={item.patientName}>
+                          {item.patientName}
+                        </span>
+                        <span className="patient-sub-text" title={`${item.idCard} • เวลา ${item.time}`}>
                           {item.idCard} • เวลา {item.time}
                         </span>
                       </div>
                     </td>
-                    <td className="col-department">
-                      <div className="dept-info-cell">
-                        <span className="dept-room-text">{item.department}</span>
-                        <span className="dept-note-text">{item.note || 'รอรับบริการ'}</span>
+                    <td
+                      className="col-department"
+                      onClick={() => setDetailModalQueue(item)}
+                      title="คลิกเพื่อดูรายละเอียดและผลการคัดกรองฉบับเต็ม"
+                    >
+                      <div className="dept-info-cell clickable">
+                        <span className="dept-room-text" title={item.department}>
+                          {item.department}
+                        </span>
+                        <span className="dept-note-text" title={item.note || 'รอรับบริการ'}>
+                          {item.note || 'รอรับบริการ'}
+                        </span>
                       </div>
                     </td>
                     <td className="col-status">
@@ -707,7 +877,7 @@ const QueuePage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="empty-table-cell">
+                  <td colSpan={6} className="empty-table-cell">
                     <div className="empty-state">
                       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
@@ -858,8 +1028,8 @@ const QueuePage: React.FC = () => {
                     onChange={(e) => handleDepartmentChange(e.target.value)}
                   >
                     <optgroup label="จุดคัดกรอง">
-                      <option value="แผนกคัดกรอง">
-                        แผนกคัดกรอง
+                      <option value="จุดคัดกรอง">
+                        จุดคัดกรอง
                       </option>
                     </optgroup>
                     <optgroup label="ห้องตรวจแพทย์">
@@ -874,8 +1044,8 @@ const QueuePage: React.FC = () => {
                       </option>
                     </optgroup>
                     <optgroup label="หัตถการ & สนับสนุน">
-                      <option value="ห้องทำแผลและฉีดยา (หัตถการ)">
-                        ห้องทำแผลและฉีดยา (หัตถการ)
+                      <option value="ห้องหัตถการ (ทำแผล/ฉีดยา)">
+                        ห้องหัตถการ (ทำแผล/ฉีดยา)
                       </option>
                     </optgroup>
                     <optgroup label="การเงิน & เภสัชกรรม">
@@ -915,6 +1085,108 @@ const QueuePage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Modal for Viewing Full Department & Screening Details */}
+      {detailModalQueue && (
+        <div className="modal-backdrop" onClick={() => setDetailModalQueue(null)}>
+          <div className="modal-content detail-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="modal-title-group">
+                <h3 className="modal-title">รายละเอียดจุดบริการ & การคัดกรอง</h3>
+                <p className="modal-subtitle">
+                  หมายเลขคิว {detailModalQueue.queueNo} • {detailModalQueue.patientName}
+                </p>
+              </div>
+              <button
+                className="modal-close-btn"
+                onClick={() => setDetailModalQueue(null)}
+                aria-label="Close modal"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              {/* Quick Info Grid */}
+              <div className="modal-info-card">
+                <div className="modal-info-item">
+                  <span className="info-label">หมายเลขคิว:</span>
+                  <span className="info-val queue-highlight">{detailModalQueue.queueNo}</span>
+                </div>
+                <div className="modal-info-item">
+                  <span className="info-label">ชื่อคนไข้:</span>
+                  <span className="info-val">{detailModalQueue.patientName}</span>
+                </div>
+                <div className="modal-info-item">
+                  <span className="info-label">เลขบัตรประชาชน / HN:</span>
+                  <span className="info-val">{detailModalQueue.idCard}</span>
+                </div>
+                <div className="modal-info-item">
+                  <span className="info-label">เวลารับคิว:</span>
+                  <span className="info-val">{detailModalQueue.time} น.</span>
+                </div>
+                <div className="modal-info-item">
+                  <span className="info-label">สถานะปัจจุบัน:</span>
+                  <span className="info-val">
+                    <span className={`status-pill ${getStatusBadgeClass(detailModalQueue.status)}`} style={{ height: '30px', fontSize: '13px', padding: '0 12px' }}>
+                      <span className="status-text">{detailModalQueue.status}</span>
+                    </span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Full Details Cards */}
+              <div className="detail-section">
+                <div className="detail-field-group">
+                  <span className="detail-field-label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                      <polyline points="9 22 9 12 15 12 15 22" />
+                    </svg>
+                    จุดบริการ / ห้องตรวจ:
+                  </span>
+                  <div className="detail-field-box room-box">
+                    {detailModalQueue.department}
+                  </div>
+                </div>
+
+                <div className="detail-field-group">
+                  <span className="detail-field-label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                      <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    หมายเหตุอาการ / ผลการคัดกรอง Triage / คำสั่งการส่งต่อ (ฉบับเต็ม):
+                  </span>
+                  <div className="detail-field-box note-box">
+                    {detailModalQueue.note ? (
+                      <p className="detail-note-full-text">{detailModalQueue.note}</p>
+                    ) : (
+                      <span className="detail-empty-text">ไม่มีข้อความเพิ่มเติม (รอรับบริการตามลำดับ)</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="modal-btn-cancel"
+                onClick={() => setDetailModalQueue(null)}
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
           </div>
         </div>
       )}

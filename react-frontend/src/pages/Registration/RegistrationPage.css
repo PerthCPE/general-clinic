@@ -713,6 +713,83 @@
 }
 
 /* ================================================================
+   ===== 3.5 DRAFT AUTO-RECOVERY BANNER =====
+   ================================================================ */
+
+.reg-draft-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  margin-bottom: 20px;
+  background-color: rgba(37, 99, 235, 0.08);
+  border: 1.5px solid rgba(37, 99, 235, 0.25);
+  border-radius: 10px;
+  font-size: 14.5px;
+  color: #1D4ED8;
+  font-weight: 600;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.reg-draft-text-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #1D4ED8;
+  font-weight: 600;
+}
+
+.reg-draft-text-wrap svg {
+  color: #2563EB;
+  flex-shrink: 0;
+}
+
+.reg-draft-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.reg-btn-draft-restore {
+  padding: 6px 14px;
+  background-color: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3);
+  transition: all 0.2s ease;
+}
+
+.reg-btn-draft-restore:hover {
+  background-color: #1D4ED8;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.4);
+}
+
+.reg-btn-draft-dismiss {
+  padding: 6px 12px;
+  background-color: #FFFFFF;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.reg-btn-draft-dismiss:hover {
+  background-color: #F1F5F9;
+  color: #0F172A;
+  border-color: #94A3B8;
+}
+
+/* ================================================================
    ===== 4. NEW PATIENT REGISTRATION FORM =====
    ================================================================ */
 
@@ -1348,15 +1425,15 @@
 }
 
 /* ================================================================
-   ===== 7. DARK MODE STYLES (GITHUB DARK DIMMED EYE-COMFORT PALETTE) =====
+   ===== 7. DARK MODE STYLES (ELEVATED DARK SLATE PALETTE) =====
    ================================================================ */
 
 body.dark-mode .registration-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .registration-subtitle {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 /* Stat Cards in Dark Mode */
@@ -1372,11 +1449,11 @@ body.dark-mode .reg-stat-card:hover {
 }
 
 body.dark-mode .reg-stat-val {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .reg-stat-lbl {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .reg-stat-card.stat-gold .reg-stat-val { color: #FBBF24; }
@@ -1400,103 +1477,103 @@ body.dark-mode .reg-card-header:hover {
 }
 
 body.dark-mode .reg-card-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .reg-card-subtitle {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .reg-card-toggle {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .reg-card-toggle:hover {
   background-color: #373E47;
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 /* Header icon boxes in Dark Mode */
 body.dark-mode .reg-header-icon-box.blue-box {
-  background: rgba(37, 99, 235, 0.2);
+  background: rgba(59, 130, 246, 0.18);
   color: #60A5FA;
 }
 
 body.dark-mode .reg-header-icon-box.green-box {
-  background: rgba(16, 185, 129, 0.2);
-  color: #34D399;
+  background: rgba(34, 197, 94, 0.18);
+  color: #4ADE80;
 }
 
 body.dark-mode .reg-header-icon-box.purple-box {
-  background: rgba(168, 85, 247, 0.2);
+  background: rgba(168, 85, 247, 0.18);
   color: #C084FC;
 }
 
 /* Search input in Dark Mode */
 body.dark-mode .reg-search-input {
   background: #22272E;
-  border: 1px solid #444C56;
-  color: #CDD9E5;
+  border: 1.5px solid #444C56;
+  color: #FFFFFF;
 }
 
 body.dark-mode .reg-search-icon-inside {
-  color: #768390;
+  color: #94A3B8;
 }
 
 body.dark-mode .reg-clear-search-btn {
-  color: #768390;
+  color: #94A3B8;
 }
 
 body.dark-mode .reg-clear-search-btn:hover {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .reg-search-input::placeholder {
-  color: #768390;
+  color: #94A3B8;
 }
 
 body.dark-mode .reg-search-input:focus {
-  background: #22272E;
   border-color: #539BF5;
   box-shadow: 0 0 0 3px rgba(83, 155, 245, 0.15);
 }
 
+/* Chips in Dark Mode */
 body.dark-mode .reg-chip-btn {
   background: #22272E;
-  border: 1px solid #444C56;
-  color: #ADBAC7;
+  border-color: #444C56;
+  color: #E2E8F0;
 }
 
 body.dark-mode .reg-chip-btn:hover {
   background: #373E47;
-  color: #CDD9E5;
   border-color: #545D68;
+  color: #FFFFFF;
 }
 
-/* Multi-result selector in Dark Mode */
+/* Multi results box in Dark Mode */
 body.dark-mode .reg-multi-results-box {
   background: #22272E;
   border-color: #373E47;
 }
 
 body.dark-mode .reg-multi-results-title {
-  color: #ADBAC7;
+  color: #CBD5E1;
 }
 
 body.dark-mode .reg-multi-result-btn {
-  background-color: #2D333B;
-  color: #CDD9E5;
+  background: #2D333B;
   border-color: #444C56;
+  color: #E2E8F0;
 }
 
 body.dark-mode .reg-multi-result-btn:hover {
-  background-color: #373E47;
+  background: #373E47;
   border-color: #545D68;
   color: #FFFFFF;
 }
 
 body.dark-mode .reg-multi-result-btn.selected {
-  background-color: #316DCA;
+  background: #316DCA;
   color: #FFFFFF;
   border-color: #316DCA;
   box-shadow: 0 2px 6px rgba(49, 109, 202, 0.3);
@@ -1510,11 +1587,11 @@ body.dark-mode .reg-search-result-card {
 }
 
 body.dark-mode .reg-patient-name {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .reg-patient-sub-meta {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .reg-hn-badge,
@@ -1530,17 +1607,17 @@ body.dark-mode .reg-patient-detail-grid {
 }
 
 body.dark-mode .reg-detail-label {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .reg-detail-val {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .reg-btn-more-info {
   background: #373E47;
   border-color: #444C56;
-  color: #CDD9E5;
+  color: #E2E8F0;
 }
 
 body.dark-mode .reg-btn-more-info:hover {
@@ -1555,11 +1632,11 @@ body.dark-mode .reg-not-found-box {
 }
 
 body.dark-mode .not-found-title {
-  color: #F47067;
+  color: #F87171;
 }
 
 body.dark-mode .not-found-desc {
-  color: #FF938A;
+  color: #FCA5A5;
 }
 
 /* Form in Dark Mode */
@@ -1568,22 +1645,22 @@ body.dark-mode .reg-form-section {
 }
 
 body.dark-mode .reg-section-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .reg-form-label {
-  color: #ADBAC7;
+  color: #F1F5F9;
 }
 
 body.dark-mode .reg-form-input,
 body.dark-mode .reg-form-select {
   background: #22272E;
   border: 1px solid #444C56;
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .reg-form-input::placeholder {
-  color: #768390;
+  color: #94A3B8;
 }
 
 body.dark-mode .reg-form-input:focus,
@@ -1595,13 +1672,13 @@ body.dark-mode .reg-form-select:focus {
 
 body.dark-mode .reg-form-input.has-error {
   background: rgba(244, 112, 103, 0.1);
-  border-color: #F47067;
+  border-color: #F87171;
 }
 
 body.dark-mode .reg-btn-reset-form {
   background: #373E47;
   border-color: #444C56;
-  color: #CDD9E5;
+  color: #E2E8F0;
 }
 
 body.dark-mode .reg-btn-reset-form:hover {
@@ -1623,7 +1700,7 @@ body.dark-mode .reg-count-pill {
 
 body.dark-mode .reg-recent-table thead th {
   background: #22272E;
-  color: #ADBAC7;
+  color: #F8FAFC;
   border-bottom: 1.5px solid #373E47;
 }
 
@@ -1637,7 +1714,7 @@ body.dark-mode .reg-table-row:hover {
 }
 
 body.dark-mode .patient-name-link {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .patient-name-link:hover {
@@ -1645,19 +1722,19 @@ body.dark-mode .patient-name-link:hover {
 }
 
 body.dark-mode .patient-sub-meta {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .time-main-text {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .time-sub-date {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .text-muted-time {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 /* Modal in Dark Mode */
@@ -1672,7 +1749,7 @@ body.dark-mode .reg-modal-header {
 }
 
 body.dark-mode .reg-modal-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .reg-modal-hn {
@@ -1686,11 +1763,11 @@ body.dark-mode .reg-modal-card {
 }
 
 body.dark-mode .modal-lbl {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .modal-val {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .reg-modal-footer {
@@ -1700,7 +1777,7 @@ body.dark-mode .reg-modal-footer {
 body.dark-mode .reg-modal-btn-close {
   background: #373E47;
   border-color: #444C56;
-  color: #CDD9E5;
+  color: #E2E8F0;
 }
 
 body.dark-mode .reg-modal-btn-close:hover {
@@ -1709,38 +1786,154 @@ body.dark-mode .reg-modal-btn-close:hover {
 }
 
 body.dark-mode .font-mono {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .font-phone {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .badge-scheme-gold {
-  background: rgba(245, 158, 11, 0.18);
-  color: #FBBF24;
-  border: 1.5px solid rgba(251, 191, 36, 0.45);
-  font-weight: 600;
+  background: rgba(217, 119, 6, 0.3);
+  color: #FDE047;
+  border: 1.5px solid #FBBF24;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
 }
 
 body.dark-mode .badge-scheme-social {
-  background: rgba(59, 130, 246, 0.18);
-  color: #60A5FA;
-  border: 1.5px solid rgba(96, 165, 250, 0.45);
-  font-weight: 600;
+  background: rgba(37, 99, 235, 0.3);
+  color: #93C5FD;
+  border: 1.5px solid #60A5FA;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 body.dark-mode .badge-scheme-gov {
-  background: rgba(168, 85, 247, 0.18);
-  color: #C084FC;
-  border: 1.5px solid rgba(192, 132, 252, 0.45);
-  font-weight: 600;
+  background: rgba(147, 51, 234, 0.3);
+  color: #D8B4FE;
+  border: 1.5px solid #A855F7;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(147, 51, 234, 0.25);
 }
 
 body.dark-mode .badge-scheme-private {
-  background: rgba(34, 197, 94, 0.18);
-  color: #4ADE80;
-  border: 1.5px solid rgba(74, 222, 128, 0.45);
+  background: rgba(22, 163, 74, 0.3);
+  color: #86EFAC;
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+}
+
+/* Custom Date of Birth Calendar SVG Input */
+.reg-date-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.reg-date-input-wrap input[type="date"] {
+  width: 100%;
+  padding-right: 44px !important;
+  cursor: pointer;
+}
+
+/* Hide native webkit indicator while keeping clickability over the whole right area */
+.reg-date-input-wrap input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  width: 36px;
+  height: 36px;
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  z-index: 2;
+}
+
+.reg-calendar-svg-btn {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748B;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+  transition: color 0.15s ease;
+}
+
+.reg-date-input-wrap:hover .reg-calendar-svg-btn,
+.reg-date-input-wrap:focus-within .reg-calendar-svg-btn {
+  color: #2563EB;
+}
+
+/* Dark Mode */
+body.dark-mode .reg-date-input-wrap input[type="date"],
+body[data-theme="dark"] .reg-date-input-wrap input[type="date"] {
+  color-scheme: dark !important;
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .reg-calendar-svg-btn,
+body[data-theme="dark"] .reg-calendar-svg-btn {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .reg-date-input-wrap:hover .reg-calendar-svg-btn,
+body[data-theme="dark"] .reg-date-input-wrap:hover .reg-calendar-svg-btn,
+body.dark-mode .reg-date-input-wrap:focus-within .reg-calendar-svg-btn,
+body[data-theme="dark"] .reg-date-input-wrap:focus-within .reg-calendar-svg-btn {
+  color: #60A5FA !important;
+}
+
+/* ===== Draft Auto-Recovery Banner in Dark Mode ===== */
+body.dark-mode .reg-draft-banner {
+  background: rgba(37, 99, 235, 0.22);
+  border: 1.5px solid #60A5FA;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25), 0 0 12px rgba(37, 99, 235, 0.2);
+}
+
+body.dark-mode .reg-draft-text-wrap {
+  color: #FFFFFF;
   font-weight: 600;
 }
+
+body.dark-mode .reg-draft-text-wrap svg {
+  color: #93C5FD;
+}
+
+body.dark-mode .reg-btn-draft-restore {
+  background-color: #2563EB;
+  color: #FFFFFF;
+  border: 1.5px solid #60A5FA;
+  font-weight: 700;
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.45);
+}
+
+body.dark-mode .reg-btn-draft-restore:hover {
+  background-color: #1D4ED8;
+  border-color: #93C5FD;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.65);
+}
+
+body.dark-mode .reg-btn-draft-dismiss {
+  background-color: #373E47;
+  color: #FFFFFF;
+  border: 1.5px solid #60A5FA;
+  font-weight: 600;
+}
+
+body.dark-mode .reg-btn-draft-dismiss:hover {
+  background-color: #444C56;
+  color: #FFFFFF;
+  border-color: #93C5FD;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+
+
 

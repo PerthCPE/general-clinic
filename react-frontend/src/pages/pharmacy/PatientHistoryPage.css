@@ -1,11 +1,11 @@
 /* ===== PatientHistoryPage - Scoped CSS ===== */
 
 .patient-history-container {
-  padding: 0;
-  max-width: 1280px;
+  padding: 24px 32px;
+  max-width: 1440px;
   margin: 0 auto;
   width: 100%;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   color: #1E293B;
   box-sizing: border-box;
 }
@@ -14,26 +14,46 @@ body.dark-mode .patient-history-container {
   color: #E2E8F0;
 }
 
+.patient-history-container .page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
 .patient-history-container .page-title {
-  color: #0D3B66;
-  font-size: 26px;
+  color: #0F172A;
+  font-size: 28px;
   font-weight: 700;
-  margin: 0 0 24px 0;
+  margin: 0 0 4px 0;
+  line-height: 1.25;
 }
 
 body.dark-mode .patient-history-container .page-title {
-  color: #60A5FA;
+  color: #F8FAFC;
+}
+
+.patient-history-container .page-subtitle {
+  font-size: 14.5px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.4;
+}
+
+body.dark-mode .patient-history-container .page-subtitle {
+  color: #94A3B8;
 }
 
 .patient-history-container .search-card {
   background-color: #FFFFFF;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 20px 24px;
   margin-bottom: 24px;
   display: flex;
   gap: 20px;
   align-items: flex-end;
   border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
 body.dark-mode .patient-history-container .search-card {
@@ -95,9 +115,10 @@ body.dark-mode .patient-history-container .input-with-icon input {
 
 .patient-history-container .patient-table-card {
   background-color: #FFFFFF;
-  border-radius: 12px;
+  border-radius: 14px;
   padding: 24px;
   border: 1px solid #E2E8F0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
 body.dark-mode .patient-history-container .patient-table-card {
@@ -144,11 +165,11 @@ body.dark-mode .patient-history-container .count-badge {
 
 .patient-history-container .patient-table th {
   padding: 14px 16px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #64748B;
+  font-size: 15px;
+  font-weight: 700;
+  color: #0F172A;
   background-color: #F8FAFC;
-  border-bottom: 1px solid #E2E8F0;
+  border-bottom: 2px solid #E2E8F0;
 }
 
 body.dark-mode .patient-history-container .patient-table th {
@@ -170,8 +191,9 @@ body.dark-mode .patient-history-container .patient-table td {
 }
 
 .patient-history-container .hn-cell {
-  font-weight: 600;
-  color: #1E40AF;
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #0F172A;
 }
 
 .patient-history-container .blood-badge {
@@ -216,8 +238,9 @@ body.dark-mode .patient-history-container .history-name-link {
 }
 
 .patient-history-container .history-hint-tag {
-  font-size: 0.75rem;
-  color: #64748B;
+  font-size: 0.8rem;
+  color: #0284C7;
+  font-weight: 600;
   display: block;
   margin-top: 2px;
 }
@@ -559,4 +582,154 @@ body.dark-mode .patient-history-container .severity-low {
   font-weight: 600;
   text-align: right !important;
   padding-right: 24px !important;
+}
+
+/* Dark Mode Table Enhancements Matching Queue Management */
+body.dark-mode .patient-history-container .patient-table th {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-bottom: 2px solid #334155 !important;
+}
+
+body.dark-mode .patient-history-container .patient-table tr {
+  background-color: #1E293B !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+body.dark-mode .patient-history-container .patient-table tr:hover {
+  background-color: #283548 !important;
+}
+
+body.dark-mode .patient-history-container .hn-cell {
+  color: #60A5FA !important;
+  font-weight: 700 !important;
+}
+
+body.dark-mode .patient-history-container .history-name-link {
+  color: #FFFFFF !important;
+}
+
+body.dark-mode .patient-history-container .history-hint-tag {
+  color: #60A5FA !important;
+}
+
+/* Base Light Mode Styles */
+.patient-history-container .filter-row-label {
+  color: #0F172A;
+}
+
+.patient-history-container .filter-pill-btn {
+  background: #F8FAFC;
+  color: #334155;
+  border: 1px solid #E2E8F0;
+}
+
+.patient-history-container .filter-pill-btn.active {
+  background: #0F172A;
+  color: #FFFFFF;
+  border: none;
+}
+
+.patient-history-container .visit-count-badge {
+  background: #EFF6FF;
+  color: #1D4ED8;
+  border: 1px solid #BFDBFE;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-weight: 700;
+  font-size: 13px;
+  display: inline-block;
+}
+
+/* Dark Mode Search Cards & Headers */
+body.dark-mode .patient-history-container .search-card {
+  background: #1E293B !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode .patient-history-container .filter-row-label {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .patient-history-container label {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .patient-history-container input[type="text"] {
+  background: #0F172A !important;
+  border-color: #334155 !important;
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .patient-history-container .filter-pill-btn {
+  background: #0F172A !important;
+  color: #CBD5E1 !important;
+  border: 1px solid #334155 !important;
+}
+
+body.dark-mode .patient-history-container .filter-pill-btn.active {
+  background: #2563EB !important;
+  color: #FFFFFF !important;
+  border: none !important;
+}
+
+.patient-history-container .collapsible-card-header {
+  background: #F8FAFC;
+}
+
+.patient-history-container .card-header-title {
+  color: #0F172A;
+}
+
+body.dark-mode .patient-history-container .collapsible-card-header {
+  background: #0F172A !important;
+  border-bottom-color: #334155 !important;
+}
+
+body.dark-mode .patient-history-container .card-header-title {
+  color: #F8FAFC !important;
+}
+
+/* Dark Mode Badges inside Table */
+body.dark-mode .patient-history-container .blood-badge {
+  background: rgba(239, 68, 68, 0.25) !important;
+  color: #F87171 !important;
+  border: 1px solid #F87171 !important;
+}
+
+body.dark-mode .patient-history-container .disease-tag {
+  background: rgba(30, 41, 59, 0.8) !important;
+  color: #CBD5E1 !important;
+  border: 1px solid #334155 !important;
+}
+
+body.dark-mode .patient-history-container .visit-count-badge {
+  background: rgba(37, 99, 235, 0.28) !important;
+  color: #93C5FD !important;
+  border: 1.5px solid #60A5FA !important;
+}
+
+/* Dark Mode Pagination Footer */
+.patient-history-container .table-pagination-footer {
+  background: #FFFFFF;
+}
+
+body.dark-mode .patient-history-container .table-pagination-footer {
+  background: #0F172A !important;
+  border-top-color: #334155 !important;
+}
+
+body.dark-mode .patient-history-container .pagination-info {
+  color: #CBD5E1 !important;
+}
+
+body.dark-mode .patient-history-container .pagination-btn {
+  background: #1E293B !important;
+  color: #94A3B8 !important;
+  border-color: #334155 !important;
+}
+
+body.dark-mode .patient-history-container .pagination-btn.active {
+  background: #2563EB !important;
+  color: #FFFFFF !important;
 }

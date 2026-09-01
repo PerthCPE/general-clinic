@@ -9,7 +9,7 @@ import "time"
 // screenings.assigned_doctor_id, queues.assigned_doctor_id) ให้ชี้ไปที่
 // users.id ทั้งหมด เพื่อให้สอดคล้องกับ JWT และ GetDoctors ที่มีอยู่เดิม
 type Doctor struct {
-	DoctorID      uint      `gorm:"primaryKey" json:"doctor_id"`
+	ID            uint      `gorm:"primaryKey" json:"id"`
 	UserID        uint      `gorm:"uniqueIndex;not null" json:"user_id"`
 	FullName      string    `gorm:"not null" json:"full_name"`
 	LicenseNumber string    `gorm:"uniqueIndex" json:"license_number"`
@@ -21,5 +21,5 @@ type Doctor struct {
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 
-	User User `gorm:"foreignKey:UserID" json:"user"`
+	User User `gorm:"foreignKey:UserID;references:ID" json:"user"`
 }

@@ -1,11 +1,11 @@
 /* ===== BillingDispensePage - Scoped CSS ===== */
 
 .billing-dispense-container {
-  padding: 0;
-  max-width: 1280px;
+  padding: 24px 32px;
+  max-width: 1440px;
   margin: 0 auto;
   width: 100%;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   color: #1E293B;
   box-sizing: border-box;
 }
@@ -95,7 +95,7 @@ body.dark-mode .billing-dispense-container .input-group label {
 }
 
 .billing-dispense-container .input-group input {
-  padding: 10px 14px;
+  padding: 32px 48px;
   border: 1px solid #CBD5E1;
   border-radius: 8px;
   font-size: 0.875rem;
@@ -124,12 +124,82 @@ body.dark-mode .billing-dispense-container .input-group input {
 
 .billing-dispense-container .page-title {
   font-size: 1.5rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   margin: 0 0 20px 0;
 }
 
 body.dark-mode .billing-dispense-container .page-title {
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.billing-dispense-container .metric-card {
+  padding: 20px !important;
+  display: flex !important;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 0 !important;
+}
+
+.billing-dispense-container .metric-icon-bg {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.billing-dispense-container .orange-bg {
+  background: #FFEDD5;
+  color: #F97316;
+}
+
+body.dark-mode .billing-dispense-container .orange-bg {
+  background: rgba(249, 115, 22, 0.15);
+}
+
+.billing-dispense-container .green-bg {
+  background: #DCFCE7;
+  color: #16A34A;
+}
+
+body.dark-mode .billing-dispense-container .green-bg {
+  background: rgba(22, 163, 74, 0.15);
+}
+
+.billing-dispense-container .metric-label {
+  font-size: 0.9rem;
+  color: #64748B;
+  font-weight: 600;
+  display: block;
+}
+
+body.dark-mode .billing-dispense-container .metric-label {
+  color: #94A3B8;
+}
+
+.billing-dispense-container .metric-val-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.billing-dispense-container .metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+body.dark-mode .billing-dispense-container .metric-value {
   color: #F8FAFC;
 }
 
@@ -148,7 +218,7 @@ body.dark-mode .billing-dispense-container .page-title {
 
 .billing-dispense-container .card-heading {
   font-size: 1.1rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   margin: 0;
 }
@@ -216,7 +286,7 @@ body.dark-mode .billing-dispense-container .stock-alert-box {
 .billing-dispense-container .dispense-table th {
   padding: 12px 14px;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #64748B;
   background: #F8FAFC;
   border-bottom: 1px solid #E2E8F0;
@@ -250,7 +320,7 @@ body.dark-mode .billing-dispense-container .font-bold {
 
 .billing-dispense-container .summary-card .card-heading {
   font-size: 1.25rem;
-  font-weight: 800;
+  font-weight: 600;
   color: #0F172A;
   margin: 0 0 18px 0;
   padding-bottom: 4px;
@@ -279,7 +349,7 @@ body.dark-mode .billing-dispense-container .summary-rights-box {
 
 .billing-dispense-container .summary-rights-label {
   font-size: 0.95rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0284C7;
   display: flex;
   align-items: center;
@@ -298,7 +368,7 @@ body.dark-mode .billing-dispense-container .summary-rights-label {
   border: 1.5px solid #0284C7;
   background: #FFFFFF;
   font-size: 0.98rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   outline: none;
   cursor: pointer;
@@ -328,7 +398,7 @@ body.dark-mode .billing-dispense-container .summary-rights-select {
 }
 
 .billing-dispense-container .item-title {
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   font-size: 0.95rem;
 }
@@ -343,7 +413,7 @@ body.dark-mode .billing-dispense-container .item-title {
 }
 
 .billing-dispense-container .item-price {
-  font-weight: 700;
+  font-weight: 500;
   color: #1E293B;
 }
 
@@ -366,7 +436,7 @@ body.dark-mode .billing-dispense-container .summary-divider {
   justify-content: space-between;
   align-items: center;
   font-size: 1.1rem;
-  font-weight: 700;
+  font-weight: 500;
   color: #0F172A;
   margin-bottom: 24px;
 }
@@ -392,7 +462,7 @@ body.dark-mode .billing-dispense-container .total-price {
   border-radius: 12px;
   padding: 16px 24px;
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 500;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -447,5 +517,33 @@ body.dark-mode .billing-dispense-container .total-price {
   background: #FEF2F2;
   color: #991B1B;
   border: 1px solid #FCA5A5;
+}
+
+/* Dark Mode Table Styling Matching Queue Management */
+body.dark-mode .billing-dispense-container table thead tr {
+  background: #22272E !important;
+  color: #F8FAFC !important;
+  border-bottom: 2px solid #373E47 !important;
+}
+
+body.dark-mode .billing-dispense-container table thead th {
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .billing-dispense-container table tbody tr {
+  background-color: #2D333B;
+  border-bottom: 1px solid #373E47;
+}
+
+body.dark-mode .billing-dispense-container table tbody tr:hover {
+  background-color: #373E47;
+}
+
+body.dark-mode .billing-dispense-container .patient-table-name {
+  color: #FFFFFF !important;
+}
+
+body.dark-mode .billing-dispense-container .patient-table-sub {
+  color: #CBD5E1 !important;
 }
 

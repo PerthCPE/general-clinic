@@ -65,10 +65,10 @@ export const CLINIC_CONFIG = {
   // ข้อมูลผู้ป่วยตัวอย่าง 2 คนที่ค้นหาได้ในระบบ
   patients: [
     {
-      id: 'HN-2023-045',
-      hn: 'HN-2023-045',
+      id: 'HN0045',
+      hn: 'HN0045',
       nationalId: '1101800234567',
-      queueNumber: '001',
+      queueNumber: 'Q0001',
       ticket: 'Ticket: 4931',
       name: 'นายบุญค้ำ โยลัย',
       shortName: 'บุญค้ำ',
@@ -120,10 +120,10 @@ export const CLINIC_CONFIG = {
       ]
     },
     {
-      id: 'HN-2023-112',
-      hn: 'HN-2023-112',
+      id: 'HN0112',
+      hn: 'HN0112',
       nationalId: '1101800234568',
-      queueNumber: '002',
+      queueNumber: 'Q0002',
       ticket: 'Ticket: 4932',
       name: 'นางสาวกานดา มณีรัตน์',
       shortName: 'กานดา',

@@ -130,7 +130,7 @@ body.dark-mode .page-showcase-title {
 }
 
 body.dark-mode .page-showcase-subtitle {
-  color: #A0A0A0;
+  color: #CBD5E1;
 }
 
 body.dark-mode .page-showcase-card {
@@ -143,19 +143,19 @@ body.dark-mode .page-showcase-card-header {
 }
 
 body.dark-mode .page-showcase-card-header h2 {
-  color: #F1F5F9;
+  color: #FFFFFF;
 }
 
 body.dark-mode .page-showcase-desc {
-  color: #E2E8F0;
-}
-
-body.dark-mode .page-features-title {
   color: #F1F5F9;
 }
 
+body.dark-mode .page-features-title {
+  color: #FFFFFF;
+}
+
 body.dark-mode .page-feature-item {
-  color: #E2E8F0;
+  color: #F1F5F9;
 }
 
 body.dark-mode .feature-check-icon {

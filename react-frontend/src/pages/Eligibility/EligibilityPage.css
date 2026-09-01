@@ -1258,15 +1258,15 @@
 }
 
 /* ================================================================
-   ===== 5. DARK MODE STYLES (GITHUB DARK DIMMED EYE-COMFORT PALETTE) =====
+   ===== 5. DARK MODE STYLES (ELEVATED DARK SLATE PALETTE) =====
    ================================================================ */
 
 body.dark-mode .eligibility-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .eligibility-subtitle {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 /* Stat Cards in Dark Mode */
@@ -1294,11 +1294,11 @@ body.dark-mode .stat-card.stat-other.active {
 }
 
 body.dark-mode .stat-value {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .stat-label {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .stat-card.stat-gold .stat-value {
@@ -1334,12 +1334,12 @@ body.dark-mode .clickable-header:hover {
 }
 
 body.dark-mode .main-card-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .main-card-subtitle,
 body.dark-mode .table-card-subtitle {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .card-header-icon-box.blue-box {
@@ -1355,30 +1355,30 @@ body.dark-mode .card-header-icon-box.purple-box {
 body.dark-mode .card-accordion-toggle {
   background: transparent;
   border: none;
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .card-accordion-toggle:hover {
   background: transparent;
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .search-label {
-  color: #CDD9E5;
+  color: #F1F5F9;
 }
 
 body.dark-mode .label-sub-tip {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .eligibility-input {
   background: #22272E;
-  border: 1px solid #444C56;
-  color: #CDD9E5;
+  border: 1.5px solid #444C56;
+  color: #FFFFFF;
 }
 
 body.dark-mode .eligibility-input::placeholder {
-  color: #768390;
+  color: #94A3B8;
 }
 
 body.dark-mode .eligibility-input:focus {
@@ -1390,7 +1390,7 @@ body.dark-mode .eligibility-input:focus {
 body.dark-mode .chip-badge {
   background: #22272E;
   border: 1px solid #444C56;
-  color: #ADBAC7;
+  color: #E2E8F0;
 }
 
 body.dark-mode .chip-badge:hover {
@@ -1400,7 +1400,7 @@ body.dark-mode .chip-badge:hover {
 }
 
 body.dark-mode .chips-title {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 /* Alert Banner in Dark Mode */
@@ -1431,67 +1431,76 @@ body.dark-mode .result-info-grid {
 }
 
 body.dark-mode .info-field-label {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .info-field-value {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .font-bold-patient {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .coverage-highlight {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .verified-time-text {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 /* Dark Mode Scheme Badges */
 body.dark-mode .badge-scheme-gold {
-  background: rgba(245, 158, 11, 0.18);
-  color: #FBBF24;
-  border: 1.5px solid rgba(251, 191, 36, 0.45);
-  font-weight: 600;
+  background: rgba(217, 119, 6, 0.3);
+  color: #FDE047;
+  border: 1.5px solid #FBBF24;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
 }
 
 body.dark-mode .badge-scheme-social {
-  background: rgba(59, 130, 246, 0.18);
-  color: #60A5FA;
-  border: 1.5px solid rgba(96, 165, 250, 0.45);
-  font-weight: 600;
+  background: rgba(37, 99, 235, 0.3);
+  color: #93C5FD;
+  border: 1.5px solid #60A5FA;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 body.dark-mode .badge-scheme-gov {
-  background: rgba(168, 85, 247, 0.18);
-  color: #C084FC;
-  border: 1.5px solid rgba(192, 132, 252, 0.45);
-  font-weight: 600;
+  background: rgba(147, 51, 234, 0.3);
+  color: #D8B4FE;
+  border: 1.5px solid #A855F7;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(147, 51, 234, 0.25);
 }
 
 body.dark-mode .badge-scheme-private {
-  background: rgba(34, 197, 94, 0.18);
-  color: #4ADE80;
-  border: 1.5px solid rgba(74, 222, 128, 0.45);
-  font-weight: 600;
+  background: rgba(22, 163, 74, 0.3);
+  color: #86EFAC;
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
 }
 
 /* Action Buttons in Dark Mode */
 body.dark-mode .btn-confirm-save-action {
-  background: #316DCA;
-  box-shadow: 0 4px 12px rgba(49, 109, 202, 0.3);
+  background: #2563EB;
+  border: 1.5px solid #60A5FA;
+  color: #FFFFFF;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
 }
 
 body.dark-mode .btn-confirm-save-action:hover {
-  background: #2563EB;
+  background: #1D4ED8;
+  border-color: #93C5FD;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.6);
 }
 
 body.dark-mode .btn-cancel-clear-action {
   background: #373E47;
-  color: #CDD9E5;
+  color: #E2E8F0;
 }
 
 body.dark-mode .btn-cancel-clear-action:hover {
@@ -1505,11 +1514,11 @@ body.dark-mode .result-empty-placeholder {
 }
 
 body.dark-mode .empty-main-text {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .empty-sub-text {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 /* History Table in Dark Mode */
@@ -1524,7 +1533,7 @@ body.dark-mode .table-controls-header {
 }
 
 body.dark-mode .table-card-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .history-count-pill {
@@ -1536,7 +1545,11 @@ body.dark-mode .history-count-pill {
 body.dark-mode .history-search-input {
   background: #22272E;
   border: 1px solid #444C56;
-  color: #CDD9E5;
+  color: #FFFFFF;
+}
+
+body.dark-mode .history-search-input::placeholder {
+  color: #94A3B8;
 }
 
 body.dark-mode .history-search-input:focus {
@@ -1547,12 +1560,12 @@ body.dark-mode .history-search-input:focus {
 body.dark-mode .scheme-dropdown-filter {
   background: #22272E;
   border: 1px solid #444C56;
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .modern-eligibility-table thead th {
   background: #22272E;
-  color: #ADBAC7;
+  color: #F8FAFC;
   border-bottom: 1.5px solid #373E47;
 }
 
@@ -1566,41 +1579,45 @@ body.dark-mode .eligibility-table-row:hover {
 }
 
 body.dark-mode .table-date-badge {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .patient-name-bold {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .patient-id-sub {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .coverage-cell-text {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .coverage-hospital-sub {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .status-pill-active {
-  background: rgba(34, 197, 94, 0.18);
-  color: #4ADE80;
-  border: 1.5px solid rgba(74, 222, 128, 0.45);
-  font-weight: 600;
+  background: rgba(22, 163, 74, 0.3);
+  color: #86EFAC;
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
 }
 
 body.dark-mode .btn-view-details {
-  background: #373E47;
-  border-color: #444C56;
-  color: #CDD9E5;
+  background: #2563EB;
+  border: 1.5px solid #60A5FA;
+  color: #FFFFFF;
+  font-weight: 600;
 }
 
 body.dark-mode .btn-view-details:hover {
-  background: #444C56;
+  background: #1D4ED8;
+  border-color: #93C5FD;
   color: #FFFFFF;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
 }
 
 body.dark-mode .table-pagination-footer {
@@ -1609,13 +1626,13 @@ body.dark-mode .table-pagination-footer {
 }
 
 body.dark-mode .pagination-info {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .pagination-btn {
   background: #22272E;
   border-color: #444C56;
-  color: #CDD9E5;
+  color: #E2E8F0;
 }
 
 body.dark-mode .pagination-btn:hover:not(:disabled) {
@@ -1639,11 +1656,11 @@ body.dark-mode .modal-header {
 }
 
 body.dark-mode .modal-title {
-  color: #CDD9E5;
+  color: #FFFFFF;
 }
 
 body.dark-mode .modal-subtitle {
-  color: #768390;
+  color: #CBD5E1;
 }
 
 body.dark-mode .modal-close-btn {
@@ -1672,7 +1689,14 @@ body.dark-mode .modal-footer {
 }
 
 body.dark-mode .online-status-badge {
-  color: #57AB5A;
-  background: rgba(87, 171, 90, 0.15);
-  border: 1px solid rgba(87, 171, 90, 0.3);
+  color: #86EFAC;
+  background: rgba(22, 163, 74, 0.3);
+  border: 1.5px solid #4ADE80;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+}
+
+body.dark-mode .status-dot {
+  background: #4ADE80;
+  box-shadow: 0 0 8px #4ADE80;
 }

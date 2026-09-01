@@ -23,38 +23,35 @@
 /* Header & Logo */
 .login-header {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
 }
 
 .login-logo-icon {
-  width: 52px;
-  height: 52px;
-  background: linear-gradient(135deg, #0F2027 0%, #1A3A4A 100%);
-  border-radius: 14px;
+  width: 195px;
+  height: 195px;
+  border-radius: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 16px;
-  box-shadow: 0 4px 12px rgba(15, 32, 39, 0.25);
+  margin: 0 auto 8px;
+  overflow: hidden;
 }
 
-.login-logo-icon svg {
-  width: 28px;
-  height: 28px;
+.login-logo-icon img,
+.login-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .login-clinic-name {
-  font-family: 'Inter', sans-serif;
-  font-size: 26px;
-  font-weight: 700;
-  color: #0F172A;
-  margin: 0 0 6px 0;
-  transition: color 0.5s ease;
+  display: none;
 }
 
 .login-tagline {
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-family: 'Inter', 'Prompt', sans-serif;
+  font-size: 13.5px;
+  font-weight: 500;
   color: #64748B;
   margin: 0;
   transition: color 0.5s ease;
