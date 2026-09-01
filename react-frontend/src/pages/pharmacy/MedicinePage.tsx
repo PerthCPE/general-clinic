@@ -343,8 +343,8 @@ export default function MedicinePage() {
 
   return (
     <div className="medicine-page-container">
-      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', textAlign: 'left', width: '100%' }}>
-        <div className="header-titles" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
+      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
+        <div className="header-titles" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <h1 className="page-title" style={{ margin: 0, fontSize: '28px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', letterSpacing: '-0.5px' }}>
               รายการยา
@@ -363,23 +363,6 @@ export default function MedicinePage() {
             ค้นหาและจัดการระบบสินค้าคงคลัง คัดกรองยาใกล้หมด และเติมสต็อกยา (อัปเดตอัตโนมัติแบบ Real-time)
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsAddModalOpen(true)}
-          style={{
-            padding: '10px 20px', borderRadius: '10px',
-            background: '#16A34A', color: '#FFFFFF', border: 'none',
-            fontSize: '14.5px', fontWeight: '700', cursor: 'pointer',
-            display: 'inline-flex', alignItems: 'center', gap: '8px',
-            boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)', transition: 'all 0.2s ease'
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          + เพิ่มรายการยาใหม่
-        </button>
       </div>
 
       {/* Stock Inventory Executive Stat Block Cards (Image 2 Pattern) */}
@@ -541,6 +524,27 @@ export default function MedicinePage() {
             </h3>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsAddModalOpen(true);
+              }}
+              style={{
+                padding: '6px 14px', borderRadius: '8px',
+                background: '#16A34A', color: '#FFFFFF', border: 'none',
+                fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)', transition: 'all 0.2s ease',
+                marginRight: '6px'
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              เพิ่มรายการยาใหม่
+            </button>
             {showSuccessBadge && (
               <span className="success-badge" style={{ background: '#DCFCE7', color: '#166534', fontWeight: 'bold', padding: '4px 12px', borderRadius: '16px', fontSize: '13px' }}>
                 ✓ อัปเดตคลังยาเรียบร้อยแล้ว
