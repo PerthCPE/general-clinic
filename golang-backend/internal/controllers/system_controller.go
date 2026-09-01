@@ -40,13 +40,13 @@ func ResetTestDatabase(c *gin.Context) {
 // POST /api/system/simulate-prescription
 // จำลองหมอกด Submit ใบสั่งยา — สุ่มดึงผู้ป่วยจริงจากตาราง patient_histories + ยาจริงจากตาราง medicines
 func SimulateDoctorPrescription(c *gin.Context) {
-	// 1. ดึงผู้ป่วยจริงจากตาราง patient_histories
-	var patientHistories []models.Patient_Hisstory
-	config.DB.Find(&patientHistories)
+	// 1. ดึงผู้ป่วยจริงจากตาราง patient_medicines
+	var patientMedicines []models.PatientMedicine
+	config.DB.Find(&patientMedicines)
 
-	// ถ้าตาราง patient_histories ว่าง → seed ข้อมูลตัวอย่าง 4 คน
-	if len(patientHistories) == 0 {
-		patientHistories = []models.Patient_Hisstory{
+	// ถ้าตาราง patient_medicines ว่าง → seed ข้อมูลตัวอย่าง 4 คน
+	if len(patientMedicines) == 0 {
+		patientMedicines = []models.PatientMedicine{
 			{
 				HN: "HN0045", NationalID: "1100501234567", FullName: "นาย สมชาย ใจดี",
 				Gender: "ชาย", Age: 45, BloodType: "O+",
@@ -76,14 +76,14 @@ func SimulateDoctorPrescription(c *gin.Context) {
 				PhoneNumber: "084-111-2233",
 			},
 		}
-		for i := range patientHistories {
-			config.DB.Create(&patientHistories[i])
+		for i := range patientMedicines {
+			config.DB.Create(&patientMedicines[i])
 		}
 	}
 
-	// 2. สุ่มเลือกผู้ป่วย 1 คนจาก patient_histories (ใช้ math/rand ให้ได้คนละคนทุกครั้ง)
+	// 2. สุ่มเลือกผู้ป่วย 1 คนจาก patient_medicines (ใช้ math/rand ให้ได้คนละคนทุกครั้ง)
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	target := patientHistories[rng.Intn(len(patientHistories))]
+	target := patientMedicines[rng.Intn(len(patientMedicines))]
 
 	// เพิ่ม visit_count ของผู้ป่วยคนนี้
 	config.DB.Model(&target).Update("visit_count", target.VisitCount+1)
