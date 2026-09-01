@@ -1,0 +1,194 @@
+/* ==========================================================================
+   Document Forward Page Styles
+   Compliant with TEAM_RULES.md & frontend.md Design System
+   ========================================================================== */
+
+.forward-container {
+  padding: 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Plus Jakarta Sans', sans-serif);
+  color: #1E293B;
+  transition: all 0.25s ease;
+}
+
+body.dark-mode .forward-container {
+  color: #F8FAFC;
+}
+
+.action-btn-send {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.forward-main-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Tabs Bar */
+.forward-tabs-bar {
+  padding: 18px 24px;
+  border-bottom: 1px solid #E2E8F0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  background: #FAFAFA;
+}
+
+body.dark-mode .forward-tabs-bar {
+  background: #1C2230;
+  border-bottom-color: #333F53;
+}
+
+.forward-tab-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.forward-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid #CBD5E1;
+  background: #FFFFFF;
+  color: #475569;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+body.dark-mode .forward-tab-btn {
+  background: #212836;
+  border-color: #333F53;
+  color: #94A3B8;
+}
+
+.forward-tab-btn:hover {
+  background: #F1F5F9;
+  color: #0F172A;
+}
+
+body.dark-mode .forward-tab-btn:hover {
+  background: #2F3B4E;
+  color: #F8FAFC;
+}
+
+.forward-tab-btn.active {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+}
+
+.tab-counter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+}
+
+.forward-tab-btn.active .tab-counter-badge {
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+.forward-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.doc-code-text {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #2563EB;
+}
+
+body.dark-mode .doc-code-text {
+  color: #60A5FA;
+}
+
+.doc-title-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-dept-text {
+  font-size: 14px;
+  color: #334155;
+  font-weight: 500;
+}
+
+body.dark-mode .doc-dept-text {
+  color: #CBD5E1;
+}
+
+.table-actions-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tbl-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.view-btn {
+  background: #EFF6FF;
+  color: #2563EB;
+  border-color: #BFDBFE;
+}
+
+body.dark-mode .view-btn {
+  background: rgba(37, 99, 235, 0.18);
+  color: #60A5FA;
+  border-color: #1D4ED8;
+}
+
+.view-btn:hover {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+.archive-btn {
+  background: #F1F5F9;
+  color: #475569;
+  border-color: #CBD5E1;
+}
+
+body.dark-mode .archive-btn {
+  background: #2F3B4E;
+  color: #CBD5E1;
+  border-color: #333F53;
+}
+
+.archive-btn:hover {
+  background: #10B981;
+  color: #FFFFFF;
+  border-color: #10B981;
+}

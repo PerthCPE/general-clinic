@@ -25,6 +25,9 @@ import DoctorQueuePage from './pages/doctor/DoctorQueuePage';
 import DoctorExaminationPage from './pages/doctor/DoctorExaminationPage';
 import DoctorSchedulePage from './pages/doctor/DoctorSchedulePage';
 import DoctorRecordsPage from './pages/doctor/DoctorRecordsPage';
+import { DocumentManagementPage } from './pages/officer/DocumentManagementPage';
+import { ScheduleManagementPage } from './pages/officer/ScheduleManagementPage';
+import { DocumentForwardPage } from './pages/officer/DocumentForwardPage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
 import { Toaster } from 'react-hot-toast';
 import './App.css';
@@ -163,6 +166,14 @@ function MainApp() {
         return <DoctorSchedulePage />;
       case 'doctor-records':
         return <DoctorRecordsPage onNavigate={setActivePage} />;
+
+      // ===== Officer & DMS Pages =====
+      case 'dms-documents':
+        return <DocumentManagementPage />;
+      case 'dms-schedule':
+        return <ScheduleManagementPage />;
+      case 'dms-forward':
+        return <DocumentForwardPage />;
 
       default:
         return <PageShowcase roleBadge="System" roleBadgeColor="#6B7280" title="หน้าแรก" subtitle="ยินดีต้อนรับ" description="กรุณาเลือกเมนูจากแถบด้านซ้าย" features={[]} />;
