@@ -828,6 +828,8 @@ export default function MedicinePage() {
             </div>
           </div>
         </div>
+      )}
+
       {/* Add New Medicine Modal */}
       {isAddModalOpen && (
         <div className="modal-overlay">
