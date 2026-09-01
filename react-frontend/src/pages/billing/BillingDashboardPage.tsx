@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import './BillingDashboardPage.css';
 import { CLINIC_CONFIG } from '../../config/clinicConfig';
+import { useWebSocket } from '../../context/WebSocketContext';
 
 interface PaymentRecord {
   id: string;
@@ -29,23 +30,16 @@ interface DetailedPatientRecord {
   clinicFee: number;
 }
 
-const mockPaymentRecords: PaymentRecord[] = [
-  { id: 'HN0045', patientName: 'นายบุญค้ำ โยลัย', date: '23/07/2026', time: '10:15 น.', amount: '฿ 1,175.00', method: 'QR Code', status: 'completed' },
-  { id: 'HN0112', patientName: 'นางสาวกานดา มณีรัตน์', date: '23/07/2026', time: '11:00 น.', amount: '฿ 1,175.00', method: 'เงินสด', status: 'completed' },
-  { id: 'HN0018', patientName: 'นายสมชาย ใจดี', date: '23/07/2026', time: '11:45 น.', amount: '฿ 1,500.00', method: 'QR Code', status: 'pending' },
-  { id: 'HN0884', patientName: 'นางสาวสวย งามตา', date: '23/07/2026', time: '13:20 น.', amount: '฿ 600.00', method: 'เงินสด', status: 'pending' },
-  { id: 'HN0105', patientName: 'นางสาวแมว อานนท์', date: '23/07/2026', time: '14:00 น.', amount: '฿ 800.00', method: 'QR Code', status: 'completed' },
-  { id: 'HN0309', patientName: 'นางสาววุฒิศรี ร้อยสาย', date: '23/07/2026', time: '14:05 น.', amount: '฿ 400.00', method: 'เงินสด', status: 'pending' },
-  { id: 'HN0512', patientName: 'นางสาวจินตนา มานิน', date: '23/07/2026', time: '15:10 น.', amount: '฿ 700.00', method: 'QR Code', status: 'completed' },
-  { id: 'HN0640', patientName: 'นางสาวสุภาสิทธิ์ ดวงใจ', date: '23/07/2026', time: '15:30 น.', amount: '฿ 850.00', method: 'เงินสด', status: 'completed' },
-  { id: 'HN0789', patientName: 'นางสาวกุหลาบ สุขี', date: '23/07/2026', time: '16:20 น.', amount: '฿ 100.00', method: 'เงินสด', status: 'completed' },
-];
+const mockPaymentRecords: PaymentRecord[] = [];
 
 export default function BillingDashboardPage() {
+  const { isConnected, subscribe } = useWebSocket();
+  const [records, setRecords] = useState<PaymentRecord[]>(mockPaymentRecords);
   const [patientId, setPatientId] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
   const [hasSearched, setHasSearched] = useState(false);
+  const [liveNotify, setLiveNotify] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<DetailedPatientRecord | null>(null);
 
   const handleSearch = () => {
@@ -59,7 +53,66 @@ export default function BillingDashboardPage() {
     setHasSearched(false);
   };
 
-  const filteredRecords = mockPaymentRecords.filter(record => {
+  // Sync Real Billings from Supabase DB
+  const fetchBillings = useCallback(() => {
+    const token = localStorage.getItem('token');
+    fetch('/api/billing/list', {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data?.billings && Array.isArray(data.billings)) {
+          const formatted: PaymentRecord[] = data.billings.map((b: any) => ({
+            id: `HN-${String(b.visit_id || b.id).padStart(4, '0')}`,
+            patientName: b.patient_name || b.VisitRecord?.Patient?.FullName || `ผู้ป่วย Visit #${b.visit_id || b.id}`,
+            date: b.created_at ? new Date(b.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
+            time: b.created_at ? new Date(b.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '10:00 น.',
+            amount: `฿ ${(b.net_amount || b.total_amount || 0).toFixed(2)}`,
+            method: b.payment_method === 'Cash' ? 'เงินสด' : 'QR Code',
+            status: b.payment_status === 'paid' || b.payment_status === 'completed' ? 'completed' : 'pending',
+          }));
+          setRecords(formatted);
+        }
+      })
+      .catch(() => {
+        // Empty on error
+      });
+  }, []);
+
+  // Real-time WebSocket Listeners for Billing & Cashier
+  useEffect(() => {
+    fetchBillings();
+
+    const unsubPay = subscribe('PAYMENT_CONFIRMED', (data: any) => {
+      fetchBillings();
+      setLiveNotify(`✓ ชำระเงินสำเร็จ: บิล #${data?.id || ''}`);
+      setTimeout(() => setLiveNotify(null), 4000);
+    });
+
+    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      fetchBillings();
+      setLiveNotify(`⚡ มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
+      setTimeout(() => setLiveNotify(null), 4000);
+    });
+
+    const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
+      if (data && data.action === 'db_reset') {
+        setRecords([]);
+      } else {
+        fetchBillings();
+      }
+    });
+
+    return () => {
+      unsubPay();
+      unsubBill();
+      unsubQueue();
+    };
+  }, [fetchBillings, subscribe]);
+
+  const filteredRecords = records.filter(record => {
     const query = patientId.trim().toLowerCase();
     const matchSearch = !query || record.id.toLowerCase().includes(query) || record.patientName.toLowerCase().includes(query);
     const matchStatus = statusFilter === 'all' || record.status === statusFilter;
@@ -120,20 +173,38 @@ export default function BillingDashboardPage() {
   return (
     <div className="billing-dashboard-container">
       {/* Page Header */}
-      <div className="dashboard-title-row">
+      <div className="dashboard-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div className="header-titles">
-          <h1 className="dashboard-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
-            แดชบอร์ดสรุปรายรับและการเงินประจำวัน
-          </h1>
-          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '1.1rem' }}>
-            สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <h1 className="dashboard-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0', letterSpacing: '-0.5px' }}>
+              แดชบอร์ดสรุปรายรับและการเงินประจำวัน
+            </h1>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '4px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: '600',
+              background: isConnected ? '#DCFCE7' : '#FEE2E2',
+              color: isConnected ? '#15803D' : '#B91C1C'
+            }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isConnected ? '#22C55E' : '#EF4444' }}></span>
+              {isConnected ? 'Real-time WebSocket Live' : 'Offline / Polling'}
+            </span>
+          </div>
+          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0', fontSize: '1.1rem' }}>
+            สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน (อัปเดต Real-time)
           </p>
         </div>
-        {hasSearched && (
-          <span className="success-badge">
-            <span className="check-icon">✓</span> ค้นหาผู้ป่วยสำเร็จ
-          </span>
-        )}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {liveNotify && (
+            <span className="success-badge" style={{ background: '#DBEAFE', color: '#1E40AF', padding: '6px 14px', borderRadius: '20px', fontWeight: 'bold' }}>
+              {liveNotify}
+            </span>
+          )}
+          {hasSearched && (
+            <span className="success-badge">
+              <span className="check-icon">✓</span> ค้นหาผู้ป่วยสำเร็จ
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Metric Cards Section - Pharmacy-style framed cards */}

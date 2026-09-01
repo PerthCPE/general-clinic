@@ -74,9 +74,17 @@ func SetUpRoutes(r *gin.Engine) {
 	billingRoutes := api.Group("/billing")
 	billingRoutes.Use(middleware.RoleRequired("cashier", "pharmacist", "registrar"))
 	{
+		billingRoutes.GET("/list", controllers.GetAllBillings)
 		billingRoutes.GET("/visit/:visit_id", controllers.GetBillingByVisit)
 		billingRoutes.POST("/calculate", controllers.CalculateBilling)
 		billingRoutes.POST("/qr/generate", controllers.GenerateQRPayment)
 		billingRoutes.POST("/confirm", controllers.ConfirmPayment)
+	}
+
+	// ===== 5. System Utilities (Reset Database for Testing) =====
+	systemRoutes := api.Group("/system")
+	{
+		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
+		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
 	}
 }

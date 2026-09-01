@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import './BillingDispensePage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
+import { useWebSocket } from '../../context/WebSocketContext';
 
 interface ToastState {
   message: string;
@@ -22,16 +23,19 @@ export default function BillingDispensePage({
   patientRightsMap,
   onUpdatePatientRights
 }: BillingDispensePageProps) {
+  const { subscribe } = useWebSocket();
   const [searchPatient, setSearchPatient] = useState('');
   const [searchQueueInput, setSearchQueueInput] = useState('');
-  const [localPatientId, setLocalPatientId] = useState<string>(selectedPatientId || CLINIC_CONFIG.patients[0]?.id || '');
+  const [localPatientId, setLocalPatientId] = useState<string>(selectedPatientId || '');
   const [isSearchExpanded, setIsSearchExpanded] = useState(true);
-  const [queueList, setQueueList] = useState<PatientConfig[]>(CLINIC_CONFIG.patients.slice());
+  
+  // คิวเริ่มต้น - เริ่มจากตารางว่างเปล่าแบบ Clean State
+  const [queueList, setQueueList] = useState<PatientConfig[]>([]);
 
   const filteredQueue = queueList.filter(p => {
     if (!searchQueueInput.trim()) return true;
     const q = searchQueueInput.trim().toLowerCase();
-    const cleanNationalId = p.nationalId.replace(/-/g, '');
+    const cleanNationalId = p.nationalId ? p.nationalId.replace(/-/g, '') : '';
     const cleanQ = q.replace(/-/g, '');
     return (
       p.id.toLowerCase().includes(q) ||
@@ -42,11 +46,55 @@ export default function BillingDispensePage({
     );
   });
 
-  const [toast, setToast] = useState<ToastState | null>({
-    message: 'ได้รับข้อมูลใบสั่งยาจากคลังยาเรียบร้อยแล้ว พร้อมชำระเงิน',
-    type: 'doctor'
-  });
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [isToastFading, setIsToastFading] = useState(false);
+
+  // Real-time Queue & Billing Listener
+  useEffect(() => {
+    const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
+      if (data && data.action === 'db_reset') {
+        setQueueList([]);
+      }
+    });
+
+    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      if (data) {
+        const pName = data.patient_name || `ผู้ป่วย คิว #${data.visit_id || ''}`;
+        const newPatient: PatientConfig = {
+          id: `HN-${data.visit_id || Date.now()}`,
+          hn: `HN-${data.visit_id || Date.now()}`,
+          nationalId: '1101800234567',
+          queueNumber: 'Q0001',
+          ticket: 'A-01',
+          name: pName,
+          shortName: pName,
+          gender: 'ชาย',
+          age: 35,
+          dob: '01/01/2534',
+          phone: '081-999-8888',
+          occupation: 'รับจ้างทั่วไป',
+          treatmentRights: 'สิทธิ 30 บาท (สปสช.)',
+          patientType: 'ผู้ป่วยนอก (OPD)',
+          allergies: ['ไม่มีประวัติแพ้ยา'],
+          chronicDiseases: 'ไม่มี',
+          vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+          visitStatus: 'รอรับยา / ชำระเงิน',
+          visitDate: '23/07/2026',
+          visitTime: '10:00 น.',
+          doctorAdvice: 'พักผ่อนให้เพียงพอ',
+          medications: [
+            { name: 'Paracetamol 500mg', medId: 'MED-0231', properties: 'ยาลดไข้ บรรเทาปวด', dosage: '1 เม็ด, ทุกๆ 6 ชั่วโมง', instructions: 'เมื่อมีอาการปวดหรือมีไข้', price: 80, stock: 100, stockStatus: 'in-stock' },
+          ],
+        };
+        setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
+      }
+    });
+
+    return () => {
+      unsubQueue();
+      unsubBill();
+    };
+  }, [subscribe]);
 
   const triggerToast = (message: string, type: 'success' | 'error' | 'doctor') => {
     setIsToastFading(false);

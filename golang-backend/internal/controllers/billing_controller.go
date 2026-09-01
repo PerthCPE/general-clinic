@@ -7,6 +7,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,6 +23,20 @@ type GenerateQRRequest struct {
 	BillingID   uint    `json:"billing_id" binding:"required"`
 	PromptPayID string  `json:"promptpay_id" binding:"required"`
 	Amount      float64 `json:"amount" binding:"required"`
+}
+
+// GET /api/billing/list - ดึงรายการบิลการเงินทั้งหมดจาก Database
+func GetAllBillings(c *gin.Context) {
+	var billings []models.Billing
+	if err := config.DB.Order("created_at desc").Find(&billings).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billings: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":   "success",
+		"billings": billings,
+	})
 }
 
 // GET /api/billing/visit/:visit_id - ดึงข้อมูลบิลตาม Visit ID
@@ -84,6 +99,8 @@ func CalculateBilling(c *gin.Context) {
 			return
 		}
 	}
+
+	ws.BroadcastEvent("BILLING_CREATED", billing)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -164,6 +181,8 @@ func ConfirmPayment(c *gin.Context) {
 	if req.PaymentMethod == "QR Code" {
 		config.DB.Model(&models.QRPayment{}).Where("billing_id = ?", billing.ID).Update("status", "completed")
 	}
+
+	ws.BroadcastEvent("PAYMENT_CONFIRMED", billing)
 
 	changeAmount := 0.0
 	if req.PaymentMethod == "Cash" {
