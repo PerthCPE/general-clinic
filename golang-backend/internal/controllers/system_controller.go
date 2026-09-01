@@ -150,6 +150,28 @@ func SimulateDoctorPrescription(c *gin.Context) {
 		})
 	}
 
+	// 8.5. บันทึก/อัปเดตลงตาราง patient_medicines เพื่อให้หน้าประวัติรับยาเห็นทันที
+	var patMed models.PatientMedicine
+	if err := config.DB.Where("hn = ?", patient.HN).First(&patMed).Error; err != nil {
+		patMed = models.PatientMedicine{
+			HN:              patient.HN,
+			NationalID:      patient.NationalID,
+			FullName:        patient.FullName,
+			Gender:          patient.Gender,
+			Age:             age,
+			SchemeType:      patient.SchemeType,
+			Allergies:       patient.Allergies,
+			ChronicDiseases: patient.ChronicDiseases,
+			PhoneNumber:     patient.PhoneNumber,
+			VisitCount:      1,
+		}
+		config.DB.Create(&patMed)
+	} else {
+		patMed.VisitCount += 1
+		config.DB.Save(&patMed)
+	}
+	ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", patMed)
+
 	// 9. Broadcast	// ยิง WebSocket ไปบอกระบบจัดการคิวห้องยา
 	ws.BroadcastEvent("QUEUE_CREATED", gin.H{
 		"id":              queue.ID,

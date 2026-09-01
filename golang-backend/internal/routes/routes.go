@@ -71,6 +71,8 @@ func SetUpRoutes(r *gin.Engine) {
 		pharmacyRoutes.GET("/dispensing/:visit_id", controllers.GetDispensingByVisit)
 		pharmacyRoutes.POST("/dispensing", controllers.RecordDispense)
 		pharmacyRoutes.POST("/dispense", controllers.ConfirmDispenseAndBill)
+		pharmacyRoutes.GET("/patient-medicines", controllers.GetPatientMedicines)
+		pharmacyRoutes.GET("/patient-medicines/:hn", controllers.GetPatientMedicineDetail)
 	}
 
 	// ===== ระบบย่อยที่ 2: การเงิน (Billing / QRPayment) - Boonkum (B6741990) =====
@@ -93,5 +95,7 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.GET("/medicines", controllers.GetMedicines)
 		systemRoutes.POST("/medicines/create", controllers.CreateMedicine)
 		systemRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)
+		systemRoutes.GET("/patient-medicines", controllers.GetPatientMedicines)
+		systemRoutes.GET("/patient-medicines/:hn", controllers.GetPatientMedicineDetail)
 	}
 }

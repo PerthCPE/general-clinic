@@ -174,6 +174,8 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 			patMed.VisitCount += 1
 			tx.Save(&patMed)
 		}
+
+		ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", patMed)
 	}
 
 	tx.Commit()
@@ -199,6 +201,62 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		"status":  "success",
 		"message": "Dispensing confirmed and billed successfully",
 		"billing": billing,
+	})
+}
+
+// GET /api/pharmacy/patient-medicines - ดึงประวัติผู้ป่วยและการรับยาทั้งหมดจากตาราง patient_medicines
+func GetPatientMedicines(c *gin.Context) {
+	var records []models.PatientMedicine
+	if err := config.DB.Order("id desc").Find(&records).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch patient medicines: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":            "success",
+		"patient_medicines": records,
+	})
+}
+
+// GET /api/pharmacy/patient-medicines/:hn - ดึงประวัติการรับยาของป่วยรายบุคคลตาม HN
+func GetPatientMedicineDetail(c *gin.Context) {
+	hn := c.Param("hn")
+	var patMed models.PatientMedicine
+	if err := config.DB.Where("hn = ? OR hn = ?", hn, "HN-"+hn).First(&patMed).Error; err != nil {
+		var patient models.Patient
+		if errP := config.DB.Where("hn = ? OR hn = ?", hn, "HN-"+hn).First(&patient).Error; errP == nil {
+			patMed = models.PatientMedicine{
+				HN:              patient.HN,
+				NationalID:      patient.NationalID,
+				FullName:        patient.FullName,
+				Gender:          patient.Gender,
+				Age:             time.Now().Year() - patient.BirthDate.Year(),
+				SchemeType:      patient.SchemeType,
+				Allergies:       patient.Allergies,
+				ChronicDiseases: patient.ChronicDiseases,
+				PhoneNumber:     patient.PhoneNumber,
+				VisitCount:      1,
+			}
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Patient history not found"})
+			return
+		}
+	}
+
+	var patient models.Patient
+	var dispensings []models.Dispensing
+	if errP := config.DB.Where("hn = ?", patMed.HN).First(&patient).Error; errP == nil {
+		var visitIDs []uint
+		config.DB.Model(&models.VisitRecord{}).Where("patient_id = ?", patient.ID).Pluck("id", &visitIDs)
+		if len(visitIDs) > 0 {
+			config.DB.Preload("Medicine").Preload("Doctor").Where("visit_id IN ?", visitIDs).Find(&dispensings)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":           "success",
+		"patient_medicine": patMed,
+		"dispensings":      dispensings,
 	})
 }
 
