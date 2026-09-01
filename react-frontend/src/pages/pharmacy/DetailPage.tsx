@@ -60,46 +60,62 @@ export default function DetailPage({
 
   // Real-time Queue Listener
   useEffect(() => {
+    // โหลดข้อมูลจาก API ทันทีที่เปิดหน้า
+    const fetchQueues = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/queue/list', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const mappedQueues = data.map((q: any) => ({
+              id: String(q.id),
+              visitId: q.visit_id || 1,
+              hn: q.Patient?.hn || q.hn || `HN-${q.patient_id}`,
+              nationalId: q.Patient?.national_id || '',
+              queueNumber: q.queue_number || 'Q0000',
+              ticket: q.queue_number || 'A-01',
+              name: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
+              shortName: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
+              gender: q.Patient?.gender || 'ชาย',
+              age: q.Patient ? new Date().getFullYear() - new Date(q.Patient.birthdate).getFullYear() : 0,
+              treatmentRights: q.Patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+              patientType: 'ผู้ป่วยนอก (OPD)',
+              allergies: q.Patient?.allergies ? [q.Patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
+              chronicDiseases: q.Patient?.chronic_diseases || 'ไม่มี',
+              vitals: 'รอตรวจสอบ',
+              visitStatus: q.status === 'pharmacy_waiting' ? 'รอรับยา / ชำระเงิน' : (q.status === 'billing_waiting' ? 'จ่ายยาแล้ว / รอชำระเงิน' : 'เสร็จสิ้น'),
+              visitDate: new Date(q.created_at || Date.now()).toLocaleDateString('th-TH'),
+              visitTime: new Date(q.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+              doctorAdvice: q.note || '',
+              medications: [] // will load detail on click
+            }));
+            setQueueList(mappedQueues);
+            if (mappedQueues.length > 0) setActivePatient(mappedQueues[0]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch queues:', err);
+      }
+    };
+
+    fetchQueues();
+
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
       if (data && data.action === 'db_reset') {
         setQueueList([]);
+      } else {
+        // If queue updated, better to re-fetch
+        fetchQueues();
       }
     });
 
     const unsubCreated = subscribe('QUEUE_CREATED', (data: any) => {
       if (data) {
-        const pName = data.patient?.full_name || data.patient_name || `ผู้ป่วยคิว ${data.queue_number || ''}`;
-        
-        // Use dynamic medications from WebSocket payload or fallback to empty
-        const dynamicMedications = data.medications || [];
-        
-        const newPatient: PatientConfig = {
-          id: String(data.id) || `Q-${Date.now()}`,
-          visitId: data.visit_id,
-          hn: data.hn || `HN-${data.patient_id || data.id || Date.now()}`,
-          nationalId: data.national_id || '',
-          queueNumber: data.queue_number || 'Q0001',
-          ticket: data.queue_number || 'A-01',
-          name: pName,
-          shortName: pName,
-          gender: data.gender || 'ชาย',
-          age: data.age || 0,
-          dob: '',
-          phone: data.phone || '',
-          occupation: '',
-          treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
-          patientType: 'ผู้ป่วยนอก (OPD)',
-          allergies: data.allergies ? [data.allergies] : ['ไม่มีประวัติแพ้ยา'],
-          chronicDiseases: data.chronic_diseases || 'ไม่มี',
-          vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-          visitStatus: 'รอรับยา / ชำระเงิน',
-          visitDate: new Date().toLocaleDateString('th-TH'),
-          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-          doctorAdvice: 'พักผ่อนให้เพียงพอ',
-          medications: dynamicMedications,
-        };
-        setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
-        triggerToast(`ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์: ${pName}`, 'doctor');
+        fetchQueues(); // Re-fetch all to ensure perfectly sync
+        triggerToast(`ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์: ${data.patient_name || ''}`, 'doctor');
       }
     });
 
