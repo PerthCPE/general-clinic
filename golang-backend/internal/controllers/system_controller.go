@@ -40,22 +40,39 @@ func ResetTestDatabase(c *gin.Context) {
 	})
 }
 
-// POST /api/system/simulate-prescription - จำลองหมอกด Submit ใบสั่งยา สุ่มดึงข้อมูลจาก Patient และ Medicine ใน Supabase DB จริง
+// POST /api/system/simulate-prescription - จำลองหมอกด Submit ใบสั่งยา สุ่มดึง/สร้างผู้ป่วย 10+ รายชื่อลง Supabase DB จริง
 func SimulateDoctorPrescription(c *gin.Context) {
-	// 1. ดึงข้อมูล Patient จริงจาก DB
-	var patients []models.Patient
-	config.DB.Find(&patients)
+	patientPool := []struct {
+		Name       string
+		Scheme     string
+		Gender     string
+		Age        int
+		NationalID string
+	}{
+		{Name: "นายสมชาย ใจดี", Scheme: "บัตรทอง (สปสช.)", Gender: "ชาย", Age: 42, NationalID: "1101800234567"},
+		{Name: "นางสาวกานดา มณีรัตน์", Scheme: "ประกันสังคม (ม.33)", Gender: "หญิง", Age: 29, NationalID: "1101800234568"},
+		{Name: "นายบุญค้ำ โยลัย", Scheme: "สิทธิ 30 บาท (สปสช.)", Gender: "ชาย", Age: 55, NationalID: "1101800234569"},
+		{Name: "นายอนันต์ สุขี", Scheme: "จ่ายตรง / ข้าราชการ", Gender: "ชาย", Age: 48, NationalID: "1101800234570"},
+		{Name: "นางสาวจินตนา มานิน", Scheme: "ประกันสุขภาพเอกชน", Gender: "หญิง", Age: 34, NationalID: "1101800234571"},
+		{Name: "นายบุญมี มีทรัพย์", Scheme: "บัตรทอง (สปสช.)", Gender: "ชาย", Age: 61, NationalID: "1101800234572"},
+		{Name: "นางสาวสุภาสิทธิ์ ดวงใจ", Scheme: "ประกันสังคม (ม.33)", Gender: "หญิง", Age: 27, NationalID: "1101800234573"},
+		{Name: "นายวิโรจน์ แสงสุริยา", Scheme: "จ่ายตรง / ข้าราชการ", Gender: "ชาย", Age: 50, NationalID: "1101800234574"},
+		{Name: "นางสาวกุหลาบ สุขี", Scheme: "ประกันสุขภาพเอกชน", Gender: "หญิง", Age: 31, NationalID: "1101800234575"},
+		{Name: "นายธนกร วรรณศิลป์", Scheme: "บัตรทอง (สปสช.)", Gender: "ชาย", Age: 39, NationalID: "1101800234576"},
+	}
+
+	randIdx := int(time.Now().UnixNano() % int64(len(patientPool)))
+	target := patientPool[randIdx]
 
 	var patient models.Patient
-	if len(patients) > 0 {
-		randPatientIdx := int(time.Now().UnixNano() % int64(len(patients)))
-		patient = patients[randPatientIdx]
-	} else {
+	if err := config.DB.Where("full_name = ?", target.Name).First(&patient).Error; err != nil {
 		patient = models.Patient{
-			HN:          fmt.Sprintf("HN-%04d", time.Now().Unix()%10000),
-			FullName:    "นายสมชาย ใจดี",
+			HN:          fmt.Sprintf("HN-%04d", (time.Now().UnixNano()/1e6)%10000),
+			NationalID:  target.NationalID,
+			FullName:    target.Name,
+			Gender:      target.Gender,
 			PhoneNumber: "081-999-8888",
-			SchemeType:  "บัตรทอง (สปสช.)",
+			SchemeType:  target.Scheme,
 		}
 		config.DB.Create(&patient)
 	}
@@ -64,7 +81,7 @@ func SimulateDoctorPrescription(c *gin.Context) {
 	var medicines []models.Medicine
 	config.DB.Find(&medicines)
 
-	queueNo := fmt.Sprintf("Q-%03d", time.Now().Unix()%1000)
+	queueNo := fmt.Sprintf("Q-%03d", (time.Now().UnixNano()/1e6)%1000)
 	queue := models.Queue{
 		PatientID:   patient.ID,
 		QueueNumber: queueNo,
@@ -95,7 +112,16 @@ func SimulateDoctorPrescription(c *gin.Context) {
 		config.DB.Create(&dispensing1)
 	}
 
-	ws.BroadcastEvent("QUEUE_CREATED", queue)
+	ws.BroadcastEvent("QUEUE_CREATED", gin.H{
+		"id":           queue.ID,
+		"patient_id":   patient.ID,
+		"queue_number": queue.QueueNumber,
+		"status":       queue.Status,
+		"patient_name": patient.FullName,
+		"hn":           patient.HN,
+		"national_id":  patient.NationalID,
+		"scheme_type":  patient.SchemeType,
+	})
 	ws.BroadcastEvent("QUEUE_UPDATED", queue)
 
 	c.JSON(http.StatusOK, gin.H{
