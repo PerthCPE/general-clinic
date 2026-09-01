@@ -101,6 +101,46 @@ export const ScheduleManagementPage: React.FC = () => {
   const [previewDates, setPreviewDates] = useState<string[]>([]);
   const [hasPreviewed, setHasPreviewed] = useState(false);
 
+  // Fetch real doctors from backend if available
+  React.useEffect(() => {
+    fetch('http://localhost:8080/api/doctors')
+      .then(res => res.ok ? res.json() : null)
+      .then((data: Array<{ id: number; username: string; full_name?: string; FullName?: string; phone?: string; Phone?: string }> | null) => {
+        if (data && Array.isArray(data) && data.length > 0) {
+          const mapped: ShiftSchedule[] = data.map((doc, idx) => {
+            const name = doc.full_name || doc.FullName || doc.username;
+            const initials = name.replace(/^(นพ\.|พญ\.|ทพญ\.|ทพ\.|ดร\.)\s*/, '').slice(0, 2).toUpperCase();
+            return {
+              id: `DOC-${doc.id}`,
+              doctorCode: `DOC-${String(doc.id).padStart(4, '0')}`,
+              name: name,
+              department: idx % 3 === 0 ? 'อายุรกรรมทั่วไป' : idx % 3 === 1 ? 'สูตินรีเวช' : 'กุมารเวชกรรม',
+              avatarText: initials || 'DR',
+              specialty: idx % 3 === 0 ? 'โรคหัวใจและหลอดเลือด' : idx % 3 === 1 ? 'เวชศาสตร์มารดาและทารก' : 'กุมารเวชศาสตร์โรคภูมิแพ้',
+              phone: doc.phone || doc.Phone || '081-222-0000',
+              email: `${doc.username}@clinic.local`,
+              shifts: {
+                mon: idx % 2 === 0 ? 'morning' : 'afternoon',
+                tue: idx % 3 === 0 ? 'morning' : 'afternoon',
+                wed: 'morning',
+                thu: idx % 2 === 1 ? 'afternoon' : 'morning',
+                fri: 'morning',
+                sat: idx % 2 === 0 ? 'morning' : 'off',
+                sun: idx % 3 === 0 ? 'afternoon' : 'off',
+              }
+            };
+          });
+          setSchedules(mapped);
+          if (mapped.length > 0) {
+            setBatchForm(prev => ({ ...prev, doctorId: mapped[0].id }));
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback to mock data if backend not connected yet
+      });
+  }, []);
+
   const thaiMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
   const buddhistYear = currentDate.getFullYear() + 543;
 
