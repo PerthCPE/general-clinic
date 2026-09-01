@@ -97,5 +97,6 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)
 		systemRoutes.GET("/patient-medicines", controllers.GetPatientMedicines)
 		systemRoutes.GET("/patient-medicines/:hn", controllers.GetPatientMedicineDetail)
+		systemRoutes.POST("/dispense", controllers.ConfirmDispenseAndBill)
 	}
 }

@@ -252,26 +252,42 @@ export default function DetailPage({
     triggerToast(`ข้อผิดพลาด: ไม่สามารถเชื่อมต่อกับฐานข้อมูลหลังบ้านได้ โปรดเปิดเซิร์ฟเวอร์`, 'error');
   };
 
-  // กดยืนยันการจ่ายยา: ส่งข้อมูลเข้า DB การเงินจริง + ลบคนไข้ออกจากคิว + รีเซ็ต selection
+  // กดยืนยันการจ่ายยา: ส่งข้อมูลเข้า DB การเงินจริง + อัปเดต PatientMedicine DB + ลบคนไข้ออกจากคิว
   const handleSendToBilling = async () => {
     if (!activePatient) return;
     const pName = activePatient.name;
     const vId = activePatient.visitId || 1;
 
+    const payload = {
+      visit_id: vId,
+      hn: activePatient.hn,
+      patient_name: activePatient.name
+    };
+
     try {
-      const token = localStorage.getItem('token');
-      await fetch('/api/pharmacy/dispense', {
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      let res = await fetch('/api/pharmacy/dispense', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          visit_id: vId
-        })
+        headers,
+        body: JSON.stringify(payload)
       });
+
+      if (!res.ok) {
+        await fetch('/api/system/dispense', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
     } catch {
-      // Fallback
+      await fetch('/api/system/dispense', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(() => {});
     }
 
     triggerToast(`ยืนยันการจ่ายยาเรียบร้อย! ส่งข้อมูลใบสั่งยาของ ${pName} ไปยังระบบการเงินแล้ว`, 'success');

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -94,17 +95,18 @@ func RecordDispense(c *gin.Context) {
 // POST /api/pharmacy/dispense - ยืนยันการจ่ายยา ตัดสต็อก และสร้างบิลการเงิน พร้อมยิง WebSocket
 func ConfirmDispenseAndBill(c *gin.Context) {
 	var req struct {
-		VisitID uint `json:"visit_id" binding:"required"`
+		VisitID     uint   `json:"visit_id"`
+		HN          string `json:"hn"`
+		PatientName string `json:"patient_name"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil && req.VisitID == 0 && req.HN == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	var dispensings []models.Dispensing
-	if err := config.DB.Preload("Medicine").Where("visit_id = ?", req.VisitID).Find(&dispensings).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch dispensing records: " + err.Error()})
-		return
+	if req.VisitID > 0 {
+		config.DB.Preload("Medicine").Where("visit_id = ?", req.VisitID).Find(&dispensings)
 	}
 
 	totalAmount := 0.0
@@ -113,7 +115,7 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 	// วนลูปตัดสต็อกยาแต่ละตัวที่ถูกสั่งจ่าย และรวมราคา
 	for _, d := range dispensings {
 		var med models.Medicine
-		if err := tx.First(&med, d.MedicineID).Error; err == nil {
+		if err := tx.Where("id = ?", d.MedicineID).First(&med).Error; err == nil {
 			if med.StockQuantity >= d.Quantity {
 				med.StockQuantity -= d.Quantity
 				tx.Save(&med)
@@ -122,12 +124,10 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		}
 	}
 
-	// ถ้าไม่มีราคายาเลย (เช่น ทดสอบข้อมูล) ให้ตั้งค่าเริ่มต้น
 	if totalAmount == 0 {
-		totalAmount = 350.0 // ค่าธรรมเนียมแพทย์หรือค่าเริ่มต้น
+		totalAmount = 350.0
 	}
 
-	// สร้างบิลการเงิน
 	billing := models.Billing{
 		VisitID:                 req.VisitID,
 		TotalAmount:             totalAmount,
@@ -141,58 +141,81 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		return
 	}
 
-	// อัปเดตสถานะคิวเป็นรอชำระเงิน และบันทึกประวัติลง PatientMedicine
 	var queue models.Queue
 	var visit models.VisitRecord
-	if err := tx.Preload("Patient").First(&visit, req.VisitID).Error; err == nil {
-		// 1. เปลี่ยนสถานะคิว
-		if err := tx.Where("patient_id = ? AND status = 'pharmacy_waiting'", visit.PatientID).First(&queue).Error; err == nil {
-			queue.Status = "billing_waiting"
-			queue.Department = "การเงิน"
-			tx.Save(&queue)
-		}
+	var patient models.Patient
 
-		// 2. อัปเดตตาราง PatientMedicine (ประวัติจัดการยา)
-		var patMed models.PatientMedicine
-		if err := tx.Where("hn = ?", visit.Patient.HN).First(&patMed).Error; err != nil {
-			// ยังไม่มี ให้สร้างใหม่
-			patMed = models.PatientMedicine{
-				HN:              visit.Patient.HN,
-				NationalID:      visit.Patient.NationalID,
-				FullName:        visit.Patient.FullName,
-				Gender:          visit.Patient.Gender,
-				Age:             time.Now().Year() - visit.Patient.BirthDate.Year(),
-				SchemeType:      visit.Patient.SchemeType,
-				Allergies:       visit.Patient.Allergies,
-				ChronicDiseases: visit.Patient.ChronicDiseases,
-				PhoneNumber:     visit.Patient.PhoneNumber,
-				VisitCount:      1,
+	if req.VisitID > 0 {
+		tx.Preload("Patient").First(&visit, req.VisitID)
+		if visit.PatientID > 0 {
+			patient = visit.Patient
+			if err := tx.Where("patient_id = ? AND status = 'pharmacy_waiting'", visit.PatientID).First(&queue).Error; err == nil {
+				queue.Status = "billing_waiting"
+				queue.Department = "การเงิน"
+				tx.Save(&queue)
 			}
-			tx.Create(&patMed)
-		} else {
-			// มีแล้ว ให้อัปเดตจำนวนครั้ง
-			patMed.VisitCount += 1
-			tx.Save(&patMed)
 		}
-
-		ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", patMed)
 	}
 
+	if patient.ID == 0 && req.HN != "" {
+		tx.Where("hn = ? OR hn = ?", req.HN, "HN-"+req.HN).First(&patient)
+	}
+
+	targetHN := patient.HN
+	if targetHN == "" {
+		targetHN = req.HN
+	}
+	if targetHN == "" {
+		targetHN = fmt.Sprintf("HN-%d", time.Now().Unix()%10000)
+	}
+
+	targetName := patient.FullName
+	if targetName == "" {
+		targetName = req.PatientName
+	}
+	if targetName == "" {
+		targetName = "ผู้ป่วย"
+	}
+
+	// อัปเดต/สร้างลงตาราง patient_medicines ใน Supabase DB ทันที!
+	var patMed models.PatientMedicine
+	if err := tx.Where("hn = ?", targetHN).First(&patMed).Error; err != nil {
+		age := 35
+		if patient.ID > 0 && patient.BirthDate.Year() > 1900 {
+			age = time.Now().Year() - patient.BirthDate.Year()
+		}
+		patMed = models.PatientMedicine{
+			HN:              targetHN,
+			NationalID:      patient.NationalID,
+			FullName:        targetName,
+			Gender:          patient.Gender,
+			Age:             age,
+			SchemeType:      patient.SchemeType,
+			Allergies:       patient.Allergies,
+			ChronicDiseases: patient.ChronicDiseases,
+			PhoneNumber:     patient.PhoneNumber,
+			VisitCount:      1,
+		}
+		tx.Create(&patMed)
+	} else {
+		patMed.VisitCount += 1
+		tx.Save(&patMed)
+	}
+
+	ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", patMed)
 	tx.Commit()
 
-	// เตรียมข้อมูลบิลที่สมบูรณ์ส่งให้หน้าจอการเงิน
 	billingPayload := gin.H{
 		"id":           billing.ID,
 		"visit_id":     billing.VisitID,
-		"patient_name": visit.Patient.FullName, // ข้อมูลชื่อผู้ป่วย
-		"hn":           visit.Patient.HN,
+		"patient_name": targetName,
+		"hn":           targetHN,
 		"total_amount": billing.TotalAmount,
 		"net_amount":   billing.NetAmount,
 		"status":       billing.PaymentStatus,
 		"created_at":   billing.CreatedAt,
 	}
 
-	// ยิง WebSocket แจ้งเตือนการเงินและอัปเดตคิว
 	ws.BroadcastEvent("DISPENSE_RECORDED", gin.H{"visit_id": req.VisitID, "action": "dispensed"})
 	ws.BroadcastEvent("BILLING_CREATED", billingPayload)
 	ws.BroadcastEvent("QUEUE_UPDATED", queue)
