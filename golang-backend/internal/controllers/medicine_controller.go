@@ -1,8 +1,9 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
-	"time"
+	"strconv"
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
@@ -130,7 +131,9 @@ func CreateMedicine(c *gin.Context) {
 
 	code := req.MedicineCode
 	if code == "" {
-		code = "MED-" + time.Now().Format("05000")
+		var count int64
+		config.DB.Model(&models.Medicine{}).Count(&count)
+		code = fmt.Sprintf("MED-%03d", count+1)
 	}
 
 	medicine := models.Medicine{
@@ -164,10 +167,21 @@ func DeleteMedicine(c *gin.Context) {
 	param := c.Param("id")
 
 	var medicine models.Medicine
-	if err := config.DB.Where("id = ? OR medicine_code = ?", param, param).First(&medicine).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Medicine not found"})
+	var err error
+
+	if id, parseErr := strconv.Atoi(param); parseErr == nil {
+		err = config.DB.Where("id = ?", id).First(&medicine).Error
+	} else {
+		err = config.DB.Where("medicine_code = ?", param).First(&medicine).Error
+	}
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Medicine not found: " + err.Error()})
 		return
 	}
+
+	// ลบรายการอ้างอิงใน dispensings เพื่อไม่ให้ติด Foreign Key Constraint
+	config.DB.Where("medicine_id = ?", medicine.ID).Delete(&models.Dispensing{})
 
 	if err := config.DB.Delete(&medicine).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete medicine: " + err.Error()})
