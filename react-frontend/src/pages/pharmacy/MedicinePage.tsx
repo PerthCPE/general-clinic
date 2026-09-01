@@ -38,39 +38,58 @@ export default function MedicinePage() {
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    fetch('/api/pharmacy/medicines', { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (data?.medicines && Array.isArray(data.medicines) && data.medicines.length > 0) {
-          const formatted: Medicine[] = data.medicines.map((m: any) => {
-            const stock = m.stock_quantity ?? 0;
-            let status: 'In Stock' | 'Low Stock' | 'Out of Stock' = 'In Stock';
-            if (stock === 0) status = 'Out of Stock';
-            else if (stock < 50) status = 'Low Stock';
+    const processMedicinesData = (data: any) => {
+      if (data?.medicines && Array.isArray(data.medicines) && data.medicines.length > 0) {
+        const formatted: Medicine[] = data.medicines.map((m: any) => {
+          const stock = m.stock_quantity ?? 0;
+          let status: 'In Stock' | 'Low Stock' | 'Out of Stock' = 'In Stock';
+          if (stock === 0) status = 'Out of Stock';
+          else if (stock < 50) status = 'Low Stock';
 
-            return {
-              id: m.medicine_code || `MED-${m.id}`,
-              medicine_code: m.medicine_code || `MED-${m.id}`,
-              name: m.name,
-              genericName: m.generic_name || m.name,
-              category: m.category || 'ยารักษาโรคทั่วไป',
-              properties: m.properties || 'ยารักษาโรคและบรรเทาอาการตามแพทย์สั่ง',
-              dosage: m.dosage || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
-              precautions: 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
-              price: `฿ ${(m.unit_price || 0).toFixed(2)}`,
-              unit_price: m.unit_price || 0,
-              manufacturer: m.manufacturer || 'บริษัท เภสัชกรรม จำกัด',
-              stock: stock,
-              stock_quantity: stock,
-              status: status,
-              dispensedToday: 0,
-            };
-          });
-          setMedicines(formatted);
+          return {
+            id: m.medicine_code || `MED-${m.id}`,
+            medicine_code: m.medicine_code || `MED-${m.id}`,
+            name: m.name,
+            genericName: m.generic_name || m.name,
+            category: m.category || 'ยารักษาโรคทั่วไป',
+            properties: m.properties || 'ยารักษาโรคและบรรเทาอาการตามแพทย์สั่ง',
+            dosage: m.dosage || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
+            precautions: 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
+            price: `฿ ${(m.unit_price || 0).toFixed(2)}`,
+            unit_price: m.unit_price || 0,
+            manufacturer: m.manufacturer || 'บริษัท เภสัชกรรม จำกัด',
+            stock: stock,
+            stock_quantity: stock,
+            status: status,
+            dispensedToday: 0,
+          };
+        });
+        setMedicines(formatted);
+        return true;
+      }
+      return false;
+    };
+
+    fetch('/api/pharmacy/medicines', { headers })
+      .then(res => {
+        if (!res.ok) throw new Error('Auth or API error');
+        return res.json();
+      })
+      .then(data => {
+        if (!processMedicinesData(data)) {
+          // Fallback to system endpoint
+          fetch('/api/system/medicines')
+            .then(res => res.json())
+            .then(sysData => processMedicinesData(sysData))
+            .catch(err => console.error('Fallback fetch medicines failed:', err));
         }
       })
       .catch(() => {
-        // Fallback: network error
+        // Fallback to system endpoint on 401 or network error
+        fetch('/api/system/medicines')
+          .then(res => res.json())
+          .then(sysData => processMedicinesData(sysData))
+          .catch(err => console.error('Fallback fetch medicines failed:', err));
       });
   }, []);
 
