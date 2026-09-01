@@ -74,6 +74,7 @@ func SetUpRoutes(r *gin.Engine) {
 	billingRoutes := api.Group("/billing")
 	billingRoutes.Use(middleware.RoleRequired("cashier", "pharmacist", "registrar"))
 	{
+		billingRoutes.GET("/list", controllers.GetAllBillings)
 		billingRoutes.GET("/visit/:visit_id", controllers.GetBillingByVisit)
 		billingRoutes.POST("/calculate", controllers.CalculateBilling)
 		billingRoutes.POST("/qr/generate", controllers.GenerateQRPayment)
