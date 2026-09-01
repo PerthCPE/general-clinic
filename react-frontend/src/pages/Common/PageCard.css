@@ -15,7 +15,7 @@
 .page-role-badge-pill {
   display: inline-block;
   color: #FFFFFF;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-heading);
   font-size: 11px;
   font-weight: 700;
   padding: 4px 12px;
@@ -26,7 +26,7 @@
 }
 
 .page-showcase-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-heading);
   font-weight: 700;
   font-size: 28px;
   line-height: 36px;
@@ -36,7 +36,7 @@
 }
 
 .page-showcase-subtitle {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 400;
   font-size: 14px;
   line-height: 22px;
@@ -61,7 +61,7 @@
 }
 
 .page-showcase-card-header h2 {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-heading);
   font-weight: 700;
   font-size: 18px;
   color: #1E293B;
@@ -74,7 +74,7 @@
 }
 
 .page-showcase-desc {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 14px;
   line-height: 24px;
   color: #475569;
@@ -83,7 +83,7 @@
 }
 
 .page-features-title {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-heading);
   font-size: 14px;
   font-weight: 700;
   color: #1E293B;
@@ -104,7 +104,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-size: 13px;
   color: #334155;
   transition: color 0.5s ease;
@@ -130,7 +130,7 @@ body.dark-mode .page-showcase-title {
 }
 
 body.dark-mode .page-showcase-subtitle {
-  color: #A0A0A0;
+  color: #CBD5E1;
 }
 
 body.dark-mode .page-showcase-card {
@@ -143,19 +143,19 @@ body.dark-mode .page-showcase-card-header {
 }
 
 body.dark-mode .page-showcase-card-header h2 {
-  color: #F1F5F9;
+  color: #FFFFFF;
 }
 
 body.dark-mode .page-showcase-desc {
-  color: #E2E8F0;
-}
-
-body.dark-mode .page-features-title {
   color: #F1F5F9;
 }
 
+body.dark-mode .page-features-title {
+  color: #FFFFFF;
+}
+
 body.dark-mode .page-feature-item {
-  color: #E2E8F0;
+  color: #F1F5F9;
 }
 
 body.dark-mode .feature-check-icon {

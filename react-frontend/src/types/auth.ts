@@ -16,6 +16,6 @@ export interface User {
 export interface NavItem {
   id: string;
   title: string;
-  iconType: 'registration' | 'queue' | 'eligibility' | 'vitals' | 'history' | 'dispense' | 'stock' | 'invoice' | 'dashboard' | 'appointment' | 'admin-users' | 'admin-access';
+  iconType: 'registration' | 'queue' | 'eligibility' | 'vitals' | 'history' | 'dispense' | 'stock' | 'invoice' | 'dashboard' | 'appointment' | 'admin-users' | 'admin-access' | 'examination' | 'schedule' | 'records';
   path: string;
 }

@@ -50,14 +50,14 @@ export const BMIWidget: React.FC<BMIWidgetProps> = ({
       <div className="vitals-widget-body">
         {hasInput && bmi && bmiInfo ? (
           <div className="bmi-display-container">
-            <div className="bmi-number-row">
+            <div className="bmi-hero-display">
               <div className="bmi-big-value">
                 <span className="bmi-num">{bmi.toFixed(2)}</span>
                 <span className="bmi-unit">kg/m²</span>
               </div>
               <div className={`bmi-status-pill ${bmiInfo.badgeClass}`}>
                 <span className="bmi-status-dot"></span>
-                <span>{bmiInfo.labelTh}</span>
+                <span className="bmi-status-label">{bmiInfo.labelTh}</span>
               </div>
             </div>
 
@@ -94,7 +94,15 @@ export const BMIWidget: React.FC<BMIWidgetProps> = ({
           </div>
         ) : (
           <div className="bmi-empty-state">
-            <div className="bmi-empty-icon">⚖️</div>
+            <div className="bmi-empty-icon">
+              <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 3v18" />
+                <path d="M6 7l6-3 6 3" />
+                <path d="M3 13l3-6 3 6a3 3 0 0 1-6 0Z" />
+                <path d="M15 13l3-6 3 6a3 3 0 0 1-6 0Z" />
+                <path d="M8 21h8" />
+              </svg>
+            </div>
             <p className="bmi-empty-text">กรอกน้ำหนักและส่วนสูง เพื่อคำนวณ BMI อัตโนมัติ</p>
             <div className="bmi-preview-badge">
               <span className="bmi-status-dot default-dot"></span>

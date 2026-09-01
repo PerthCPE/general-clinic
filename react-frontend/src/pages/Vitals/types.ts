@@ -34,6 +34,8 @@ export interface DoctorOption {
 
 export interface QueuePatientItem {
   id: string;
+  queueId?: number;
+  patientId?: number;
   queueNo: string;
   hn: string;
   fullName: string;

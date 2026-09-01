@@ -6,6 +6,7 @@ export type SchemeType =
   | 'ชำระเงินเอง';
 
 export interface Patient {
+  id?: number;
   hn: string;
   fullName: string;
   nationalId: string;

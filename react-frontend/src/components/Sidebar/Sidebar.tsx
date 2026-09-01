@@ -1,5 +1,6 @@
 import React from 'react';
 import './Sidebar.css';
+import clinicLogo from '../../assets/logo.png';
 import { useAuth } from '../../context/AuthContext';
 import { ROLE_MENUS } from '../../config/roles';
 import type { NavItem } from '../../types/auth';
@@ -68,6 +69,25 @@ const renderNavIcon = (iconType: NavItem['iconType']) => {
           <path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zm0 11h7v7h-7v-7zm-11 0h7v7H3v-7z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       );
+    case 'examination':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M4.5 3v6.5a5.5 5.5 0 0011 0V3M8 3H3m5 0v-.5M15.5 3H21m-5.5 0v-.5M12 14.5v3.5a3 3 0 006 0V16a3 3 0 00-2-2.83" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+          <circle cx="18.5" cy="10.5" r="2" strokeWidth="1.66667"/>
+        </svg>
+      );
+    case 'schedule':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8 2v3m8-3v3M3.5 9h17M4 5h16a1 1 0 011 1v13a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+    case 'records':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 12h6m-6 4h4M7 3.5h10a2 2 0 012 2V19a2 2 0 01-2 2H7a2 2 0 01-2-2V5.5a2 2 0 012-2z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
     default:
       return null;
   }
@@ -85,12 +105,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, activePage, onNaviga
       {/* TOP Logo */}
       <div className="sidebar-logo">
         <div className="sidebar-logo-icon">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M18 14H14V18H10V14H6V10H10V6H14V10H18M20 2H4C2.9 2 2 2.9 2 4V20C2 21.1 2.9 22 4 22H20C21.1 22 22 21.1 22 20V4C22 2.9 21.1 2 20 2M20 20H4V4H20V20Z"
-              fill="#FFFFFF"
-            />
-          </svg>
+          <img src={clinicLogo} alt="General Clinic Logo" className="sidebar-logo-img" />
         </div>
         <span className="sidebar-logo-text">General Clinic</span>
         {/* ปุ่มกากบาทปิด Sidebar */}

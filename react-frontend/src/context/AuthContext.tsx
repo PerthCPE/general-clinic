@@ -2,6 +2,10 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { User, UserRole } from '../types/auth';
 import { DEMO_USERS, ROLE_DEFAULT_PAGES, PAGE_PERMISSIONS } from '../config/roles';
 
+// โค้ดส่วนของเพื่อน (ระบบเชื่อม Backend)
+import { authApi } from '../services/api';
+
+// โค้ดส่วนของคุณ (ระบบคิวและนัดหมาย)
 export interface PatientQueueItem {
   id: number;
   name: string;
@@ -19,8 +23,8 @@ export interface PatientQueueItem {
 interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
-  login: (roleOrUsername: string, password?: string) => boolean;
-  switchRole: (role: UserRole) => void;
+  login: (roleOrUsername: string, password?: string) => Promise<boolean>;
+  switchRole: (role: UserRole) => Promise<void>;
   logout: () => void;
   hasAccess: (pageId: string) => boolean;
   defaultPage: string;
@@ -35,7 +39,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const AUTH_STORAGE_KEY = 'clinic_auth_user';
 const QUEUE_STORAGE_KEY = 'clinic_queue_data_v3'; 
 
-// ฟังก์ชันดึงวันที่ปัจจุบันในรูปแบบ YYYY-MM-DD
 const getTodayDateString = () => {
   const today = new Date();
   const yyyy = today.getFullYear();
@@ -46,7 +49,6 @@ const getTodayDateString = () => {
 
 const todayStr = getTodayDateString();
 
-// รายชื่อผู้ป่วยเริ่มต้นโดยใช้วันที่ปัจจุบันเป็นค่าตั้งต้น
 const initialDefaultQueue: PatientQueueItem[] = [
   { id: 1, name: 'อนันต์ สุขสวัสดิ์', initial: 'อน', dept: 'โรคทั่วไป', date: '2026-08-08', time: '09:00', phone: '081-456-7890', status: '-', statusColor: 'default', deptColor: 'primary' },
   { id: 2, name: 'วิมล มั่นคง', initial: 'วม', dept: 'อายุรกรรม', date: '2026-08-08', time: '09:30', phone: '089-123-4567', status: '-', statusColor: 'default', deptColor: 'warning' },
@@ -59,7 +61,19 @@ const initialDefaultQueue: PatientQueueItem[] = [
 ];
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  
+  // ของเพื่อน: ดึงข้อมูล User
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
 
   const [patientQueue, setPatientQueue] = useState<PatientQueueItem[]>(() => {
     const saved = localStorage.getItem(QUEUE_STORAGE_KEY);
@@ -74,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [currentUser]);
 
+  // ของคุณ: อัปเดตคิว
   useEffect(() => {
     localStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(patientQueue));
   }, [patientQueue]);
@@ -86,7 +101,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPatientQueue(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
   };
 
-  const login = (roleOrUsername: string, _password?: string): boolean => {
+  // ของเพื่อน: ระบบล็อกอิน
+  const login = async (roleOrUsername: string, password?: string): Promise<boolean> => {
+    try {
+      let usernameToSend = roleOrUsername;
+      if (roleOrUsername === 'registrar') usernameToSend = 'registrar1';
+      else if (roleOrUsername === 'nurse') usernameToSend = 'nurse1';
+      else if (roleOrUsername === 'nurse_assistant') usernameToSend = 'assistant1';
+      else if (roleOrUsername === 'doctor') usernameToSend = 'doctor1';
+
+      const res = await authApi.login(usernameToSend, password || 'password');
+      if (res && res.user) {
+        const userRole = res.user.role as UserRole;
+        const fallback = DEMO_USERS[userRole] || DEMO_USERS['registrar'];
+        const loggedInUser: User = {
+          id: String(res.user.id),
+          username: res.user.username,
+          fullName: res.user.fullname || fallback.fullName,
+          role: userRole,
+          roleTitleTh: fallback.roleTitleTh,
+          roleTitleEn: fallback.roleTitleEn,
+          department: fallback.department,
+          avatarText: fallback.avatarText,
+          avatarColor: fallback.avatarColor,
+        };
+        setCurrentUser(loggedInUser);
+        return true;
+      }
+    } catch (err) {
+      console.warn('Backend login error, checking fallback:', err);
+    }
+
     let matchedUser: User | undefined;
     if (roleOrUsername in DEMO_USERS) {
       matchedUser = DEMO_USERS[roleOrUsername as UserRole];
@@ -101,7 +146,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return false;
   };
 
-  const switchRole = (role: UserRole) => {
+  const switchRole = async (role: UserRole) => {
+    let username = 'registrar1';
+    if (role === 'nurse') username = 'nurse1';
+    else if (role === 'nurse_assistant') username = 'assistant1';
+    else if (role === 'doctor') username = 'doctor1';
+
+    try {
+      await authApi.login(username, 'password');
+    } catch {
+      // ignore
+    }
+
     const targetUser = DEMO_USERS[role];
     if (targetUser) {
       setCurrentUser(targetUser);
@@ -109,6 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    authApi.logout();
     setCurrentUser(null);
   };
 

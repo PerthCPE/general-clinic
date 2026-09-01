@@ -1,12 +1,15 @@
 import './Topbar.css';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useDoctorData } from '../../pages/doctor/DoctorDataContext';
+import { matchPatientSearch } from '../../pages/doctor/utils/searchUtils';
 
 interface TopbarProps {
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   isDarkMode: boolean;
   onToggleTheme: () => void;
+  onNavigate?: (page: string) => void;
 }
 
 interface NotificationItem {
@@ -17,10 +20,27 @@ interface NotificationItem {
   isUnread: boolean;
 }
 
-function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: TopbarProps) {
+function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onNavigate }: TopbarProps) {
   const { currentUser, logout } = useAuth();
+  const { patients: doctorPatients, setSelectedRecordPatient } = useDoctorData();
+  const isDoctor = currentUser?.role === 'doctor';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // ค้นหาผู้ป่วยแบบ Live Search (เฉพาะ role หมอที่มีข้อมูลคิวผู้ป่วยให้ค้นหา)
+  const matchingPatients = isDoctor && searchQuery.trim()
+    ? doctorPatients.filter((p) => matchPatientSearch(p, searchQuery))
+    : [];
+
+  const handleSelectSearchResult = (patient: (typeof doctorPatients)[number]) => {
+    setSelectedRecordPatient(patient);
+    setSearchQuery('');
+    setIsSearchDropdownOpen(false);
+    onNavigate?.('doctor-records');
+  };
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [isSpeakingAll, setIsSpeakingAll] = useState(false);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -132,6 +152,9 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
       }
       if (noticeRef.current && !noticeRef.current.contains(event.target as Node)) {
         setIsNoticeOpen(false);
+      }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setIsSearchDropdownOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -399,13 +422,64 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
       )}
 
       {/* Search Bar */}
-      <div className="search-container">
+      {/* คลาส search-container-interactive ใส่เฉพาะ role แพทย์ ซึ่งเป็น role เดียว
+          ที่ช่องค้นหานี้ทำงานจริง จึงให้มีสถานะ focus (กรอบฟ้า) ตอบสนองการคลิก
+          role อื่นช่องค้นหายังไม่ได้ต่อข้อมูล จึงคงหน้าตาเดิมไว้ */}
+      <div
+        className={`search-container${isDoctor ? ' search-container-interactive' : ''}`}
+        ref={searchRef}
+      >
         <div className="search-icon">
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
-        <input className="search-input" type="text" placeholder="Search" />
+        <input
+          className="search-input"
+          type="text"
+          placeholder={isDoctor ? 'ค้นหาผู้ป่วย ชื่อ, HN, VN...' : 'Search'}
+          value={searchQuery}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setIsSearchDropdownOpen(true);
+          }}
+          onFocus={() => {
+            if (searchQuery.trim()) setIsSearchDropdownOpen(true);
+          }}
+        />
+
+        {/* Live Search Results Dropdown (เฉพาะ role หมอ) */}
+        {isDoctor && isSearchDropdownOpen && searchQuery.trim() !== '' && (
+          <div className="search-results-dropdown">
+            <div className="search-results-header">
+              <span>ผลการค้นหา ({matchingPatients.length})</span>
+              <span className="search-results-hint">คลิกเพื่อดูประวัติการรักษา</span>
+            </div>
+            {matchingPatients.length > 0 ? (
+              <div className="search-results-list">
+                {matchingPatients.slice(0, 6).map((patient) => (
+                  <div
+                    key={patient.id}
+                    className="search-result-item"
+                    onClick={() => handleSelectSearchResult(patient)}
+                  >
+                    <div className="search-result-avatar">{patient.name.charAt(0)}</div>
+                    <div className="search-result-info">
+                      <span className="search-result-name">{patient.name}</span>
+                      <span className="search-result-meta">
+                        HN: {patient.hn} &bull; VN: {patient.vn}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="search-results-empty">
+                ไม่พบข้อมูลผู้ป่วยที่ตรงกับ "{searchQuery}"
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Actions Group (Notifications + Profile) */}
@@ -439,7 +513,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
                     onClick={() => setShowVoiceSettings(!showVoiceSettings)}
                     title="เปิดแผงประกาศเรียกคิวด้วยเสียง"
                   >
-                    ⚙️ เสียง
+                    ตั้งค่าเสียง
                   </button>
                 </div>
               </div>
@@ -449,7 +523,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
                 <div className="voice-settings-panel">
                   {/* 1. ระบบกำหนดคิวและช่องบริการ (Narakeet Queue Builder) */}
                   <div className="voice-setting-row narakeet-builder-box">
-                    <label className="voice-label">📢 กำหนดหมายเลขคิว และ ห้อง/ช่องบริการ:</label>
+                    <label className="voice-label">กำหนดหมายเลขคิว และ ห้อง/ช่องบริการ:</label>
                     <div className="narakeet-input-group">
                       <div className="narakeet-input-field">
                         <span className="narakeet-field-label">หมายเลขคิว:</span>
@@ -476,38 +550,38 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
 
                   {/* 2. ปุ่มกดประกาศด่วนอัตโนมัติ (1-Click Quick Auto Announce - Dynamic based on inputs) */}
                   <div className="voice-setting-row">
-                    <label className="voice-label">⚡ ประกาศด่วนตามห้อง/ช่องที่ระบุข้างต้น (กด 1 ครั้ง):</label>
+                    <label className="voice-label">ประกาศด่วนตามห้อง/ช่องที่ระบุข้างต้น:</label>
                     <div className="quick-auto-btn-grid">
                       <button 
                         className="quick-auto-btn"
                         onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ช่องบริการรับยา ${channelInput || 'ช่อง 1'} ค่ะ`)}
                       >
-                        💊 คิว {queueInput || 'A01'} รับยา {channelInput || 'ช่อง 1'}
+                        คิว {queueInput || 'A01'} รับยา {channelInput || 'ช่อง 1'}
                       </button>
                       <button 
                         className="quick-auto-btn"
                         onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ห้องตรวจ ${channelInput || 'ห้อง 1'} ค่ะ`)}
                       >
-                        🩺 คิว {queueInput || 'A01'} ห้องตรวจ {channelInput || 'ห้อง 1'}
+                        คิว {queueInput || 'A01'} ห้องตรวจ {channelInput || 'ห้อง 1'}
                       </button>
                       <button 
                         className="quick-auto-btn"
                         onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ช่องชำระเงิน ${channelInput || 'ช่อง 1'} ค่ะ`)}
                       >
-                        💳 คิว {queueInput || 'A01'} ชำระเงิน {channelInput || 'ช่อง 1'}
+                        คิว {queueInput || 'A01'} ชำระเงิน {channelInput || 'ช่อง 1'}
                       </button>
                       <button 
                         className="quick-auto-btn"
                         onClick={() => speakText(`ขอเชิญหมายเลขคิว ${(queueInput || 'A01').toUpperCase().split('').join(' ')} ที่ช่องบริการ ${channelInput || 'ช่อง 1'} ค่ะ`)}
                       >
-                        🔔 คิว {queueInput || 'A01'} ช่องบริการ {channelInput || 'ช่อง 1'}
+                        คิว {queueInput || 'A01'} ช่องบริการ {channelInput || 'ช่อง 1'}
                       </button>
                     </div>
                   </div>
 
                   {/* 3. พิมพ์ข้อความอิสระที่ต้องการประกาศ */}
                   <div className="voice-setting-row custom-text-box">
-                    <label className="voice-label">✍️ พิมพ์ข้อความประกาศอิสระเพิ่มเติม:</label>
+                    <label className="voice-label">พิมพ์ข้อความประกาศอิสระเพิ่มเติม:</label>
                     <div className="custom-text-input-group">
                       <input 
                         type="text" 
@@ -520,7 +594,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme }: T
                         className="custom-text-speak-btn"
                         onClick={() => speakText(customTextInput)}
                       >
-                        🔊 ประกาศ
+                        ประกาศ
                       </button>
                     </div>
                   </div>

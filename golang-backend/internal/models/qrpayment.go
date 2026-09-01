@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// QR Code สำหรับชำระเงิน (db)
+// QR Code สำหรับชำระเงิน (db) (4) บุญ
 type QRPayment struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	BillingID   uint      `gorm:"not null" json:"billing_id"`

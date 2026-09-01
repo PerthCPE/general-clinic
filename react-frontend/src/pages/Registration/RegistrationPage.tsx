@@ -1,148 +1,324 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import PatientSearchCard from './components/PatientSearchCard';
 import PatientFormCard from './components/PatientFormCard';
 import type { Patient, SchemeType } from './types';
+import { patientApi, queueApi, type BackendPatient, type BackendQueue } from '../../services/api';
+import { useWebSocket } from '../../context/WebSocketContext';
+import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
+import toast from 'react-hot-toast';
 import './RegistrationPage.css';
 
-/**
- * แปลงลำดับตัวเลขเป็นรหัส HN รูปแบบ 4 หลัก (เช่น HN-0001 ถึง HN-9999)
- * และหากเกิน 9999 (ลำดับ 10000 ขึ้นไป) จะแปลงเป็นเลขฐาน 16 (เช่น HN-A001, HN-A002...)
- */
-export const formatHN = (seq: number): string => {
-  if (seq <= 9999) {
-    return `HN-${seq.toString().padStart(4, '0')}`;
+export { formatHN, formatQueueNo, formatNationalId, formatPhone };
+
+const mapBackendPatientToUI = (p: BackendPatient): Patient => {
+  const birthYear = p.birthdate ? new Date(p.birthdate).getFullYear() : 1995;
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - birthYear;
+
+  let formattedDob = p.birthdate || '';
+  if (p.birthdate) {
+    try {
+      const d = new Date(p.birthdate);
+      if (!isNaN(d.getTime())) {
+        formattedDob = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+      }
+    } catch {
+      formattedDob = p.birthdate;
+    }
   }
-  // เมื่อถึง 10000 ขึ้นไป จะเปลี่ยนเป็นตัวอักษรฐาน 16 (A001, A002, ...)
-  const offset = seq - 10000;
-  const hexValue = (0xA001 + offset).toString(16).toUpperCase();
-  return `HN-${hexValue}`;
+
+  let formattedRegAt = p.created_at || '';
+  if (p.created_at) {
+    try {
+      const d = new Date(p.created_at);
+      if (!isNaN(d.getTime())) {
+        formattedRegAt = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear() + 543} ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')} น.`;
+      }
+    } catch {
+      formattedRegAt = p.created_at;
+    }
+  }
+
+  const patientSeq = typeof p.id === 'number' ? p.id : 1;
+
+  return {
+    id: p.id,
+    hn: formatHN(p.hn || patientSeq),
+    fullName: p.fullname,
+    nationalId: formatNationalId(p.national_id),
+    dob: formattedDob || '01/01/2000',
+    age: age > 0 ? age : 30,
+    gender: (p.gender as 'ชาย' | 'หญิง' | 'อื่นๆ') || 'ชาย',
+    phone: formatPhone(p.phone_number),
+    emergencyContact: p.emergency_contact || '-',
+    address: p.address || 'กรุงเทพมหานคร',
+    schemeType: (p.scheme_type as SchemeType) || 'บัตรทอง (สปสช.)',
+    chronicDiseases: p.chronic_diseases || '',
+    allergies: p.allergies || '',
+    registeredAt: formattedRegAt || 'วันนี้',
+  };
 };
 
-const INITIAL_PATIENTS: Patient[] = [
+const DEFAULT_INITIAL_PATIENTS: Patient[] = [
   {
-    hn: 'HN-0089',
+    id: 1,
+    hn: 'HN0001',
     fullName: 'นายสมชาย ใจดี',
     nationalId: '0-1234-56789-01-2',
-    dob: '15/05/1990',
-    age: 36,
+    dob: '15/04/1988',
+    age: 38,
     gender: 'ชาย',
     phone: '081-234-5678',
-    emergencyContact: 'นางสมศรี (ภรรยา) 089-999-1111',
-    address: '123/45 ถนนพหลโยธิน แขวงลาดยาว เขตจตุจักร กรุงเทพฯ',
+    emergencyContact: '089-999-8888 (ภรรยา)',
+    address: '99/12 หมู่ 4 ต.ในเมือง อ.เมือง จ.นครราชสีมา 30000',
     schemeType: 'บัตรทอง (สปสช.)',
-    chronicDiseases: '',
-    allergies: '',
-    registeredAt: '06/08/2026 08:30 น.',
+    chronicDiseases: 'ความดันโลหิตสูง',
+    allergies: 'แพ้ยาเพนิซิลลิน (Penicillin)',
+    registeredAt: 'วันนี้ 08:30 น.',
   },
   {
-    hn: 'HN-0090',
-    fullName: 'นางสาววิภาดา มณีรัตน์',
+    id: 2,
+    hn: 'HN0002',
+    fullName: 'นางวิภาดา รักสงบ',
     nationalId: '3-1005-98765-43-2',
-    dob: '22/11/1995',
-    age: 31,
+    dob: '22/08/1992',
+    age: 34,
     gender: 'หญิง',
     phone: '089-876-5432',
-    emergencyContact: 'นายประสิทธิ์ (บิดา) 081-444-2222',
-    address: '88/12 ซอยสุขุมวิท 55 แขวงคลองตันเหนือ เขตวัฒนา กรุงเทพฯ',
+    emergencyContact: '081-111-2222 (สามี)',
+    address: '123/45 ถนนมิตรภาพ ต.สุรนารี อ.เมือง จ.นครราชสีมา 30000',
     schemeType: 'ประกันสังคม (ม.33)',
-    chronicDiseases: '',
-    allergies: '',
-    registeredAt: '06/08/2026 09:15 น.',
+    chronicDiseases: '-',
+    allergies: '-',
+    registeredAt: 'วันนี้ 08:45 น.',
   },
   {
-    hn: 'HN-0091',
-    fullName: 'นายอาทิตย์ มีสุข',
+    id: 3,
+    hn: 'HN0003',
+    fullName: 'นายอาทิตย์ เจริญยิ่ง',
     nationalId: '1-1014-55443-21-9',
-    dob: '10/03/1982',
-    age: 44,
+    dob: '10/11/1975',
+    age: 51,
     gender: 'ชาย',
     phone: '086-555-4321',
-    emergencyContact: 'นางวรรณา (มารดา) 082-333-8888',
-    address: '45/6 ถนนงามวงศ์วาน ตำบลบางเขน อำเภอเมือง นนทบุรี',
+    emergencyContact: '082-333-4444 (บุตร)',
+    address: '55/6 ต.หนองจะบก อ.เมือง จ.นครราชสีมา 30000',
     schemeType: 'สิทธิ์ข้าราชการ',
-    chronicDiseases: '',
-    allergies: '',
-    registeredAt: '06/08/2026 10:00 น.',
-  },
-  {
-    hn: 'HN-0092',
-    fullName: 'นางสมศรี รักษาดี',
-    nationalId: '5-1020-11223-34-5',
-    dob: '05/08/1975',
-    age: 51,
-    gender: 'หญิง',
-    phone: '084-111-2233',
-    emergencyContact: 'นายธนา (บุตรชาย) 087-654-3210',
-    address: '99/8 ซอยลาดพร้าว 71 แขวงสะพานสอง เขตวังทองหลาง กรุงเทพฯ',
-    schemeType: 'บัตรทอง (สปสช.)',
-    chronicDiseases: '',
-    allergies: '',
-    registeredAt: '06/08/2026 11:20 น.',
+    chronicDiseases: 'เบาหวานชนิดที่ 2',
+    allergies: 'อาหารทะเล',
+    registeredAt: 'วันนี้ 09:00 น.',
   },
 ];
 
 function RegistrationPage() {
-  const [patients, setPatients] = useState<Patient[]>(INITIAL_PATIENTS);
-  const [nextHnSeq, setNextHnSeq] = useState<number>(93);
+  const [allPatients, setAllPatients] = useState<Patient[]>(DEFAULT_INITIAL_PATIENTS);
+  const [patients, setPatients] = useState<Patient[]>(DEFAULT_INITIAL_PATIENTS);
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searchResult, setSearchResult] = useState<Patient | null>(null);
   const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
   const [isRecentOpen, setIsRecentOpen] = useState(true);
+  const { subscribe } = useWebSocket();
 
   const formSectionRef = useRef<HTMLDivElement>(null);
 
-  // ค้นหาคนไข้
-  const handleSearch = (query: string) => {
-    const cleanQuery = query.trim().replace(/[-\s]/g, '').toLowerCase();
-    const found = patients.find(
-      (p) =>
-        p.nationalId.replace(/[-\s]/g, '').includes(cleanQuery) ||
-        p.fullName.toLowerCase().includes(query.toLowerCase()) ||
-        p.hn.toLowerCase().includes(query.toLowerCase())
-    );
+  // ดึงรายชื่อผู้ป่วยทั้งหมด และคิวที่กำลัง active จาก Backend DB จริง
+  const fetchPatients = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [patientsData, queuesData] = await Promise.all([
+        patientApi.getAll(),
+        queueApi.getList().catch(() => [] as BackendQueue[]),
+      ]);
 
-    if (found) {
-      setSearchResult(found);
+      if (Array.isArray(patientsData)) {
+        const allMapped = patientsData.map(mapBackendPatientToUI);
+        setAllPatients(allMapped);
+
+        // หา ID ของผู้ป่วยที่กำลังอยู่ในคิวตรวจ (ยังไม่เสร็จสิ้น / ไม่ถูกยกเลิก)
+        const activeQueuedPatientIds = new Set(
+          (Array.isArray(queuesData) ? queuesData : [])
+            .filter((q) => q.status !== 'เสร็จสิ้น' && q.status !== 'ยกเลิกคิว')
+            .map((q) => q.patient_id)
+        );
+
+        // กรองเอาเฉพาะผู้ป่วยที่ยังไม่ได้เข้าคิวสำหรับตารางลงทะเบียนล่าสุด
+        const unqueued = patientsData.filter((p) => !activeQueuedPatientIds.has(p.id));
+        setPatients(unqueued.map(mapBackendPatientToUI));
+      }
+    } catch (err) {
+      console.warn('Could not fetch patients from backend:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPatients();
+
+    // ดักฟัง Real-time เมื่อมีคนไข้ลงทะเบียนใหม่ หรือมีคิวใหม่
+    const unsubPatient = subscribe('PATIENT_REGISTERED', () => {
+      fetchPatients();
+    });
+    const unsubQueue = subscribe('QUEUE_CREATED', () => {
+      fetchPatients();
+    });
+
+    return () => {
+      unsubPatient();
+      unsubQueue();
+    };
+  }, [fetchPatients, subscribe]);
+
+  // ค้นหาคนไข้จาก Backend DB จริง (รองรับทั้งเลขบัตร 13 หลัก, ชื่อ, นามสกุล, หรือ HN)
+  const handleSearch = async (query: string) => {
+    const cleanQuery = query.trim();
+    if (!cleanQuery) return;
+
+    try {
+      const res = await patientApi.search(cleanQuery);
+      if (res) {
+        if (Array.isArray(res) && res.length > 0) {
+          const mapped = res.map(mapBackendPatientToUI);
+          setSearchResults(mapped);
+          setSearchResult(mapped[0]);
+          setNotFoundQuery(null);
+          return;
+        } else if (!Array.isArray(res) && (res as BackendPatient).id) {
+          const mapped = mapBackendPatientToUI(res as BackendPatient);
+          setSearchResults([mapped]);
+          setSearchResult(mapped);
+          setNotFoundQuery(null);
+          return;
+        }
+      }
+    } catch {
+      // Local fallback
+    }
+
+    const searchPool = allPatients.length > 0 ? allPatients : patients;
+    const clean = cleanQuery.replace(/[-\s]/g, '').toLowerCase();
+    const queryLower = cleanQuery.toLowerCase();
+    const words = queryLower.split(/\s+/).filter(Boolean);
+
+    const matched = searchPool.filter((p) => {
+      const pCleanId = p.nationalId.replace(/[-\s]/g, '').toLowerCase();
+      const pFull = p.fullName.toLowerCase();
+      const pHN = p.hn.toLowerCase();
+      const pPhone = p.phone.replace(/[-\s]/g, '').toLowerCase();
+
+      // ค้นหาเลขบัตร, HN, เบอร์โทร
+      if (clean && (pCleanId.includes(clean) || pHN.includes(clean) || pPhone.includes(clean))) return true;
+
+      // ค้นหาชื่อ-นามสกุลแบบตรงๆ
+      if (pFull.includes(queryLower)) return true;
+
+      // ค้นหาแบบแยกคำ เช่น ชื่อ หรือ นามสกุล
+      if (words.length > 0 && words.every((w) => pFull.includes(w))) return true;
+      if (words.some((w) => w.length >= 2 && pFull.includes(w))) return true;
+
+      return false;
+    });
+
+    if (matched.length > 0) {
+      setSearchResults(matched);
+      setSearchResult(matched[0]);
       setNotFoundQuery(null);
     } else {
+      setSearchResults([]);
       setSearchResult(null);
       setNotFoundQuery(query);
     }
   };
 
   const handleClearSearch = () => {
+    setSearchResults([]);
     setSearchResult(null);
     setNotFoundQuery(null);
   };
 
-  // ส่งต่อเข้าคิวตรวจ -> ลบออกจากรายชื่อล่าสุด + ปิดข้อมูลค้นหา
-  const handleAssignQueue = (patient: Patient) => {
-    // 1. นำออกจาก list ผู้ป่วยที่ยังไม่ได้เข้าคิว
-    setPatients((prev) => prev.filter((p) => p.hn !== patient.hn));
+  // ส่งต่อเข้าคิวตรวจ -> ยิง Backend ออกบัตรคิวจริง และลบออกจากรายชื่อรอเข้าคิวทันที
+  const handleAssignQueue = async (patient: Patient) => {
+    try {
+      let patientId = patient.id;
+      if (!patientId) {
+        try {
+          const res = await patientApi.search(patient.nationalId.replace(/[-\s]/g, ''));
+          if (res) {
+            patientId = Array.isArray(res) ? res[0]?.id : res.id;
+          }
+        } catch {
+          // ignore
+        }
+      }
 
-    // 2. ปิดข้อมูลผู้ป่วยที่เปิดอยู่ใน search
+      if (patientId) {
+        await queueApi.create(patientId, 'แผนกคัดกรอง', 'ส่งเข้าคิวจากการลงทะเบียน');
+      }
+    } catch (err) {
+      console.warn('Queue assign error:', err);
+    }
+
+    // เอาผู้ป่วยออกจากรายการ "ผู้ป่วยที่ยังไม่ได้เข้าคิว" ทันที
+    setPatients((prev) =>
+      prev.filter((p) => p.hn !== patient.hn && p.nationalId !== patient.nationalId && (!patient.id || p.id !== patient.id))
+    );
+
+    // ปิดข้อมูลผู้ป่วยที่เปิดอยู่ใน search / modal
     setSearchResult(null);
     setNotFoundQuery(null);
-
-    // 3. ปิด modal หากเปิดอยู่
     setSelectedPatientModal(null);
 
-    // 4. แสดง Toast แจ้งเตือน
-    showToast(`⚡ เพิ่มผู้ป่วย "${patient.fullName}" (HN: ${patient.hn}) เข้าคิวตรวจเรียบร้อยแล้ว`);
+    showToast(`เพิ่มผู้ป่วย "${patient.fullName}" (HN: ${patient.hn}) เข้าคิวตรวจเรียบร้อยแล้ว`);
   };
 
-  // ลงทะเบียนผู้ป่วยใหม่
-  const handleFormSubmit = (formData: Partial<Patient>) => {
-    const generatedHn = formatHN(nextHnSeq);
-    setNextHnSeq((prev) => prev + 1);
+  // ลงทะเบียนผู้ป่วยใหม่ บันทึกลง Database จริง
+  const handleFormSubmit = async (formData: Partial<Patient>) => {
+    try {
+      // แปลงวันเกิด DD/MM/YYYY เป็น YYYY-MM-DD
+      let birthDateStr = formData.dob || '2000-01-01';
+      if (formData.dob && formData.dob.includes('/')) {
+        const parts = formData.dob.split('/');
+        if (parts.length === 3) {
+          birthDateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      }
 
+      const payload = {
+        national_id: (formData.nationalId || '').replace(/[-\s]/g, ''),
+        fullname: formData.fullName || 'ผู้ป่วยใหม่',
+        gender: formData.gender || 'ชาย',
+        birthdate: birthDateStr,
+        address: formData.address || 'กรุงเทพมหานคร',
+        phone_number: (formData.phone || '').replace(/[-\s]/g, ''),
+        emergency_contact: formData.emergencyContact || '-',
+        scheme_type: formData.schemeType || 'บัตรทอง (สปสช.)',
+        chronic_diseases: formData.chronicDiseases || '',
+        allergies: formData.allergies || '',
+      };
+
+      const res = await patientApi.register(payload);
+      if (res && res.patient) {
+        const newUI = mapBackendPatientToUI(res.patient);
+        setPatients((prev) => [newUI, ...prev.filter((p) => p.hn !== newUI.hn && p.id !== newUI.id)]);
+        setSearchResult(null);
+        showToast(`บันทึกและลงทะเบียนผู้ป่วย "${newUI.fullName}" (HN: ${newUI.hn}) เรียบร้อยแล้ว`);
+        return;
+      }
+    } catch (err: any) {
+      console.warn('Register error:', err);
+      showToast(err?.message || 'ไม่สามารถลงทะเบียนได้');
+    }
+
+    // Fallback UI
     const now = new Date();
     const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} น.`;
     const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear() + 543}`;
 
     const newPatient: Patient = {
-      hn: generatedHn,
+      hn: formatHN(patients.length + 1),
       fullName: formData.fullName || 'ผู้ป่วยใหม่',
       nationalId: formData.nationalId || '0-0000-00000-00-0',
       dob: formData.dob || '01/01/2000',
@@ -159,7 +335,7 @@ function RegistrationPage() {
 
     setPatients((prev) => [newPatient, ...prev]);
     setSearchResult(null);
-    showToast(`✨ บันทึกและลงทะเบียนผู้ป่วย "${newPatient.fullName}" (HN: ${newPatient.hn}) เรียบร้อยแล้ว`);
+    showToast(`บันทึกและลงทะเบียนผู้ป่วย "${newPatient.fullName}" (HN: ${newPatient.hn}) เรียบร้อยแล้ว`);
   };
 
   const scrollToForm = () => {
@@ -168,6 +344,7 @@ function RegistrationPage() {
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
+    toast.success(msg, { id: msg });
     setTimeout(() => {
       setToastMessage(null);
     }, 4000);
@@ -236,6 +413,8 @@ function RegistrationPage() {
       <PatientSearchCard
         onSearch={handleSearch}
         searchResult={searchResult}
+        searchResults={searchResults}
+        onSelectResult={(p) => setSearchResult(p)}
         notFoundQuery={notFoundQuery}
         onAssignQueue={handleAssignQueue}
         onViewMoreInfo={(p) => setSelectedPatientModal(p)}
@@ -283,7 +462,6 @@ function RegistrationPage() {
                 <tr>
                   <th className="col-reg-hn">HN</th>
                   <th className="col-reg-patient">ชื่อ-นามสกุล คนไข้</th>
-                  <th className="col-reg-id">เลขบัตรประชาชน</th>
                   <th className="col-reg-phone">เบอร์โทรศัพท์</th>
                   <th className="col-reg-scheme">สิทธิการรักษา</th>
                   <th className="col-reg-time">เวลาลงทะเบียน</th>
@@ -293,7 +471,7 @@ function RegistrationPage() {
               <tbody>
                 {patients.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="reg-empty-table-cell">
+                    <td colSpan={6} className="reg-empty-table-cell">
                       <div className="reg-empty-wrap">
                         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path
@@ -320,12 +498,9 @@ function RegistrationPage() {
                             {p.fullName}
                           </span>
                           <span className="patient-sub-meta">
-                            เพศ {p.gender}, อายุ {p.age} ปี
+                            <span className="font-mono">{p.nationalId}</span> • เพศ {p.gender}, {p.age} ปี
                           </span>
                         </div>
-                      </td>
-                      <td className="col-reg-id">
-                        <span className="font-mono">{p.nationalId}</span>
                       </td>
                       <td className="col-reg-phone">
                         <span className="font-phone">{p.phone}</span>
@@ -336,7 +511,14 @@ function RegistrationPage() {
                         </span>
                       </td>
                       <td className="col-reg-time">
-                        <span className="text-muted-time">{p.registeredAt}</span>
+                        <div className="reg-time-cell">
+                          <span className="time-main-text">
+                            {p.registeredAt.includes(' ') ? p.registeredAt.split(' ')[1] : p.registeredAt}
+                          </span>
+                          {p.registeredAt.includes(' ') && (
+                            <span className="time-sub-date">{p.registeredAt.split(' ')[0]}</span>
+                          )}
+                        </div>
                       </td>
                       <td className="col-reg-action">
                         <button
@@ -346,7 +528,11 @@ function RegistrationPage() {
                           onClick={() => handleAssignQueue(p)}
                         >
                           <svg viewBox="0 0 20 20" fill="currentColor" className="btn-icon-svg">
-                            <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                            <path
+                              fillRule="evenodd"
+                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                              clipRule="evenodd"
+                            />
                           </svg>
                           <span>เข้าคิว</span>
                         </button>
@@ -369,8 +555,11 @@ function RegistrationPage() {
                 <h3 className="reg-modal-title">ข้อมูลประวัติผู้ป่วย (Patient Profile)</h3>
                 <span className="reg-modal-hn">{selectedPatientModal.hn}</span>
               </div>
-              <button className="reg-modal-close" onClick={() => setSelectedPatientModal(null)}>
-                ✕
+              <button className="reg-modal-close" onClick={() => setSelectedPatientModal(null)} aria-label="ปิดหน้าต่าง">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
               </button>
             </div>
 

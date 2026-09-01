@@ -3,7 +3,7 @@ package models
 import "time"
 
 type Document struct {
-	DocID          uint      `gorm:"primaryKey" json:"doc_id"`
+	ID             uint      `gorm:"primaryKey" json:"id"`
 	ExternalDocRef string    `json:"external_doc_ref"`
 	SenderName     string    `json:"sender_name"`
 	Subject        string    `gorm:"not null" json:"subject"`
@@ -12,11 +12,11 @@ type Document struct {
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 
-	Creator User `gorm:"foreignKey:CreatedBy" json:"creator"`
+	Creator User `gorm:"foreignKey:CreatedBy;references:ID" json:"creator"`
 }
 
 type DocumentForward struct {
-	DocForwardID   uint       `gorm:"primaryKey" json:"doc_forward_id"`
+	ID             uint       `gorm:"primaryKey" json:"id"`
 	DocID          uint       `gorm:"not null" json:"doc_id"`
 	ForwardedTo    uint       `gorm:"not null" json:"forwarded_to"`
 	Status         string     `json:"status"` // Pending, Acknowledged
@@ -24,12 +24,12 @@ type DocumentForward struct {
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
 
-	Document  Document `gorm:"foreignKey:DocID" json:"document"`
-	Recipient User     `gorm:"foreignKey:ForwardedTo" json:"recipient"`
+	Document  Document `gorm:"foreignKey:DocID;references:ID" json:"document"`
+	Recipient User     `gorm:"foreignKey:ForwardedTo;references:ID" json:"recipient"`
 }
 
 type DoctorSchedule struct {
-	ScheduleID     uint      `gorm:"primaryKey" json:"schedule_id"`
+	ID        uint      `gorm:"primaryKey" json:"id"`
 	DoctorID  uint      `gorm:"not null" json:"doctor_id"`
 	WorkDate  time.Time `json:"work_date"`
 	ShiftType string    `json:"shift_type"` // Morning, Afternoon
@@ -38,12 +38,12 @@ type DoctorSchedule struct {
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 
-	Doctor  Doctor `gorm:"foreignKey:DoctorID" json:"doctor"`
-	Creator User   `gorm:"foreignKey:CreatedBy" json:"creator"`
+	Doctor  Doctor `gorm:"foreignKey:DoctorID;references:ID" json:"doctor"`
+	Creator User   `gorm:"foreignKey:CreatedBy;references:ID" json:"creator"`
 }
 
 type LeaveRequest struct {
-	LeaveRequestID uint      `gorm:"primaryKey" json:"leave_request_id"`
+	ID         uint      `gorm:"primaryKey" json:"id"`
 	DoctorID   uint      `gorm:"not null" json:"doctor_id"`
 	LeaveDate  time.Time `json:"leave_date"`
 	Reason     string    `json:"reason"`
@@ -52,12 +52,12 @@ type LeaveRequest struct {
 	CreatedAt  time.Time `json:"created_at"`
 	UpdatedAt  time.Time `json:"updated_at"`
 
-	Doctor   Doctor `gorm:"foreignKey:DoctorID" json:"doctor"`
-	Approver *User  `gorm:"foreignKey:ApprovedBy" json:"approver"`
+	Doctor   Doctor `gorm:"foreignKey:DoctorID;references:ID" json:"doctor"`
+	Approver *User  `gorm:"foreignKey:ApprovedBy;references:ID" json:"approver"`
 }
 
 type ShiftSwapRequest struct {
-	ShiftSwapID    uint      `gorm:"primaryKey" json:"shift_swap_id"`
+	ID             uint      `gorm:"primaryKey" json:"id"`
 	RequesterID    uint      `gorm:"not null" json:"requester_id"`
 	ReceiverID     uint      `gorm:"not null" json:"receiver_id"`
 	OriginalShift  uint      `gorm:"not null" json:"original_shift"`
@@ -67,8 +67,8 @@ type ShiftSwapRequest struct {
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 
-	Requester         User           `gorm:"foreignKey:RequesterID" json:"requester"`
-	Receiver          User           `gorm:"foreignKey:ReceiverID" json:"receiver"`
-	OriginalShiftData DoctorSchedule `gorm:"foreignKey:OriginalShift" json:"original_shift_data"`
-	TargetShiftData   DoctorSchedule `gorm:"foreignKey:TargetShift" json:"target_shift_data"`
+	Requester         User           `gorm:"foreignKey:RequesterID;references:ID" json:"requester"`
+	Receiver          User           `gorm:"foreignKey:ReceiverID;references:ID" json:"receiver"`
+	OriginalShiftData DoctorSchedule `gorm:"foreignKey:OriginalShift;references:ID" json:"original_shift_data"`
+	TargetShiftData   DoctorSchedule `gorm:"foreignKey:TargetShift;references:ID" json:"target_shift_data"`
 }

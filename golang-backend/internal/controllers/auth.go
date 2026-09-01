@@ -52,8 +52,15 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, dto.LoginResponse {
-		Token:	tokenString,
-		Role:	user.Role,
+	c.JSON(http.StatusOK, dto.LoginResponse{
+		Token: tokenString,
+		Role:  user.Role,
+		User: dto.UserInfo{
+			ID:       user.ID,
+			Username: user.Username,
+			FullName: user.FullName,
+			Role:     user.Role,
+			Phone:    user.Phone,
+		},
 	})
 }

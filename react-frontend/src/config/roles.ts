@@ -60,6 +60,7 @@ export const DEMO_USERS: Record<UserRole, User> = {
   doctor: {
     id: 'user-doc-01',
     username: 'doctor1',
+<<<<<<< HEAD
     fullName: 'นพ. สมเกียรติ รักษาดี',
     role: 'doctor',
     roleTitleTh: 'แพทย์ประจำคลินิก',
@@ -72,6 +73,16 @@ export const DEMO_USERS: Record<UserRole, User> = {
     id: 'user-admin-01', username: 'admin1', fullName: 'คุณอารยา ดีมาก',
     role: 'admin', roleTitleTh: 'ผู้ดูแลระบบ', roleTitleEn: 'System Admin', department: 'แผนกไอที', avatarText: 'AD', avatarColor: '#1E40AF', email: 'aranya.admin@clinic.com'
   }
+=======
+    fullName: 'นพ.อานนท์ ศรีตรวจ',
+    role: 'doctor',
+    roleTitleTh: 'แพทย์ผู้ตรวจ',
+    roleTitleEn: 'Doctor',
+    department: 'แผนกตรวจโรคทั่วไป',
+    avatarText: 'AS',
+    avatarColor: '#DC2626',
+  },
+>>>>>>> 8fed2fbbfed6583ff23d80570b538c743b08a6a4
 };
 
 // เมนูใน Sidebar สำหรับแต่ละ Role
@@ -103,6 +114,7 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'billing-dashboard', title: 'แดชบอร์ด', iconType: 'dashboard', path: '/billing-dashboard' },
   ],
   doctor: [
+<<<<<<< HEAD
     { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' },
     { id: 'appointment-form', title: 'สร้างนัดหมายใหม่', iconType: 'appointment', path: '/appointment-form' },
   ],
@@ -110,6 +122,14 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'admin-users', title: 'จัดการบัญชีผู้ใช้งาน', iconType: 'admin-users', path: '/admin-users' },
     { id: 'admin-access', title: 'จัดการสิทธิ์การใช้งานระบบ', iconType: 'admin-access', path: '/admin-access' },
   ]
+=======
+    { id: 'doctor-dashboard', title: 'แดชบอร์ด', iconType: 'dashboard', path: '/doctor-dashboard' },
+    { id: 'doctor-queue', title: 'คิวผู้ป่วย', iconType: 'queue', path: '/doctor-queue' },
+    { id: 'doctor-examination', title: 'บันทึกการตรวจ', iconType: 'examination', path: '/doctor-examination' },
+    { id: 'doctor-schedule', title: 'ตารางเวร', iconType: 'schedule', path: '/doctor-schedule' },
+    { id: 'doctor-records', title: 'ประวัติเวชระเบียน', iconType: 'records', path: '/doctor-records' },
+  ],
+>>>>>>> 8fed2fbbfed6583ff23d80570b538c743b08a6a4
 };
 
 // หน้าเริ่มต้นเมื่อ Login เข้าสู่ระบบตาม Role
@@ -119,8 +139,12 @@ export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
   nurse_assistant: 'queue',
   pharmacist: 'pharmacy-dispense',
   cashier: 'billing-dispense',
+<<<<<<< HEAD
   doctor: 'appointment-dashboard',
   admin: 'admin-users',
+=======
+  doctor: 'doctor-dashboard',
+>>>>>>> 8fed2fbbfed6583ff23d80570b538c743b08a6a4
 };
 
 // กำหนดว่าแต่ละหน้าอนุญาตให้ Role ใดเข้าถึงได้บ้าง (Role-based Route Permissions)
@@ -136,8 +160,16 @@ export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'billing-dispense': ['cashier'],
   'billing-invoice': ['cashier'],
   'billing-dashboard': ['cashier'],
+<<<<<<< HEAD
   'appointment-form': ['doctor'], 
   'appointment-dashboard': ['registrar', 'doctor', 'nurse', 'nurse_assistant', 'pharmacist', 'cashier'], 
   'admin-users': ['admin'],
   'admin-access': ['admin'],
+=======
+  'doctor-dashboard': ['doctor'],
+  'doctor-queue': ['doctor'],
+  'doctor-examination': ['doctor'],
+  'doctor-schedule': ['doctor'],
+  'doctor-records': ['doctor'],
+>>>>>>> 8fed2fbbfed6583ff23d80570b538c743b08a6a4
 };

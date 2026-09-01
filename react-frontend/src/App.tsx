@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { WebSocketProvider } from './context/WebSocketContext';
 import Sidebar from './components/Sidebar/Sidebar';
 import Topbar from './components/Topbar/Topbar';
 
@@ -18,16 +19,27 @@ import BillingDashboardPage from './pages/billing/BillingDashboardPage';
 import BillingDispensePage from './pages/billing/BillingDispensePage';
 import BillingInvoicePage from './pages/billing/BillingInvoicePage';
 import VitalsScreeningPage from './pages/nurse/VitalsScreeningPage';
+import { DoctorDataProvider } from './pages/doctor/DoctorDataContext';
+import DoctorDashboardPage from './pages/doctor/DoctorDashboardPage';
+import DoctorQueuePage from './pages/doctor/DoctorQueuePage';
+import DoctorExaminationPage from './pages/doctor/DoctorExaminationPage';
+import DoctorSchedulePage from './pages/doctor/DoctorSchedulePage';
+import DoctorRecordsPage from './pages/doctor/DoctorRecordsPage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
+
+// โค้ดฝั่งของคุณ
 import AppointmentForm from './pages/Appointment/AppointmentForm';
 import AppointmentDashboard from './pages/Appointment/AppointmentDashboard';
 import UserManagement from './pages/Admin/UserManagement'; 
 import GrantAccess from './pages/Admin/GrantAccess';
+
+// โค้ดฝั่งของเพื่อน
+import { Toaster } from 'react-hot-toast';
 import './App.css';
 
 function MainApp() {
   const { currentUser, isAuthenticated, hasAccess } = useAuth();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('isDarkMode') === 'true';
   });
@@ -35,18 +47,16 @@ function MainApp() {
     return localStorage.getItem('activePage') || 'registration';
   });
 
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('HN-2023-045');
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('HN0045');
   const [patientRightsMap, setPatientRightsMap] = useState<Record<string, string>>({});
   const handleUpdatePatientRights = (patientId: string, rights: string) => {
     setPatientRightsMap(prev => ({ ...prev, [patientId]: rights }));
   };
 
-  // บันทึก Tab ปัจจุบันลง localStorage เมื่อมีการเปลี่ยน Tab
   useEffect(() => {
     localStorage.setItem('activePage', activePage);
   }, [activePage]);
 
-  // บันทึกโหมดสี และใส่/ถอด class dark-mode บน body
   useEffect(() => {
     localStorage.setItem('isDarkMode', String(isDarkMode));
     if (isDarkMode) {
@@ -56,7 +66,6 @@ function MainApp() {
     }
   }, [isDarkMode]);
 
-  // เมื่อสลับ Role: ถ้าหน้าที่เปิดอยู่ไม่มีสิทธิ์ ให้ Redirect ไปที่หน้าเริ่มต้นของ Role นั้นอัตโนมัติ
   useEffect(() => {
     if (currentUser) {
       if (!hasAccess(activePage)) {
@@ -69,7 +78,6 @@ function MainApp() {
     setIsDarkMode((prev) => !prev);
   };
 
-  // หากยังไม่ได้ Login ให้แสดงหน้า LoginPage
   if (!isAuthenticated) {
     return (
       <LoginPage
@@ -82,9 +90,7 @@ function MainApp() {
     );
   }
 
-  // Router & Route Guard Component
   const renderContent = () => {
-    // ตรวจสอบสิทธิ์ Role-Based Access Control (RBAC)
     if (!hasAccess(activePage)) {
       return (
         <UnauthorizedPage
@@ -99,24 +105,16 @@ function MainApp() {
     }
 
     switch (activePage) {
-      // ===== Shared & Registrar Pages =====
       case 'registration':
         return <RegistrationPage />;
-
       case 'queue':
         return <QueuePage />;
-
       case 'eligibility':
         return <EligibilityPage />;
-
-      // ===== Nurse Pages =====
       case 'vitals':
         return <VitalsPage />;
-
       case 'vitals-history':
         return <ScreeningHistoryPage />;
-
-      // ===== Pharmacist Pages =====
       case 'pharmacy-dispense':
         return <DetailPage 
           selectedPatientId={selectedPatientId}
@@ -128,8 +126,6 @@ function MainApp() {
         return <MedicinePage />;
       case 'pharmacy-history':
         return <PatientHistoryPage />;
-
-      // ===== Cashier Pages =====
       case 'billing-dispense':
         return <BillingDispensePage 
           selectedPatientId={selectedPatientId}
@@ -148,19 +144,29 @@ function MainApp() {
       case 'billing-dashboard':
         return <BillingDashboardPage />;
 
-      // ===== Appointment Pages =====
+      // ===== Appointment Pages (ของคุณ) =====
       case 'appointment-form':
         return <AppointmentForm />;
-      
       case 'appointment-dashboard':
         return <AppointmentDashboard />;
 
-      // ===== Admin Pages =====
+      // ===== Admin Pages (ของคุณ) =====
       case 'admin-users':
         return <UserManagement />;
-
       case 'admin-access':
         return <GrantAccess />;
+
+      // ===== Doctor Pages (ของเพื่อน) =====
+      case 'doctor-dashboard':
+        return <DoctorDashboardPage onNavigate={setActivePage} />;
+      case 'doctor-queue':
+        return <DoctorQueuePage onNavigate={setActivePage} />;
+      case 'doctor-examination':
+        return <DoctorExaminationPage onNavigate={setActivePage} />;
+      case 'doctor-schedule':
+        return <DoctorSchedulePage />;
+      case 'doctor-records':
+        return <DoctorRecordsPage onNavigate={setActivePage} />;
 
       default:
         return <PageShowcase roleBadge="System" roleBadgeColor="#6B7280" title="หน้าแรก" subtitle="ยินดีต้อนรับ" description="กรุณาเลือกเมนูจากแถบด้านซ้าย" features={[]} />;
@@ -168,35 +174,78 @@ function MainApp() {
   };
 
   return (
-    <div className="app-layout">
-      {/* 1. Left Sidebar */}
-      <Sidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        activePage={activePage}
-        onNavigate={setActivePage}
-      />
+    <DoctorDataProvider>
+      <div className="app-layout">
+        {/* 1. Left Sidebar */}
+        <Sidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          activePage={activePage}
+          onNavigate={setActivePage}
+        />
 
-      {/* 2. Top Navigation Bar */}
-      <Topbar
-        isSidebarOpen={isSidebarOpen}
-        onToggleSidebar={() => setIsSidebarOpen(true)}
-        isDarkMode={isDarkMode}
-        onToggleTheme={toggleTheme}
-      />
+        {/* 2. Top Navigation Bar */}
+        <Topbar
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={() => setIsSidebarOpen(true)}
+          isDarkMode={isDarkMode}
+          onToggleTheme={toggleTheme}
+          onNavigate={setActivePage}
+        />
 
-      {/* 3. Main Body Content */}
-      <main className={`body-content ${isSidebarOpen ? 'body-with-sidebar' : 'body-full'}`}>
-        {renderContent()}
-      </main>
-    </div>
+        {/* 3. Main Body Content */}
+        <main
+          className={`body-content ${isSidebarOpen ? 'body-with-sidebar' : 'body-full'}${
+            activePage.startsWith('doctor-') ? ' doctor-module' : ''
+          }`}
+        >
+          {renderContent()}
+        </main>
+
+        {/* Global Clinical Toast Notifications (ของเพื่อน) */}
+        <Toaster
+          position="top-right"
+          gutter={10}
+          toastOptions={{
+            duration: 4000,
+            style: {
+              background: isDarkMode ? '#212836' : '#FFFFFF',
+              color: isDarkMode ? '#F8FAFC' : '#0F172A',
+              border: isDarkMode ? '1px solid #333F53' : '1px solid #E2E8F0',
+              borderRadius: '10px',
+              padding: '12px 18px',
+              fontSize: '14.5px',
+              fontWeight: 600,
+              fontFamily: "'IBM Plex Sans Thai', 'Plus Jakarta Sans', sans-serif",
+              boxShadow: isDarkMode
+                ? '0 0 0 1px #333F53, 0 10px 25px -5px rgba(0, 0, 0, 0.5)'
+                : '0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04)',
+            },
+            success: {
+              iconTheme: {
+                primary: '#10B981',
+                secondary: '#FFFFFF',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#EF4444',
+                secondary: '#FFFFFF',
+              },
+            },
+          }}
+        />
+      </div>
+    </DoctorDataProvider>
   );
 }
 
 function App() {
   return (
     <AuthProvider>
-      <MainApp />
+      <WebSocketProvider>
+        <MainApp />
+      </WebSocketProvider>
     </AuthProvider>
   );
 }

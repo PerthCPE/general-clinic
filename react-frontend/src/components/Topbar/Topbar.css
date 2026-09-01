@@ -52,6 +52,7 @@
 
 /* ===== Search Container ===== */
 .search-container {
+  position: relative;
   flex: 1;
   max-width: 600px;
   height: 42px;
@@ -62,6 +63,127 @@
   padding: 0 16px;
   margin-right: auto;
   transition: background-color 0.5s ease;
+}
+
+/* ===== สถานะ Focus ของช่องค้นหา (เฉพาะ role แพทย์) =====
+   ใช้ :focus-within เพื่อให้กรอบขึ้นตอนคลิกที่ช่อง แม้ตัวที่ได้ focus จริงคือ <input> ข้างใน
+   ใช้ box-shadow ทำกรอบแทน border เพราะไม่กินพื้นที่ layout จึงไม่ทำให้ช่องขยับตอนคลิก
+   ให้โทนเดียวกับช่องค้นหาในตารางคิว (ขอบฟ้า #2563EB + วงเรืองแสงจาง ๆ) */
+.search-container-interactive {
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+}
+
+.search-container-interactive:hover {
+  background: #E8EEF5;
+}
+
+.search-container-interactive:focus-within {
+  background: #FFFFFF;
+  box-shadow: 0 0 0 1px #2563EB, 0 0 0 4px rgba(37, 99, 235, 0.15);
+}
+
+/* ไอคอนแว่นขยายเปลี่ยนเป็นสีฟ้าตอน focus เพื่อย้ำว่าช่องกำลังถูกใช้งาน */
+.search-container-interactive:focus-within .search-icon path {
+  stroke: #2563EB;
+}
+
+/* ===== Search Live-Results Dropdown (เฉพาะ role หมอ) ===== */
+.search-results-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  max-width: 420px;
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  overflow: hidden;
+  z-index: 50;
+  max-height: 380px;
+  overflow-y: auto;
+}
+
+.search-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #F8FAFC;
+  border-bottom: 1px solid #F1F5F9;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748B;
+}
+
+.search-results-hint {
+  font-weight: 400;
+  font-size: 10.5px;
+  color: #94A3B8;
+}
+
+.search-results-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-result-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 1px solid #F1F5F9;
+  transition: background-color 0.15s ease;
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background: #EFF6FF;
+}
+
+.search-result-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #2563EB;
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.search-result-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.search-result-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0F172A;
+}
+
+.search-result-meta {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: #64748B;
+  margin-top: 2px;
+}
+
+.search-results-empty {
+  padding: 20px 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #94A3B8;
 }
 
 .search-icon {
@@ -88,7 +210,7 @@
   border: none;
   background: transparent;
   outline: none;
-  font-family: 'Inter';
+  font-family: var(--font-primary);
   font-style: normal;
   font-weight: 400;
   font-size: 13px;
@@ -215,7 +337,7 @@
 }
 
 .user-name {
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--font-heading);
   font-style: normal;
   font-weight: 700;
   font-size: 14px;
@@ -228,7 +350,7 @@
 }
 
 .user-role {
-  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-family: var(--font-primary);
   font-style: normal;
   font-weight: 500;
   font-size: 12px;
@@ -270,7 +392,7 @@
 /* Avatar Text */
 .avatar-text {
   color: #FFFFFF;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-heading);
   font-weight: 700;
   font-size: 13px;
   line-height: 1;
@@ -312,7 +434,7 @@
   padding: 13px 16px;
   background: transparent;
   border: none;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-style: normal;
   font-weight: 500;
   font-size: 13px;
@@ -368,7 +490,7 @@
 }
 
 .theme-toggle-text {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-primary);
   font-weight: 500;
   font-size: 13px;
   line-height: 20px;
@@ -449,99 +571,172 @@
    ===== DARK MODE STYLES (ตอนเปิดโหมดมืด) =====
    ================================================================ */
 
-/* Topbar - Dark (ลอยเด่นด้วยสี #1E1E1E และเงา) */
+/* Topbar - Dark (Dimmed Eye-Comfort) */
 body.dark-mode .top-nav-header {
-  background: #1E1E1E  ;
-  box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.4);
-  border-bottom: 1px solid #2D2D2D;
+  background: #2D333B;
+  box-shadow: 0px 4px 16px rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid #444C56;
 }
 
-/* Search bar - Dark (#2D2D2D เพื่อให้ตัดกับ Header และกลมกลืนสบายตา) */
+/* Search bar - Dark (Seamless & Blended) */
 body.dark-mode .search-container {
-  background: #2b2b2b;
+  background: #22272E;
+  border: 1px solid #373E47;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+body.dark-mode .search-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 body.dark-mode .search-icon path {
-  stroke: #cacaca;
+  stroke: #768390;
+  transition: stroke 0.2s ease;
 }
 
 body.dark-mode .search-input {
-  color: #E2E8F0;
+  background: transparent !important;
+  color: #CDD9E5 !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 body.dark-mode .search-input::placeholder {
-  color: #777777;
+  color: #768390 !important;
+}
+
+body.dark-mode .search-container-interactive:hover,
+body.dark-mode .search-container:hover {
+  background: #262C35;
+  border-color: #444C56;
+}
+
+body.dark-mode .search-container-interactive:focus-within,
+body.dark-mode .search-container:focus-within {
+  background: #22272E;
+  box-shadow: 0 0 0 1px #539BF5, 0 0 0 3px rgba(83, 155, 245, 0.2);
+  border-color: #539BF5;
+}
+
+body.dark-mode .search-container-interactive:focus-within .search-icon path,
+body.dark-mode .search-container:focus-within .search-icon path {
+  stroke: #539BF5;
+}
+
+body.dark-mode .search-container-interactive:focus-within .search-input,
+body.dark-mode .search-container:focus-within .search-input {
+  background: transparent !important;
+  color: #CDD9E5 !important;
+}
+
+body.dark-mode .search-results-dropdown {
+  background: #2D333B;
+  border-color: #444C56;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+body.dark-mode .search-results-header {
+  background: #22272E;
+  border-bottom-color: #444C56;
+  color: #768390;
+}
+
+body.dark-mode .search-results-hint {
+  color: #636E7B;
+}
+
+body.dark-mode .search-result-item {
+  border-bottom-color: #373E47;
+}
+
+body.dark-mode .search-result-item:hover {
+  background: rgba(83, 155, 245, 0.12);
+}
+
+body.dark-mode .search-result-name {
+  color: #CDD9E5;
+}
+
+body.dark-mode .search-result-meta {
+  color: #768390;
+}
+
+body.dark-mode .search-results-empty {
+  color: #636E7B;
 }
 
 /* Notice icon - Dark */
 body.dark-mode .notice-btn path {
-  stroke: #d9d9d9;
+  stroke: #ADBAC7;
 }
 
 body.dark-mode .notice-badge {
-  box-shadow: 0px 0px 0px 2px #1E1E1E;
+  box-shadow: 0px 0px 0px 2px #2D333B;
 }
 
 /* Avatar - Dark */
 body.dark-mode .avatar-circle {
-  background: #2D2D2D;
-  border-color: #444444;
+  background: #22272E;
+  border-color: #444C56;
 }
 
 body.dark-mode .avatar-bg {
-  background: #444444;
+  background: #373E47;
 }
 
 body.dark-mode .avatar-bg svg {
-  fill: #CCCCCC;
+  fill: #ADBAC7;
 }
 
 /* User text - Dark */
 body.dark-mode .user-name {
-  color: #FFFFFF;
+  color: #CDD9E5;
 }
 
 body.dark-mode .user-role {
-  color: #A0A0A0;
+  color: #768390;
 }
 
 /* Dropdown arrow - Dark */
 body.dark-mode .dropdown-arrow path {
-  stroke: #777777;
+  stroke: #768390;
 }
 
 /* Profile wrap hover - Dark */
 body.dark-mode .profile-wrap:hover {
-  background-color: #2D2D2D;
+  background-color: #373E47;
 }
 
-/* Dropdown Menu - Dark (#242424 เพื่อให้ลอยขึ้นอีกระดับ) */
+/* Dropdown Menu - Dark */
 body.dark-mode .profile-dropdown-menu {
-  background: #242424;
-  border-color: #2D2D2D;
-  box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.5);
+  background: #2D333B;
+  border-color: #444C56;
+  box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.3);
 }
 
 body.dark-mode .dropdown-menu-item {
-  color: #E2E8F0;
+  color: #CDD9E5;
 }
 
 body.dark-mode .dropdown-menu-item:not(:last-child) {
-  border-bottom-color: #2D2D2D;
+  border-bottom-color: #373E47;
 }
 
 body.dark-mode .dropdown-menu-item:hover {
-  background-color: #2D2D2D;
+  background-color: #373E47;
   color: #FFFFFF;
 }
 
 body.dark-mode .dropdown-logout-btn {
-  color: #F87171;
+  color: #F47067;
 }
 
 body.dark-mode .dropdown-logout-btn:hover {
-  background-color: #3F1D1D !important;
-  color: #FCA5A5 !important;
+  background-color: rgba(244, 112, 103, 0.12) !important;
+  color: #FF938A !important;
 }
 
 body.dark-mode .topbar-menu-toggle {
