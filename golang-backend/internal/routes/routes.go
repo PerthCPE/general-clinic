@@ -64,6 +64,8 @@ func SetUpRoutes(r *gin.Engine) {
 	pharmacyRoutes.Use(middleware.RoleRequired("pharmacist", "doctor", "registrar"))
 	{
 		pharmacyRoutes.GET("/medicines", controllers.GetMedicines)
+		pharmacyRoutes.POST("/medicines", controllers.CreateMedicine)
+		pharmacyRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)
 		pharmacyRoutes.GET("/medicines/:code", controllers.GetMedicineByCode)
 		pharmacyRoutes.POST("/medicines/stock", controllers.UpdateMedicineStock)
 		pharmacyRoutes.GET("/dispensing/:visit_id", controllers.GetDispensingByVisit)
@@ -89,5 +91,7 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
 		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
 		systemRoutes.GET("/medicines", controllers.GetMedicines)
+		systemRoutes.POST("/medicines/create", controllers.CreateMedicine)
+		systemRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)
 	}
 }

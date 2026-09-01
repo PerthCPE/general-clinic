@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
@@ -105,3 +106,79 @@ func UpdateMedicineStock(c *gin.Context) {
 		"medicine": medicine,
 	})
 }
+
+// DTO สำหรับการเพิ่มยาใหม่เข้าคลัง
+type CreateMedicineRequest struct {
+	MedicineCode  string  `json:"medicine_code"`
+	Name          string  `json:"name" binding:"required"`
+	GenericName   string  `json:"generic_name"`
+	Category      string  `json:"category"`
+	Properties    string  `json:"properties"`
+	Dosage        string  `json:"dosage"`
+	Manufacturer  string  `json:"manufacturer"`
+	StockQuantity int     `json:"stock_quantity"`
+	UnitPrice     float64 `json:"unit_price"`
+}
+
+// POST /api/pharmacy/medicines - เพิ่มยาใหม่เข้าคลัง
+func CreateMedicine(c *gin.Context) {
+	var req CreateMedicineRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	code := req.MedicineCode
+	if code == "" {
+		code = "MED-" + time.Now().Format("05000")
+	}
+
+	medicine := models.Medicine{
+		MedicineCode:  code,
+		Name:          req.Name,
+		GenericName:   req.GenericName,
+		Category:      req.Category,
+		Properties:    req.Properties,
+		Dosage:        req.Dosage,
+		Manufacturer:  req.Manufacturer,
+		StockQuantity: req.StockQuantity,
+		UnitPrice:     req.UnitPrice,
+	}
+
+	if err := config.DB.Create(&medicine).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create medicine: " + err.Error()})
+		return
+	}
+
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", medicine)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"status":   "success",
+		"message":  "Medicine created successfully",
+		"medicine": medicine,
+	})
+}
+
+// DELETE /api/pharmacy/medicines/:id - ลบยาออกจากคลัง
+func DeleteMedicine(c *gin.Context) {
+	param := c.Param("id")
+
+	var medicine models.Medicine
+	if err := config.DB.Where("id = ? OR medicine_code = ?", param, param).First(&medicine).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Medicine not found"})
+		return
+	}
+
+	if err := config.DB.Delete(&medicine).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete medicine: " + err.Error()})
+		return
+	}
+
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", gin.H{"deleted_code": medicine.MedicineCode})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Medicine deleted successfully",
+	})
+}
+

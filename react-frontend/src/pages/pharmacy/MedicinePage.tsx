@@ -120,6 +120,21 @@ export default function MedicinePage() {
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
   const [detailModalMed, setDetailModalMed] = useState<Medicine | null>(null);
 
+  // Add Medicine Form state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addMedCode, setAddMedCode] = useState('');
+  const [addMedName, setAddMedName] = useState('');
+  const [addGenericName, setAddGenericName] = useState('');
+  const [addCategory, setAddCategory] = useState('ยารักษาโรคทั่วไป');
+  const [addProperties, setAddProperties] = useState('');
+  const [addDosage, setAddDosage] = useState('');
+  const [addManufacturer, setAddManufacturer] = useState('');
+  const [addStock, setAddStock] = useState<number | ''>(100);
+  const [addUnitPrice, setAddUnitPrice] = useState<number | ''>(20);
+
+  // Delete Confirmation state
+  const [deleteConfirmMed, setDeleteConfirmMed] = useState<Medicine | null>(null);
+
   const [updateMode, setUpdateMode] = useState<'add' | 'reduce'>('add');
   const [quantity, setQuantity] = useState<number | ''>('');
   
@@ -134,6 +149,97 @@ export default function MedicinePage() {
     setIsModalOpen(false);
     setSelectedMedicine(null);
     setQuantity('');
+  };
+
+  // Add Medicine Handler
+  const handleAddMedicineSubmit = () => {
+    if (!addMedName.trim()) return;
+
+    const payload = {
+      medicine_code: addMedCode.trim() || undefined,
+      name: addMedName.trim(),
+      generic_name: addGenericName.trim() || addMedName.trim(),
+      category: addCategory.trim() || 'ยารักษาโรคทั่วไป',
+      properties: addProperties.trim() || 'บรรเทาอาการตามแพทย์สั่ง',
+      dosage: addDosage.trim() || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
+      manufacturer: addManufacturer.trim() || 'บริษัท เภสัชกรรม จำกัด',
+      stock_quantity: Number(addStock) || 0,
+      unit_price: Number(addUnitPrice) || 0
+    };
+
+    const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    fetch('/api/pharmacy/medicines', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Primary API failed');
+      return res.json();
+    })
+    .then(() => {
+      fetchMedicines();
+      setShowSuccessBadge(true);
+      setTimeout(() => setShowSuccessBadge(false), 3000);
+    })
+    .catch(() => {
+      // Fallback to system endpoint
+      fetch('/api/system/medicines/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        fetchMedicines();
+        setShowSuccessBadge(true);
+        setTimeout(() => setShowSuccessBadge(false), 3000);
+      });
+    });
+
+    setIsAddModalOpen(false);
+    setAddMedCode('');
+    setAddMedName('');
+    setAddGenericName('');
+    setAddCategory('ยารักษาโรคทั่วไป');
+    setAddProperties('');
+    setAddDosage('');
+    setAddManufacturer('');
+    setAddStock(100);
+    setAddUnitPrice(20);
+  };
+
+  // Delete Medicine Handler
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmMed) return;
+
+    const targetCode = deleteConfirmMed.medicine_code || deleteConfirmMed.id;
+
+    setMedicines(prev => prev.filter(m => m.id !== deleteConfirmMed.id && m.medicine_code !== deleteConfirmMed.medicine_code));
+
+    const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    fetch(`/api/pharmacy/medicines/${encodeURIComponent(targetCode)}`, {
+      method: 'DELETE',
+      headers
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Primary delete failed');
+      fetchMedicines();
+    })
+    .catch(() => {
+      fetch(`/api/system/medicines/${encodeURIComponent(targetCode)}`, {
+        method: 'DELETE'
+      }).then(() => fetchMedicines());
+    });
+
+    setDeleteConfirmMed(null);
+    setShowSuccessBadge(true);
+    setTimeout(() => setShowSuccessBadge(false), 3000);
   };
   
   const handleSaveChanges = () => {
@@ -237,8 +343,8 @@ export default function MedicinePage() {
 
   return (
     <div className="medicine-page-container">
-      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
-        <div className="header-titles" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
+      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', textAlign: 'left', width: '100%' }}>
+        <div className="header-titles" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <h1 className="page-title" style={{ margin: 0, fontSize: '28px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', letterSpacing: '-0.5px' }}>
               รายการยา
@@ -257,6 +363,23 @@ export default function MedicinePage() {
             ค้นหาและจัดการระบบสินค้าคงคลัง คัดกรองยาใกล้หมด และเติมสต็อกยา (อัปเดตอัตโนมัติแบบ Real-time)
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setIsAddModalOpen(true)}
+          style={{
+            padding: '10px 20px', borderRadius: '10px',
+            background: '#16A34A', color: '#FFFFFF', border: 'none',
+            fontSize: '14.5px', fontWeight: '700', cursor: 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: '8px',
+            boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)', transition: 'all 0.2s ease'
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          + เพิ่มรายการยาใหม่
+        </button>
       </div>
 
       {/* Stock Inventory Executive Stat Block Cards (Image 2 Pattern) */}
@@ -517,13 +640,28 @@ export default function MedicinePage() {
                           </span>
                         </td>
                         <td className="dispensed-cell" style={{ textAlign: 'center' }}>{med.dispensedToday} เม็ด</td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button
-                            className="update-stock-btn"
-                            onClick={() => handleUpdateClick(med)}
-                          >
-                            ปรับสต็อก
-                          </button>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <button
+                              className="update-stock-btn"
+                              onClick={() => handleUpdateClick(med)}
+                            >
+                              ปรับสต็อก
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmMed(med)}
+                              style={{
+                                padding: '6px 12px', borderRadius: '8px',
+                                background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5',
+                                fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                              }}
+                              title="ลบรายการยานี้ออกจากคลัง"
+                            >
+                              ลบยา
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -686,6 +824,162 @@ export default function MedicinePage() {
             <div className="med-detail-footer">
               <button className="primary-btn-close" onClick={() => setDetailModalMed(null)}>
                 ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      {/* Add New Medicine Modal */}
+      {isAddModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-card card" style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">+ เพิ่มรายการยาใหม่เข้าคลัง</h3>
+              <button className="close-btn" onClick={() => setIsAddModalOpen(false)}>✕</button>
+            </div>
+
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '70vh', overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>รหัสยา (Medicine Code)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น MED-013 (ว่างไว้ให้ระบบสร้างให้)"
+                    value={addMedCode}
+                    onChange={(e) => setAddMedCode(e.target.value)}
+                  />
+                </div>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ชื่อยา * (Trade Name)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น Paracetamol 500mg"
+                    value={addMedName}
+                    onChange={(e) => setAddMedName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ชื่อสามัญทางยา (Generic Name)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น Acetaminophen"
+                    value={addGenericName}
+                    onChange={(e) => setAddGenericName(e.target.value)}
+                  />
+                </div>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ชนิด / หมวดหมู่ยา</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น ยาลดไข้ บรรเทาปวด"
+                    value={addCategory}
+                    onChange={(e) => setAddCategory(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label style={{ fontSize: '13px', fontWeight: '600' }}>สรรพคุณและข้อบ่งใช้ (Properties)</label>
+                <input
+                  type="text"
+                  placeholder="เช่น บรรเทาอาการปวดและลดไข้"
+                  value={addProperties}
+                  onChange={(e) => setAddProperties(e.target.value)}
+                />
+              </div>
+
+              <div className="input-group">
+                <label style={{ fontSize: '13px', fontWeight: '600' }}>ขนาดและวิธีรับประทาน (Dosage)</label>
+                <input
+                  type="text"
+                  placeholder="เช่น ครั้งละ 1-2 เม็ด ทุก 4-6 ชั่วโมง"
+                  value={addDosage}
+                  onChange={(e) => setAddDosage(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>จำนวนรับเข้า (เม็ด)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="100"
+                    value={addStock}
+                    onChange={(e) => setAddStock(e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                </div>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ราคา/หน่วย (บาท)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    placeholder="20"
+                    value={addUnitPrice}
+                    onChange={(e) => setAddUnitPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                </div>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ผู้ผลิต/บริษัท</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น สยามเภสัช"
+                    value={addManufacturer}
+                    onChange={(e) => setAddManufacturer(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ marginTop: '16px' }}>
+              <button className="cancel-btn" onClick={() => setIsAddModalOpen(false)}>ยกเลิก</button>
+              <button
+                className="save-btn"
+                disabled={!addMedName.trim()}
+                onClick={handleAddMedicineSubmit}
+                style={{ background: '#16A34A' }}
+              >
+                + เพิ่มรายการยาเข้าคลัง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmMed && (
+        <div className="modal-overlay">
+          <div className="modal-card card" style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </div>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+                ยืนยันการลบรายการยา
+              </h3>
+              <p style={{ margin: 0, fontSize: '14px', color: '#64748B', lineHeight: '1.5' }}>
+                คุณต้องการลบยา <strong style={{ color: '#0F172A' }}>{deleteConfirmMed.name}</strong> ({deleteConfirmMed.medicine_code || deleteConfirmMed.id}) ออกจากฐานข้อมูลคลังยาใช่หรือไม่?
+              </p>
+            </div>
+            <div className="modal-footer" style={{ justifyContent: 'center', gap: '12px', background: '#F8FAFC', padding: '16px 20px', borderRadius: '0 0 12px 12px' }}>
+              <button className="cancel-btn" onClick={() => setDeleteConfirmMed(null)}>ยกเลิก</button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                style={{
+                  padding: '10px 20px', borderRadius: '8px',
+                  background: '#DC2626', color: '#FFFFFF', border: 'none',
+                  fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+                }}
+              >
+                ยืนยันการลบยา
               </button>
             </div>
           </div>
