@@ -33,18 +33,17 @@ interface ShiftSwapItem {
   status: 'pending' | 'approved' | 'rejected';
 }
 
+import { vitalsApi, type BackendDoctor } from '../../services/api';
+
 const generateMockSchedules = (): ShiftSchedule[] => {
   const doctors = [
-    { code: 'DOC-0001', name: 'นพ. อานนท์ ศรีตรวจ', dept: 'อายุรกรรมทั่วไป', specialty: 'โรคหัวใจและหลอดเลือด', phone: '081-445-9821', email: 'arnon.s@clinic.local', avatar: 'AS' },
-    { code: 'DOC-0002', name: 'พญ. วิภาดา รักดี', dept: 'กุมารเวชกรรม', specialty: 'กุมารเวชศาสตร์โรคภูมิแพ้', phone: '089-223-1144', email: 'wiphada.r@clinic.local', avatar: 'WR' },
-    { code: 'DOC-0003', name: 'นพ. สมชาย ใจเย็น', dept: 'ศัลยกรรมกระดูก', specialty: 'ศัลยกรรมกระดูกและข้อ', phone: '084-551-8790', email: 'somchai.j@clinic.local', avatar: 'SJ' },
-    { code: 'DOC-0004', name: 'พญ. พิมผกา มีชัย', dept: 'สูตินรีเวช', specialty: 'เวชศาสตร์มารดาและทารก', phone: '086-778-9900', email: 'pimpaka.m@clinic.local', avatar: 'PM' },
-    { code: 'DOC-0005', name: 'นพ. นิธิ เจริญยิ่ง', dept: 'จักษุวิทยา', specialty: 'กระจกตาและการแก้ไขสายตา', phone: '082-334-5566', email: 'nithi.c@clinic.local', avatar: 'NC' },
-    { code: 'DOC-0006', name: 'ทพญ. สุดา ตั้งมั่น', dept: 'ทันตกรรม', specialty: 'ทันตกรรมประดิษฐ์', phone: '085-112-3344', email: 'suda.t@clinic.local', avatar: 'ST' },
+    { code: 'DOC-0001', name: 'พญ.สุดา สุขสมบูรณ์', dept: 'สูตินรีเวช', specialty: 'เวชศาสตร์มารดาและทารก', phone: '081-222-0001', email: 'doctor1@clinic.local', avatar: 'SS' },
+    { code: 'DOC-0002', name: 'นพ.วิชัย ชาญการแพทย์', dept: 'อายุรกรรมทั่วไป', specialty: 'โรคหัวใจและหลอดเลือด', phone: '081-222-0002', email: 'doctor2@clinic.local', avatar: 'WC' },
+    { code: 'DOC-0003', name: 'พญ.เกศรา รักษาดี', dept: 'กุมารเวชกรรม', specialty: 'กุมารเวชศาสตร์โรคภูมิแพ้', phone: '081-222-0003', email: 'doctor3@clinic.local', avatar: 'KR' },
   ];
 
   return doctors.map((doc, idx) => ({
-    id: `EMP-${101 + idx}`,
+    id: `DOC-${idx + 1}`,
     doctorCode: doc.code,
     name: doc.name,
     department: doc.dept,
@@ -53,21 +52,20 @@ const generateMockSchedules = (): ShiftSchedule[] => {
     phone: doc.phone,
     email: doc.email,
     shifts: {
-      mon: idx % 2 === 0 ? 'morning' : 'afternoon',
-      tue: idx % 3 === 0 ? 'morning' : 'afternoon',
+      mon: idx === 0 ? 'morning' : idx === 1 ? 'afternoon' : 'morning',
+      tue: idx === 1 ? 'morning' : 'afternoon',
       wed: 'morning',
-      thu: idx % 2 === 1 ? 'afternoon' : 'morning',
+      thu: idx === 2 ? 'afternoon' : 'morning',
       fri: 'morning',
-      sat: idx % 2 === 0 ? 'morning' : 'off',
-      sun: idx % 3 === 0 ? 'afternoon' : 'off',
+      sat: idx === 0 ? 'morning' : 'off',
+      sun: idx === 1 ? 'afternoon' : 'off',
     }
   }));
 };
 
 const initialSwapRequests: ShiftSwapItem[] = [
-  { id: 'SWP-2569-01', requesterName: 'นพ. อานนท์ ศรีตรวจ', requesterShift: 'เวรเช้า (08:00 - 16:00)', receiverName: 'พญ. วิภาดา รักดี', receiverShift: 'เวรบ่าย (16:00 - 00:00)', date: '15 ก.ย. 2569', reason: 'ติดประชุมวิชาการแพทย์', status: 'pending' },
-  { id: 'SWP-2569-02', requesterName: 'นพ. สมชาย ใจเย็น', requesterShift: 'เวรบ่าย (16:00 - 00:00)', receiverName: 'นพ. นิธิ เจริญยิ่ง', receiverShift: 'เวรเช้า (08:00 - 16:00)', date: '18 ก.ย. 2569', reason: 'ติดภารกิจครอบครัวต่างจังหวัด', status: 'pending' },
-  { id: 'SWP-2569-03', requesterName: 'พญ. พิมผกา มีชัย', requesterShift: 'เวรเช้า (08:00 - 16:00)', receiverName: 'ทพญ. สุดา ตั้งมั่น', receiverShift: 'วันหยุด (Off)', date: '22 ก.ย. 2569', reason: 'ขอสลับวันหยุดประจำสัปดาห์', status: 'pending' },
+  { id: 'SWP-2569-01', requesterName: 'พญ.สุดา สุขสมบูรณ์', requesterShift: 'เวรเช้า (08:00 - 16:00)', receiverName: 'นพ.วิชัย ชาญการแพทย์', receiverShift: 'เวรบ่าย (16:00 - 00:00)', date: '15 ก.ย. 2569', reason: 'ติดประชุมวิชาการแพทย์', status: 'pending' },
+  { id: 'SWP-2569-02', requesterName: 'นพ.วิชัย ชาญการแพทย์', requesterShift: 'เวรบ่าย (16:00 - 00:00)', receiverName: 'พญ.เกศรา รักษาดี', receiverShift: 'เวรเช้า (08:00 - 16:00)', date: '18 ก.ย. 2569', reason: 'ติดภารกิจครอบครัวต่างจังหวัด', status: 'pending' },
 ];
 
 export const ScheduleManagementPage: React.FC = () => {
@@ -92,7 +90,7 @@ export const ScheduleManagementPage: React.FC = () => {
 
   // Batch Creation Form State (Use Case U2)
   const [batchForm, setBatchForm] = useState({
-    doctorId: 'EMP-101',
+    doctorId: 'DOC-1',
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
     weekdays: [1, 2, 3, 4, 5], // 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 0=Sun
@@ -103,30 +101,29 @@ export const ScheduleManagementPage: React.FC = () => {
 
   // Fetch real doctors from backend if available
   React.useEffect(() => {
-    fetch('http://localhost:8080/api/doctors')
-      .then(res => res.ok ? res.json() : null)
-      .then((data: Array<{ id: number; username: string; full_name?: string; FullName?: string; phone?: string; Phone?: string }> | null) => {
+    vitalsApi.getDoctors()
+      .then((data: BackendDoctor[]) => {
         if (data && Array.isArray(data) && data.length > 0) {
           const mapped: ShiftSchedule[] = data.map((doc, idx) => {
-            const name = doc.full_name || doc.FullName || doc.username;
+            const name = doc.fullname || doc.username;
             const initials = name.replace(/^(นพ\.|พญ\.|ทพญ\.|ทพ\.|ดร\.)\s*/, '').slice(0, 2).toUpperCase();
             return {
               id: `DOC-${doc.id}`,
               doctorCode: `DOC-${String(doc.id).padStart(4, '0')}`,
               name: name,
-              department: idx % 3 === 0 ? 'อายุรกรรมทั่วไป' : idx % 3 === 1 ? 'สูตินรีเวช' : 'กุมารเวชกรรม',
+              department: idx % 3 === 0 ? 'สูตินรีเวช' : idx % 3 === 1 ? 'อายุรกรรมทั่วไป' : 'กุมารเวชกรรม',
               avatarText: initials || 'DR',
-              specialty: idx % 3 === 0 ? 'โรคหัวใจและหลอดเลือด' : idx % 3 === 1 ? 'เวชศาสตร์มารดาและทารก' : 'กุมารเวชศาสตร์โรคภูมิแพ้',
-              phone: doc.phone || doc.Phone || '081-222-0000',
+              specialty: idx % 3 === 0 ? 'เวชศาสตร์มารดาและทารก' : idx % 3 === 1 ? 'โรคหัวใจและหลอดเลือด' : 'กุมารเวชศาสตร์โรคภูมิแพ้',
+              phone: doc.phone || '081-222-0000',
               email: `${doc.username}@clinic.local`,
               shifts: {
-                mon: idx % 2 === 0 ? 'morning' : 'afternoon',
-                tue: idx % 3 === 0 ? 'morning' : 'afternoon',
+                mon: idx === 0 ? 'morning' : idx === 1 ? 'afternoon' : 'morning',
+                tue: idx === 1 ? 'morning' : 'afternoon',
                 wed: 'morning',
-                thu: idx % 2 === 1 ? 'afternoon' : 'morning',
+                thu: idx === 2 ? 'afternoon' : 'morning',
                 fri: 'morning',
-                sat: idx % 2 === 0 ? 'morning' : 'off',
-                sun: idx % 3 === 0 ? 'afternoon' : 'off',
+                sat: idx === 0 ? 'morning' : 'off',
+                sun: idx === 1 ? 'afternoon' : 'off',
               }
             };
           });
@@ -137,7 +134,7 @@ export const ScheduleManagementPage: React.FC = () => {
         }
       })
       .catch(() => {
-        // Fallback to mock data if backend not connected yet
+        // Fallback to initial matching doctors
       });
   }, []);
 
