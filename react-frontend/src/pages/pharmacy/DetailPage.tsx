@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import './DetailPage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
+import { useWebSocket } from '../../context/WebSocketContext';
 
 interface ToastState {
   message: string;
@@ -28,22 +29,21 @@ export default function DetailPage({
   patientRightsMap,
   onUpdatePatientRights
 }: DetailPageProps) {
+  const { subscribe } = useWebSocket();
   const [patientIdInput, setPatientIdInput] = useState('');
   const [localPatientId, setLocalPatientId] = useState<string>(selectedPatientId || '');
   const [isSearchExpanded, setIsSearchExpanded] = useState(true);
   const [isPrescriptionExpanded, setIsPrescriptionExpanded] = useState(true);
   const [selectedMedInfo, setSelectedMedInfo] = useState<{ name: string; medId: string; properties: string } | null>(null);
-  // คิวเริ่มต้น - ใช้รหัสจาก config เป็นตัวอย่าง
-  const [queueList, setQueueList] = useState<PatientConfig[]>(CLINIC_CONFIG.patients.slice());
+  
+  // คิวเริ่มต้น - เริ่มจากตารางว่างเปล่าแบบ Clean State
+  const [queueList, setQueueList] = useState<PatientConfig[]>([]);
   
   // Current active patient object
-  const activePatient: PatientConfig | undefined = CLINIC_CONFIG.patients.find(p => p.id === localPatientId);
+  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || CLINIC_CONFIG.patients.find(p => p.id === localPatientId);
   const currentRights = activePatient ? ((patientRightsMap && patientRightsMap[activePatient.id]) || activePatient.treatmentRights) : '';
 
-  const [toast, setToast] = useState<ToastState | null>({
-    message: 'ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์เรียบร้อยแล้ว',
-    type: 'doctor'
-  });
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [isToastFading, setIsToastFading] = useState(false);
 
   const triggerToast = (message: string, type: 'success' | 'error' | 'doctor') => {
@@ -58,18 +58,54 @@ export default function DetailPage({
     }, 3500);
   };
 
-  // ค้างไว้ 3.5 วินาที แล้วค่อยๆ จางหายไปเมื่อโหลดหน้าเว็บครั้งแรก
+  // Real-time Queue Listener
   useEffect(() => {
-    const timer1 = setTimeout(() => {
-      setIsToastFading(true);
-      const timer2 = setTimeout(() => {
-        setToast(null);
-        setIsToastFading(false);
-      }, 400);
-      return () => clearTimeout(timer2);
-    }, 3500);
-    return () => clearTimeout(timer1);
-  }, []);
+    const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
+      if (data && data.action === 'db_reset') {
+        setQueueList([]);
+      }
+    });
+
+    const unsubCreated = subscribe('QUEUE_CREATED', (data: any) => {
+      if (data) {
+        const pName = data.patient?.full_name || data.patient_name || `ผู้ป่วยคิว ${data.queue_number || ''}`;
+        const newPatient: PatientConfig = {
+          id: `HN-${data.patient_id || data.id || Date.now()}`,
+          hn: `HN-${data.patient_id || data.id || Date.now()}`,
+          nationalId: '1101800234567',
+          queueNumber: data.queue_number || 'Q0001',
+          ticket: 'A-01',
+          name: pName,
+          shortName: pName,
+          gender: 'ชาย',
+          age: 35,
+          dob: '01/01/2534',
+          phone: '081-999-8888',
+          occupation: 'รับจ้างทั่วไป',
+          treatmentRights: 'สิทธิ 30 บาท (สปสช.)',
+          patientType: 'ผู้ป่วยนอก (OPD)',
+          allergies: ['ไม่มีประวัติแพ้ยา'],
+          chronicDiseases: 'ไม่มี',
+          vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+          visitStatus: 'รอรับยา / ชำระเงิน',
+          visitDate: '23/07/2026',
+          visitTime: '10:00 น.',
+          doctorAdvice: 'พักผ่อนให้เพียงพอ',
+          medications: [
+            { name: 'Paracetamol 500mg', medId: 'MED-0231', properties: 'ยาลดไข้ บรรเทาปวด', dosage: '1 เม็ด, ทุกๆ 6 ชั่วโมง', instructions: 'เมื่อมีอาการปวดหรือมีไข้', price: 80, stock: 100, stockStatus: 'in-stock' },
+            { name: 'Amoxicillin 250mg', medId: 'MED-0187', properties: 'ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย', dosage: '1 เม็ด, วันละ 3 ครั้ง หลังอาหาร', instructions: 'ทานทานติดต่อกันจนหมด', price: 120, stock: 45, stockStatus: 'in-stock' },
+          ],
+        };
+        setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
+        triggerToast(`ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์: ${pName}`, 'doctor');
+      }
+    });
+
+    return () => {
+      unsubQueue();
+      unsubCreated();
+    };
+  }, [subscribe]);
 
 
 
