@@ -40,25 +40,29 @@ func ResetTestDatabase(c *gin.Context) {
 	})
 }
 
-// POST /api/system/simulate-prescription - จำลองหมอกด Submit ใบสั่งยา ลง Supabase Database จริง
+// POST /api/system/simulate-prescription - จำลองหมอกด Submit ใบสั่งยา สุ่มดึงข้อมูลจาก Patient และ Medicine ใน Supabase DB จริง
 func SimulateDoctorPrescription(c *gin.Context) {
-	names := []string{"นายสมชาย ใจดี", "นางสาวกานดา มณีรัตน์", "นายอนันต์ สุขี", "นางสาวจินตนา มานิน", "นายบุญมี มีทรัพย์"}
-	hns := []string{"HN-0089", "HN-0112", "HN-0789", "HN-0512", "HN-0309"}
-
-	randIdx := int(time.Now().UnixNano() % int64(len(names)))
-	patientName := names[randIdx]
-	hn := hns[randIdx]
+	// 1. ดึงข้อมูล Patient จริงจาก DB
+	var patients []models.Patient
+	config.DB.Find(&patients)
 
 	var patient models.Patient
-	if err := config.DB.Where("hn = ?", hn).First(&patient).Error; err != nil {
+	if len(patients) > 0 {
+		randPatientIdx := int(time.Now().UnixNano() % int64(len(patients)))
+		patient = patients[randPatientIdx]
+	} else {
 		patient = models.Patient{
-			HN:          hn,
-			FullName:    patientName,
+			HN:          fmt.Sprintf("HN-%04d", time.Now().Unix()%10000),
+			FullName:    "นายสมชาย ใจดี",
 			PhoneNumber: "081-999-8888",
 			SchemeType:  "บัตรทอง (สปสช.)",
 		}
 		config.DB.Create(&patient)
 	}
+
+	// 2. ดึงข้อมูล Medicine จริงจาก DB
+	var medicines []models.Medicine
+	config.DB.Find(&medicines)
 
 	queueNo := fmt.Sprintf("Q-%03d", time.Now().Unix()%1000)
 	queue := models.Queue{
@@ -70,22 +74,36 @@ func SimulateDoctorPrescription(c *gin.Context) {
 	}
 	config.DB.Create(&queue)
 
-	// สร้าง VisitRecord
+	// สร้าง VisitRecord จริงลง DB
 	visit := models.VisitRecord{
 		PatientID: patient.ID,
 		VisitDate: time.Now(),
 	}
 	config.DB.Create(&visit)
 
+	// สร้าง Dispensing บันทึกลง DB จริง สุ่มยา 1-2 รายการจาก DB
+	if len(medicines) > 0 {
+		randMedIdx := int(time.Now().UnixNano() % int64(len(medicines)))
+		med1 := medicines[randMedIdx]
+		dispensing1 := models.Dispensing{
+			VisitID:      visit.ID,
+			MedicineID:   med1.ID,
+			Quantity:     1,
+			Dosage:       "1 เม็ด วันละ 3 ครั้ง หลังอาหาร",
+			Instructions: "รับประทานต่อเนื่องจนหมด",
+		}
+		config.DB.Create(&dispensing1)
+	}
+
 	ws.BroadcastEvent("QUEUE_CREATED", queue)
 	ws.BroadcastEvent("QUEUE_UPDATED", queue)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":       "success",
-		"message":      "Prescription submitted to DB successfully",
+		"message":      "Prescription submitted to Supabase DB successfully",
 		"queue":        queue,
-		"patient_name": patientName,
-		"hn":           hn,
+		"patient_name": patient.FullName,
+		"hn":           patient.HN,
 		"visit_id":     visit.ID,
 	})
 }
