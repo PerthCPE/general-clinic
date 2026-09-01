@@ -29,6 +29,14 @@ import { DocumentManagementPage } from './pages/officer/DocumentManagementPage';
 import { ScheduleManagementPage } from './pages/officer/ScheduleManagementPage';
 import { DocumentForwardPage } from './pages/officer/DocumentForwardPage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
+
+// โค้ดฝั่งของคุณ
+import AppointmentForm from './pages/Appointment/AppointmentForm';
+import AppointmentDashboard from './pages/Appointment/AppointmentDashboard';
+import UserManagement from './pages/Admin/UserManagement'; 
+import GrantAccess from './pages/Admin/GrantAccess';
+
+// โค้ดฝั่งของเพื่อน
 import { Toaster } from 'react-hot-toast';
 import './App.css';
 
@@ -48,12 +56,10 @@ function MainApp() {
     setPatientRightsMap(prev => ({ ...prev, [patientId]: rights }));
   };
 
-  // บันทึก Tab ปัจจุบันลง localStorage เมื่อมีการเปลี่ยน Tab
   useEffect(() => {
     localStorage.setItem('activePage', activePage);
   }, [activePage]);
 
-  // บันทึกโหมดสี และใส่/ถอด class dark-mode บน body
   useEffect(() => {
     localStorage.setItem('isDarkMode', String(isDarkMode));
     if (isDarkMode) {
@@ -63,7 +69,6 @@ function MainApp() {
     }
   }, [isDarkMode]);
 
-  // เมื่อสลับ Role: ถ้าหน้าที่เปิดอยู่ไม่มีสิทธิ์ ให้ Redirect ไปที่หน้าเริ่มต้นของ Role นั้นอัตโนมัติ
   useEffect(() => {
     if (currentUser) {
       if (!hasAccess(activePage)) {
@@ -76,7 +81,6 @@ function MainApp() {
     setIsDarkMode((prev) => !prev);
   };
 
-  // หากยังไม่ได้ Login ให้แสดงหน้า LoginPage
   if (!isAuthenticated) {
     return (
       <LoginPage
@@ -89,9 +93,7 @@ function MainApp() {
     );
   }
 
-  // Router & Route Guard Component
   const renderContent = () => {
-    // ตรวจสอบสิทธิ์ Role-Based Access Control (RBAC)
     if (!hasAccess(activePage)) {
       return (
         <UnauthorizedPage
@@ -106,24 +108,16 @@ function MainApp() {
     }
 
     switch (activePage) {
-      // ===== Shared & Registrar Pages =====
       case 'registration':
         return <RegistrationPage />;
-
       case 'queue':
         return <QueuePage />;
-
       case 'eligibility':
         return <EligibilityPage />;
-
-      // ===== Nurse Pages =====
       case 'vitals':
         return <VitalsPage />;
-
       case 'vitals-history':
         return <ScreeningHistoryPage />;
-
-      // ===== Pharmacist Pages =====
       case 'pharmacy-dispense':
         return <DetailPage 
           selectedPatientId={selectedPatientId}
@@ -135,8 +129,6 @@ function MainApp() {
         return <MedicinePage />;
       case 'pharmacy-history':
         return <PatientHistoryPage />;
-
-      // ===== Cashier Pages =====
       case 'billing-dispense':
         return <BillingDispensePage 
           selectedPatientId={selectedPatientId}
@@ -155,7 +147,19 @@ function MainApp() {
       case 'billing-dashboard':
         return <BillingDashboardPage />;
 
-      // ===== Doctor Pages =====
+      // ===== Appointment Pages (ของคุณ) =====
+      case 'appointment-form':
+        return <AppointmentForm />;
+      case 'appointment-dashboard':
+        return <AppointmentDashboard />;
+
+      // ===== Admin Pages (ของคุณ) =====
+      case 'admin-users':
+        return <UserManagement />;
+      case 'admin-access':
+        return <GrantAccess />;
+
+      // ===== Doctor Pages (ของเพื่อน) =====
       case 'doctor-dashboard':
         return <DoctorDashboardPage onNavigate={setActivePage} />;
       case 'doctor-queue':
@@ -183,7 +187,7 @@ function MainApp() {
   return (
     <DoctorDataProvider>
       <div className="app-layout">
-        {/* 1. Left Sidebar - Menu filtered dynamically for Registrar & Nurse */}
+        {/* 1. Left Sidebar */}
         <Sidebar
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
@@ -200,9 +204,7 @@ function MainApp() {
           onNavigate={setActivePage}
         />
 
-        {/* 3. Main Body Content
-            เพิ่มคลาส doctor-module เมื่ออยู่หน้าของแพทย์ เพื่อเปิด preflight แบบย่อ
-            (reset ปุ่ม/ตาราง/หัวข้อ) ให้เฉพาะหน้าที่ใช้ Tailwind เท่านั้น */}
+        {/* 3. Main Body Content */}
         <main
           className={`body-content ${isSidebarOpen ? 'body-with-sidebar' : 'body-full'}${
             activePage.startsWith('doctor-') ? ' doctor-module' : ''
@@ -211,7 +213,7 @@ function MainApp() {
           {renderContent()}
         </main>
 
-        {/* Global Clinical Toast Notifications */}
+        {/* Global Clinical Toast Notifications (ของเพื่อน) */}
         <Toaster
           position="top-right"
           gutter={10}
