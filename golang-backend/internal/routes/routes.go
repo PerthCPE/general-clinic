@@ -89,7 +89,4 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
 		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
 	}
-
-	// Expose queue list for easy frontend sync
-	r.GET("/api/queue/list", controllers.GetQueueList)
 }
