@@ -88,19 +88,28 @@ func SimulateDoctorPrescription(c *gin.Context) {
 		}
 	}
 
+	// ดึงเจ้าหน้าที่ (User) มา 1 คนเพื่อใช้เป็นผู้สร้างรายการ
+	var systemUser models.User
+	config.DB.First(&systemUser)
+	if systemUser.ID == 0 {
+		systemUser.ID = 1 // Fallback in case table is empty, though FK might still fail if literally empty
+	}
+
 	queueNo := fmt.Sprintf("Q-%03d", (time.Now().UnixNano()/1e6)%1000)
 	queue := models.Queue{
-		PatientID:   patient.ID,
-		QueueNumber: queueNo,
-		Status:      "pharmacy_waiting",
-		Department:  "ห้องยา",
-		Note:        "มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา",
+		PatientID:       patient.ID,
+		CreatedByUserID: systemUser.ID,
+		QueueNumber:     queueNo,
+		Status:          "pharmacy_waiting",
+		Department:      "ห้องยา",
+		Note:            "มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา",
 	}
 	config.DB.Create(&queue)
 
 	// สร้าง VisitRecord จริงลง DB
 	visit := models.VisitRecord{
 		PatientID: patient.ID,
+		DoctorID:  systemUser.ID,
 		VisitDate: time.Now(),
 	}
 	config.DB.Create(&visit)
@@ -113,6 +122,7 @@ func SimulateDoctorPrescription(c *gin.Context) {
 		dispensing1 := models.Dispensing{
 			VisitID:      visit.ID,
 			MedicineID:   med1.ID,
+			DoctorID:     systemUser.ID,
 			Quantity:     1,
 			Dosage:       "1 เม็ด วันละ 3 ครั้ง หลังอาหาร",
 			Instructions: "รับประทานต่อเนื่องจนหมด",
