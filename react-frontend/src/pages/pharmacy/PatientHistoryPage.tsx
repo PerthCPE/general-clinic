@@ -110,8 +110,7 @@ export default function PatientHistoryPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [searchHn, setSearchHn] = useState('');
-  const [searchName, setSearchName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
   const [patientMedHistory, setPatientMedHistory] = useState<MedicationHistory[]>([]);
   const [isPatientListExpanded, setIsPatientListExpanded] = useState(true);
@@ -140,7 +139,7 @@ export default function PatientHistoryPage() {
             return {
               id: `PT-${pm.id || pm.hn}`,
               hn: pm.hn || '',
-              name: pm.full_name || '',
+              name: pm.fullname || pm.full_name || 'ผู้ป่วย',
               age: pm.age || 35,
               bloodType: pm.blood_type || 'O+',
               diseases: rawDiseases.length > 0 ? rawDiseases : ['ไม่มี'],
@@ -211,19 +210,35 @@ export default function PatientHistoryPage() {
   };
 
   const filteredPatients = patients.filter(patient => {
-    const matchHn = (patient.hn || '').toLowerCase().includes(searchHn.toLowerCase());
-    const matchName = (patient.name || '').toLowerCase().includes(searchName.toLowerCase());
+    const q = (searchQuery || '').trim().toLowerCase();
+    
+    const cleanedHn = (patient?.hn || '').toLowerCase().replace(/^hn-?/, '');
+    const cleanedQ = q.replace(/^hn-?/, '');
+    
+    // Check ID match
+    const queryDigits = q.replace(/\D/g, '');
+    const hnDigits = (patient?.hn || '').replace(/\D/g, '');
+    const matchHn = cleanedHn.includes(cleanedQ) || 
+      (patient?.hn || '').toLowerCase().includes(q) ||
+      (queryDigits !== '' && hnDigits.includes(queryDigits));
+
+    // Multi-word name search
+    const searchTerms = q.split(/\s+/).filter(Boolean);
+    const nameStr = (patient?.name || '').toLowerCase();
+    const matchName = searchTerms.length > 0 && searchTerms.every(term => nameStr.includes(term));
+
+    const matchSearch = q === '' || matchHn || matchName;
 
     let matchRisk = true;
     if (riskFilter === 'hypertension') {
       matchRisk = (patient.diseases || []).some(d => d.includes('ความดัน'));
     } else if (riskFilter === 'allergies') {
-      const hasAllergyDisease = (patient.diseases || []).some(d => d.includes('แพ้ยา') || d.includes('ภูมิแพ้'));
-      const hasAllergiesText = Boolean(patient.allergies && !patient.allergies.includes('ปฏิเสธ'));
+      const hasAllergyDisease = (patient?.diseases || []).some(d => d?.includes('แพ้ยา') || d?.includes('ภูมิแพ้'));
+      const hasAllergiesText = Boolean(patient?.allergies && typeof patient.allergies === 'string' && !patient.allergies.includes('ปฏิเสธ'));
       matchRisk = hasAllergyDisease || hasAllergiesText;
     }
 
-    return matchHn && matchName && matchRisk;
+    return matchSearch && matchRisk;
   });
 
   return (
@@ -241,26 +256,13 @@ export default function PatientHistoryPage() {
         <div className="search-card card" style={{ padding: '20px 24px', marginBottom: '24px', borderRadius: '12px', background: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
           <div className="search-inputs" style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
             <div className="input-group" style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13.5px', color: '#475569' }}>รหัสผู้ป่วย (HN)</label>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13.5px', color: '#475569' }}>ค้นหาผู้ป่วย (รหัส HN หรือ ชื่อผู้ป่วย)</label>
               <div className="input-with-icon">
                 <input
                   type="text"
-                  placeholder="เช่น HN0001"
-                  value={searchHn}
-                  onChange={(e) => setSearchHn(e.target.value)}
-                  style={{ width: '100%', padding: '9px 14px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '14px' }}
-                />
-              </div>
-            </div>
-
-            <div className="input-group" style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13.5px', color: '#475569' }}>ชื่อผู้ป่วย</label>
-              <div className="input-with-icon">
-                <input
-                  type="text"
-                  placeholder="เช่น Somchai Jai-dee"
-                  value={searchName}
-                  onChange={(e) => setSearchName(e.target.value)}
+                  placeholder="เช่น HN0001, Somchai หรือ 0001"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   style={{ width: '100%', padding: '9px 14px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '14px' }}
                 />
               </div>
@@ -332,7 +334,7 @@ export default function PatientHistoryPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', padding: '4px 12px', borderRadius: '16px', fontSize: '13px' }}>
-                แสดง {filteredPatients.length} รายการ
+                แสดง {filteredPatients?.length || 0} รายการ
               </span>
               <svg 
                 width="18" height="18" viewBox="0 0 24 24" fill="none" 
@@ -398,7 +400,7 @@ export default function PatientHistoryPage() {
                           </td>
                           <td>
                             <div className="disease-badges">
-                              {patient.diseases.map((d, i) => (
+                              {(patient.diseases || []).map((d, i) => (
                                 <span key={i} className="disease-tag">{d}</span>
                               ))}
                             </div>
@@ -547,9 +549,9 @@ export default function PatientHistoryPage() {
                   <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
                     <strong style={{ fontSize: '13px', color: '#0F172A' }}>รายการยาที่จัดส่ง:</strong>
                     <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: '13px', color: '#475569' }}>
-                      {patientMedHistory.map((item, idx) => (
+                      {(patientMedHistory || []).map((item, idx) => (
                         <li key={idx} style={{ marginBottom: '4px' }}>
-                          <strong style={{ color: '#0F172A' }}>{item.medName}</strong> ({item.quantity}) - {item.dosage} <span style={{ color: '#2563EB', fontWeight: '600' }}>({item.dosageTag})</span>
+                          <strong style={{ color: '#0F172A' }}>{item?.medName}</strong> ({item?.quantity}) - {item?.dosage} <span style={{ color: '#2563EB', fontWeight: '600' }}>({item?.dosageTag})</span>
                         </li>
                       ))}
                     </ul>

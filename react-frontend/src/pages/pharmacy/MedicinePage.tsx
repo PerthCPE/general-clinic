@@ -24,8 +24,7 @@ export default function MedicinePage() {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const { isConnected, subscribe } = useWebSocket();
 
-  const [searchMedId, setSearchMedId] = useState('');
-  const [searchMedName, setSearchMedName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all');
   
@@ -283,23 +282,30 @@ export default function MedicinePage() {
   };
 
   const filteredMedicines = medicines.filter(med => {
-    const rawIdQuery = searchMedId.trim().toLowerCase();
-    let matchId = !rawIdQuery;
-    if (rawIdQuery) {
+    const q = searchQuery.trim().toLowerCase();
+    
+    let matchSearch = !q;
+    if (q) {
       const codeStr = (med.medicine_code || med.id).toLowerCase();
       const codeDigits = codeStr.replace(/\D/g, '');
-      const queryDigits = rawIdQuery.replace(/\D/g, '');
+      const queryDigits = q.replace(/\D/g, '');
 
-      matchId = codeStr.includes(rawIdQuery) || 
+      const matchId = codeStr.includes(q) || 
         (queryDigits !== '' && (
           codeDigits.includes(queryDigits) || 
           (parseInt(codeDigits, 10) > 0 && parseInt(codeDigits, 10) === parseInt(queryDigits, 10))
         ));
-    }
 
-    const matchName = !searchMedName.trim() || 
-      med.name.toLowerCase().includes(searchMedName.trim().toLowerCase()) ||
-      med.genericName.toLowerCase().includes(searchMedName.trim().toLowerCase());
+      const searchTerms = q.split(/\s+/).filter(Boolean);
+      const nameStr = (med.name || '').toLowerCase();
+      const genericStr = (med.genericName || '').toLowerCase();
+
+      const matchName = searchTerms.length > 0 && searchTerms.every(term => 
+        nameStr.includes(term) || genericStr.includes(term)
+      );
+        
+      matchSearch = matchId || matchName;
+    }
       
     let matchCategory = true;
     if (categoryFilter !== 'all') {
@@ -311,12 +317,11 @@ export default function MedicinePage() {
     else if (stockStatusFilter === 'low-stock') matchStatus = med.status === 'Low Stock';
     else if (stockStatusFilter === 'out-of-stock') matchStatus = med.status === 'Out of Stock';
 
-    return matchId && matchName && matchCategory && matchStatus;
+    return matchSearch && matchCategory && matchStatus;
   });
   
   const handleResetFilters = () => {
-    setSearchMedId('');
-    setSearchMedName('');
+    setSearchQuery('');
     setCategoryFilter('all');
     setStockStatusFilter('all');
   };
@@ -456,22 +461,13 @@ export default function MedicinePage() {
 
       <div className="search-card card">
         <div className="search-inputs">
-          <div className="input-group">
-            <label>รหัสยา</label>
+          <div className="input-group" style={{ flex: 2 }}>
+            <label>ค้นหายา (รหัสยา หรือ ชื่อยา)</label>
             <input
               type="text"
-              placeholder="เช่น 001, 231 หรือ MED-0231"
-              value={searchMedId}
-              onChange={(e) => setSearchMedId(e.target.value)}
-            />
-          </div>
-          <div className="input-group">
-            <label>ชื่อยา</label>
-            <input
-              type="text"
-              placeholder="เช่น Paracetamol"
-              value={searchMedName}
-              onChange={(e) => setSearchMedName(e.target.value)}
+              placeholder="เช่น 001, MED-0231, หรือ Paracetamol"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <div className="input-group">
@@ -495,7 +491,7 @@ export default function MedicinePage() {
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="search-btn" type="button">ค้นหา</button>
-          {(searchMedId || searchMedName || stockStatusFilter !== 'all') && (
+          {(searchQuery || stockStatusFilter !== 'all') && (
             <button 
               className="search-btn" 
               type="button" 
