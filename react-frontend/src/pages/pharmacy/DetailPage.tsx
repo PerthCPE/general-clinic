@@ -69,10 +69,14 @@ export default function DetailPage({
     const unsubCreated = subscribe('QUEUE_CREATED', (data: any) => {
       if (data) {
         const pName = data.patient?.full_name || data.patient_name || `ผู้ป่วยคิว ${data.queue_number || ''}`;
+        
+        // Use dynamic medications from WebSocket payload or fallback to empty
+        const dynamicMedications = data.medications || [];
+        
         const newPatient: PatientConfig = {
           id: `HN-${data.patient_id || data.id || Date.now()}`,
-          hn: `HN-${data.patient_id || data.id || Date.now()}`,
-          nationalId: '1101800234567',
+          hn: data.hn || `HN-${data.patient_id || data.id || Date.now()}`,
+          nationalId: data.national_id || '1101800234567',
           queueNumber: data.queue_number || 'Q0001',
           ticket: 'A-01',
           name: pName,
@@ -82,19 +86,16 @@ export default function DetailPage({
           dob: '01/01/2534',
           phone: '081-999-8888',
           occupation: 'รับจ้างทั่วไป',
-          treatmentRights: 'สิทธิ 30 บาท (สปสช.)',
+          treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
           patientType: 'ผู้ป่วยนอก (OPD)',
           allergies: ['ไม่มีประวัติแพ้ยา'],
           chronicDiseases: 'ไม่มี',
           vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
           visitStatus: 'รอรับยา / ชำระเงิน',
-          visitDate: '23/07/2026',
-          visitTime: '10:00 น.',
+          visitDate: new Date().toLocaleDateString('th-TH'),
+          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
           doctorAdvice: 'พักผ่อนให้เพียงพอ',
-          medications: [
-            { name: 'Paracetamol 500mg', medId: 'MED-0231', properties: 'ยาลดไข้ บรรเทาปวด', dosage: '1 เม็ด, ทุกๆ 6 ชั่วโมง', instructions: 'เมื่อมีอาการปวดหรือมีไข้', price: 80, stock: 100, stockStatus: 'in-stock' },
-            { name: 'Amoxicillin 250mg', medId: 'MED-0187', properties: 'ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย', dosage: '1 เม็ด, วันละ 3 ครั้ง หลังอาหาร', instructions: 'ทานทานติดต่อกันจนหมด', price: 120, stock: 45, stockStatus: 'in-stock' },
-          ],
+          medications: dynamicMedications,
         };
         setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
         triggerToast(`ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์: ${pName}`, 'doctor');
@@ -132,17 +133,9 @@ export default function DetailPage({
   };
 
   const fallbackSimulate = () => {
-    const allPatients = CLINIC_CONFIG.patients;
-    const nextPatient = allPatients.find(p => !queueList.some(q => q.id === p.id));
-    if (nextPatient) {
-      setQueueList(prev => [...prev, nextPatient]);
-      triggerToast(`แพทย์ส่งใบสั่งยาเข้ามาใหม่: ${nextPatient.name} (เพิ่มเข้าคิว)`, 'doctor');
-    } else {
-      const cyclePatient = allPatients[queueList.length % allPatients.length];
-      const hexNum = Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
-      setQueueList(prev => [...prev, { ...cyclePatient, id: cyclePatient.id + '_' + Date.now(), hn: 'HN' + hexNum }]);
-      triggerToast(`แพทย์ส่งคนไข้เข้าคิวใหม่`, 'doctor');
-    }
+    // Backend fetch failed, do not use CLINIC_CONFIG mock data anymore.
+    // Ensure you start the backend before clicking this.
+    triggerToast(`ข้อผิดพลาด: ไม่สามารถเชื่อมต่อกับฐานข้อมูลหลังบ้านได้ โปรดเปิดเซิร์ฟเวอร์`, 'error');
   };
 
   // กดยืนยันการจ่ายยา: ส่งข้อมูลเข้า DB การเงินจริง + ลบคนไข้ออกจากคิว + รีเซ็ต selection

@@ -59,12 +59,16 @@ export default function BillingDispensePage({
 
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
       if (data) {
-        const pName = data.patient_name || `ผู้ป่วย คิว #${data.visit_id || ''}`;
+        const pName = data.patient_name || data.patient?.full_name || `ผู้ป่วย คิว #${data.visit_id || ''}`;
+        
+        // Use dynamic medications from WebSocket payload or fallback to empty
+        const dynamicMedications = data.medications || [];
+
         const newPatient: PatientConfig = {
-          id: `HN-${data.visit_id || Date.now()}`,
-          hn: `HN-${data.visit_id || Date.now()}`,
-          nationalId: '1101800234567',
-          queueNumber: 'Q0001',
+          id: `HN-${data.patient_id || data.visit_id || Date.now()}`,
+          hn: data.hn || `HN-${data.patient_id || data.visit_id || Date.now()}`,
+          nationalId: data.national_id || '1101800234567',
+          queueNumber: data.queue_number || 'Q0001',
           ticket: 'A-01',
           name: pName,
           shortName: pName,
@@ -73,18 +77,16 @@ export default function BillingDispensePage({
           dob: '01/01/2534',
           phone: '081-999-8888',
           occupation: 'รับจ้างทั่วไป',
-          treatmentRights: 'สิทธิ 30 บาท (สปสช.)',
+          treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
           patientType: 'ผู้ป่วยนอก (OPD)',
           allergies: ['ไม่มีประวัติแพ้ยา'],
           chronicDiseases: 'ไม่มี',
           vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
           visitStatus: 'รอรับยา / ชำระเงิน',
-          visitDate: '23/07/2026',
-          visitTime: '10:00 น.',
+          visitDate: new Date().toLocaleDateString('th-TH'),
+          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
           doctorAdvice: 'พักผ่อนให้เพียงพอ',
-          medications: [
-            { name: 'Paracetamol 500mg', medId: 'MED-0231', properties: 'ยาลดไข้ บรรเทาปวด', dosage: '1 เม็ด, ทุกๆ 6 ชั่วโมง', instructions: 'เมื่อมีอาการปวดหรือมีไข้', price: 80, stock: 100, stockStatus: 'in-stock' },
-          ],
+          medications: dynamicMedications,
         };
         setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
       }

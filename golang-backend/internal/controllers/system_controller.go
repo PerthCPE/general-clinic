@@ -23,12 +23,8 @@ func ResetTestDatabase(c *gin.Context) {
 	config.DB.Exec("DELETE FROM queues")
 	config.DB.Exec("DELETE FROM visit_records")
 
-	// รีเซ็ตสต็อกยาตัวอย่างกลับค่าเดิม (เช่น 50, 100)
-	config.DB.Model(&models.Medicine{}).Where("medicine_code = ?", "MED-0231").Update("stock_quantity", 342)
-	config.DB.Model(&models.Medicine{}).Where("medicine_code = ?", "MED-0187").Update("stock_quantity", 48)
-	config.DB.Model(&models.Medicine{}).Where("medicine_code = ?", "MED-0402").Update("stock_quantity", 0)
-	config.DB.Model(&models.Medicine{}).Where("medicine_code = ?", "MED-0119").Update("stock_quantity", 215)
-	config.DB.Model(&models.Medicine{}).Where("medicine_code = ?", "MED-0356").Update("stock_quantity", 76)
+	// รีเซ็ตสต็อกยาทุกตัวกลับค่าเดิม (100)
+	config.DB.Model(&models.Medicine{}).Where("1=1").Update("stock_quantity", 100)
 
 	// กระจายข่าวผ่าน WebSocket ให้ทุกหน้าจอรีเฟรชทันที
 	ws.BroadcastEvent("QUEUE_UPDATED", gin.H{"action": "db_reset"})
@@ -99,6 +95,7 @@ func SimulateDoctorPrescription(c *gin.Context) {
 	config.DB.Create(&visit)
 
 	// สร้าง Dispensing บันทึกลง DB จริง สุ่มยา 1-2 รายการจาก DB
+	var dispensedMeds []gin.H
 	if len(medicines) > 0 {
 		randMedIdx := int(time.Now().UnixNano() % int64(len(medicines)))
 		med1 := medicines[randMedIdx]
@@ -110,6 +107,24 @@ func SimulateDoctorPrescription(c *gin.Context) {
 			Instructions: "รับประทานต่อเนื่องจนหมด",
 		}
 		config.DB.Create(&dispensing1)
+		
+		status := "in-stock"
+		if med1.StockQuantity == 0 {
+			status = "out-stock"
+		} else if med1.StockQuantity < 50 {
+			status = "low-stock"
+		}
+
+		dispensedMeds = append(dispensedMeds, gin.H{
+			"medId":       med1.MedicineCode,
+			"name":        med1.Name,
+			"properties":  med1.Properties,
+			"dosage":      dispensing1.Dosage,
+			"instructions": dispensing1.Instructions,
+			"price":       med1.UnitPrice,
+			"stock":       med1.StockQuantity,
+			"stockStatus": status,
+		})
 	}
 
 	ws.BroadcastEvent("QUEUE_CREATED", gin.H{
@@ -121,6 +136,7 @@ func SimulateDoctorPrescription(c *gin.Context) {
 		"hn":           patient.HN,
 		"national_id":  patient.NationalID,
 		"scheme_type":  patient.SchemeType,
+		"medications":  dispensedMeds,
 	})
 	ws.BroadcastEvent("QUEUE_UPDATED", queue)
 
