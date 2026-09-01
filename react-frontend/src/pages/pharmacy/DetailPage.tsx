@@ -153,16 +153,14 @@ export default function DetailPage({
 
     try {
       const token = localStorage.getItem('token');
-      await fetch('/api/billing/calculate', {
+      await fetch('/api/pharmacy/dispense', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          visit_id: vId,
-          total_amount: 350,
-          discount_from_eligibility: 0
+          visit_id: vId
         })
       });
     } catch {
