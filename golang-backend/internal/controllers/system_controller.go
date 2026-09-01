@@ -48,28 +48,28 @@ func SimulateDoctorPrescription(c *gin.Context) {
 	if len(patientMedicines) == 0 {
 		patientMedicines = []models.PatientMedicine{
 			{
-				HN: "HN0045", NationalID: "1100501234567", FullName: "นาย สมชาย ใจดี",
+				HN: "HN-9001", NationalID: "9110050123451", FullName: "นาย สมชาย ใจดี",
 				Gender: "ชาย", Age: 45, BloodType: "O+",
 				SchemeType: "สิทธิ 30 บาท (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา",
 				ChronicDiseases: "ความดันโลหิตสูง, เบาหวาน", VisitCount: 5,
 				PhoneNumber: "081-234-5678",
 			},
 			{
-				HN: "HN0112", NationalID: "3100598765432", FullName: "นาง มะลิวัน จันทร์เพ็ญ",
+				HN: "HN-9002", NationalID: "9310059876542", FullName: "นาง มะลิวัน จันทร์เพ็ญ",
 				Gender: "หญิง", Age: 62, BloodType: "A-",
 				SchemeType: "ประกันสังคม", Allergies: "แพ้ยา Penicillin",
 				ChronicDiseases: "ไม่มี", VisitCount: 8,
 				PhoneNumber: "089-876-5432",
 			},
 			{
-				HN: "HN0018", NationalID: "1101455443219", FullName: "นาย พงศกร รัตนสังข์",
+				HN: "HN-9003", NationalID: "9110145544323", FullName: "นาย พงศกร รัตนสังข์",
 				Gender: "ชาย", Age: 28, BloodType: "B+",
 				SchemeType: "ประกันสุขภาพเอกชน", Allergies: "ปฏิเสธการแพ้ยา",
 				ChronicDiseases: "หอบหืด", VisitCount: 11,
 				PhoneNumber: "086-555-4321",
 			},
 			{
-				HN: "HN0884", NationalID: "5102011223345", FullName: "นางสาว ศิริพร แก้วมณี",
+				HN: "HN-9004", NationalID: "9510201122344", FullName: "นางสาว ศิริพร แก้วมณี",
 				Gender: "หญิง", Age: 34, BloodType: "AB+",
 				SchemeType: "สิทธิ 30 บาท (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา",
 				ChronicDiseases: "ไม่มี", VisitCount: 2,
