@@ -1,3 +1,4 @@
+```json
 {
   "name": "react-frontend",
   "private": true,
@@ -39,3 +40,5 @@
     "vite": "^8.1.1"
   }
 }
+
+```
