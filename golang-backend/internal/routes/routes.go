@@ -89,9 +89,4 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
 		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
 	}
-
-	// Public utility endpoints for testing & seamless demo flow
-	r.GET("/api/pharmacy/dispensing/:visit_id", controllers.GetDispensingByVisit)
-	r.POST("/api/pharmacy/dispense", controllers.ConfirmDispenseAndBill)
-	r.GET("/api/billing/list", controllers.GetAllBillings)
 }
