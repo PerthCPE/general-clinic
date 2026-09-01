@@ -77,6 +77,17 @@ func SimulateDoctorPrescription(c *gin.Context) {
 	var medicines []models.Medicine
 	config.DB.Find(&medicines)
 
+	if len(medicines) == 0 {
+		medicines = []models.Medicine{
+			{MedicineCode: "MED-0231", Name: "Paracetamol 500mg", UnitPrice: 80, StockQuantity: 100},
+			{MedicineCode: "MED-0187", Name: "Amoxicillin 250mg", UnitPrice: 120, StockQuantity: 100},
+			{MedicineCode: "MED-0402", Name: "Ibuprofen 400mg", UnitPrice: 90, StockQuantity: 100},
+		}
+		for i := range medicines {
+			config.DB.Create(&medicines[i])
+		}
+	}
+
 	queueNo := fmt.Sprintf("Q-%03d", (time.Now().UnixNano()/1e6)%1000)
 	queue := models.Queue{
 		PatientID:   patient.ID,

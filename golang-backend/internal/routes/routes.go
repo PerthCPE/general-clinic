@@ -83,7 +83,8 @@ func SetUpRoutes(r *gin.Engine) {
 	}
 
 	// ===== 5. System Utilities (Reset Database for Testing) =====
-	systemRoutes := api.Group("/system")
+	// Expose without auth so tests don't fail with 401 Unauthorized
+	systemRoutes := r.Group("/api/system")
 	{
 		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
 		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
