@@ -5,6 +5,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
 )
@@ -95,6 +96,8 @@ func UpdateMedicineStock(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update stock: " + err.Error()})
 		return
 	}
+
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", medicine)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":   "success",

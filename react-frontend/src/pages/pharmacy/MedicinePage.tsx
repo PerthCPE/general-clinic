@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import './MedicinePage.css';
+import { useWebSocket } from '../../context/WebSocketContext';
 
 interface Medicine {
   id: string;
@@ -109,6 +110,7 @@ const initialMedicines: Medicine[] = [
 
 export default function MedicinePage() {
   const [medicines, setMedicines] = useState<Medicine[]>(initialMedicines);
+  const { isConnected, subscribe } = useWebSocket();
 
   const [searchMedId, setSearchMedId] = useState('');
   const [searchMedName, setSearchMedName] = useState('');
@@ -119,7 +121,7 @@ export default function MedicinePage() {
   const [isStockTableExpanded, setIsStockTableExpanded] = useState(true);
 
   // Sync with Backend API
-  useEffect(() => {
+  const fetchMedicines = useCallback(() => {
     fetch('/api/pharmacy/medicines')
       .then(res => res.json())
       .then(data => {
@@ -155,6 +157,25 @@ export default function MedicinePage() {
         // Fallback to initialMedicines on network error
       });
   }, []);
+
+  useEffect(() => {
+    fetchMedicines();
+
+    // Real-time WebSocket Listeners
+    const unsubStock = subscribe('MEDICINE_STOCK_UPDATED', () => {
+      fetchMedicines();
+      setShowSuccessBadge(true);
+      setTimeout(() => setShowSuccessBadge(false), 3000);
+    });
+    const unsubDispense = subscribe('DISPENSE_RECORDED', () => {
+      fetchMedicines();
+    });
+
+    return () => {
+      unsubStock();
+      unsubDispense();
+    };
+  }, [fetchMedicines, subscribe]);
 
   // Extract unique categories
   const categories = Array.from(new Set(medicines.map(m => m.category).filter(Boolean)));
@@ -281,10 +302,21 @@ export default function MedicinePage() {
 
   return (
     <div className="medicine-page-container">
-      <div className="page-header" style={{ marginBottom: '24px' }}>
+      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div className="header-titles">
-          <h1 className="page-title">รายการยา</h1>
-          <p className="page-subtitle">ค้นหาและจัดการระบบสินค้าคงคลัง คัดกรองยาใกล้หมด และเติมสต็อกยา</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <h1 className="page-title" style={{ margin: 0 }}>รายการยา</h1>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '4px 10px', borderRadius: '16px', fontSize: '12px', fontWeight: '600',
+              background: isConnected ? '#DCFCE7' : '#FEE2E2',
+              color: isConnected ? '#15803D' : '#B91C1C'
+            }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isConnected ? '#22C55E' : '#EF4444' }}></span>
+              {isConnected ? 'Real-time WebSocket Live' : 'Offline / Polling'}
+            </span>
+          </div>
+          <p className="page-subtitle" style={{ marginTop: '4px' }}>ค้นหาและจัดการระบบสินค้าคงคลัง คัดกรองยาใกล้หมด และเติมสต็อกยา (อัปเดตอัตโนมัติแบบ Real-time)</p>
         </div>
       </div>
 

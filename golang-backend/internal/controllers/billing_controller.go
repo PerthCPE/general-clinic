@@ -7,6 +7,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
 )
@@ -84,6 +85,8 @@ func CalculateBilling(c *gin.Context) {
 			return
 		}
 	}
+
+	ws.BroadcastEvent("BILLING_CREATED", billing)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
@@ -164,6 +167,8 @@ func ConfirmPayment(c *gin.Context) {
 	if req.PaymentMethod == "QR Code" {
 		config.DB.Model(&models.QRPayment{}).Where("billing_id = ?", billing.ID).Update("status", "completed")
 	}
+
+	ws.BroadcastEvent("PAYMENT_CONFIRMED", billing)
 
 	changeAmount := 0.0
 	if req.PaymentMethod == "Cash" {

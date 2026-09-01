@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import './BillingDashboardPage.css';
 import { CLINIC_CONFIG } from '../../config/clinicConfig';
+import { useWebSocket } from '../../context/WebSocketContext';
 
 interface PaymentRecord {
   id: string;
@@ -42,10 +43,12 @@ const mockPaymentRecords: PaymentRecord[] = [
 ];
 
 export default function BillingDashboardPage() {
+  const { isConnected, subscribe } = useWebSocket();
   const [patientId, setPatientId] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
   const [hasSearched, setHasSearched] = useState(false);
+  const [liveNotify, setLiveNotify] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<DetailedPatientRecord | null>(null);
 
   const handleSearch = () => {
@@ -58,6 +61,29 @@ export default function BillingDashboardPage() {
     setMethodFilter('all');
     setHasSearched(false);
   };
+
+  // Real-time WebSocket Listeners for Billing & Cashier
+  useEffect(() => {
+    const unsubPay = subscribe('PAYMENT_CONFIRMED', (data: any) => {
+      setLiveNotify(`✓ ชำระเงินสำเร็จ: บิล #${data?.id || ''}`);
+      setTimeout(() => setLiveNotify(null), 4000);
+    });
+
+    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      setLiveNotify(`⚡ มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
+      setTimeout(() => setLiveNotify(null), 4000);
+    });
+
+    const unsubQueue = subscribe('QUEUE_UPDATED', () => {
+      // Refresh or notify queue update
+    });
+
+    return () => {
+      unsubPay();
+      unsubBill();
+      unsubQueue();
+    };
+  }, [subscribe]);
 
   const filteredRecords = mockPaymentRecords.filter(record => {
     const query = patientId.trim().toLowerCase();
@@ -120,20 +146,38 @@ export default function BillingDashboardPage() {
   return (
     <div className="billing-dashboard-container">
       {/* Page Header */}
-      <div className="dashboard-title-row">
+      <div className="dashboard-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div className="header-titles">
-          <h1 className="dashboard-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
-            แดชบอร์ดสรุปรายรับและการเงินประจำวัน
-          </h1>
-          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '1.1rem' }}>
-            สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <h1 className="dashboard-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0', letterSpacing: '-0.5px' }}>
+              แดชบอร์ดสรุปรายรับและการเงินประจำวัน
+            </h1>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '6px',
+              padding: '4px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: '600',
+              background: isConnected ? '#DCFCE7' : '#FEE2E2',
+              color: isConnected ? '#15803D' : '#B91C1C'
+            }}>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: isConnected ? '#22C55E' : '#EF4444' }}></span>
+              {isConnected ? 'Real-time WebSocket Live' : 'Offline / Polling'}
+            </span>
+          </div>
+          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0', fontSize: '1.1rem' }}>
+            สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน (อัปเดต Real-time)
           </p>
         </div>
-        {hasSearched && (
-          <span className="success-badge">
-            <span className="check-icon">✓</span> ค้นหาผู้ป่วยสำเร็จ
-          </span>
-        )}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {liveNotify && (
+            <span className="success-badge" style={{ background: '#DBEAFE', color: '#1E40AF', padding: '6px 14px', borderRadius: '20px', fontWeight: 'bold' }}>
+              {liveNotify}
+            </span>
+          )}
+          {hasSearched && (
+            <span className="success-badge">
+              <span className="check-icon">✓</span> ค้นหาผู้ป่วยสำเร็จ
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Metric Cards Section - Pharmacy-style framed cards */}
