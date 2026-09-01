@@ -21,6 +21,7 @@ func ResetTestDatabase(c *gin.Context) {
 	config.DB.Exec("DELETE FROM dispensings")
 	config.DB.Exec("DELETE FROM prescription_items")
 	config.DB.Exec("DELETE FROM screenings")
+	config.DB.Exec("DELETE FROM patient_medicines")
 	config.DB.Exec("DELETE FROM queues")
 	config.DB.Exec("DELETE FROM visit_records")
 
@@ -40,69 +41,26 @@ func ResetTestDatabase(c *gin.Context) {
 // POST /api/system/simulate-prescription
 // จำลองหมอกด Submit ใบสั่งยา — สุ่มดึงผู้ป่วยจริงจากตาราง patient_histories + ยาจริงจากตาราง medicines
 func SimulateDoctorPrescription(c *gin.Context) {
-	// 1. ดึงผู้ป่วยจริงจากตาราง patient_medicines
-	var patientMedicines []models.PatientMedicine
-	config.DB.Find(&patientMedicines)
+	// 1. ดึงผู้ป่วยจริงจากตาราง patients เดิม
+	var patients []models.Patient
+	config.DB.Find(&patients)
 
-	// ถ้าตาราง patient_medicines ว่าง → seed ข้อมูลตัวอย่าง 4 คน
-	if len(patientMedicines) == 0 {
-		patientMedicines = []models.PatientMedicine{
-			{
-				HN: "HN-9001", NationalID: "9110050123451", FullName: "นาย สมชาย ใจดี",
-				Gender: "ชาย", Age: 45, BloodType: "O+",
-				SchemeType: "สิทธิ 30 บาท (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา",
-				ChronicDiseases: "ความดันโลหิตสูง, เบาหวาน", VisitCount: 5,
-				PhoneNumber: "081-234-5678",
-			},
-			{
-				HN: "HN-9002", NationalID: "9310059876542", FullName: "นาง มะลิวัน จันทร์เพ็ญ",
-				Gender: "หญิง", Age: 62, BloodType: "A-",
-				SchemeType: "ประกันสังคม", Allergies: "แพ้ยา Penicillin",
-				ChronicDiseases: "ไม่มี", VisitCount: 8,
-				PhoneNumber: "089-876-5432",
-			},
-			{
-				HN: "HN-9003", NationalID: "9110145544323", FullName: "นาย พงศกร รัตนสังข์",
-				Gender: "ชาย", Age: 28, BloodType: "B+",
-				SchemeType: "ประกันสุขภาพเอกชน", Allergies: "ปฏิเสธการแพ้ยา",
-				ChronicDiseases: "หอบหืด", VisitCount: 11,
-				PhoneNumber: "086-555-4321",
-			},
-			{
-				HN: "HN-9004", NationalID: "9510201122344", FullName: "นางสาว ศิริพร แก้วมณี",
-				Gender: "หญิง", Age: 34, BloodType: "AB+",
-				SchemeType: "สิทธิ 30 บาท (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา",
-				ChronicDiseases: "ไม่มี", VisitCount: 2,
-				PhoneNumber: "084-111-2233",
-			},
-		}
-		for i := range patientMedicines {
-			config.DB.Create(&patientMedicines[i])
-		}
+	if len(patients) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"status":  "error",
+			"message": "ไม่มีข้อมูลผู้ป่วยในตาราง patients กรุณา Seed ข้อมูลก่อน",
+		})
+		return
 	}
 
-	// 2. สุ่มเลือกผู้ป่วย 1 คนจาก patient_medicines (ใช้ math/rand ให้ได้คนละคนทุกครั้ง)
+	// 2. สุ่มเลือกผู้ป่วย 1 คนจาก patients
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	target := patientMedicines[rng.Intn(len(patientMedicines))]
+	patient := patients[rng.Intn(len(patients))]
+	age := time.Now().Year() - patient.BirthDate.Year()
 
-	// เพิ่ม visit_count ของผู้ป่วยคนนี้
-	config.DB.Model(&target).Update("visit_count", target.VisitCount+1)
-
-	// 3. สร้าง/ดึงผู้ป่วยในตาราง patients เดิม (สำหรับ FK ของ Queue, Visit, Dispensing)
-	var patient models.Patient
-	if err := config.DB.Where("hn = ?", target.HN).First(&patient).Error; err != nil {
-		patient = models.Patient{
-			HN:              target.HN,
-			NationalID:      target.NationalID,
-			FullName:        target.FullName,
-			Gender:          target.Gender,
-			PhoneNumber:     target.PhoneNumber,
-			SchemeType:      target.SchemeType,
-			Allergies:       target.Allergies,
-			ChronicDiseases: target.ChronicDiseases,
-		}
-		config.DB.Create(&patient)
-	}
+	// 3. จำลอง BloodType (เพราะใน patients ไม่มี)
+	bloodTypes := []string{"A+", "B+", "O+", "AB+", "O-"}
+	bloodType := bloodTypes[rng.Intn(len(bloodTypes))]
 
 	// 4. ดึงข้อมูล Medicine จริงจาก DB
 	var medicines []models.Medicine
@@ -192,23 +150,23 @@ func SimulateDoctorPrescription(c *gin.Context) {
 		})
 	}
 
-	// 9. Broadcast WebSocket → หน้าจ่ายยารับข้อมูลเรียลไทม์
+	// 9. Broadcast	// ยิง WebSocket ไปบอกระบบจัดการคิวห้องยา
 	ws.BroadcastEvent("QUEUE_CREATED", gin.H{
 		"id":              queue.ID,
 		"patient_id":      patient.ID,
 		"queue_number":    queue.QueueNumber,
 		"status":          queue.Status,
-		"patient_name":    target.FullName,
-		"hn":              target.HN,
-		"national_id":     target.NationalID,
-		"scheme_type":     target.SchemeType,
-		"age":             target.Age,
-		"gender":          target.Gender,
-		"blood_type":      target.BloodType,
-		"allergies":       target.Allergies,
-		"chronic_diseases": target.ChronicDiseases,
-		"visit_count":     target.VisitCount + 1,
-		"phone":           target.PhoneNumber,
+		"patient_name":    patient.FullName,
+		"hn":              patient.HN,
+		"national_id":     patient.NationalID,
+		"scheme_type":     patient.SchemeType,
+		"age":             age,
+		"gender":          patient.Gender,
+		"blood_type":      bloodType,
+		"allergies":       patient.Allergies,
+		"chronic_diseases": patient.ChronicDiseases,
+		"visit_count":     1, // We will calculate this accurately in the dispensing phase
+		"phone":           patient.PhoneNumber,
 		"medications":     dispensedMeds,
 		"visit_id":        visit.ID,
 	})
@@ -218,8 +176,8 @@ func SimulateDoctorPrescription(c *gin.Context) {
 		"status":       "success",
 		"message":      "Prescription submitted to Supabase DB successfully",
 		"queue":        queue,
-		"patient_name": target.FullName,
-		"hn":           target.HN,
+		"patient_name": patient.FullName,
+		"hn":           patient.HN,
 		"visit_id":     visit.ID,
 	})
 }

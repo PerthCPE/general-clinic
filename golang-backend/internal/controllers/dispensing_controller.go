@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
@@ -140,22 +141,58 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		return
 	}
 
-	// อัปเดตสถานะคิวเป็นรอชำระเงิน
+	// อัปเดตสถานะคิวเป็นรอชำระเงิน และบันทึกประวัติลง PatientMedicine
 	var queue models.Queue
 	var visit models.VisitRecord
-	if err := tx.First(&visit, req.VisitID).Error; err == nil {
+	if err := tx.Preload("Patient").First(&visit, req.VisitID).Error; err == nil {
+		// 1. เปลี่ยนสถานะคิว
 		if err := tx.Where("patient_id = ? AND status = 'pharmacy_waiting'", visit.PatientID).First(&queue).Error; err == nil {
 			queue.Status = "billing_waiting"
 			queue.Department = "การเงิน"
 			tx.Save(&queue)
 		}
+
+		// 2. อัปเดตตาราง PatientMedicine (ประวัติจัดการยา)
+		var patMed models.PatientMedicine
+		if err := tx.Where("hn = ?", visit.Patient.HN).First(&patMed).Error; err != nil {
+			// ยังไม่มี ให้สร้างใหม่
+			patMed = models.PatientMedicine{
+				HN:              visit.Patient.HN,
+				NationalID:      visit.Patient.NationalID,
+				FullName:        visit.Patient.FullName,
+				Gender:          visit.Patient.Gender,
+				Age:             time.Now().Year() - visit.Patient.BirthDate.Year(),
+				SchemeType:      visit.Patient.SchemeType,
+				Allergies:       visit.Patient.Allergies,
+				ChronicDiseases: visit.Patient.ChronicDiseases,
+				PhoneNumber:     visit.Patient.PhoneNumber,
+				VisitCount:      1,
+			}
+			tx.Create(&patMed)
+		} else {
+			// มีแล้ว ให้อัปเดตจำนวนครั้ง
+			patMed.VisitCount += 1
+			tx.Save(&patMed)
+		}
 	}
 
 	tx.Commit()
 
+	// เตรียมข้อมูลบิลที่สมบูรณ์ส่งให้หน้าจอการเงิน
+	billingPayload := gin.H{
+		"id":           billing.ID,
+		"visit_id":     billing.VisitID,
+		"patient_name": visit.Patient.FullName, // ข้อมูลชื่อผู้ป่วย
+		"hn":           visit.Patient.HN,
+		"total_amount": billing.TotalAmount,
+		"net_amount":   billing.NetAmount,
+		"status":       billing.PaymentStatus,
+		"created_at":   billing.CreatedAt,
+	}
+
 	// ยิง WebSocket แจ้งเตือนการเงินและอัปเดตคิว
 	ws.BroadcastEvent("DISPENSE_RECORDED", gin.H{"visit_id": req.VisitID, "action": "dispensed"})
-	ws.BroadcastEvent("BILLING_CREATED", billing)
+	ws.BroadcastEvent("BILLING_CREATED", billingPayload)
 	ws.BroadcastEvent("QUEUE_UPDATED", queue)
 
 	c.JSON(http.StatusOK, gin.H{

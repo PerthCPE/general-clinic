@@ -74,7 +74,7 @@ export default function DetailPage({
         const dynamicMedications = data.medications || [];
         
         const newPatient: PatientConfig = {
-          id: data.hn || `HN-${data.patient_id || data.id || Date.now()}`,
+          id: String(data.id) || `Q-${Date.now()}`,
           visitId: data.visit_id,
           hn: data.hn || `HN-${data.patient_id || data.id || Date.now()}`,
           nationalId: data.national_id || '',

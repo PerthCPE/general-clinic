@@ -28,7 +28,7 @@ type GenerateQRRequest struct {
 // GET /api/billing/list - ดึงรายการบิลการเงินทั้งหมดจาก Database
 func GetAllBillings(c *gin.Context) {
 	var billings []models.Billing
-	if err := config.DB.Order("created_at desc").Find(&billings).Error; err != nil {
+	if err := config.DB.Preload("VisitRecord").Preload("VisitRecord.Patient").Order("created_at desc").Find(&billings).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billings: " + err.Error()})
 		return
 	}
