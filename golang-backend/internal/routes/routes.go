@@ -84,5 +84,6 @@ func SetUpRoutes(r *gin.Engine) {
 	systemRoutes := api.Group("/system")
 	{
 		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
+		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
 	}
 }

@@ -73,16 +73,35 @@ export default function DetailPage({
 
 
 
-  // จำลองแพทย์ส่งคนไข้ใหม่ - เพิ่มเข้าคิวล่างสุด อย่า auto-select
-  const handleSimulateDoctorSubmit = () => {
-    // หาคนไข้ที่ยังไม่อยู่ในคิว เพิ่มใหม่
+  // จำลองแพทย์ส่งคนไข้ใหม่ - บันทึกลง DB จริงแบบ Real-time
+  const handleSimulateDoctorSubmit = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/system/simulate-prescription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        triggerToast(`แพทย์ส่งใบสั่งยาลง DB จริงสำเร็จ: ${data.patient_name || 'ผู้ป่วยใหม่'} (${data.hn || ''})`, 'doctor');
+      } else {
+        fallbackSimulate();
+      }
+    } catch {
+      fallbackSimulate();
+    }
+  };
+
+  const fallbackSimulate = () => {
     const allPatients = CLINIC_CONFIG.patients;
     const nextPatient = allPatients.find(p => !queueList.some(q => q.id === p.id));
     if (nextPatient) {
       setQueueList(prev => [...prev, nextPatient]);
       triggerToast(`แพทย์ส่งใบสั่งยาเข้ามาใหม่: ${nextPatient.name} (เพิ่มเข้าคิว)`, 'doctor');
     } else {
-      // ถ้าคนไข้อยู่ในคิวหมดแล้ว เพิ่มซ้ำจากต้น
       const cyclePatient = allPatients[queueList.length % allPatients.length];
       const hexNum = Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
       setQueueList(prev => [...prev, { ...cyclePatient, id: cyclePatient.id + '_' + Date.now(), hn: 'HN' + hexNum }]);

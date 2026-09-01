@@ -1,7 +1,9 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
@@ -28,42 +30,6 @@ func ResetTestDatabase(c *gin.Context) {
 	config.DB.Model(&models.Medicine{}).Where("medicine_code = ?", "MED-0119").Update("stock_quantity", 215)
 	config.DB.Model(&models.Medicine{}).Where("medicine_code = ?", "MED-0356").Update("stock_quantity", 76)
 
-	// สร้างคิวทดสอบตั้งต้นสำหรับ Flow ทั้ง 5 สถานะ
-	queues := []models.Queue{
-		{
-			PatientID:   1,
-			QueueNumber: "Q-001",
-			Status:      "waiting",
-			Department:  "แผนกคัดกรอง",
-			Note:        "มีไข้ ไอ เจ็บคอ 2 วัน",
-		},
-		{
-			PatientID:   2,
-			QueueNumber: "Q-002",
-			Status:      "doctor_waiting",
-			Department:  "ห้องตรวจ 1",
-			Note:        "ปวดท้องลิ้นปี่ คลื่นไส้",
-		},
-		{
-			PatientID:   3,
-			QueueNumber: "Q-003",
-			Status:      "pharmacy_waiting",
-			Department:  "ห้องยา",
-			Note:        "ตรวจติดตามความดันโลหิต",
-		},
-		{
-			PatientID:   4,
-			QueueNumber: "Q-004",
-			Status:      "billing_waiting",
-			Department:  "ห้องชำระเงิน",
-			Note:        "ผื่นคันตามแขนขา",
-		},
-	}
-
-	for i := range queues {
-		config.DB.Create(&queues[i])
-	}
-
 	// กระจายข่าวผ่าน WebSocket ให้ทุกหน้าจอรีเฟรชทันที
 	ws.BroadcastEvent("QUEUE_UPDATED", gin.H{"action": "db_reset"})
 	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", gin.H{"action": "db_reset"})
@@ -71,5 +37,55 @@ func ResetTestDatabase(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
 		"message": "Database reset successfully for E2E testing",
+	})
+}
+
+// POST /api/system/simulate-prescription - จำลองหมอกด Submit ใบสั่งยา ลง Supabase Database จริง
+func SimulateDoctorPrescription(c *gin.Context) {
+	names := []string{"นายสมชาย ใจดี", "นางสาวกานดา มณีรัตน์", "นายอนันต์ สุขี", "นางสาวจินตนา มานิน", "นายบุญมี มีทรัพย์"}
+	hns := []string{"HN-0089", "HN-0112", "HN-0789", "HN-0512", "HN-0309"}
+
+	randIdx := int(time.Now().UnixNano() % int64(len(names)))
+	patientName := names[randIdx]
+	hn := hns[randIdx]
+
+	var patient models.Patient
+	if err := config.DB.Where("hn = ?", hn).First(&patient).Error; err != nil {
+		patient = models.Patient{
+			HN:          hn,
+			FullName:    patientName,
+			PhoneNumber: "081-999-8888",
+			SchemeType:  "บัตรทอง (สปสช.)",
+		}
+		config.DB.Create(&patient)
+	}
+
+	queueNo := fmt.Sprintf("Q-%03d", time.Now().Unix()%1000)
+	queue := models.Queue{
+		PatientID:   patient.ID,
+		QueueNumber: queueNo,
+		Status:      "pharmacy_waiting",
+		Department:  "ห้องยา",
+		Note:        "มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา",
+	}
+	config.DB.Create(&queue)
+
+	// สร้าง VisitRecord
+	visit := models.VisitRecord{
+		PatientID: patient.ID,
+		VisitDate: time.Now(),
+	}
+	config.DB.Create(&visit)
+
+	ws.BroadcastEvent("QUEUE_CREATED", queue)
+	ws.BroadcastEvent("QUEUE_UPDATED", queue)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":       "success",
+		"message":      "Prescription submitted to DB successfully",
+		"queue":        queue,
+		"patient_name": patientName,
+		"hn":           hn,
+		"visit_id":     visit.ID,
 	})
 }
