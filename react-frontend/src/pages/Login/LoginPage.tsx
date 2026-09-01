@@ -103,7 +103,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
             <input
               type="text"
               className="login-form-input"
-              placeholder="เช่น registrar1, nurse1, assistant1"
+              placeholder="เช่น registrar1, nurse1, officer1, doctor1"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />

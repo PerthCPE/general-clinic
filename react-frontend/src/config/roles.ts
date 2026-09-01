@@ -68,6 +68,17 @@ export const DEMO_USERS: Record<UserRole, User> = {
     avatarText: 'AS',
     avatarColor: '#DC2626',
   },
+  officer: {
+    id: 'user-off-01',
+    username: 'officer1',
+    fullName: 'คุณสมจิต ดีใจ',
+    role: 'officer',
+    roleTitleTh: 'เจ้าหน้าที่ธุรการ',
+    roleTitleEn: 'Administrative Officer',
+    department: 'แผนกธุรการ',
+    avatarText: 'SJ',
+    avatarColor: '#EC4899',
+  },
 };
 
 // เมนูใน Sidebar สำหรับแต่ละ Role
@@ -104,6 +115,11 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'doctor-schedule', title: 'ตารางเวร', iconType: 'schedule', path: '/doctor-schedule' },
     { id: 'doctor-records', title: 'ประวัติเวชระเบียน', iconType: 'records', path: '/doctor-records' },
   ],
+  officer: [
+    { id: 'dms-documents', title: 'การจัดการเอกสาร', iconType: 'document', path: '/dms-documents' },
+    { id: 'dms-forward', title: 'ส่งต่อเอกสาร', iconType: 'forward', path: '/dms-forward' },
+    { id: 'dms-schedule', title: 'จัดการตารางงานแพทย์', iconType: 'calendar', path: '/dms-schedule' },
+  ],
 };
 
 // หน้าเริ่มต้นเมื่อ Login เข้าสู่ระบบตาม Role
@@ -114,10 +130,14 @@ export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
   pharmacist: 'pharmacy-dispense',
   cashier: 'billing-dispense',
   doctor: 'doctor-dashboard',
+  officer: 'dms-documents',
 };
 
 // กำหนดว่าแต่ละหน้าอนุญาตให้ Role ใดเข้าถึงได้บ้าง (Role-based Route Permissions)
 export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
+  'dms-documents': ['officer'],
+  'dms-schedule': ['officer'],
+  'dms-forward': ['officer'],
   'registration': ['registrar'],
   'queue': ['registrar', 'nurse', 'nurse_assistant'],
   'eligibility': ['registrar'],
