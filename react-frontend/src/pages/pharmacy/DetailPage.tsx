@@ -75,6 +75,7 @@ export default function DetailPage({
         
         const newPatient: PatientConfig = {
           id: data.hn || `HN-${data.patient_id || data.id || Date.now()}`,
+          visitId: data.visit_id,
           hn: data.hn || `HN-${data.patient_id || data.id || Date.now()}`,
           nationalId: data.national_id || '',
           queueNumber: data.queue_number || 'Q0001',
@@ -142,7 +143,7 @@ export default function DetailPage({
   const handleSendToBilling = async () => {
     if (!activePatient) return;
     const pName = activePatient.name;
-    const vId = Number(activePatient.id.replace(/\D/g, '')) || 1;
+    const vId = activePatient.visitId || 1;
 
     try {
       const token = localStorage.getItem('token');

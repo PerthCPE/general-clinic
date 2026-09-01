@@ -50,9 +50,9 @@ func SetUpRoutes(r *gin.Engine) {
 		nurseRoutes.GET("/vitals/history/:patient_id", controllers.GetScreeningHistory)
 	}
 
-	// 3. Queue Management Module (จัดการคิว สำหรับ Registrar, Nurse, Nurse Assistant)
+	// 3. Queue Management Module (จัดการคิว สำหรับ	// ===================== QUEUE & VISIT =====================
 	queueRoutes := api.Group("/queue")
-	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant", "doctor"))
+	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant", "doctor", "pharmacist", "cashier"))
 	{
 		queueRoutes.GET("/list", controllers.GetQueueList)
 		queueRoutes.POST("/create", controllers.CreateQueue)

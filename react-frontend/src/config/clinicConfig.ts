@@ -3,6 +3,7 @@
 
 export interface PatientConfig {
   id: string;
+  visitId?: number;
   hn: string;
   nationalId: string;
   queueNumber: string;
