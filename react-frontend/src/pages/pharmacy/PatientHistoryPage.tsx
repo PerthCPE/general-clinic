@@ -159,7 +159,7 @@ export default function PatientHistoryPage() {
     } catch (err) {
       console.error('Failed to fetch patient medicines:', err);
     }
-    setPatients(mockPatients);
+    setPatients([]);
     setLoading(false);
   };
 

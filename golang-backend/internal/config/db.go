@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	"clinic-backend/internal/models"
@@ -491,6 +492,39 @@ func seedDatabase() {
 				DB.Create(&qrPayments[i])
 			}
 			log.Println("QRPayments seeded successfully.")
+		}
+	}
+
+	// 8. Auto Sync patient_medicines DB table from patients if empty
+	var pmCount int64
+	DB.Model(&models.PatientMedicine{}).Count(&pmCount)
+	if pmCount == 0 {
+		var allPatients []models.Patient
+		DB.Find(&allPatients)
+		if len(allPatients) > 0 {
+			rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+			bloodTypes := []string{"A+", "B+", "O+", "AB+", "O-"}
+			for _, p := range allPatients {
+				age := time.Now().Year() - p.BirthDate.Year()
+				if age <= 0 || age > 120 {
+					age = 30 + rng.Intn(30)
+				}
+				pm := models.PatientMedicine{
+					HN:              p.HN,
+					NationalID:      p.NationalID,
+					FullName:        p.FullName,
+					Gender:          p.Gender,
+					Age:             age,
+					BloodType:       bloodTypes[rng.Intn(len(bloodTypes))],
+					SchemeType:      p.SchemeType,
+					Allergies:       p.Allergies,
+					ChronicDiseases: p.ChronicDiseases,
+					PhoneNumber:     p.PhoneNumber,
+					VisitCount:      rng.Intn(5) + 1,
+				}
+				DB.Create(&pm)
+			}
+			log.Println("Seeded patient_medicines DB table successfully.")
 		}
 	}
 }
