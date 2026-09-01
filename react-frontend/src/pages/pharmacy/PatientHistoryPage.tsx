@@ -106,7 +106,7 @@ const mockMedHistory: MedicationHistory[] = [
 ];
 
 export default function PatientHistoryPage() {
-  const { ws } = useWebSocket();
+  const { subscribe } = useWebSocket();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -120,6 +120,7 @@ export default function PatientHistoryPage() {
   const [timeRange, setTimeRange] = useState<'all' | 'today' | 'month'>('all');
   const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'emergency' | 'urgent' | 'normal'>('all');
   const [riskFilter, setRiskFilter] = useState<'all' | 'hypertension' | 'fever' | 'allergies'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
 
   const fetchPatientMedicines = async () => {
     try {
@@ -138,8 +139,8 @@ export default function PatientHistoryPage() {
             const rawDiseases = pm.chronic_diseases ? pm.chronic_diseases.split(',').map((d: string) => d.trim()).filter(Boolean) : [];
             return {
               id: `PT-${pm.id || pm.hn}`,
-              hn: pm.hn,
-              name: pm.full_name,
+              hn: pm.hn || '',
+              name: pm.full_name || '',
               age: pm.age || 35,
               bloodType: pm.blood_type || 'O+',
               diseases: rawDiseases.length > 0 ? rawDiseases : ['ไม่มี'],
@@ -165,24 +166,18 @@ export default function PatientHistoryPage() {
   useEffect(() => {
     fetchPatientMedicines();
 
-    if (ws) {
-      const handleWsMessage = (event: MessageEvent) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (
-            data.type === 'PATIENT_MEDICINE_UPDATED' ||
-            data.type === 'DISPENSE_RECORDED' ||
-            data.type === 'QUEUE_CREATED' ||
-            data.type === 'QUEUE_UPDATED'
-          ) {
-            fetchPatientMedicines();
-          }
-        } catch (e) {}
-      };
-      ws.addEventListener('message', handleWsMessage);
-      return () => ws.removeEventListener('message', handleWsMessage);
-    }
-  }, [ws]);
+    const unsub1 = subscribe('PATIENT_MEDICINE_UPDATED', fetchPatientMedicines);
+    const unsub2 = subscribe('DISPENSE_RECORDED', fetchPatientMedicines);
+    const unsub3 = subscribe('QUEUE_CREATED', fetchPatientMedicines);
+    const unsub4 = subscribe('QUEUE_UPDATED', fetchPatientMedicines);
+
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+    };
+  }, [subscribe]);
 
   const handleSelectPatient = async (patient: Patient) => {
     setSelectedPatientModal(patient);
@@ -216,14 +211,16 @@ export default function PatientHistoryPage() {
   };
 
   const filteredPatients = patients.filter(patient => {
-    const matchHn = patient.hn.toLowerCase().includes(searchHn.toLowerCase());
-    const matchName = patient.name.toLowerCase().includes(searchName.toLowerCase());
+    const matchHn = (patient.hn || '').toLowerCase().includes(searchHn.toLowerCase());
+    const matchName = (patient.name || '').toLowerCase().includes(searchName.toLowerCase());
 
     let matchRisk = true;
     if (riskFilter === 'hypertension') {
-      matchRisk = patient.diseases.some(d => d.includes('ความดัน'));
+      matchRisk = (patient.diseases || []).some(d => d.includes('ความดัน'));
     } else if (riskFilter === 'allergies') {
-      matchRisk = patient.diseases.some(d => d.includes('แพ้ยา') || d.includes('ภูมิแพ้')) || (patient.allergies && !patient.allergies.includes('ปฏิเสธ'));
+      const hasAllergyDisease = (patient.diseases || []).some(d => d.includes('แพ้ยา') || d.includes('ภูมิแพ้'));
+      const hasAllergiesText = Boolean(patient.allergies && !patient.allergies.includes('ปฏิเสธ'));
+      matchRisk = hasAllergyDisease || hasAllergiesText;
     }
 
     return matchHn && matchName && matchRisk;

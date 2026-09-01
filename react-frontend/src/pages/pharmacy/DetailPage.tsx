@@ -82,7 +82,7 @@ export default function DetailPage({
               gender: q.Patient?.gender || 'ชาย',
               age: q.Patient ? new Date().getFullYear() - new Date(q.Patient.birthdate).getFullYear() : 0,
               treatmentRights: q.Patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
-              patientType: 'ผู้ป่วยนอก (OPD)',
+              patientType: 'ผู้ป่วยนอก (OPD)' as const,
               allergies: q.Patient?.allergies ? [q.Patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
               chronicDiseases: q.Patient?.chronic_diseases || 'ไม่มี',
               vitals: 'รอตรวจสอบ',
@@ -93,7 +93,7 @@ export default function DetailPage({
               medications: [] // will load detail on click
             }));
             setQueueList(mappedQueues);
-            if (mappedQueues.length > 0) setActivePatient(mappedQueues[0]);
+            if (mappedQueues.length > 0) setLocalPatientId(mappedQueues[0].id);
           }
         }
       } catch (err) {
