@@ -44,6 +44,7 @@ func ConnectDB() {
 		&models.User{},
 		&models.Doctor{},
 		&models.Patient{},
+		&models.Patient_Hisstory{},
 		&models.MedicalEligibility{},
 		&models.VisitRecord{},
 		&models.Queue{},

@@ -34,7 +34,11 @@ export default function MedicinePage() {
 
   // Sync with Backend API
   const fetchMedicines = useCallback(() => {
-    fetch('/api/pharmacy/medicines')
+    const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    fetch('/api/pharmacy/medicines', { headers })
       .then(res => res.json())
       .then(data => {
         if (data?.medicines && Array.isArray(data.medicines) && data.medicines.length > 0) {
@@ -66,7 +70,7 @@ export default function MedicinePage() {
         }
       })
       .catch(() => {
-        // Fallback to initialMedicines on network error
+        // Fallback: network error
       });
   }, []);
 

@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// ข้อมูลของผู้ป่วย (Patient Entity)
+// ข้อมูลของผู้ป่วย (Patient Entity) — ตารางเดิม patients (อย่ายุ่ง!)
 type Patient struct {
 	ID               uint      `gorm:"primaryKey" json:"id"`
 	HN               string    `gorm:"uniqueIndex" json:"hn"`
