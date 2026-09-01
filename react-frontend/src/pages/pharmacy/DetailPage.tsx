@@ -158,6 +158,39 @@ export default function DetailPage({
     };
   }, [subscribe]);
 
+  // Real-time Query Medications from DB for Active Patient Visit
+  useEffect(() => {
+    if (activePatient && activePatient.visitId) {
+      fetch(`/api/pharmacy/dispensing/${activePatient.visitId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
+            const fetchedMeds = data.dispensing.map((item: any) => ({
+              medId: item.Medicine?.code || `MED-${item.medicine_id}`,
+              name: item.Medicine?.name || 'ยาบรรเทาอาการ',
+              genericName: item.Medicine?.generic_name || '',
+              category: item.Medicine?.category || 'ยาสามัญ',
+              properties: item.Medicine?.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
+              dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
+              instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
+              price: item.Medicine?.unit_price || 50,
+              quantity: item.quantity || 1,
+              stock: item.Medicine?.stock_quantity || 100,
+              stockStatus: (item.Medicine?.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
+            }));
+            
+            setQueueList(prev => prev.map(q => {
+              if (q.id === activePatient.id) {
+                return { ...q, medications: fetchedMeds };
+              }
+              return q;
+            }));
+          }
+        })
+        .catch(err => console.error('Failed to fetch medications for visit:', err));
+    }
+  }, [activePatient?.id, activePatient?.visitId]);
+
 
 
   // จำลองแพทย์ส่งคนไข้ใหม่ - บันทึกลง DB จริงแบบ Real-time

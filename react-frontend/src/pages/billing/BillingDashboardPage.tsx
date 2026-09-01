@@ -92,6 +92,18 @@ export default function BillingDashboardPage() {
     });
 
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      if (data) {
+        const newRec: PaymentRecord = {
+          id: `HN-${String(data.visit_id || data.id).padStart(4, '0')}`,
+          patientName: data.patient_name || `ผู้ป่วย Visit #${data.visit_id || data.id}`,
+          date: new Date().toLocaleDateString('th-TH'),
+          time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+          amount: `฿ ${(data.net_amount || data.total_amount || 0).toFixed(2)}`,
+          method: 'QR Code',
+          status: 'pending',
+        };
+        setRecords(prev => [newRec, ...prev.filter(r => r.id !== newRec.id)]);
+      }
       fetchBillings();
       setLiveNotify(`⚡ มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
