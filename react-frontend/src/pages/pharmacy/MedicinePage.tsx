@@ -302,13 +302,15 @@ export default function MedicinePage() {
 
   return (
     <div className="medicine-page-container">
-      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-        <div className="header-titles">
+      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
+        <div className="header-titles" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <h1 className="page-title" style={{ margin: 0 }}>รายการยา</h1>
+            <h1 className="page-title" style={{ margin: 0, fontSize: '28px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', letterSpacing: '-0.5px' }}>
+              รายการยา
+            </h1>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
-              padding: '4px 10px', borderRadius: '16px', fontSize: '12px', fontWeight: '600',
+              padding: '4px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: '600',
               background: isConnected ? '#DCFCE7' : '#FEE2E2',
               color: isConnected ? '#15803D' : '#B91C1C'
             }}>
@@ -316,7 +318,9 @@ export default function MedicinePage() {
               {isConnected ? 'Real-time WebSocket Live' : 'Offline / Polling'}
             </span>
           </div>
-          <p className="page-subtitle" style={{ marginTop: '4px' }}>ค้นหาและจัดการระบบสินค้าคงคลัง คัดกรองยาใกล้หมด และเติมสต็อกยา (อัปเดตอัตโนมัติแบบ Real-time)</p>
+          <p className="page-subtitle" style={{ marginTop: '6px', fontSize: '14.5px', color: 'var(--text-secondary, #64748B)', textAlign: 'left' }}>
+            ค้นหาและจัดการระบบสินค้าคงคลัง คัดกรองยาใกล้หมด และเติมสต็อกยา (อัปเดตอัตโนมัติแบบ Real-time)
+          </p>
         </div>
       </div>
 
