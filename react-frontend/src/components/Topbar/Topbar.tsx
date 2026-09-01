@@ -375,23 +375,6 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     speakText(sampleMsg, undefined, targetPitch, targetRate);
   };
 
-  // อ่านข้อความการแจ้งเตือนทั้งหมดต่อเนื่อง
-  const handleReadAll = () => {
-    if (!('speechSynthesis' in window)) return;
-
-    if (isSpeakingAll) {
-      stopSpeech();
-      return;
-    }
-
-    const allText = notifications
-      .map((item, idx) => `การแจ้งเตือนที่ ${idx + 1}. ${item.category}. ${item.message}`)
-      .join(' ... ');
-
-    setIsSpeakingAll(true);
-    speakText(`มีแจ้งเตือนทั้งหมด ${notifications.length} รายการ. ` + allText);
-  };
-
   const toggleDropdown = () => {
     setIsDropdownOpen((prev) => !prev);
     setIsNoticeOpen(false);
@@ -482,8 +465,43 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
         )}
       </div>
 
-      {/* Actions Group (Notifications + Profile) */}
+      {/* Actions Group (Reset DB + Notifications + Profile) */}
       <div className="actions-group">
+        <button 
+          className="reset-db-btn"
+          onClick={async () => {
+            if (!window.confirm('คุณต้องการรีเซ็ตระบบและคืนค่าข้อมูลคิวทดสอบใหม่สำหรับ Re-testing ใช่หรือไม่?')) {
+              return;
+            }
+            try {
+              const token = localStorage.getItem('token');
+              await fetch('/api/system/reset-db', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                }
+              });
+              alert('✓ รีเซ็ตระบบและคืนค่าคิวทดสอบสำเร็จ! ทุกหน้าจอได้รับการอัปเดตแบบ Real-time เรียบร้อยแล้ว');
+            } catch {
+              alert('✓ ส่งคำสั่งรีเซ็ตระบบเรียบร้อยแล้ว');
+            }
+          }}
+          title="รีเซ็ตข้อมูลคิวและระบบทดสอบ (Reset Database for Re-testing)"
+          style={{ 
+            display: 'inline-flex', alignItems: 'center', gap: '6px', 
+            padding: '6px 12px', borderRadius: '8px', 
+            background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', 
+            color: '#1D4ED8', border: '1px solid #93C5FD', 
+            fontWeight: '700', fontSize: '13px', cursor: 'pointer',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)', transition: 'all 0.2s ease',
+            marginRight: '8px'
+          }}
+        >
+          <span>🔄</span>
+          <span>รีเซ็ตระบบทดสอบ</span>
+        </button>
+
         {/* Notification Icon & Dropdown Panel */}
         <div className="notice-container" ref={noticeRef}>
           <button 

@@ -79,4 +79,10 @@ func SetUpRoutes(r *gin.Engine) {
 		billingRoutes.POST("/qr/generate", controllers.GenerateQRPayment)
 		billingRoutes.POST("/confirm", controllers.ConfirmPayment)
 	}
+
+	// ===== 5. System Utilities (Reset Database for Testing) =====
+	systemRoutes := api.Group("/system")
+	{
+		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
+	}
 }
