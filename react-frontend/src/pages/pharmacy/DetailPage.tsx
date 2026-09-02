@@ -281,7 +281,12 @@ export default function DetailPage({
     const payload = {
       visit_id: vId,
       hn: activePatient.hn,
-      patient_name: activePatient.name
+      patient_name: activePatient.name,
+      national_id: activePatient.nationalId,
+      gender: activePatient.gender,
+      age: activePatient.age,
+      scheme_type: currentRights || activePatient.treatmentRights,
+      doctor_advice: activePatient.doctorAdvice
     };
 
     try {

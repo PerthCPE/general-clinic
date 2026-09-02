@@ -63,21 +63,20 @@ export default function BillingDispensePage({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isToastFading, setIsToastFading] = useState(false);
 
-  // Real-time Queue & Billing Listener
+  // Real-time Queue & Billing Listener (คิวการเงินเฉพาะ ไม่ปนกับคิวหมอ)
   useEffect(() => {
     const fetchInitialQueue = async () => {
       try {
         const token = localStorage.getItem('token');
         const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
         
-        // 1. ลองดึงจากตาราง billing_queues ก่อน
         let bRes = await fetch('/api/billing/queues', { headers });
         if (!bRes.ok) {
           bRes = await fetch('/api/system/billing/queues');
         }
         if (bRes.ok) {
           const bData = await bRes.json();
-          if (bData.status === 'success' && Array.isArray(bData.queues) && bData.queues.length > 0) {
+          if (bData.status === 'success' && Array.isArray(bData.queues)) {
             const mapped = bData.queues.map((bq: any) => {
               let parsedMeds = [];
               if (bq.medications) {
@@ -88,23 +87,23 @@ export default function BillingDispensePage({
               return {
                 id: String(bq.id),
                 visitId: bq.visit_id || 1,
-                hn: bq.hn || `HN-${bq.id}`,
-                nationalId: bq.national_id || '',
-                queueNumber: bq.queue_number || 'Q0001',
-                ticket: bq.queue_number || 'A-01',
+                hn: bq.hn || `HN${bq.id}`,
+                nationalId: bq.national_id || '-',
+                queueNumber: bq.queue_number || 'B-001',
+                ticket: bq.queue_number || 'B-001',
                 name: bq.patient_name || 'ผู้ป่วย',
                 shortName: bq.patient_name || 'ผู้ป่วย',
-                gender: bq.gender || 'ชาย',
+                gender: bq.gender || 'หญิง',
                 age: bq.age || 35,
-                treatmentRights: bq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+                treatmentRights: bq.scheme_type || 'บัตรทอง (สปสช.)',
                 patientType: 'ผู้ป่วยนอก (OPD)' as const,
                 allergies: ['ไม่มีประวัติแพ้ยา'],
                 chronicDiseases: 'ไม่มี',
                 vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-                visitStatus: 'จ่ายยาแล้ว / รอชำระเงิน',
+                visitStatus: 'รอรับยา / ชำระเงิน',
                 visitDate: new Date(bq.created_at || Date.now()).toLocaleDateString('th-TH'),
                 visitTime: new Date(bq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                doctorAdvice: bq.doctor_advice || 'พักผ่อนให้เพียงพอ',
+                doctorAdvice: bq.doctor_advice || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
                 medications: parsedMeds
               };
             });
@@ -117,104 +116,49 @@ export default function BillingDispensePage({
               }
               return prev;
             });
-            return;
-          }
-        }
-
-        // 2. Fallback ไปที่ /api/queue/list
-        let res = await fetch('/api/queue/list', { headers });
-        if (!res.ok) {
-          res = await fetch('/api/system/queue/list');
-        }
-        
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            const billingQueues = data.filter((q: any) => q.status === 'billing_waiting' || q.status === 'pharmacy_dispensed');
-            const mappedQueues = billingQueues.map((q: any) => ({
-              id: String(q.id),
-              visitId: q.visit_id || q.id || 1,
-              hn: q.Patient?.hn || q.hn || `HN-${q.patient_id}`,
-              nationalId: q.Patient?.national_id || '',
-              queueNumber: q.queue_number || 'Q0000',
-              ticket: q.queue_number || 'A-01',
-              name: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
-              shortName: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
-              gender: q.Patient?.gender || 'ชาย',
-              age: q.Patient ? (new Date().getFullYear() - new Date(q.Patient.birthdate).getFullYear()) : 35,
-              treatmentRights: q.Patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
-              patientType: 'ผู้ป่วยนอก (OPD)' as const,
-              allergies: q.Patient?.allergies ? [q.Patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
-              chronicDiseases: q.Patient?.chronic_diseases || 'ไม่มี',
-              vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-              visitStatus: 'จ่ายยาแล้ว / รอชำระเงิน',
-              visitDate: new Date(q.created_at || Date.now()).toLocaleDateString('th-TH'),
-              visitTime: new Date(q.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-              doctorAdvice: q.note || 'พักผ่อนให้เพียงพอ',
-              medications: []
-            }));
-            
-            setQueueList(mappedQueues);
-            setLocalPatientId(prev => {
-              if (mappedQueues.length > 0) {
-                if (!prev || !mappedQueues.find((q: any) => q.id === prev)) {
-                  return mappedQueues[0].id;
-                }
-              }
-              return prev;
-            });
           }
         }
       } catch (err) {
-        console.error('Failed to fetch initial queue:', err);
+        console.error('Failed to fetch initial billing queue:', err);
       }
     };
     
     fetchInitialQueue();
 
-    const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
-      if (data && data.action === 'db_reset') {
-        setQueueList([]);
-      } else {
-        fetchInitialQueue();
-      }
-    });
-
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
       if (data) {
-        const pName = data.patient_name || data.patient?.full_name || `ผู้ป่วย คิว #${data.visit_id || ''}`;
+        const pName = data.patient_name || 'ผู้ป่วย';
         const newPatient: PatientConfig = {
           id: String(data.queue_id || data.id || data.visit_id || Date.now()),
           visitId: data.visit_id || 1,
-          hn: data.hn || `HN-${data.patient_id || data.visit_id || Date.now()}`,
-          nationalId: data.national_id || '1101800234567',
-          queueNumber: data.queue_number || 'Q0001',
-          ticket: data.queue_number || 'A-01',
+          hn: data.hn || `HN0094`,
+          nationalId: data.national_id || '-',
+          queueNumber: data.queue_number || 'B-001',
+          ticket: data.queue_number || 'B-001',
           name: pName,
           shortName: pName,
-          gender: 'ชาย',
-          age: 35,
+          gender: data.gender || 'หญิง',
+          age: data.age || 35,
           dob: '01/01/2534',
           phone: '081-999-8888',
           occupation: 'รับจ้างทั่วไป',
-          treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+          treatmentRights: data.scheme_type || 'บัตรทอง (สปสช.)',
           patientType: 'ผู้ป่วยนอก (OPD)',
           allergies: ['ไม่มีประวัติแพ้ยา'],
           chronicDiseases: 'ไม่มี',
           vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-          visitStatus: 'จ่ายยาแล้ว / รอชำระเงิน',
+          visitStatus: 'รอรับยา / ชำระเงิน',
           visitDate: new Date().toLocaleDateString('th-TH'),
           visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-          doctorAdvice: 'พักผ่อนให้เพียงพอ',
+          doctorAdvice: data.doctor_advice || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
           medications: data.medications || [],
         };
         setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
-        triggerToast(`ได้รับคิวใหม่จากการจัดการยา: ${pName}`, 'doctor');
+        triggerToast(`ได้รับคิวใหม่จากการจัดการยา: ${pName} (${data.queue_number || ''})`, 'doctor');
       }
     });
 
     return () => {
-      unsubQueue();
       unsubBill();
     };
   }, [subscribe]);

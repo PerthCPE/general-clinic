@@ -210,12 +210,8 @@ func ConfirmPayment(c *gin.Context) {
 		config.DB.Model(&models.QRPayment{}).Where("billing_id = ?", billing.ID).Update("status", "completed")
 	}
 
-	// ปรับสถานะในตาราง billing_queues และ queues เป็น completed
+	// ปรับสถานะในตาราง billing_queues การเงินเป็น completed
 	config.DB.Model(&models.BillingQueue{}).Where("visit_id = ?", req.VisitID).Update("status", "completed")
-	var visit models.VisitRecord
-	if err := config.DB.First(&visit, req.VisitID).Error; err == nil && visit.PatientID > 0 {
-		config.DB.Model(&models.Queue{}).Where("patient_id = ?", visit.PatientID).Update("status", "completed")
-	}
 
 	changeAmount := 0.0
 	if req.PaymentMethod == "Cash" {

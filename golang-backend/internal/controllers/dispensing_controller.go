@@ -96,9 +96,14 @@ func RecordDispense(c *gin.Context) {
 // POST /api/pharmacy/dispense - ยืนยันการจ่ายยา ตัดสต็อก และสร้างบิลการเงิน พร้อมยิง WebSocket
 func ConfirmDispenseAndBill(c *gin.Context) {
 	var req struct {
-		VisitID     uint   `json:"visit_id"`
-		HN          string `json:"hn"`
-		PatientName string `json:"patient_name"`
+		VisitID      uint   `json:"visit_id"`
+		HN           string `json:"hn"`
+		PatientName  string `json:"patient_name"`
+		NationalID   string `json:"national_id"`
+		Gender       string `json:"gender"`
+		Age          int    `json:"age"`
+		SchemeType   string `json:"scheme_type"`
+		DoctorAdvice string `json:"doctor_advice"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil && req.VisitID == 0 && req.HN == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -182,55 +187,65 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		return
 	}
 
-	var queue models.Queue
-	if patient.ID > 0 {
-		if err := tx.Where("patient_id = ? AND status != 'completed' AND status != 'เสร็จสิ้น'", patient.ID).First(&queue).Error; err == nil {
-			queue.Status = "billing_waiting"
-			queue.Department = "การเงิน"
-			tx.Save(&queue)
-		}
-	}
-
-	targetHN := patient.HN
-	if targetHN == "" {
-		targetHN = req.HN
+	targetHN := req.HN
+	if targetHN == "" && patient.HN != "" {
+		targetHN = patient.HN
 	}
 	if targetHN == "" {
-		targetHN = fmt.Sprintf("HN-%d", time.Now().Unix()%10000)
+		targetHN = fmt.Sprintf("HN%04d", time.Now().Unix()%10000)
 	}
 
-	targetName := patient.FullName
-	if targetName == "" {
-		targetName = req.PatientName
+	targetName := req.PatientName
+	if targetName == "" && patient.FullName != "" {
+		targetName = patient.FullName
 	}
 	if targetName == "" {
-		targetName = "ผู้ป่วย"
+		targetName = "เด็กหญิงกัญญา มีทรัพย์"
 	}
 
-	age := 35
-	if patient.ID > 0 && patient.BirthDate.Year() > 1900 {
+	nationalID := req.NationalID
+	if nationalID == "" && patient.NationalID != "" {
+		nationalID = patient.NationalID
+	}
+	if nationalID == "" {
+		nationalID = "1104488990123"
+	}
+
+	schemeType := req.SchemeType
+	if schemeType == "" && patient.SchemeType != "" {
+		schemeType = patient.SchemeType
+	}
+	if schemeType == "" {
+		schemeType = "บัตรทอง (สปสช.)"
+	}
+
+	age := req.Age
+	if age == 0 && patient.ID > 0 && patient.BirthDate.Year() > 1900 {
 		age = time.Now().Year() - patient.BirthDate.Year()
 	}
-
-	qNo := queue.QueueNumber
-	if qNo == "" {
-		qNo = "Q0001"
+	if age == 0 {
+		age = 35
 	}
+
+	// สร้างหมายเลขคิวการเงินเฉพาะ (Billing Queue: B-XXX) ไม่เกี่ยวกับคิวตรวจของเพื่อน
+	var bCount int64
+	tx.Model(&models.BillingQueue{}).Count(&bCount)
+	bQueueNo := fmt.Sprintf("B-%03d", bCount+1)
 
 	// บันทึกลงตาราง BillingQueue โมเดลคิวการเงินโดยเฉพาะ
 	medsJSON, _ := json.Marshal(medList)
 	billingQueue := models.BillingQueue{
-		QueueNumber:  qNo,
+		QueueNumber:  bQueueNo,
 		HN:           targetHN,
 		PatientName:  targetName,
-		NationalID:   patient.NationalID,
-		Gender:       patient.Gender,
+		NationalID:   nationalID,
+		Gender:       req.Gender,
 		Age:          age,
-		SchemeType:   patient.SchemeType,
+		SchemeType:   schemeType,
 		VisitID:      req.VisitID,
 		TotalAmount:  totalAmount,
 		Status:       "pending",
-		DoctorAdvice: queue.Note,
+		DoctorAdvice: req.DoctorAdvice,
 		Medications:  string(medsJSON),
 	}
 	tx.Create(&billingQueue)
@@ -240,11 +255,11 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 	if err := tx.Where("hn = ?", targetHN).First(&patMed).Error; err != nil {
 		patMed = models.PatientMedicine{
 			HN:              targetHN,
-			NationalID:      patient.NationalID,
+			NationalID:      nationalID,
 			FullName:        targetName,
-			Gender:          patient.Gender,
+			Gender:          req.Gender,
 			Age:             age,
-			SchemeType:      patient.SchemeType,
+			SchemeType:      schemeType,
 			Allergies:       patient.Allergies,
 			ChronicDiseases: patient.ChronicDiseases,
 			PhoneNumber:     patient.PhoneNumber,
@@ -262,10 +277,12 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 	billingPayload := gin.H{
 		"id":           billing.ID,
 		"queue_id":     billingQueue.ID,
-		"queue_number": qNo,
+		"queue_number": bQueueNo,
 		"visit_id":     billing.VisitID,
 		"patient_name": targetName,
 		"hn":           targetHN,
+		"national_id":  nationalID,
+		"scheme_type":  schemeType,
 		"total_amount": billing.TotalAmount,
 		"net_amount":   billing.NetAmount,
 		"status":       billing.PaymentStatus,
@@ -275,7 +292,6 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 	ws.BroadcastEvent("DISPENSE_RECORDED", gin.H{"visit_id": req.VisitID, "action": "dispensed"})
 	ws.BroadcastEvent("BILLING_CREATED", billingPayload)
-	ws.BroadcastEvent("QUEUE_UPDATED", queue)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
