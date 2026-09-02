@@ -85,7 +85,7 @@ func SetUpRoutes(r *gin.Engine) {
 		queueRoutes.PUT("/:id/status", controllers.UpdateQueueStatus)
 	}
 
-	// ===== ระบบย่อยที่ 1: คลังยา (Pharmacy / Dispensing) - Boonkum (B6741990) =====
+	// ===== ระบบย่อยที่ 1: คลังยา (Pharmacy / Dispensing) - Bun =====
 	pharmacyRoutes := api.Group("/pharmacy")
 	pharmacyRoutes.Use(middleware.RoleRequired("pharmacist", "doctor", "registrar"))
 	{
