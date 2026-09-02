@@ -433,22 +433,43 @@ func resolveVisitForQueue(q *models.Queue) *models.VisitRecord {
 		}
 	}
 
-	err := config.DB.Where("patient_id = ? AND visit_date >= ?", q.PatientID, startOfToday()).
+	err := config.DB.Where("patient_id = ?", q.PatientID).
 		Order("id desc").
 		First(&visit).Error
 
-	if err != nil {
-		return nil
+	if err == nil {
+		visitID := visit.ID
+		config.DB.Model(&models.Queue{}).Where("id = ?", q.ID).Update("visit_id", visitID)
+		q.VisitID = &visitID
+		ensureVN(&visit)
+		return &visit
 	}
 
-	// เติม visit_id กลับลงในคิว เพื่อให้ครั้งหน้าไม่ต้องเดาอีก
-	visitID := visit.ID
-	config.DB.Model(&models.Queue{}).Where("id = ?", q.ID).Update("visit_id", visitID)
-	q.VisitID = &visitID
+	// หากยังไม่มี VisitRecord (เช่น คิวที่เพิ่งสร้างจากการลงทะเบียน/จำลองข้อมูล) ให้สร้างให้อัตโนมัติ เพื่อให้แพทย์สามารถเปิดตรวจได้ทันที
+	now := time.Now()
+	dept := q.Department
+	if dept == "" {
+		dept = "ห้องตรวจ 1"
+	}
+	newVisit := models.VisitRecord{
+		PatientID:  q.PatientID,
+		VisitDate:  now,
+		Status:     models.VisitStatusWaiting,
+		Department: dept,
+		VisitType:  "walk-in",
+	}
+	if q.AssignedDoctorID != nil {
+		newVisit.DoctorID = *q.AssignedDoctorID
+	}
+	if err := config.DB.Create(&newVisit).Error; err == nil {
+		ensureVN(&newVisit)
+		vID := newVisit.ID
+		config.DB.Model(&models.Queue{}).Where("id = ?", q.ID).Update("visit_id", vID)
+		q.VisitID = &vID
+		return &newVisit
+	}
 
-	ensureVN(&visit)
-
-	return &visit
+	return nil
 }
 
 // GetDoctorQueue - GET /api/doctor/queue

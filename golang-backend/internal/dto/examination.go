@@ -102,6 +102,25 @@ type ExaminationDetail struct {
 	PatientHistory *PatientHistoryDTO `json:"patientHistory"`
 }
 
+// PrescriptionItemDTO - รายการสั่งยาที่แพทย์สั่ง
+type PrescriptionItemDTO struct {
+	ID           string  `json:"id"`
+	MedicineID   uint    `json:"medicineId"`
+	MedicineCode string  `json:"medicineCode"`
+	MedicineName string  `json:"medicineName"`
+	GenericName  string  `json:"genericName"`
+	Category     string  `json:"category"`
+	Dosage       string  `json:"dosage"`
+	Frequency    string  `json:"frequency"`
+	Duration     string  `json:"duration"`
+	Quantity     int     `json:"quantity"`
+	UnitPrice    float64 `json:"unitPrice"`
+	TotalPrice   float64 `json:"totalPrice"`
+	Instructions string  `json:"instructions"`
+	Notes        string  `json:"notes"`
+	Status       string  `json:"status"`
+}
+
 // SaveExaminationRequest - body ของ PUT /api/doctor/visits/:id/examination
 //
 // action = "draft" บันทึกร่างไว้ก่อน (แก้ไขต่อได้)
@@ -123,7 +142,10 @@ type SaveExaminationRequest struct {
 	SecondaryDiagnoses []DiagnosisItemDTO `json:"secondaryDiagnoses"`
 
 	// ส่งมาด้วยได้ ถ้าแพทย์แก้ประวัติติดตัวผู้ป่วยในหน้าเดียวกัน
-	PatientHistory *PatientHistoryDTO `json:"patientHistory"`
+	PatientHistory  *PatientHistoryDTO    `json:"patientHistory"`
+	Prescriptions   []PrescriptionItemDTO `json:"prescriptions"`
+	Allergies       string                `json:"allergies"`
+	ChronicDiseases string                `json:"chronicDiseases"`
 }
 
 // SaveExaminationResponse - ผลลัพธ์หลังบันทึก

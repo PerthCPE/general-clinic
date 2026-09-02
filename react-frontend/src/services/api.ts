@@ -582,6 +582,24 @@ export interface BackendExaminationDetail {
   patientHistory: BackendPatientHistory | null;
 }
 
+export interface BackendPrescriptionItem {
+  id?: string;
+  medicineId?: number;
+  medicineCode?: string;
+  medicineName: string;
+  genericName?: string;
+  category?: string;
+  dosage: string;
+  frequency?: string;
+  duration?: string;
+  quantity: number;
+  unitPrice?: number;
+  totalPrice?: number;
+  instructions?: string;
+  notes?: string;
+  status?: string;
+}
+
 export interface SaveExaminationPayload {
   // draft = บันทึกร่าง (แก้ต่อได้), sign = เซ็นปิดการตรวจ (ต้องมีวินิจฉัยหลัก)
   action: 'draft' | 'sign';
@@ -600,6 +618,9 @@ export interface SaveExaminationPayload {
   secondaryDiagnoses: BackendDiagnosisItem[];
 
   patientHistory: BackendPatientHistory | null;
+  prescriptions?: BackendPrescriptionItem[];
+  allergies?: string;
+  chronicDiseases?: string;
 }
 
 export interface SaveExaminationResult {

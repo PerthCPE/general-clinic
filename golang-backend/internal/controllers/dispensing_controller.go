@@ -592,6 +592,27 @@ func GetPharmacyQueues(c *gin.Context) {
 			medList = []gin.H{}
 		}
 
+		// ดึงข้อมูลการแพ้ยาและโรคประจำตัวจริงของผู้ป่วย
+		var pat models.Patient
+		if mq.HN != "" {
+			config.DB.Where("hn = ?", mq.HN).First(&pat)
+		}
+		if pat.ID == 0 && mq.VisitID > 0 {
+			var vr models.VisitRecord
+			if config.DB.First(&vr, mq.VisitID).Error == nil {
+				config.DB.First(&pat, vr.PatientID)
+			}
+		}
+
+		allergies := pat.Allergies
+		if allergies == "" {
+			allergies = "ไม่มีประวัติแพ้ยา"
+		}
+		chronic := pat.ChronicDiseases
+		if chronic == "" {
+			chronic = "ไม่มี"
+		}
+
 		results = append(results, PharmacyQueueItem{
 			ID:              fmt.Sprintf("MQ-%d", mq.ID),
 			VisitID:         mq.VisitID,
@@ -602,8 +623,8 @@ func GetPharmacyQueues(c *gin.Context) {
 			Gender:          mq.Gender,
 			Age:             mq.Age,
 			SchemeType:      mq.SchemeType,
-			Allergies:       "ปฏิเสธการแพ้ยา",
-			ChronicDiseases: "ไม่มี",
+			Allergies:       allergies,
+			ChronicDiseases: chronic,
 			DoctorAdvice:    mq.DoctorAdvice,
 			Medications:     medList,
 			CreatedAt:       mq.CreatedAt,

@@ -1,4 +1,4 @@
-import type { DiagnosisItem, PastVisitRecord, Patient, QueueStatus } from '../types';
+import type { DiagnosisItem, PastVisitRecord, Patient, PrescriptionItem, QueueStatus } from '../types';
 import type {
   BackendDoctorQueueItem,
   BackendDoctorScreening,
@@ -332,6 +332,18 @@ export function buildExaminationRequest(
         : null,
       currentMedications: patient.currentMedications || [],
     },
+    prescriptions: (patient.prescriptions || []).map((p: PrescriptionItem) => ({
+      id: p.id,
+      medicineName: p.medicineName,
+      dosage: p.dosage,
+      frequency: p.frequency,
+      duration: p.duration,
+      quantity: Number(p.quantity) || 1,
+      instructions: [p.route, p.timing, p.specialInstructions].filter(Boolean).join(' - ') || 'รับประทานตามแพทย์สั่ง',
+      status: 'Active'
+    })),
+    allergies: Array.isArray(patient.drugAllergies) ? patient.drugAllergies.join(', ') : '',
+    chronicDiseases: Array.isArray(patient.chronicDiseases) ? patient.chronicDiseases.join(', ') : '',
   };
 }
 
