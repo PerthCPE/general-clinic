@@ -19,6 +19,46 @@ import './VitalsPage.css';
 
 export { formatHN, formatQueueNo };
 
+const VITALS_DRAFT_KEY = 'clinic_vitals_draft_v1';
+
+interface VitalsDraftPayload {
+  selectedPatientId: string;
+  patientQueueNo?: string;
+  searchQuery: string;
+  weight: string;
+  height: string;
+  temperature: string;
+  systolicBP: string;
+  diastolicBP: string;
+  heartRate: string;
+  respiratoryRate: string;
+  spo2: string;
+  painScore: string;
+  bloodSugar: string;
+  chiefComplaint: string;
+  allergies: string;
+  foodAllergies: string;
+  medicalHistory: string;
+  currentMedications: string;
+  smokingHistory: string;
+  alcoholHistory: string;
+  selectedTriage: TriageLevelKey;
+  assignedDoctorId: number;
+  savedAt: string;
+}
+
+const getInitialDraft = (): VitalsDraftPayload | null => {
+  try {
+    const saved = localStorage.getItem(VITALS_DRAFT_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
 // Initial Fallback Doctors
 const DEFAULT_DOCTORS: DoctorOption[] = [
   { doctorId: 4, fullName: 'พญ.สุดา สุขสมบูรณ์', specialty: 'เวชปฏิบัติทั่วไป', roomName: 'ห้องตรวจ 1' },
@@ -65,10 +105,11 @@ const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
 
 export const VitalsPage: React.FC = () => {
   const { currentUser } = useAuth();
+  const initialDraft = useMemo(() => getInitialDraft(), []);
 
-  // Queue & Patient State
+  // Queue & Patient State (Auto-restored from draft if available)
   const [queueList, setQueueList] = useState<QueuePatientItem[]>([]);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(() => initialDraft?.selectedPatientId || '');
   const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTORS);
 
   // ดึงรายการคิวจาก Backend DB
@@ -127,28 +168,35 @@ export const VitalsPage: React.FC = () => {
     };
   }, [fetchQueues, fetchDoctors, subscribe]);
 
-  // Form State (empty initially, waiting for input)
-  const [weight, setWeight] = useState<string>('');
-  const [height, setHeight] = useState<string>('');
-  const [temperature, setTemperature] = useState<string>('');
-  const [systolicBP, setSystolicBP] = useState<string>('');
-  const [diastolicBP, setDiastolicBP] = useState<string>('');
-  const [heartRate, setHeartRate] = useState<string>('');
-  const [respiratoryRate, setRespiratoryRate] = useState<string>('');
-  const [spo2, setSpo2] = useState<string>('');
-  const [chiefComplaint, setChiefComplaint] = useState<string>('');
-  const [allergies, setAllergies] = useState<string>('');
-  const [medicalHistory, setMedicalHistory] = useState<string>('');
-  const [selectedTriage, setSelectedTriage] = useState<TriageLevelKey>('ปกติ (Normal)');
-  const [assignedDoctorId, setAssignedDoctorId] = useState<number>(4);
+  // Form State (Auto-restored from in-progress draft)
+  const [weight, setWeight] = useState<string>(() => initialDraft?.weight || '');
+  const [height, setHeight] = useState<string>(() => initialDraft?.height || '');
+  const [temperature, setTemperature] = useState<string>(() => initialDraft?.temperature || '');
+  const [systolicBP, setSystolicBP] = useState<string>(() => initialDraft?.systolicBP || '');
+  const [diastolicBP, setDiastolicBP] = useState<string>(() => initialDraft?.diastolicBP || '');
+  const [heartRate, setHeartRate] = useState<string>(() => initialDraft?.heartRate || '');
+  const [respiratoryRate, setRespiratoryRate] = useState<string>(() => initialDraft?.respiratoryRate || '');
+  const [spo2, setSpo2] = useState<string>(() => initialDraft?.spo2 || '');
+  const [painScore, setPainScore] = useState<string>(() => initialDraft?.painScore || '');
+  const [bloodSugar, setBloodSugar] = useState<string>(() => initialDraft?.bloodSugar || '');
+  const [chiefComplaint, setChiefComplaint] = useState<string>(() => initialDraft?.chiefComplaint || '');
+  const [allergies, setAllergies] = useState<string>(() => initialDraft?.allergies || '');
+  const [foodAllergies, setFoodAllergies] = useState<string>(() => initialDraft?.foodAllergies || '');
+  const [medicalHistory, setMedicalHistory] = useState<string>(() => initialDraft?.medicalHistory || '');
+  const [currentMedications, setCurrentMedications] = useState<string>(() => initialDraft?.currentMedications || '');
+  const [smokingHistory, setSmokingHistory] = useState<string>(() => initialDraft?.smokingHistory || '');
+  const [alcoholHistory, setAlcoholHistory] = useState<string>(() => initialDraft?.alcoholHistory || '');
+  const [selectedTriage, setSelectedTriage] = useState<TriageLevelKey>(() => initialDraft?.selectedTriage || 'ปกติ (Normal)');
+  const [assignedDoctorId, setAssignedDoctorId] = useState<number>(() => initialDraft?.assignedDoctorId || 4);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(() => initialDraft?.savedAt || null);
 
   // Accordion and UI States
   const [isFormOpen, setIsFormOpen] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Searchable Queue Dropdown State (empty search initially)
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  // Searchable Queue Dropdown State
+  const [searchQuery, setSearchQuery] = useState<string>(() => initialDraft?.searchQuery || '');
   const [isQueueDropdownOpen, setIsQueueDropdownOpen] = useState<boolean>(false);
   const queueDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -175,9 +223,117 @@ export const VitalsPage: React.FC = () => {
     setSelectedPatientId(patient.id);
     setSearchQuery(`${patient.queueNo} - ${patient.fullName} (HN: ${patient.hn} | มาถึง ${patient.registeredTime})`);
     setIsQueueDropdownOpen(false);
-    if (patient.allergies) setAllergies(patient.allergies);
-    if (patient.chronicDiseases) setMedicalHistory(patient.chronicDiseases);
+    if (patient.allergies && !allergies) setAllergies(patient.allergies);
+    if (patient.chronicDiseases && !medicalHistory) setMedicalHistory(patient.chronicDiseases);
   };
+
+  // Auto-sync / reconnect draft patient once queueList is loaded from DB
+  useEffect(() => {
+    if (queueList.length > 0) {
+      const targetId = selectedPatientId || initialDraft?.selectedPatientId;
+      const targetQNo = initialDraft?.patientQueueNo;
+      if (targetId || targetQNo) {
+        const found = queueList.find(
+          (p) =>
+            (targetId && (p.id === targetId || String(p.queueId) === targetId)) ||
+            (targetQNo && p.queueNo.toLowerCase() === targetQNo.toLowerCase())
+        );
+        if (found) {
+          if (found.id !== selectedPatientId) {
+            setSelectedPatientId(found.id);
+          }
+          const formattedStr = `${found.queueNo} - ${found.fullName} (HN: ${found.hn} | มาถึง ${found.registeredTime})`;
+          if (!searchQuery || searchQuery.trim() === '') {
+            setSearchQuery(formattedStr);
+          }
+        }
+      }
+    }
+  }, [queueList, selectedPatientId, initialDraft?.selectedPatientId, initialDraft?.patientQueueNo, searchQuery]);
+
+  // Auto-save draft on change with debounce
+  useEffect(() => {
+    const hasData =
+      Boolean(selectedPatientId) ||
+      Boolean(weight) ||
+      Boolean(height) ||
+      Boolean(temperature) ||
+      Boolean(systolicBP) ||
+      Boolean(diastolicBP) ||
+      Boolean(heartRate) ||
+      Boolean(respiratoryRate) ||
+      Boolean(spo2) ||
+      Boolean(painScore) ||
+      Boolean(bloodSugar) ||
+      Boolean(chiefComplaint) ||
+      Boolean(allergies) ||
+      Boolean(foodAllergies) ||
+      Boolean(medicalHistory) ||
+      Boolean(currentMedications) ||
+      Boolean(smokingHistory) ||
+      Boolean(alcoholHistory);
+
+    if (hasData) {
+      const timer = setTimeout(() => {
+        try {
+          const nowStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+          const payload: VitalsDraftPayload = {
+            selectedPatientId,
+            patientQueueNo: selectedPatient?.queueNo,
+            searchQuery,
+            weight,
+            height,
+            temperature,
+            systolicBP,
+            diastolicBP,
+            heartRate,
+            respiratoryRate,
+            spo2,
+            painScore,
+            bloodSugar,
+            chiefComplaint,
+            allergies,
+            foodAllergies,
+            medicalHistory,
+            currentMedications,
+            smokingHistory,
+            alcoholHistory,
+            selectedTriage,
+            assignedDoctorId,
+            savedAt: nowStr,
+          };
+          localStorage.setItem(VITALS_DRAFT_KEY, JSON.stringify(payload));
+          setDraftSavedAt(nowStr);
+        } catch {
+          // ignore
+        }
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    selectedPatientId,
+    selectedPatient,
+    searchQuery,
+    weight,
+    height,
+    temperature,
+    systolicBP,
+    diastolicBP,
+    heartRate,
+    respiratoryRate,
+    spo2,
+    painScore,
+    bloodSugar,
+    chiefComplaint,
+    allergies,
+    foodAllergies,
+    medicalHistory,
+    currentMedications,
+    smokingHistory,
+    alcoholHistory,
+    selectedTriage,
+    assignedDoctorId,
+  ]);
 
   // Filtered waiting queue options for the searchable dropdown
   const filteredWaitingQueues = useMemo(() => {
@@ -309,14 +465,32 @@ export const VitalsPage: React.FC = () => {
       case 'spo2':
         setSpo2(String(val));
         break;
+      case 'painScore':
+        setPainScore(String(val));
+        break;
+      case 'bloodSugar':
+        setBloodSugar(String(val));
+        break;
       case 'chiefComplaint':
         setChiefComplaint(String(val));
         break;
       case 'allergies':
         setAllergies(String(val));
         break;
+      case 'foodAllergies':
+        setFoodAllergies(String(val));
+        break;
       case 'medicalHistory':
         setMedicalHistory(String(val));
+        break;
+      case 'currentMedications':
+        setCurrentMedications(String(val));
+        break;
+      case 'smokingHistory':
+        setSmokingHistory(String(val));
+        break;
+      case 'alcoholHistory':
+        setAlcoholHistory(String(val));
         break;
       case 'assignedDoctorId':
         setAssignedDoctorId(Number(val));
@@ -328,6 +502,13 @@ export const VitalsPage: React.FC = () => {
 
   // Form Reset
   const handleResetForm = () => {
+    try {
+      localStorage.removeItem(VITALS_DRAFT_KEY);
+    } catch {
+      // ignore
+    }
+    setSelectedPatientId('');
+    setSearchQuery('');
     setWeight('');
     setHeight('');
     setTemperature('');
@@ -336,10 +517,17 @@ export const VitalsPage: React.FC = () => {
     setHeartRate('');
     setRespiratoryRate('');
     setSpo2('');
+    setPainScore('');
+    setBloodSugar('');
     setChiefComplaint('');
     setAllergies('');
+    setFoodAllergies('');
     setMedicalHistory('');
+    setCurrentMedications('');
+    setSmokingHistory('');
+    setAlcoholHistory('');
     setSelectedTriage('ปกติ (Normal)');
+    setDraftSavedAt(null);
   };
 
   // Submit Handler
@@ -362,6 +550,8 @@ export const VitalsPage: React.FC = () => {
     const numHR = parseInt(heartRate, 10) || 75;
     const numRR = parseInt(respiratoryRate, 10) || 18;
     const numSpO2 = parseInt(spo2, 10) || 98;
+    const numPain = parseInt(painScore, 10) || 0;
+    const numBS = parseInt(bloodSugar, 10) || 0;
 
     const targetPatientId = selectedPatient.patientId || parseInt(selectedPatient.id, 10) || 1;
     const targetQueueId = selectedPatient.queueId || (typeof selectedPatient.id === 'number' ? selectedPatient.id : parseInt(selectedPatient.id, 10));
@@ -380,8 +570,14 @@ export const VitalsPage: React.FC = () => {
         heart_rate: numHR,
         respiratory_rate: numRR,
         spo2: numSpO2,
+        pain_score: numPain,
+        blood_sugar: numBS,
         allergies: allergies.trim() || selectedPatient.allergies,
+        food_allergies: foodAllergies.trim(),
         medical_history: medicalHistory.trim() || selectedPatient.chronicDiseases,
+        current_medications: currentMedications.trim(),
+        smoking_history: smokingHistory.trim(),
+        alcohol_history: alcoholHistory.trim(),
         assigned_doctor_id: docObj.doctorId,
         triage_level: selectedTriage,
       });
@@ -529,9 +725,15 @@ export const VitalsPage: React.FC = () => {
             heartRate={heartRate}
             respiratoryRate={respiratoryRate}
             spo2={spo2}
+            painScore={painScore}
+            bloodSugar={bloodSugar}
             chiefComplaint={chiefComplaint}
             allergies={allergies}
+            foodAllergies={foodAllergies}
             medicalHistory={medicalHistory}
+            currentMedications={currentMedications}
+            smokingHistory={smokingHistory}
+            alcoholHistory={alcoholHistory}
             assignedDoctorId={assignedDoctorId}
             doctorOptions={doctorList}
             isAccordionOpen={isFormOpen}
@@ -540,6 +742,7 @@ export const VitalsPage: React.FC = () => {
             onSubmit={handleSubmit}
             onReset={handleResetForm}
             isSaving={isSaving}
+            savedDraftTime={draftSavedAt}
           />
         </div>
 

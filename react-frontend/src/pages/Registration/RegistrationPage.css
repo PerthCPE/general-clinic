@@ -998,6 +998,10 @@
   font-family: var(--font-primary);
   font-weight: 600;
   font-size: 15.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -1833,23 +1837,11 @@ body.dark-mode .badge-scheme-private {
   width: 100%;
 }
 
-.reg-date-input-wrap input[type="date"] {
-  width: 100%;
+.reg-date-input-wrap input,
+.reg-date-input-wrap .reg-form-input {
+  width: 100% !important;
   padding-right: 44px !important;
-  cursor: pointer;
-}
-
-/* Hide native webkit indicator while keeping clickability over the whole right area */
-.reg-date-input-wrap input[type="date"]::-webkit-calendar-picker-indicator {
-  opacity: 0;
-  width: 36px;
-  height: 36px;
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  cursor: pointer;
-  z-index: 2;
+  box-sizing: border-box;
 }
 
 .reg-calendar-svg-btn {
@@ -1861,8 +1853,8 @@ body.dark-mode .badge-scheme-private {
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
-  z-index: 1;
+  cursor: pointer;
+  z-index: 2;
   transition: color 0.15s ease;
 }
 
@@ -1872,15 +1864,17 @@ body.dark-mode .badge-scheme-private {
 }
 
 /* Dark Mode */
-body.dark-mode .reg-date-input-wrap input[type="date"],
-body[data-theme="dark"] .reg-date-input-wrap input[type="date"] {
+body.dark-mode .reg-date-input-wrap input,
+body[data-theme="dark"] .reg-date-input-wrap input,
+body.dark-mode .reg-date-input-wrap .reg-form-input,
+body[data-theme="dark"] .reg-date-input-wrap .reg-form-input {
   color-scheme: dark !important;
   color: #F8FAFC !important;
 }
 
 body.dark-mode .reg-calendar-svg-btn,
 body[data-theme="dark"] .reg-calendar-svg-btn {
-  color: #F8FAFC !important;
+  color: #94A3B8 !important;
 }
 
 body.dark-mode .reg-date-input-wrap:hover .reg-calendar-svg-btn,

@@ -11,16 +11,18 @@ import './RegistrationPage.css';
 export { formatHN, formatQueueNo, formatNationalId, formatPhone };
 
 const mapBackendPatientToUI = (p: BackendPatient): Patient => {
-  const birthYear = p.birthdate ? new Date(p.birthdate).getFullYear() : 1995;
-  const currentYear = new Date().getFullYear();
-  const age = currentYear - birthYear;
+  let age = 30;
+  let formattedDob = '01/01/2543';
 
-  let formattedDob = p.birthdate || '';
   if (p.birthdate) {
     try {
       const d = new Date(p.birthdate);
       if (!isNaN(d.getTime())) {
-        formattedDob = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+        const birthYear = d.getFullYear() >= 2400 ? d.getFullYear() - 543 : d.getFullYear();
+        const currentYear = new Date().getFullYear();
+        const calcAge = currentYear - birthYear;
+        age = calcAge > 0 ? calcAge : 1;
+        formattedDob = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${birthYear + 543}`;
       }
     } catch {
       formattedDob = p.birthdate;
@@ -59,60 +61,9 @@ const mapBackendPatientToUI = (p: BackendPatient): Patient => {
   };
 };
 
-const DEFAULT_INITIAL_PATIENTS: Patient[] = [
-  {
-    id: 1,
-    hn: 'HN0001',
-    fullName: 'นายสมชาย ใจดี',
-    nationalId: '0-1234-56789-01-2',
-    dob: '15/04/1988',
-    age: 38,
-    gender: 'ชาย',
-    phone: '081-234-5678',
-    emergencyContact: '089-999-8888 (ภรรยา)',
-    address: '99/12 หมู่ 4 ต.ในเมือง อ.เมือง จ.นครราชสีมา 30000',
-    schemeType: 'บัตรทอง (สปสช.)',
-    chronicDiseases: 'ความดันโลหิตสูง',
-    allergies: 'แพ้ยาเพนิซิลลิน (Penicillin)',
-    registeredAt: 'วันนี้ 08:30 น.',
-  },
-  {
-    id: 2,
-    hn: 'HN0002',
-    fullName: 'นางวิภาดา รักสงบ',
-    nationalId: '3-1005-98765-43-2',
-    dob: '22/08/1992',
-    age: 34,
-    gender: 'หญิง',
-    phone: '089-876-5432',
-    emergencyContact: '081-111-2222 (สามี)',
-    address: '123/45 ถนนมิตรภาพ ต.สุรนารี อ.เมือง จ.นครราชสีมา 30000',
-    schemeType: 'ประกันสังคม (ม.33)',
-    chronicDiseases: '-',
-    allergies: '-',
-    registeredAt: 'วันนี้ 08:45 น.',
-  },
-  {
-    id: 3,
-    hn: 'HN0003',
-    fullName: 'นายอาทิตย์ เจริญยิ่ง',
-    nationalId: '1-1014-55443-21-9',
-    dob: '10/11/1975',
-    age: 51,
-    gender: 'ชาย',
-    phone: '086-555-4321',
-    emergencyContact: '082-333-4444 (บุตร)',
-    address: '55/6 ต.หนองจะบก อ.เมือง จ.นครราชสีมา 30000',
-    schemeType: 'สิทธิ์ข้าราชการ',
-    chronicDiseases: 'เบาหวานชนิดที่ 2',
-    allergies: 'อาหารทะเล',
-    registeredAt: 'วันนี้ 09:00 น.',
-  },
-];
-
 function RegistrationPage() {
-  const [allPatients, setAllPatients] = useState<Patient[]>(DEFAULT_INITIAL_PATIENTS);
-  const [patients, setPatients] = useState<Patient[]>(DEFAULT_INITIAL_PATIENTS);
+  const [allPatients, setAllPatients] = useState<Patient[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searchResult, setSearchResult] = useState<Patient | null>(null);
@@ -277,12 +228,21 @@ function RegistrationPage() {
   // ลงทะเบียนผู้ป่วยใหม่ บันทึกลง Database จริง
   const handleFormSubmit = async (formData: Partial<Patient>) => {
     try {
-      // แปลงวันเกิด DD/MM/YYYY เป็น YYYY-MM-DD
+      // แปลงวันเกิด DD/MM/YYYY (พ.ศ. หรือ ค.ศ.) เป็น YYYY-MM-DD
       let birthDateStr = formData.dob || '2000-01-01';
       if (formData.dob && formData.dob.includes('/')) {
         const parts = formData.dob.split('/');
         if (parts.length === 3) {
-          birthDateStr = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+          let yr = parseInt(parts[2], 10);
+          if (yr >= 2400) yr = yr - 543;
+          birthDateStr = `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+      } else if (formData.dob && formData.dob.includes('-')) {
+        const parts = formData.dob.split('-');
+        if (parts.length === 3 && parts[0].length === 4) {
+          let yr = parseInt(parts[0], 10);
+          if (yr >= 2400) yr = yr - 543;
+          birthDateStr = `${yr}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
         }
       }
 

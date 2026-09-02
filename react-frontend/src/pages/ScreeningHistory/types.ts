@@ -18,6 +18,7 @@ export interface ScreeningHistoryItem {
   timeOnly: string;         // เช่น "09:30 น."
   queueNo: string;          // เช่น "Q001"
   patientId: number;
+  hn?: string;              // เช่น "HN0001"
   nationalId: string;       // เช่น "0-1234-56789-01-2"
   patientName: string;      // เช่น "นายสมชาย ใจดี"
   gender: 'ชาย' | 'หญิง';
@@ -36,12 +37,18 @@ export interface ScreeningHistoryItem {
   heartRate: number;        // bpm
   respiratoryRate?: number; // breaths/min
   spo2?: number;            // %
+  painScore?: number;       // 0-10
+  bloodSugar?: number;      // mg/dL
 
   // Clinical records
   triageLevel: TriageLevelKey;
   chiefComplaint: string;
   allergies: string;
+  foodAllergies?: string;
   medicalHistory: string;
+  currentMedications?: string;
+  smokingHistory?: string;
+  alcoholHistory?: string;
   nurseNotes?: string;
 
   // Staff info

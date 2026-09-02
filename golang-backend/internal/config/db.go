@@ -94,6 +94,14 @@ func ConnectDB() {
 		log.Println("Database schema already up to date. Skipped redundant AutoMigrate.")
 	}
 
+	// Always ensure new screening columns exist in PostgreSQL database
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS pain_score integer DEFAULT 0")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS blood_sugar integer DEFAULT 0")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS food_allergies text DEFAULT ''")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS current_medications text DEFAULT ''")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS smoking_history text DEFAULT ''")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS alcohol_history text DEFAULT ''")
+
 	DB = database
 
 	seedDatabase()

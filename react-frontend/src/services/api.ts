@@ -253,6 +253,12 @@ export interface BackendScreening {
   heart_rate: number;
   respiratory_rate: number;
   spo2: number;
+  pain_score?: number;
+  blood_sugar?: number;
+  food_allergies?: string;
+  current_medications?: string;
+  smoking_history?: string;
+  alcohol_history?: string;
   created_at: string;
   updated_at: string;
   visit_record?: {
@@ -299,6 +305,12 @@ export const vitalsApi = {
     heart_rate: number;
     respiratory_rate?: number;
     spo2?: number;
+    pain_score?: number;
+    blood_sugar?: number;
+    food_allergies?: string;
+    current_medications?: string;
+    smoking_history?: string;
+    alcohol_history?: string;
     allergies?: string;
     medical_history?: string;
     nurse_notes?: string;

@@ -537,102 +537,9 @@ const QueuePage: React.FC = () => {
             )}
           </div>
 
-          <div className="status-filter-pills-bar">
-            {selectedCategory === 'all' && (
-              <>
-                <button
-                  type="button"
-                  className={`filter-pill-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('all');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span>ทั้งหมดในระบบ</span>
-                  <span className="pill-count">{stats.active}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-screening ${statusFilter === 'รอคัดกรอง' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอคัดกรอง');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-screening"></span>
-                  <span>รอคัดกรอง</span>
-                  <span className="pill-count">{stats.waitingScreening}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-doctor ${statusFilter === 'รอพบแพทย์' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอพบแพทย์');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-doctor"></span>
-                  <span>รอพบแพทย์</span>
-                  <span className="pill-count">{stats.waitingDoctor}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-examination ${statusFilter === 'กำลังตรวจ' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('กำลังตรวจ');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-examination"></span>
-                  <span>กำลังตรวจ</span>
-                  <span className="pill-count">{stats.inExamination}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-treatment ${statusFilter === 'รอทำหัตถการ' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอทำหัตถการ');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-treatment"></span>
-                  <span>รอทำหัตถการ</span>
-                  <span className="pill-count">{stats.waitingTreatment}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-billing ${statusFilter === 'รอชำระเงิน' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอชำระเงิน');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-billing"></span>
-                  <span>รอชำระเงิน</span>
-                  <span className="pill-count">{stats.waitingBilling}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-pharmacy ${statusFilter === 'รอรับยา' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอรับยา');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-pharmacy"></span>
-                  <span>รอรับยา</span>
-                  <span className="pill-count">{stats.waitingPharmacy}</span>
-                </button>
-              </>
-            )}
-
-            {selectedCategory === 'in_service' && (
+          {selectedCategory !== 'all' && (
+            <div className="status-filter-pills-bar">
+              {selectedCategory === 'in_service' && (
               <>
                 <button
                   type="button"
@@ -786,7 +693,8 @@ const QueuePage: React.FC = () => {
               </>
             )}
           </div>
-        </div>
+        )}
+      </div>
 
         {/* Responsive Queue Table */}
         <div className="table-responsive">
