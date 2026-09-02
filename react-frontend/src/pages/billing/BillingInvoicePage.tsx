@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './BillingInvoicePage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
+import { useWebSocket } from '../../context/WebSocketContext';
 
 interface BillingInvoicePageProps {
   selectedPatientId?: string;
@@ -15,8 +16,57 @@ export default function BillingInvoicePage({
   patientRightsMap,
   onUpdatePatientRights
 }: BillingInvoicePageProps) {
-  const activePatient: PatientConfig = CLINIC_CONFIG.patients.find(p => p.id === selectedPatientId) || CLINIC_CONFIG.patients[0];
-  const currentRights = patientRightsMap?.[activePatient.id] || activePatient.treatmentRights;
+  const { subscribe } = useWebSocket();
+  const [queueList, setQueueList] = useState<PatientConfig[]>([]);
+
+  useEffect(() => {
+    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      if (data) {
+        const pName = data.patient_name || data.patient?.full_name || `ผู้ป่วย คิว #${data.visit_id || ''}`;
+        const dynamicMedications = data.medications || [];
+
+        const newPatient: PatientConfig = {
+          id: `HN-${data.patient_id || data.visit_id || Date.now()}`,
+          hn: data.hn || `HN-${data.patient_id || data.visit_id || Date.now()}`,
+          nationalId: data.national_id || '1101800234567',
+          queueNumber: data.queue_number || 'Q0001',
+          ticket: 'A-01',
+          name: pName,
+          shortName: pName,
+          gender: 'ชาย',
+          age: 35,
+          dob: '01/01/2534',
+          phone: '081-999-8888',
+          occupation: 'รับจ้างทั่วไป',
+          treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+          patientType: 'ผู้ป่วยนอก (OPD)',
+          allergies: ['ไม่มีประวัติแพ้ยา'],
+          chronicDiseases: 'ไม่มี',
+          vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+          visitStatus: 'รอรับยา / ชำระเงิน',
+          visitDate: new Date().toLocaleDateString('th-TH'),
+          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+          doctorAdvice: 'พักผ่อนให้เพียงพอ',
+          medications: dynamicMedications,
+        };
+        setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
+      }
+    });
+
+    const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
+      if (data && data.action === 'db_reset') {
+        setQueueList([]);
+      }
+    });
+
+    return () => {
+      unsubBill();
+      unsubQueue();
+    };
+  }, [subscribe]);
+
+  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === selectedPatientId) || queueList[0];
+  const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
   
   const [showQrModal, setShowQrModal] = useState(false);
   const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
@@ -47,7 +97,7 @@ export default function BillingInvoicePage({
   };
 
   // คำนวณยอดรวม
-  const medTotal = activePatient.medications.reduce((sum, m) => sum + m.price, 0);
+  const medTotal = activePatient ? activePatient.medications.reduce((sum, m) => sum + m.price, 0) : 0;
   const medicalServiceFee = 800; // 500 (Doctor) + 300 (Clinic)
   const vatTax = Math.round(medTotal * 0.07);
   const grandTotal = medTotal + medicalServiceFee + vatTax;
@@ -55,16 +105,24 @@ export default function BillingInvoicePage({
   const cashNumber = parseFloat(cashReceived) || 0;
   const changeAmount = cashNumber >= grandTotal ? cashNumber - grandTotal : 0;
 
+  if (!activePatient) {
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#64748B' }}>ไม่พบข้อมูลบิลของผู้ป่วย กรุณารอข้อมูลบิลส่งมาจากการยืนยันจ่ายยา</div>;
+  }
+
   return (
     <div className="billing-invoice-container">
       <div className="page-header-row">
-        <div>
-          <h1 className="page-title">รายการบิล (Billing & Invoice)</h1>
-          <p className="page-subtitle">สรุปค่าบริการ ค่ายา และสร้าง QR Code สำหรับชำระเงิน</p>
+        <div className="header-titles">
+          <h1 className="page-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
+            รายการบิล (Billing & Invoice)
+          </h1>
+          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '1.1rem' }}>
+            สรุปค่าบริการ ค่ายา และสร้าง QR Code สำหรับชำระเงิน
+          </p>
         </div>
 
         <div className="invoice-patient-switcher">
-          {CLINIC_CONFIG.patients.map((p) => (
+          {queueList.map((p) => (
             <button
               key={p.id}
               className={`patient-switch-btn ${p.id === activePatient.id ? 'active' : ''}`}

@@ -1,10 +1,13 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
+	"time"
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
 )
@@ -88,3 +91,195 @@ func RecordDispense(c *gin.Context) {
 		"medicine":   medicine,
 	})
 }
+
+// POST /api/pharmacy/dispense - ยืนยันการจ่ายยา ตัดสต็อก และสร้างบิลการเงิน พร้อมยิง WebSocket
+func ConfirmDispenseAndBill(c *gin.Context) {
+	var req struct {
+		VisitID     uint   `json:"visit_id"`
+		HN          string `json:"hn"`
+		PatientName string `json:"patient_name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil && req.VisitID == 0 && req.HN == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var dispensings []models.Dispensing
+	if req.VisitID > 0 {
+		config.DB.Preload("Medicine").Where("visit_id = ?", req.VisitID).Find(&dispensings)
+	}
+
+	totalAmount := 0.0
+	tx := config.DB.Begin()
+
+	// วนลูปตัดสต็อกยาแต่ละตัวที่ถูกสั่งจ่าย และรวมราคา
+	for _, d := range dispensings {
+		var med models.Medicine
+		if err := tx.Where("id = ?", d.MedicineID).First(&med).Error; err == nil {
+			if med.StockQuantity >= d.Quantity {
+				med.StockQuantity -= d.Quantity
+				tx.Save(&med)
+			}
+			totalAmount += float64(d.Quantity) * med.UnitPrice
+		}
+	}
+
+	if totalAmount == 0 {
+		totalAmount = 350.0
+	}
+
+	billing := models.Billing{
+		VisitID:                 req.VisitID,
+		TotalAmount:             totalAmount,
+		DiscountFromEligibility: 0,
+		NetAmount:               totalAmount,
+		PaymentStatus:           "pending",
+	}
+	if err := tx.Create(&billing).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing record: " + err.Error()})
+		return
+	}
+
+	var queue models.Queue
+	var visit models.VisitRecord
+	var patient models.Patient
+
+	if req.VisitID > 0 {
+		tx.Preload("Patient").First(&visit, req.VisitID)
+		if visit.PatientID > 0 {
+			patient = visit.Patient
+			if err := tx.Where("patient_id = ? AND status = 'pharmacy_waiting'", visit.PatientID).First(&queue).Error; err == nil {
+				queue.Status = "billing_waiting"
+				queue.Department = "การเงิน"
+				tx.Save(&queue)
+			}
+		}
+	}
+
+	if patient.ID == 0 && req.HN != "" {
+		tx.Where("hn = ? OR hn = ?", req.HN, "HN-"+req.HN).First(&patient)
+	}
+
+	targetHN := patient.HN
+	if targetHN == "" {
+		targetHN = req.HN
+	}
+	if targetHN == "" {
+		targetHN = fmt.Sprintf("HN-%d", time.Now().Unix()%10000)
+	}
+
+	targetName := patient.FullName
+	if targetName == "" {
+		targetName = req.PatientName
+	}
+	if targetName == "" {
+		targetName = "ผู้ป่วย"
+	}
+
+	// อัปเดต/สร้างลงตาราง patient_medicines ใน Supabase DB ทันที!
+	var patMed models.PatientMedicine
+	if err := tx.Where("hn = ?", targetHN).First(&patMed).Error; err != nil {
+		age := 35
+		if patient.ID > 0 && patient.BirthDate.Year() > 1900 {
+			age = time.Now().Year() - patient.BirthDate.Year()
+		}
+		patMed = models.PatientMedicine{
+			HN:              targetHN,
+			NationalID:      patient.NationalID,
+			FullName:        targetName,
+			Gender:          patient.Gender,
+			Age:             age,
+			SchemeType:      patient.SchemeType,
+			Allergies:       patient.Allergies,
+			ChronicDiseases: patient.ChronicDiseases,
+			PhoneNumber:     patient.PhoneNumber,
+			VisitCount:      1,
+		}
+		tx.Create(&patMed)
+	} else {
+		patMed.VisitCount += 1
+		tx.Save(&patMed)
+	}
+
+	ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", patMed)
+	tx.Commit()
+
+	billingPayload := gin.H{
+		"id":           billing.ID,
+		"visit_id":     billing.VisitID,
+		"patient_name": targetName,
+		"hn":           targetHN,
+		"total_amount": billing.TotalAmount,
+		"net_amount":   billing.NetAmount,
+		"status":       billing.PaymentStatus,
+		"created_at":   billing.CreatedAt,
+	}
+
+	ws.BroadcastEvent("DISPENSE_RECORDED", gin.H{"visit_id": req.VisitID, "action": "dispensed"})
+	ws.BroadcastEvent("BILLING_CREATED", billingPayload)
+	ws.BroadcastEvent("QUEUE_UPDATED", queue)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Dispensing confirmed and billed successfully",
+		"billing": billing,
+	})
+}
+
+// GET /api/pharmacy/patient-medicines - ดึงประวัติผู้ป่วยและการรับยาทั้งหมดจากตาราง patient_medicines
+func GetPatientMedicines(c *gin.Context) {
+	var records []models.PatientMedicine
+	if err := config.DB.Order("id desc").Find(&records).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch patient medicines: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":            "success",
+		"patient_medicines": records,
+	})
+}
+
+// GET /api/pharmacy/patient-medicines/:hn - ดึงประวัติการรับยาของป่วยรายบุคคลตาม HN
+func GetPatientMedicineDetail(c *gin.Context) {
+	hn := c.Param("hn")
+	var patMed models.PatientMedicine
+	if err := config.DB.Where("hn = ? OR hn = ?", hn, "HN-"+hn).First(&patMed).Error; err != nil {
+		var patient models.Patient
+		if errP := config.DB.Where("hn = ? OR hn = ?", hn, "HN-"+hn).First(&patient).Error; errP == nil {
+			patMed = models.PatientMedicine{
+				HN:              patient.HN,
+				NationalID:      patient.NationalID,
+				FullName:        patient.FullName,
+				Gender:          patient.Gender,
+				Age:             time.Now().Year() - patient.BirthDate.Year(),
+				SchemeType:      patient.SchemeType,
+				Allergies:       patient.Allergies,
+				ChronicDiseases: patient.ChronicDiseases,
+				PhoneNumber:     patient.PhoneNumber,
+				VisitCount:      1,
+			}
+		} else {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Patient history not found"})
+			return
+		}
+	}
+
+	var patient models.Patient
+	var dispensings []models.Dispensing
+	if errP := config.DB.Where("hn = ?", patMed.HN).First(&patient).Error; errP == nil {
+		var visitIDs []uint
+		config.DB.Model(&models.VisitRecord{}).Where("patient_id = ?", patient.ID).Pluck("id", &visitIDs)
+		if len(visitIDs) > 0 {
+			config.DB.Preload("Medicine").Preload("Doctor").Where("visit_id IN ?", visitIDs).Find(&dispensings)
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":           "success",
+		"patient_medicine": patMed,
+		"dispensings":      dispensings,
+	})
+}
+

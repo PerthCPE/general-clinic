@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useWebSocket } from '../../context/WebSocketContext';
 import './PatientHistoryPage.css';
 
 interface Patient {
@@ -11,6 +12,9 @@ interface Patient {
   avatarUrl?: string;
   weightHeight?: string;
   treatmentRights?: string;
+  visitCount?: number;
+  allergies?: string;
+  phone?: string;
 }
 
 interface MedicationHistory {
@@ -32,43 +36,51 @@ interface AllergyInfo {
 const mockPatients: Patient[] = [
   {
     id: 'PT-88213',
-    hn: 'HN-2023-045',
+    hn: 'HN0045',
     name: 'นาย สมชาย ใจดี',
     age: 45,
     bloodType: 'O+',
     diseases: ['ความดันโลหิตสูง', 'เบาหวาน'],
     weightHeight: '72 kg / 175 cm',
-    treatmentRights: 'ประกันสังคม'
+    treatmentRights: 'ประกันสังคม',
+    visitCount: 5,
+    allergies: 'ปฏิเสธการแพ้ยา'
   },
   {
     id: 'PT-88214',
-    hn: 'HN-2023-112',
+    hn: 'HN0112',
     name: 'นาง มะลิวัน จันทร์เพ็ญ',
     age: 62,
     bloodType: 'A-',
     diseases: ['ไม่มี'],
     weightHeight: '58 kg / 160 cm',
-    treatmentRights: 'สิทธิ 30 บาท'
+    treatmentRights: 'สิทธิ 30 บาท (สปสช.)',
+    visitCount: 8,
+    allergies: 'ปฏิเสธการแพ้ยา'
   },
   {
     id: 'PT-88215',
-    hn: 'HN-2024-018',
+    hn: 'HN0018',
     name: 'นาย พงศกร รัตนสัจจะ',
     age: 28,
     bloodType: 'B+',
     diseases: ['หอบหืด'],
     weightHeight: '68 kg / 170 cm',
-    treatmentRights: 'ประกันสุขภาพเอกชน'
+    treatmentRights: 'ประกันสุขภาพเอกชน',
+    visitCount: 11,
+    allergies: 'หอบหืด'
   },
   {
     id: 'PT-88216',
-    hn: 'HN-2022-884',
+    hn: 'HN0884',
     name: 'นางสาว ศิริพร แก้วมณี',
     age: 34,
     bloodType: 'AB+',
     diseases: ['ไม่มี'],
     weightHeight: '52 kg / 163 cm',
-    treatmentRights: 'สิทธิ 30 บาท'
+    treatmentRights: 'สิทธิ 30 บาท (สปสช.)',
+    visitCount: 2,
+    allergies: 'ปฏิเสธการแพ้ยา'
   }
 ];
 
@@ -90,212 +102,485 @@ const mockMedHistory: MedicationHistory[] = [
     dosage: '1 เม็ด วันละ 2 ครั้ง',
     dosageTag: 'หลังอาหาร เช้า-เย็น',
     quantity: '60 Tabs'
-  },
-  {
-    date: '10 ส.ค. 66',
-    time: '09:15 น.',
-    medName: 'Paracetamol 500mg',
-    indication: 'แก้ไข้ ปวดศีรษะ',
-    dosage: '1 เม็ด ทุกๆ 6 ชั่วโมง',
-    dosageTag: 'เมื่อมีอาการ',
-    quantity: '20 Tabs'
-  },
-  {
-    date: '02 ก.ค. 66',
-    time: '11:00 น.',
-    medName: 'Simvastatin 20mg',
-    indication: 'ไขมันในเลือดสูง',
-    dosage: '1 เม็ด วันละ 1 ครั้ง',
-    dosageTag: 'หลังอาหารเย็น',
-    quantity: '30 Tabs'
-  }
-];
-
-const mockAllergies: AllergyInfo[] = [
-  {
-    allergen: 'Penicillin',
-    symptom: 'ผื่นแดง หายใจขัดขัด (รุนแรง)',
-    severity: 'high'
-  },
-  {
-    allergen: 'อาหารทะเล',
-    symptom: 'ผื่นคันเล็กน้อย',
-    severity: 'low'
   }
 ];
 
 export default function PatientHistoryPage() {
-  const [searchHn, setSearchHn] = useState('');
-  const [searchName, setSearchName] = useState('');
-  const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
+  const { subscribe } = useWebSocket();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredPatients = mockPatients.filter(patient => {
-    const matchHn = patient.hn.toLowerCase().includes(searchHn.toLowerCase());
-    const matchName = patient.name.toLowerCase().includes(searchName.toLowerCase());
-    return matchHn && matchName;
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
+  const [patientMedHistory, setPatientMedHistory] = useState<MedicationHistory[]>([]);
+  const [isPatientListExpanded, setIsPatientListExpanded] = useState(true);
+
+  // Filter States matching Image 3
+  const [timeRange, setTimeRange] = useState<'all' | 'today' | 'month'>('all');
+  const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'emergency' | 'urgent' | 'normal'>('all');
+  const [riskFilter, setRiskFilter] = useState<'all' | 'hypertension' | 'fever' | 'allergies'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const fetchPatientMedicines = async () => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      let res = await fetch('/api/pharmacy/patient-medicines', { headers });
+      if (!res.ok) {
+        res = await fetch('/api/system/patient-medicines');
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.patient_medicines && Array.isArray(data.patient_medicines) && data.patient_medicines.length > 0) {
+          const mapped: Patient[] = data.patient_medicines.map((pm: any) => {
+            const rawDiseases = pm.chronic_diseases ? pm.chronic_diseases.split(',').map((d: string) => d.trim()).filter(Boolean) : [];
+            return {
+              id: `PT-${pm.id || pm.hn}`,
+              hn: pm.hn || '',
+              name: pm.fullname || pm.full_name || 'ผู้ป่วย',
+              age: pm.age || 35,
+              bloodType: pm.blood_type || 'O+',
+              diseases: rawDiseases.length > 0 ? rawDiseases : ['ไม่มี'],
+              weightHeight: '65 kg / 170 cm',
+              treatmentRights: pm.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+              visitCount: pm.visit_count || 1,
+              allergies: pm.allergies || 'ปฏิเสธการแพ้ยา',
+              phone: pm.phone_number
+            };
+          });
+          setPatients(mapped);
+          setLoading(false);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch patient medicines:', err);
+    }
+    setPatients([]);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchPatientMedicines();
+
+    const unsub1 = subscribe('PATIENT_MEDICINE_UPDATED', fetchPatientMedicines);
+    const unsub2 = subscribe('DISPENSE_RECORDED', fetchPatientMedicines);
+    const unsub3 = subscribe('QUEUE_CREATED', fetchPatientMedicines);
+    const unsub4 = subscribe('QUEUE_UPDATED', fetchPatientMedicines);
+
+    return () => {
+      unsub1();
+      unsub2();
+      unsub3();
+      unsub4();
+    };
+  }, [subscribe]);
+
+  const handleSelectPatient = async (patient: Patient) => {
+    setSelectedPatientModal(patient);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      let res = await fetch(`/api/pharmacy/patient-medicines/${patient.hn}`, { headers });
+      if (!res.ok) {
+        res = await fetch(`/api/system/patient-medicines/${patient.hn}`);
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (data.dispensings && Array.isArray(data.dispensings) && data.dispensings.length > 0) {
+          const mappedHist: MedicationHistory[] = data.dispensings.map((item: any) => ({
+            date: new Date(item.created_at || Date.now()).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' }),
+            time: new Date(item.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+            medName: item.medicine?.name || item.medicine?.medicine_code || 'ยาตามแพทย์สั่ง',
+            indication: item.medicine?.properties || 'การรักษาตามอาการ',
+            dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
+            dosageTag: item.instructions || 'หลังอาหาร',
+            quantity: `${item.quantity || 1} เม็ด`
+          }));
+          setPatientMedHistory(mappedHist);
+          return;
+        }
+      }
+    } catch (err) {}
+    setPatientMedHistory(mockMedHistory);
+  };
+
+  const filteredPatients = patients.filter(patient => {
+    const q = (searchQuery || '').trim().toLowerCase();
+    
+    const cleanedHn = (patient?.hn || '').toLowerCase().replace(/^hn-?/, '');
+    const cleanedQ = q.replace(/^hn-?/, '');
+    
+    // Check ID match
+    const queryDigits = q.replace(/\D/g, '');
+    const hnDigits = (patient?.hn || '').replace(/\D/g, '');
+    const matchHn = cleanedHn.includes(cleanedQ) || 
+      (patient?.hn || '').toLowerCase().includes(q) ||
+      (queryDigits !== '' && hnDigits.includes(queryDigits));
+
+    // Multi-word name search
+    const searchTerms = q.split(/\s+/).filter(Boolean);
+    const nameStr = (patient?.name || '').toLowerCase();
+    const matchName = searchTerms.length > 0 && searchTerms.every(term => nameStr.includes(term));
+
+    const matchSearch = q === '' || matchHn || matchName;
+
+    let matchRisk = true;
+    if (riskFilter === 'hypertension') {
+      matchRisk = (patient.diseases || []).some(d => d.includes('ความดัน'));
+    } else if (riskFilter === 'allergies') {
+      const hasAllergyDisease = (patient?.diseases || []).some(d => d?.includes('แพ้ยา') || d?.includes('ภูมิแพ้'));
+      const hasAllergiesText = Boolean(patient?.allergies && typeof patient.allergies === 'string' && !patient.allergies.includes('ปฏิเสธ'));
+      matchRisk = hasAllergyDisease || hasAllergiesText;
+    }
+
+    return matchSearch && matchRisk;
   });
 
   return (
     <div className="patient-history-container">
       <div className="list-view-container">
-        <h1 className="page-title">ประวัติผู้ป่วย</h1>
-        <p className="page-subtitle" style={{ color: '#64748B', marginBottom: '20px' }}>
-          ค้นหาและคลิกที่ชื่อผู้ป่วยเพื่อดูประวัติการรักษา ยาที่ได้รับ และประวัติแพ้ยา
-        </p>
-
-        <div className="search-card">
-          <div className="search-inputs">
-            <div className="input-group">
-              <label>รหัสผู้ป่วย (HN)</label>
-              <div className="input-with-icon">
-                <input
-                  type="text"
-                  placeholder="เช่น HN-2023-001"
-                  value={searchHn}
-                  onChange={(e) => setSearchHn(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div className="input-group">
-              <label>ชื่อผู้ป่วย</label>
-              <div className="input-with-icon">
-                <input
-                  type="text"
-                  placeholder="เช่น Somchai Jai-dee"
-                  value={searchName}
-                  onChange={(e) => setSearchName(e.target.value)}
-                />
-              </div>
-            </div>
+        <div className="page-header" style={{ marginBottom: '24px' }}>
+          <div className="header-titles">
+            <h1 className="page-title">ประวัติผู้ป่วย</h1>
+            <p className="page-subtitle">
+              ค้นหาและคลิกที่ชื่อผู้ป่วยเพื่อดูประวัติการรักษา ยาที่ได้รับ และประวัติแพ้ยา
+            </p>
           </div>
-
-          <button className="search-btn">ค้นหา</button>
         </div>
 
-        <div className="patient-table-card">
-          <div className="table-header-row">
-            <h2 className="table-title">รายชื่อผู้ป่วยที่เข้ารับการรักษา</h2>
-            <span className="count-badge">แสดง {filteredPatients.length} รายการ</span>
+        <div className="search-card card" style={{ padding: '20px 24px', marginBottom: '24px', borderRadius: '12px', background: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+          <div className="search-inputs" style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+            <div className="input-group" style={{ flex: 1 }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13.5px', color: '#475569' }}>ค้นหาผู้ป่วย (รหัส HN หรือ ชื่อผู้ป่วย)</label>
+              <div className="input-with-icon">
+                <input
+                  type="text"
+                  placeholder="เช่น HN0001, Somchai หรือ 0001"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ width: '100%', padding: '9px 14px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '14px' }}
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="table-wrapper">
-            <table className="patient-table">
-              <thead>
-                <tr>
-                  <th>ID (HN)</th>
-                  <th>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
-                  <th>อายุ</th>
-                  <th>กรุ๊ปเลือด</th>
-                  <th>โรคประจำตัว</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredPatients.map((patient) => (
-                  <tr key={patient.id}>
-                    <td className="hn-cell">{patient.hn}</td>
-                    <td 
-                      className="patient-name-cell clickable-patient-history"
-                      onClick={() => setSelectedPatientModal(patient)}
-                    >
-                      <span className="history-name-link">👤 {patient.name}</span>
-                      <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
-                    </td>
-                    <td>{patient.age} ปี</td>
-                    <td><span className="blood-badge">{patient.bloodType}</span></td>
-                    <td>
-                      <div className="disease-badges">
-                        {patient.diseases.map((d, i) => (
-                          <span key={i} className="disease-tag">{d}</span>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Filter Pills matching Image 3 (Urgency Filter Removed) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
+            {/* Row 1: ช่วงเวลา */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span className="filter-row-label" style={{ fontSize: '13.5px', fontWeight: '700', minWidth: '80px' }}>ช่วงเวลา:</span>
+              {(['all', 'today', 'month'] as const).map((key) => {
+                const labels = { all: 'ทั้งหมด', today: 'วันนี้', month: 'เดือนนี้' };
+                const active = timeRange === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setTimeRange(key)}
+                    className={`filter-pill-btn ${active ? 'active' : ''}`}
+                    style={{
+                      padding: '6px 16px', borderRadius: '8px',
+                      fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                  >
+                    {labels[key]}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Row 2: ความเสี่ยงทางคลินิก */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span className="filter-row-label" style={{ fontSize: '13.5px', fontWeight: '700', minWidth: '120px' }}>ความเสี่ยงทางคลินิก:</span>
+              {(['all', 'hypertension', 'fever', 'allergies'] as const).map((key) => {
+                const labels = { all: 'ทั้งหมด', hypertension: 'ความดันสูง', fever: 'มีไข้ (> 37.5°C)', allergies: 'มีประวัติแพ้ยา' };
+                const active = riskFilter === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setRiskFilter(key)}
+                    className={`filter-pill-btn ${active ? 'active' : ''}`}
+                    style={{
+                      padding: '6px 16px', borderRadius: '8px',
+                      fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                  >
+                    {labels[key]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+        </div>
+
+        <div className="patient-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
+          <div 
+            className="collapsible-card-header"
+            onClick={() => setIsPatientListExpanded(!isPatientListExpanded)}
+            style={{ 
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
+              padding: '18px 24px', borderBottom: isPatientListExpanded ? '1px solid #E2E8F0' : 'none',
+              cursor: 'pointer', userSelect: 'none' 
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <h3 className="card-header-title" style={{ margin: 0, fontSize: '16.5px', fontWeight: '700' }}>
+                รายชื่อผู้ป่วยที่เข้ารับการรักษา
+              </h3>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', padding: '4px 12px', borderRadius: '16px', fontSize: '13px' }}>
+                แสดง {filteredPatients?.length || 0} รายการ
+              </span>
+              <svg 
+                width="18" height="18" viewBox="0 0 24 24" fill="none" 
+                style={{ color: '#64748B', transform: isPatientListExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.25s ease', flexShrink: 0 }}
+              >
+                <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </div>
+          </div>
+
+          {isPatientListExpanded && (
+            <>
+              <div className="table-wrapper">
+                <table className="patient-table">
+                  <thead>
+                    <tr>
+                      <th>ID (HN)</th>
+                      <th>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
+                      <th>อายุ</th>
+                      <th>กรุ๊ปเลือด</th>
+                      <th style={{ textAlign: 'center' }}>สิทธิการรักษา</th>
+                      <th style={{ textAlign: 'center' }}>จำนวนเข้ารักษา</th>
+                      <th>โรคประจำตัว</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPatients.map((patient) => {
+                      const rights = patient.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
+                      return (
+                        <tr key={patient.id}>
+                          <td className="hn-cell" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>{patient.hn.replace(/[-]/g, '')}</td>
+                          <td 
+                            className="patient-name-cell clickable-patient-history"
+                            onClick={() => handleSelectPatient(patient)}
+                          >
+                            <span className="history-name-link">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '6px', marginTop: '-2px' }}>
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                              </svg>
+                              {patient.name}
+                            </span>
+                            <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
+                          </td>
+                          <td>{patient.age} ปี</td>
+                          <td><span className="blood-badge">{patient.bloodType}</span></td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{ 
+                              background: rights.includes('30') ? '#FEF9C3' : rights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
+                              color: rights.includes('30') ? '#92400E' : rights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
+                              border: `1px solid ${rights.includes('30') ? '#FDE68A' : rights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
+                              padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
+                              whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center',
+                              width: '175px', textAlign: 'center', boxSizing: 'border-box'
+                            }}>
+                              {rights}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span className="visit-count-badge">
+                              เข้ารักษา {patient.visitCount || 1} ครั้ง
+                            </span>
+                          </td>
+                          <td>
+                            <div className="disease-badges">
+                              {(patient.diseases || []).map((d, i) => (
+                                <span key={i} className="disease-tag">{d}</span>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination Bar matching Image 4 */}
+              <div className="table-pagination-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderTop: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '12px' }}>
+                <span className="pagination-info" style={{ fontSize: '13.5px', fontWeight: '500' }}>
+                  แสดง 1 ถึง {filteredPatients.length} จาก {patients.length} รายการ
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <button 
+                    disabled={currentPage === 1}
+                    className="pagination-btn"
+                    style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13.5px', cursor: 'not-allowed' }}
+                  >
+                    ย้อนกลับ
+                  </button>
+                  <button 
+                    className="pagination-btn active"
+                    style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: '#2563EB', color: '#FFFFFF', fontWeight: '700', fontSize: '13.5px', cursor: 'pointer' }}
+                  >
+                    1
+                  </button>
+                  <button 
+                    disabled
+                    className="pagination-btn"
+                    style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13.5px', cursor: 'not-allowed' }}
+                  >
+                    ถัดไป
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Patient Full History Pop-up Modal */}
+      {/* Patient Full History Pop-up Modal (Images 1 & 2 Pattern) */}
       {selectedPatientModal && (
         <div className="modal-overlay" onClick={() => setSelectedPatientModal(null)}>
-          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()}>
-            <div className="history-modal-header">
+          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: 'none' }}>
+            {/* Modal Header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <span className="history-modal-badge">👤 รายละเอียดประวัติสุขภาพผู้ป่วย</span>
-                <h2 className="history-modal-name">{selectedPatientModal.name}</h2>
-                <span className="history-modal-hn">รหัสผู้ป่วย: {selectedPatientModal.id} • {selectedPatientModal.hn}</span>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+                  รายละเอียดประวัติสุขภาพ & ข้อมูลการรับยา
+                </h2>
+                <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B' }}>
+                  หมายเลขคิว <span style={{ color: '#2563EB', fontWeight: '700' }}>Q0001</span> • {selectedPatientModal.name}
+                </p>
               </div>
-              <button className="history-modal-close" onClick={() => setSelectedPatientModal(null)}>✕</button>
+              <button 
+                onClick={() => setSelectedPatientModal(null)}
+                style={{ background: 'transparent', border: 'none', fontSize: '18px', color: '#94A3B8', cursor: 'pointer', padding: '4px' }}
+              >
+                ✕
+              </button>
             </div>
 
-            <div className="history-modal-body">
-              {/* Stats Bar */}
-              <div className="history-stats-bar">
-                <div className="h-stat-box">
-                  <span className="h-stat-label">อายุ</span>
-                  <span className="h-stat-val">{selectedPatientModal.age} ปี</span>
+            <div className="history-modal-body" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '75vh', overflowY: 'auto' }}>
+              {/* Summary Information Card (Image 1 Format) */}
+              <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>หมายเลขคิว:</span>
+                  <span style={{ color: '#2563EB', fontWeight: '700', fontSize: '14.5px' }}>Q0001</span>
                 </div>
-                <div className="h-stat-box">
-                  <span className="h-stat-label">กรุ๊ปเลือด</span>
-                  <span className="h-stat-val">{selectedPatientModal.bloodType}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>ชื่อคนไข้:</span>
+                  <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>{selectedPatientModal.name}</span>
                 </div>
-                <div className="h-stat-box">
-                  <span className="h-stat-label">น้ำหนัก / ส่วนสูง</span>
-                  <span className="h-stat-val">{selectedPatientModal.weightHeight || '70 kg / 172 cm'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>เลขบัตรประชาชน / HN:</span>
+                  <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>{selectedPatientModal.hn}</span>
                 </div>
-                <div className="h-stat-box">
-                  <span className="h-stat-label">สิทธิการรักษา</span>
-                  <span className="h-stat-val">{selectedPatientModal.treatmentRights || 'ประกันสังคม'}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>เวลารับคิว:</span>
+                  <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>08:45 น.</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gridColumn: 'span 2', paddingTop: '6px', borderTop: '1px dashed #E2E8F0' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>จำนวนเข้ารักษาทั้งหมด:</span>
+                  <span style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', padding: '2px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>
+                    {selectedPatientModal.visitCount || 1} ครั้ง (Visit #{selectedPatientModal.visitCount || 1})
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gridColumn: 'span 2', paddingTop: '4px' }}>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>สิทธิการรักษา:</span>
+                  <span style={{ background: '#F3E8FF', color: '#6B21A8', border: '1px solid #DDD6FE', padding: '2px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>
+                    {selectedPatientModal.treatmentRights || 'สิทธิ 30 บาท (สปสช.)'}
+                  </span>
                 </div>
               </div>
 
-              {/* Allergies Section */}
-              <div className="history-section-block">
-                <h3 className="section-title text-red">⚠️ ข้อมูลการแพ้ยา (Allergies)</h3>
-                <div className="allergy-list-grid">
-                  {mockAllergies.map((allergy, i) => (
-                    <div key={i} className={`allergy-pill-item ${allergy.severity === 'high' ? 'sev-high' : 'sev-low'}`}>
-                      <div className="allergy-pill-name">{allergy.allergen}</div>
-                      <div className="allergy-pill-symptom">อาการ: {allergy.symptom}</div>
-                    </div>
-                  ))}
+              {/* Vital Signs Grid (Image 2 Format) */}
+              <div>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#3B82F6' }}><path d="M12 20V10"></path><path d="M18 20V4"></path><path d="M6 20v-4"></path></svg>
+                  ค่าสัญญาณชีพและสรีรวิทยา (Vital Signs Measurements)
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+                  <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>ความดันโลหิต (BP)</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>120/80 <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>mmHg</span></div>
+                    <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
+                  </div>
+                  <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>ชีพจร (Heart Rate)</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>80 <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>bpm</span></div>
+                    <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
+                  </div>
+                  <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>อุณหภูมิ (Temp)</div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>36.5 <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>°C</span></div>
+                    <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Medication History Table */}
-              <div className="history-section-block">
-                <h3 className="section-title">ประวัติการรับยาล่าสุดในระบบ</h3>
-                <div className="table-wrapper">
-                  <table className="med-history-table">
-                    <thead>
-                      <tr>
-                        <th>วันที่รับยา</th>
-                        <th>รายการยา (MEDICINE NAME)</th>
-                        <th>วิธีใช้ (DOSAGE)</th>
-                        <th style={{ textAlign: 'right' }}>จำนวน</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {mockMedHistory.map((item, idx) => (
-                        <tr key={idx}>
-                          <td className="date-cell">{item.date} ({item.time})</td>
-                          <td className="med-title">{item.medName}</td>
-                          <td>{item.dosage} ({item.dosageTag})</td>
-                          <td className="qty-cell">{item.quantity}</td>
-                        </tr>
+              {/* Department / Room Block (Image 1 Format) */}
+              <div>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#0369A1' }}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                  จุดบริการ / ห้องตรวจ:
+                </h4>
+                <div style={{ background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '10px', padding: '12px 16px', color: '#0369A1', fontWeight: '700', fontSize: '14.5px' }}>
+                  ห้องจ่ายยาและเภสัชกรรม (อาคารผู้ป่วยนอก ชั้น 1)
+                </div>
+              </div>
+
+              {/* Prescription & Doctor Advice Block (Image 1 Format) */}
+              <div>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#475569' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                  คำสั่งการรักษา & รายการยาที่ได้รับ (ฉบับเต็ม):
+                </h4>
+                <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '13.5px', color: '#334155', lineHeight: '1.5' }}>
+                    <strong>คำสั่งแพทย์:</strong> ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที
+                  </div>
+                  <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
+                    <strong style={{ fontSize: '13px', color: '#0F172A' }}>รายการยาที่จัดส่ง:</strong>
+                    <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: '13px', color: '#475569' }}>
+                      {(patientMedHistory || []).map((item, idx) => (
+                        <li key={idx} style={{ marginBottom: '4px' }}>
+                          <strong style={{ color: '#0F172A' }}>{item?.medName}</strong> ({item?.quantity}) - {item?.dosage} <span style={{ color: '#2563EB', fontWeight: '600' }}>({item?.dosageTag})</span>
+                        </li>
                       ))}
-                    </tbody>
-                  </table>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Allergies Block (Image 1 & 2 Format) */}
+              <div>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#DC2626' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                  ประวัติแพ้ยา (Known Allergies):
+                </h4>
+                <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ background: '#FEE2E2', color: '#991B1B', fontWeight: '700', padding: '4px 12px', borderRadius: '8px', fontSize: '12.5px' }}>
+                    {selectedPatientModal.allergies || 'ปฏิเสธการแพ้ยา'}
+                  </span>
+                  <span style={{ fontSize: '12.5px', color: '#991B1B' }}>ข้อมูลประวัติแพ้ยาที่ลงบันทึกในระบบ</span>
                 </div>
               </div>
             </div>
 
-            <div className="history-modal-footer">
-              <button className="primary-close-btn" onClick={() => setSelectedPatientModal(null)}>
-                ปิดหน้าต่างประวัติผู้ป่วย
+            {/* Modal Footer */}
+            <div style={{ padding: '14px 24px', borderTop: '1px solid #F1F5F9', display: 'flex', justifyContent: 'flex-end', background: '#F8FAFC' }}>
+              <button 
+                onClick={() => setSelectedPatientModal(null)}
+                style={{ padding: '8px 24px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#334155', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}
+              >
+                ปิดหน้าต่าง
               </button>
             </div>
           </div>

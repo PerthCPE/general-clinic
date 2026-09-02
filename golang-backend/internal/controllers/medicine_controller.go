@@ -1,10 +1,13 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
 )
@@ -20,10 +23,21 @@ type UpdateStockRequest struct {
 func GetMedicines(c *gin.Context) {
 	var medicines []models.Medicine
 	query := c.Query("query")
+	category := c.Query("category")
 
 	dbQuery := config.DB
 	if query != "" {
-		dbQuery = dbQuery.Where("LOWER(medicine_code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?)", "%"+query+"%", "%"+query+"%")
+		dbQuery = dbQuery.Where(
+			"LOWER(medicine_code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?) OR LOWER(generic_name) LIKE LOWER(?) OR LOWER(medicine_code) LIKE LOWER(?)",
+			"%"+query+"%",
+			"%"+query+"%",
+			"%"+query+"%",
+			"%MED-%"+query+"%",
+		)
+	}
+
+	if category != "" && category != "all" {
+		dbQuery = dbQuery.Where("LOWER(category) LIKE LOWER(?)", "%"+category+"%")
 	}
 
 	if err := dbQuery.Find(&medicines).Error; err != nil {
@@ -85,9 +99,100 @@ func UpdateMedicineStock(c *gin.Context) {
 		return
 	}
 
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", medicine)
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":   "success",
 		"message":  "Stock updated successfully",
 		"medicine": medicine,
 	})
 }
+
+// DTO สำหรับการเพิ่มยาใหม่เข้าคลัง
+type CreateMedicineRequest struct {
+	MedicineCode  string  `json:"medicine_code"`
+	Name          string  `json:"name" binding:"required"`
+	GenericName   string  `json:"generic_name"`
+	Category      string  `json:"category"`
+	Properties    string  `json:"properties"`
+	Dosage        string  `json:"dosage"`
+	Manufacturer  string  `json:"manufacturer"`
+	StockQuantity int     `json:"stock_quantity"`
+	UnitPrice     float64 `json:"unit_price"`
+}
+
+// POST /api/pharmacy/medicines - เพิ่มยาใหม่เข้าคลัง
+func CreateMedicine(c *gin.Context) {
+	var req CreateMedicineRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	code := req.MedicineCode
+	if code == "" {
+		var count int64
+		config.DB.Model(&models.Medicine{}).Count(&count)
+		code = fmt.Sprintf("MED-%03d", count+1)
+	}
+
+	medicine := models.Medicine{
+		MedicineCode:  code,
+		Name:          req.Name,
+		GenericName:   req.GenericName,
+		Category:      req.Category,
+		Properties:    req.Properties,
+		Dosage:        req.Dosage,
+		Manufacturer:  req.Manufacturer,
+		StockQuantity: req.StockQuantity,
+		UnitPrice:     req.UnitPrice,
+	}
+
+	if err := config.DB.Create(&medicine).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create medicine: " + err.Error()})
+		return
+	}
+
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", medicine)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"status":   "success",
+		"message":  "Medicine created successfully",
+		"medicine": medicine,
+	})
+}
+
+// DELETE /api/pharmacy/medicines/:id - ลบยาออกจากคลัง
+func DeleteMedicine(c *gin.Context) {
+	param := c.Param("id")
+
+	var medicine models.Medicine
+	var err error
+
+	if id, parseErr := strconv.Atoi(param); parseErr == nil {
+		err = config.DB.Where("id = ?", id).First(&medicine).Error
+	} else {
+		err = config.DB.Where("medicine_code = ?", param).First(&medicine).Error
+	}
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Medicine not found: " + err.Error()})
+		return
+	}
+
+	// ลบรายการอ้างอิงใน dispensings เพื่อไม่ให้ติด Foreign Key Constraint
+	config.DB.Where("medicine_id = ?", medicine.ID).Delete(&models.Dispensing{})
+
+	if err := config.DB.Delete(&medicine).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete medicine: " + err.Error()})
+		return
+	}
+
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", gin.H{"deleted_code": medicine.MedicineCode})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Medicine deleted successfully",
+	})
+}
+

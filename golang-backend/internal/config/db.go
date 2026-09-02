@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	"clinic-backend/internal/models"
@@ -35,14 +36,6 @@ func ConnectDB() {
 
 	if err != nil {
 		log.Fatal("Failed to connect database. Error: ", err)
-	}
-
-	// Connection Pool Optimization (ลด Overhead ของ TCP/TLS Handshake)
-	sqlDB, err := database.DB()
-	if err == nil {
-		sqlDB.SetMaxIdleConns(10)
-		sqlDB.SetMaxOpenConns(50)
-		sqlDB.SetConnMaxLifetime(time.Hour)
 	}
 
 	log.Println("Database Connection Established Successfully")
@@ -100,17 +93,9 @@ func seedDatabase() {
 		{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
 		{Username: "doctor3", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
 	}
-	
-	// Batch Check: โหลดรายชื่อ username ที่มีอยู่แล้วด้วย 1 Query เดียวแทนการยิงทีละคน
-	var existingUsernames []string
-	DB.Model(&models.User{}).Pluck("username", &existingUsernames)
-	existingMap := make(map[string]bool)
-	for _, u := range existingUsernames {
-		existingMap[u] = true
-	}
-
 	for i := range users {
-		if !existingMap[users[i].Username] {
+		var existing models.User
+		if err := DB.Where("username = ?", users[i].Username).First(&existing).Error; err != nil {
 			DB.Create(&users[i])
 		}
 	}
@@ -447,5 +432,103 @@ func seedDatabase() {
 			DB.Create(&screenings[i])
 		}
 		log.Println("Screenings and Vitals seeded successfully.")
+
+		// 6. Seed Medicines
+		var medCount int64
+		DB.Model(&models.Medicine{}).Count(&medCount)
+		var medicines []models.Medicine
+		if medCount == 0 {
+			medicines = []models.Medicine{
+				{MedicineCode: "MED-001", Name: "Paracetamol 500mg", GenericName: "Paracetamol (Acetaminophen)", Category: "ยาลดไข้ บรรเทาปวด", Properties: "บรรเทาอาการปวดเล็กน้อยถึงปานกลาง และลดไข้", Dosage: "ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.", Manufacturer: "สยามเภสัช", StockQuantity: 1000, UnitPrice: 10.0},
+				{MedicineCode: "MED-002", Name: "Amoxicillin 500mg", GenericName: "Amoxicillin Trihydrate", Category: "ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย", Properties: "รักษาการติดเชื้อแบคทีเรียระบบทางเดินหายใจ ทางเดินปัสสาวะ", Dosage: "ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร", Manufacturer: "องค์การเภสัชกรรม (GPO)", StockQuantity: 48, UnitPrice: 50.0},
+				{MedicineCode: "MED-003", Name: "Ibuprofen 400mg", GenericName: "Ibuprofen (NSAID)", Category: "ยาต้านการอักเสบ (NSAIDs)", Properties: "ลดการอักเสบ ปวดข้อ ปวดกล้ามเนื้อ ปวดฟัน", Dosage: "ครั้งละ 1 เม็ด วันละ 2-3 ครั้ง หลังอาหารทันที", Manufacturer: "เบอร์ลินซัพพลาย", StockQuantity: 0, UnitPrice: 30.0},
+				{MedicineCode: "MED-004", Name: "Cetirizine 10mg", GenericName: "Cetirizine Dihydrochloride", Category: "ยาแก้อาการแพ้ ต้านฮิสตามีน", Properties: "รักษาอาการแพ้อากาศ ลมพิษ น้ำมูกไหล จาม คันตา", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนนอน", Manufacturer: "เมดฮับ ฟาร์มาซูติคอล", StockQuantity: 600, UnitPrice: 15.0},
+				{MedicineCode: "MED-005", Name: "Omeprazole 20mg", GenericName: "Omeprazole Magnesium", Category: "ยาลดกรดในกระเพาะอาหาร", Properties: "รักษาโรคกรดไหลย้อน แผลในกระเพาะอาหาร", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนอาหารเช้า 30 นาที", Manufacturer: "แอสตร้าเซนเนก้า", StockQuantity: 400, UnitPrice: 25.0},
+				{MedicineCode: "MED-006", Name: "Amlodipine 5mg", GenericName: "Amlodipine Besylate", Category: "ยาลดความดันโลหิต", Properties: "ควบคุมระดับความดันโลหิต ป้องกันภาวะเจ็บหน้าอก", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ตอนเช้า", Manufacturer: "ไฟเซอร์ (Pfizer)", StockQuantity: 30, UnitPrice: 20.0},
+				{MedicineCode: "MED-007", Name: "Metformin 500mg", GenericName: "Metformin Hydrochloride", Category: "ยาควบคุมระดับน้ำตาล (เบาหวาน)", Properties: "ลดการสร้างน้ำตาลที่ตับ และเพิ่มความไวต่ออินซูลิน", Dosage: "ครั้งละ 1 เม็ด พร้อมอาหารเช้า-เย็น", Manufacturer: "สยามเภสัช", StockQuantity: 700, UnitPrice: 12.0},
+				{MedicineCode: "MED-008", Name: "Losartan 50mg", GenericName: "Losartan Potassium", Category: "ยาลดความดันโลหิต", Properties: "ขยายหลอดเลือด ลดความดันโลหิตและปกป้องไต", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง", Manufacturer: "เอ็มเอสดี (MSD)", StockQuantity: 450, UnitPrice: 40.0},
+				{MedicineCode: "MED-009", Name: "Bromhexine 8mg", GenericName: "Bromhexine Hydrochloride", Category: "ยาละลายเสมหะ", Properties: "ช่วยขับเสมหะ ละลายเสมหะที่เหนียวข้นในทางเดินหายใจ", Dosage: "ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร", Manufacturer: "เมดฮับ ฟาร์มาซูติคอล", StockQuantity: 350, UnitPrice: 18.0},
+				{MedicineCode: "MED-010", Name: "Dextromethorphan 15mg", GenericName: "Dextromethorphan HBr", Category: "ยากดอาการไอ", Properties: "บรรเทาอาการไอแห้ง ไอไม่มีเสมหะ", Dosage: "ครั้งละ 1 เม็ด ทุก 6-8 ชั่วโมง เมื่อมีอาการ", Manufacturer: "สยามเภสัช", StockQuantity: 25, UnitPrice: 15.0},
+				{MedicineCode: "MED-011", Name: "ORSLyte Oral Rehydration Salts", GenericName: "Oral Rehydration Salts (ORS)", Category: "เกลือแร่ทดแทนน้ำ", Properties: "ชดเชยการสูญเสียน้ำและเกลือแร่จากอาการท้องเสีย ท้องร่วง", Dosage: "ละลายน้ำสะอาด 250ml จิบเรื่อยๆ เมื่อถ่ายเหลว", Manufacturer: "องค์การเภสัชกรรม (GPO)", StockQuantity: 800, UnitPrice: 8.0},
+				{MedicineCode: "MED-012", Name: "Simethicone 80mg", GenericName: "Simethicone Chewable", Category: "ยาขับลม ขับแก๊ส", Properties: "บรรเทาอาการท้องอืด ท้องเฟ้อ แน่นท้อง จากแก๊สในกระเพาะ", Dosage: "เคี้ยวครั้งละ 1 เม็ด หลังอาหาร 3 เวลา", Manufacturer: "เบอร์ลินซัพพลาย", StockQuantity: 500, UnitPrice: 10.0},
+			}
+			for i := range medicines {
+				DB.Create(&medicines[i])
+			}
+			log.Println("Medicines seeded successfully with full metadata.")
+		} else {
+			DB.Find(&medicines)
+		}
+
+		// 7. Seed Dispensing & Billing
+		var dispensingCount int64
+		DB.Model(&models.Dispensing{}).Count(&dispensingCount)
+		if dispensingCount == 0 && len(medicines) > 0 {
+			dispensings := []models.Dispensing{
+				{VisitID: visits[0].ID, MedicineID: medicines[0].ID, Quantity: 20, Dosage: "500mg", Instructions: "ทานครั้งละ 1 เม็ด ทุก 4-6 ชั่วโมง เวลามีไข้", DoctorID: users[3].ID},
+				{VisitID: visits[0].ID, MedicineID: medicines[3].ID, Quantity: 10, Dosage: "10mg", Instructions: "ทานครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนนอน", DoctorID: users[3].ID},
+				{VisitID: visits[1].ID, MedicineID: medicines[2].ID, Quantity: 15, Dosage: "400mg", Instructions: "ทานครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร", DoctorID: users[4].ID},
+				{VisitID: visits[3].ID, MedicineID: medicines[5].ID, Quantity: 30, Dosage: "5mg", Instructions: "ทานครั้งละ 1 เม็ด วันละ 1 ครั้ง หลังอาหารเช้า", DoctorID: users[4].ID},
+			}
+			for i := range dispensings {
+				DB.Create(&dispensings[i])
+			}
+			log.Println("Dispensing seeded successfully.")
+		}
+
+		var billingCount int64
+		DB.Model(&models.Billing{}).Count(&billingCount)
+		if billingCount == 0 {
+			billings := []models.Billing{
+				{VisitID: visits[0].ID, TotalAmount: 550.0, DiscountFromEligibility: 50.0, NetAmount: 500.0, PaymentMethod: "QR Code", PaymentStatus: "paid", ReceiptNumber: "REC-2607-001"},
+				{VisitID: visits[1].ID, TotalAmount: 850.0, DiscountFromEligibility: 0.0, NetAmount: 850.0, PaymentMethod: "เงินสด", PaymentStatus: "pending", ReceiptNumber: "REC-2607-002"},
+				{VisitID: visits[3].ID, TotalAmount: 1200.0, DiscountFromEligibility: 1200.0, NetAmount: 0.0, PaymentMethod: "-", PaymentStatus: "paid", ReceiptNumber: "REC-2607-003"},
+			}
+			for i := range billings {
+				DB.Create(&billings[i])
+			}
+			log.Println("Billings seeded successfully.")
+
+			qrPayments := []models.QRPayment{
+				{BillingID: billings[0].ID, QRCodeData: "00020101021129370016A000000677010111011300668999911115802TH53037645405500.006304EE88", PromptPayID: "089-999-1111", Amount: 500.0, Status: "paid"},
+			}
+			for i := range qrPayments {
+				DB.Create(&qrPayments[i])
+			}
+			log.Println("QRPayments seeded successfully.")
+		}
+	}
+
+	// 8. Auto Sync patient_medicines DB table from patients if empty
+	var pmCount int64
+	DB.Model(&models.PatientMedicine{}).Count(&pmCount)
+	if pmCount == 0 {
+		var allPatients []models.Patient
+		DB.Find(&allPatients)
+		if len(allPatients) > 0 {
+			rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+			bloodTypes := []string{"A+", "B+", "O+", "AB+", "O-"}
+			for _, p := range allPatients {
+				age := time.Now().Year() - p.BirthDate.Year()
+				if age <= 0 || age > 120 {
+					age = 30 + rng.Intn(30)
+				}
+				pm := models.PatientMedicine{
+					HN:              p.HN,
+					NationalID:      p.NationalID,
+					FullName:        p.FullName,
+					Gender:          p.Gender,
+					Age:             age,
+					BloodType:       bloodTypes[rng.Intn(len(bloodTypes))],
+					SchemeType:      p.SchemeType,
+					Allergies:       p.Allergies,
+					ChronicDiseases: p.ChronicDiseases,
+					PhoneNumber:     p.PhoneNumber,
+					VisitCount:      rng.Intn(5) + 1,
+				}
+				DB.Create(&pm)
+			}
+			log.Println("Seeded patient_medicines DB table successfully.")
+		}
 	}
 }

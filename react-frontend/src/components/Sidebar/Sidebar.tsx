@@ -88,6 +88,28 @@ const renderNavIcon = (iconType: NavItem['iconType']) => {
           <path d="M9 12h6m-6 4h4M7 3.5h10a2 2 0 012 2V19a2 2 0 01-2 2H7a2 2 0 01-2-2V5.5a2 2 0 012-2z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       );
+    case 'document':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M14 2v6h6" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+    case 'calendar':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+          <line x1="16" y1="2" x2="16" y2="6" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+          <line x1="8" y1="2" x2="8" y2="6" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+          <line x1="3" y1="10" x2="21" y2="10" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
+    case 'forward':
+      return (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeWidth="1.66667" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      );
     default:
       return null;
   }

@@ -182,7 +182,8 @@
 .stat-sub-text {
   font-family: var(--font-primary);
   font-size: 13.5px;
-  color: #94A3B8;
+  font-weight: 500;
+  color: #64748B;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -741,22 +742,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 16px;
-  min-width: 120px;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  min-width: 110px;
   background: #2563EB;
   color: #FFFFFF;
   border: 1.5px solid transparent;
   border-radius: 8px;
   font-family: var(--font-primary);
   font-weight: 600;
-  font-size: 14.5px;
+  font-size: 13.5px;
   line-height: 20px;
   white-space: nowrap;
   flex-shrink: 0;
   cursor: pointer;
   box-sizing: border-box;
+  margin: 0 auto;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(37, 99, 235, 0.18);
 }
