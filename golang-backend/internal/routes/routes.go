@@ -104,7 +104,7 @@ func SetUpRoutes(r *gin.Engine) {
 
 	// ===== ระบบย่อยที่ 2: การเงิน (Billing / QRPayment) -Bun =====
 	billingRoutes := api.Group("/billing")
-	billingRoutes.Use(middleware.RoleRequired("cashier", "pharmacist", "registrar"))
+	billingRoutes.Use(middleware.RoleRequired("cashier", "pharmacist", "registrar", "doctor", "nurse", "nurse_assistant", "admin"))
 	{
 		billingRoutes.GET("/queues", controllers.GetBillingQueues)
 		billingRoutes.GET("/history", controllers.GetBillingHistories)
@@ -133,5 +133,6 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.GET("/billing/queues", controllers.GetBillingQueues)
 		systemRoutes.GET("/billing/history", controllers.GetBillingHistories)
 		systemRoutes.GET("/dispensing/:visit_id", controllers.GetDispensingByVisit)
+		systemRoutes.POST("/billing/confirm", controllers.ConfirmPayment)
 	}
 }

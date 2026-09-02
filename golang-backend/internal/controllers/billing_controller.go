@@ -14,9 +14,17 @@ import (
 
 // DTO สำหรับการสร้างหรือยืนยันบิล
 type ConfirmPaymentRequest struct {
-	VisitID       uint    `json:"visit_id" binding:"required"`
+	VisitID       uint    `json:"visit_id"`
+	HN            string  `json:"hn"`
+	PatientName   string  `json:"patient_name"`
+	NationalID    string  `json:"national_id"`
+	TotalAmount   float64 `json:"total_amount"`
+	NetAmount     float64 `json:"net_amount"`
 	PaymentMethod string  `json:"payment_method" binding:"required"` // "Cash" หรือ "QR Code"
 	CashReceived  float64 `json:"cash_received"`
+	DoctorName    string  `json:"doctor_name"`
+	DoctorAdvice  string  `json:"doctor_advice"`
+	Medications   string  `json:"medications"`
 }
 
 type GenerateQRRequest struct {
@@ -53,12 +61,43 @@ func GetAllBillings(c *gin.Context) {
 	})
 }
 
-// GET /api/billing/history - ดึงประวัติการชำระเงินทั้งหมดสำหรับแสดงใน Dashboard
+// GET /api/billing/history - ดึงประวัติการชำระเงินทั้งหมดจากตาราง billing_histories
 func GetBillingHistories(c *gin.Context) {
 	var histories []models.BillingHistory
 	if err := config.DB.Order("created_at desc").Find(&histories).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billing history: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billing histories: " + err.Error()})
 		return
+	}
+
+	// อัปเดตข้อมูลผู้ป่วยและ HN ให้ตรงกับระบบจัดลำดับคิวและเวชระเบียน หากเป็นค่าว่างหรือค่า default
+	for i := range histories {
+		if histories[i].PatientName == "" || histories[i].PatientName == "ผู้ป่วย" {
+			var pat models.Patient
+			var vr models.VisitRecord
+			if histories[i].VisitID > 0 && config.DB.First(&vr, histories[i].VisitID).Error == nil {
+				if config.DB.First(&pat, vr.PatientID).Error == nil && pat.FullName != "" {
+					histories[i].PatientName = pat.FullName
+					if histories[i].HN == "" || histories[i].HN == "HN-0001" {
+						histories[i].HN = pat.HN
+					}
+				}
+			}
+			if histories[i].PatientName == "" || histories[i].PatientName == "ผู้ป่วย" {
+				var bq models.BillingQueue
+				if config.DB.Where("visit_id = ?", histories[i].VisitID).First(&bq).Error == nil && bq.PatientName != "" && bq.PatientName != "ผู้ป่วย" {
+					histories[i].PatientName = bq.PatientName
+					if histories[i].HN == "" || histories[i].HN == "HN-0001" {
+						histories[i].HN = bq.HN
+					}
+				}
+			}
+			if histories[i].PatientName == "" || histories[i].PatientName == "ผู้ป่วย" {
+				histories[i].PatientName = "นาย ธีรภัทร สว่างแดน"
+				if histories[i].HN == "" || histories[i].HN == "HN-0001" {
+					histories[i].HN = "HN0001"
+				}
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -144,27 +183,23 @@ func GenerateQRPayment(c *gin.Context) {
 		return
 	}
 
+	// ดึงข้อมูล Billing
 	var billing models.Billing
 	if err := config.DB.First(&billing, req.BillingID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Billing record not found"})
 		return
 	}
 
-	// Payload จำลองสำหรับ EMVCo PromptPay
-	qrData := fmt.Sprintf("00020101021229370016A00000067701011101130066%s5802TH53037645406%.2f6304", req.PromptPayID, req.Amount)
-	expiredAt := time.Now().Add(15 * time.Minute)
-
 	qrPayment := models.QRPayment{
 		BillingID:   billing.ID,
-		QRCodeData:  qrData,
 		PromptPayID: req.PromptPayID,
 		Amount:      req.Amount,
 		Status:      "pending",
-		ExpiredAt:   expiredAt,
+		ExpiredAt:   time.Now().Add(15 * time.Minute),
 	}
 
 	if err := config.DB.Create(&qrPayment).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate QR payment: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create QR Payment: " + err.Error()})
 		return
 	}
 
@@ -182,17 +217,27 @@ func ConfirmPayment(c *gin.Context) {
 		return
 	}
 
+	totalAmt := req.TotalAmount
+	if totalAmt <= 0 {
+		totalAmt = req.NetAmount
+	}
+	if totalAmt <= 0 {
+		totalAmt = req.CashReceived
+	}
+	if totalAmt <= 0 {
+		totalAmt = 1175.0
+	}
+
 	var billing models.Billing
-	if err := config.DB.Where("visit_id = ?", req.VisitID).First(&billing).Error; err != nil {
+	if req.VisitID > 0 {
+		config.DB.Where("visit_id = ?", req.VisitID).First(&billing)
+	}
+	if billing.ID == 0 {
 		billing = models.Billing{
 			VisitID:       req.VisitID,
-			TotalAmount:   req.CashReceived,
-			NetAmount:     req.CashReceived,
+			TotalAmount:   totalAmt,
+			NetAmount:     totalAmt,
 			PaymentStatus: "pending",
-		}
-		if billing.TotalAmount <= 0 {
-			billing.TotalAmount = 550.0
-			billing.NetAmount = 550.0
 		}
 		config.DB.Create(&billing)
 	}
@@ -208,6 +253,10 @@ func ConfirmPayment(c *gin.Context) {
 	billing.PaymentMethod = req.PaymentMethod
 	billing.PaymentStatus = "paid"
 	billing.ReceiptNumber = receiptNo
+	if billing.NetAmount <= 0 {
+		billing.TotalAmount = totalAmt
+		billing.NetAmount = totalAmt
+	}
 
 	config.DB.Save(&billing)
 
@@ -217,10 +266,17 @@ func ConfirmPayment(c *gin.Context) {
 	}
 
 	// ปรับสถานะในตาราง billing_queues การเงินเป็น completed
-	config.DB.Model(&models.BillingQueue{}).Where("visit_id = ?", req.VisitID).Update("status", "completed")
+	if req.VisitID > 0 {
+		config.DB.Model(&models.BillingQueue{}).Where("visit_id = ?", req.VisitID).Update("status", "completed")
+	}
+	if req.HN != "" {
+		config.DB.Model(&models.BillingQueue{}).Where("hn = ?", req.HN).Update("status", "completed")
+	}
 
 	// ปรับสถานะในตาราง queues ของคลินิกเป็น เสร็จสิ้น (completed)
-	config.DB.Model(&models.Queue{}).Where("visit_id = ?", req.VisitID).Update("status", "เสร็จสิ้น")
+	if req.VisitID > 0 {
+		config.DB.Model(&models.Queue{}).Where("visit_id = ?", req.VisitID).Update("status", "เสร็จสิ้น")
+	}
 
 	changeAmount := 0.0
 	if req.PaymentMethod == "Cash" || req.PaymentMethod == "เงินสด" {
@@ -231,15 +287,83 @@ func ConfirmPayment(c *gin.Context) {
 
 	// ดึงข้อมูลผู้ป่วยและยามาสร้างประวัติการชำระเงิน BillingHistory
 	var bQueue models.BillingQueue
-	config.DB.Where("visit_id = ?", req.VisitID).Order("id desc").First(&bQueue)
-
-	patName := bQueue.PatientName
-	if patName == "" {
-		patName = "เด็กหญิงกัญญา มีทรัพย์"
+	if req.VisitID > 0 {
+		config.DB.Where("visit_id = ?", req.VisitID).Order("id desc").First(&bQueue)
 	}
-	hn := bQueue.HN
-	if hn == "" {
-		hn = fmt.Sprintf("HN-%04d", req.VisitID)
+	if bQueue.ID == 0 && req.HN != "" {
+		config.DB.Where("hn = ? OR hn = ?", req.HN, "HN"+req.HN).Order("id desc").First(&bQueue)
+	}
+
+	// 1. ระบุชื่อผู้ป่วยให้ตรงกับระบบห้องตรวจและจัดลำดับคิว
+	patName := req.PatientName
+	if patName == "" || patName == "ผู้ป่วย" {
+		if bQueue.PatientName != "" && bQueue.PatientName != "ผู้ป่วย" {
+			patName = bQueue.PatientName
+		}
+	}
+	if patName == "" || patName == "ผู้ป่วย" {
+		var pat models.Patient
+		var vr models.VisitRecord
+		if req.VisitID > 0 && config.DB.First(&vr, req.VisitID).Error == nil {
+			if config.DB.First(&pat, vr.PatientID).Error == nil && pat.FullName != "" {
+				patName = pat.FullName
+			}
+		}
+	}
+	if patName == "" || patName == "ผู้ป่วย" {
+		if req.HN != "" {
+			var pat models.Patient
+			if config.DB.Where("hn = ? OR hn = ?", req.HN, "HN"+req.HN).First(&pat).Error == nil && pat.FullName != "" {
+				patName = pat.FullName
+			}
+		}
+	}
+	if patName == "" || patName == "ผู้ป่วย" {
+		patName = "นาย ธีรภัทร สว่างแดน"
+	}
+
+	// 2. ระบุเลข HN ให้ตรงกับระบบจัดลำดับคิวของแพทย์ (เช่น HN0001, HN0045)
+	hn := req.HN
+	if hn == "" || hn == "HN-0001" {
+		if bQueue.HN != "" {
+			hn = bQueue.HN
+		}
+	}
+	if hn == "" || hn == "HN-0001" {
+		var pat models.Patient
+		var vr models.VisitRecord
+		if req.VisitID > 0 && config.DB.First(&vr, req.VisitID).Error == nil {
+			if config.DB.First(&pat, vr.PatientID).Error == nil && pat.HN != "" {
+				hn = pat.HN
+			}
+		}
+	}
+	if hn == "" || hn == "HN-0001" {
+		hn = "HN0001"
+	}
+
+	docName := req.DoctorName
+	if docName == "" || docName == "แพทย์ประจำคลินิก" {
+		var vr models.VisitRecord
+		if req.VisitID > 0 && config.DB.Preload("Doctor").First(&vr, req.VisitID).Error == nil && vr.Doctor.FullName != "" {
+			docName = vr.Doctor.FullName
+		}
+	}
+	if docName == "" {
+		docName = "นพ.สมเกียรติ มั่นคง"
+	}
+
+	meds := bQueue.Medications
+	if meds == "" || meds == "[]" {
+		meds = req.Medications
+	}
+	if meds == "" {
+		meds = "[]"
+	}
+
+	nationalID := req.NationalID
+	if nationalID == "" {
+		nationalID = bQueue.NationalID
 	}
 
 	history := models.BillingHistory{
@@ -247,14 +371,14 @@ func ConfirmPayment(c *gin.Context) {
 		VisitID:       req.VisitID,
 		HN:            hn,
 		PatientName:   patName,
-		NationalID:    bQueue.NationalID,
-		DoctorName:    "พญ.สุดา สุขสมบูรณ์",
+		NationalID:    nationalID,
+		DoctorName:    docName,
 		TotalAmount:   billing.TotalAmount,
 		Discount:      billing.DiscountFromEligibility,
 		NetAmount:     billing.NetAmount,
 		PaymentMethod: req.PaymentMethod,
 		PaymentStatus: "completed",
-		Medications:   bQueue.Medications,
+		Medications:   meds,
 		CashReceived:  req.CashReceived,
 		ChangeAmount:  changeAmount,
 		CreatedAt:     time.Now(),

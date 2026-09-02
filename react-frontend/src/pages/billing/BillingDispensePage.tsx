@@ -270,6 +270,7 @@ export default function BillingDispensePage({
     if (onSelectPatientId) {
       onSelectPatientId(activePatient.id);
     }
+    localStorage.setItem('billing_active_patient', activePatient.id);
     if (onNavigateToBilling) {
       onNavigateToBilling();
     }
@@ -470,7 +471,7 @@ export default function BillingDispensePage({
                             padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
                             whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center'
                           }}>
-                            {p.treatmentRights.includes('30') ? 'บัตรทอง (สปสช.)' : p.treatmentRights}
+                            {(p.treatmentRights || '').includes('30') ? 'บัตรทอง (สปสช.)' : (p.treatmentRights || 'บัตรทอง (สปสช.)')}
                           </span>
                         </td>
 
