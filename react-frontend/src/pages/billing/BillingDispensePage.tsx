@@ -42,17 +42,21 @@ export default function BillingDispensePage({
   // คิวเริ่มต้น - เริ่มจากตารางว่างเปล่าแบบ Clean State
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
 
+  // Current active patient object
+  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0];
+  const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
+
   const filteredQueue = queueList.filter(p => {
     if (!searchQueueInput.trim()) return true;
     const q = searchQueueInput.trim().toLowerCase();
     const cleanNationalId = p.nationalId ? p.nationalId.replace(/-/g, '') : '';
     const cleanQ = q.replace(/-/g, '');
     return (
-      p.id.toLowerCase().includes(q) ||
-      p.hn.toLowerCase().includes(q) ||
+      (p.id || '').toLowerCase().includes(q) ||
+      (p.hn || '').toLowerCase().includes(q) ||
       cleanNationalId.includes(cleanQ) ||
-      p.name.toLowerCase().includes(q) ||
-      p.shortName.toLowerCase().includes(q)
+      (p.name || '').toLowerCase().includes(q) ||
+      (p.shortName || '').toLowerCase().includes(q)
     );
   });
 
@@ -64,8 +68,60 @@ export default function BillingDispensePage({
     const fetchInitialQueue = async () => {
       try {
         const token = localStorage.getItem('token');
-        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
         
+        // 1. ลองดึงจากตาราง billing_queues ก่อน
+        let bRes = await fetch('/api/billing/queues', { headers });
+        if (!bRes.ok) {
+          bRes = await fetch('/api/system/billing/queues');
+        }
+        if (bRes.ok) {
+          const bData = await bRes.json();
+          if (bData.status === 'success' && Array.isArray(bData.queues) && bData.queues.length > 0) {
+            const mapped = bData.queues.map((bq: any) => {
+              let parsedMeds = [];
+              if (bq.medications) {
+                try {
+                  parsedMeds = typeof bq.medications === 'string' ? JSON.parse(bq.medications) : bq.medications;
+                } catch {}
+              }
+              return {
+                id: String(bq.id),
+                visitId: bq.visit_id || 1,
+                hn: bq.hn || `HN-${bq.id}`,
+                nationalId: bq.national_id || '',
+                queueNumber: bq.queue_number || 'Q0001',
+                ticket: bq.queue_number || 'A-01',
+                name: bq.patient_name || 'ผู้ป่วย',
+                shortName: bq.patient_name || 'ผู้ป่วย',
+                gender: bq.gender || 'ชาย',
+                age: bq.age || 35,
+                treatmentRights: bq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+                patientType: 'ผู้ป่วยนอก (OPD)' as const,
+                allergies: ['ไม่มีประวัติแพ้ยา'],
+                chronicDiseases: 'ไม่มี',
+                vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+                visitStatus: 'จ่ายยาแล้ว / รอชำระเงิน',
+                visitDate: new Date(bq.created_at || Date.now()).toLocaleDateString('th-TH'),
+                visitTime: new Date(bq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+                doctorAdvice: bq.doctor_advice || 'พักผ่อนให้เพียงพอ',
+                medications: parsedMeds
+              };
+            });
+            setQueueList(mapped);
+            setLocalPatientId(prev => {
+              if (mapped.length > 0) {
+                if (!prev || !mapped.find((q: any) => q.id === prev)) {
+                  return mapped[0].id;
+                }
+              }
+              return prev;
+            });
+            return;
+          }
+        }
+
+        // 2. Fallback ไปที่ /api/queue/list
         let res = await fetch('/api/queue/list', { headers });
         if (!res.ok) {
           res = await fetch('/api/system/queue/list');
@@ -229,9 +285,6 @@ export default function BillingDispensePage({
     return () => clearTimeout(timer1);
   }, []);
 
-  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0];
-  const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
-
   const handleSelectPatient = (id: string) => {
     setLocalPatientId(id);
     if (onSelectPatientId) {
@@ -249,10 +302,26 @@ export default function BillingDispensePage({
     }
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
     if (!activePatient) return;
     triggerToast(`ชำระเงินเรียบร้อยแล้วสำหรับ ${activePatient.name} (ออกใบเสร็จชำระเงินสำเร็จ)`, 'success');
     
+    try {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      await fetch('/api/billing/confirm', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          visit_id: activePatient.visitId || 1,
+          payment_method: 'Cash',
+          cash_received: medTotal
+        })
+      });
+    } catch {}
+
     if (onSelectPatientId) {
       onSelectPatientId(activePatient.id);
     }
@@ -270,7 +339,9 @@ export default function BillingDispensePage({
     }
   };
 
-  const medTotal = activePatient ? activePatient.medications.reduce((sum, m) => sum + m.price, 0) : 0;
+  const medTotal = activePatient && Array.isArray(activePatient.medications) 
+    ? activePatient.medications.reduce((sum, m) => sum + (Number(m?.price) || 0), 0) 
+    : 0;
 
   return (
     <div className="billing-dispense-container">
@@ -414,16 +485,15 @@ export default function BillingDispensePage({
 
             {/* Patients Table */}
             <div style={{ overflowX: 'auto', marginTop: '16px' }}>
-              <table style={{ width: '100%', minWidth: '950px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+              <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                 <thead>
                   <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>ลำดับคิว</th>
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>HN</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>ประเภท</th>
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'left' }}>ชื่อ-นามสกุล คนไข้</th>
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>เลขบัตรประชาชน</th>
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>ดำเนินการ</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -450,33 +520,21 @@ export default function BillingDispensePage({
                             {p.hn.replace(/[-]/g, '')}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                          <span style={{ 
-                            background: p.patientType.includes('OPD') ? '#EFF6FF' : '#F3E8FF', 
-                            color: p.patientType.includes('OPD') ? '#1D4ED8' : '#6D28D9', 
-                            border: `1px solid ${p.patientType.includes('OPD') ? '#BFDBFE' : '#DDD6FE'}`,
-                            padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
-                            whiteSpace: 'nowrap', display: 'inline-block'
-                          }}>
-                            {p.patientType.includes('OPD') ? 'OPD (ผู้ป่วยนอก)' : 'IPD (ผู้ป่วยใน)'}
-                          </span>
-                        </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'left' }}>
-                          <div className="patient-table-name" style={{ whiteSpace: 'nowrap' }}>{p.name}</div>
+                          <div className="patient-table-name" style={{ fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>{p.name}</div>
                         </td>
-                        <td className="patient-table-sub" style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                          {p.nationalId}
+                        <td className="patient-table-sub" style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center', color: '#64748B' }}>
+                          {p.nationalId || '-'}
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <span style={{ 
-                            background: p.treatmentRights.includes('30') ? '#FEF9C3' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
-                            color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
-                            border: `1px solid ${p.treatmentRights.includes('30') ? '#FDE68A' : p.treatmentRights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
+                            background: '#F3E8FF',
+                            color: '#7E22CE',
+                            border: '1px solid #E9D5FF',
                             padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
-                            whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center',
-                            width: '175px', textAlign: 'center', boxSizing: 'border-box'
+                            whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center'
                           }}>
-                            {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
+                            {p.treatmentRights.includes('30') ? 'บัตรทอง (สปสช.)' : p.treatmentRights}
                           </span>
                         </td>
 
@@ -484,23 +542,23 @@ export default function BillingDispensePage({
                           <button 
                             onClick={() => handleSelectPatient(p.id)}
                             style={{ 
-                              padding: '8px 20px', 
+                              padding: '8px 22px', 
                               background: localPatientId === p.id ? '#10B981' : '#2563EB', 
                               color: 'white', border: 'none', borderRadius: '10px', 
                               cursor: 'pointer', fontWeight: '700', fontSize: '14px',
                               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                              whiteSpace: 'nowrap', minWidth: '100px',
+                              whiteSpace: 'nowrap', minWidth: '95px',
                               boxShadow: localPatientId === p.id ? '0 2px 6px rgba(16, 185, 129, 0.25)' : '0 2px 6px rgba(37, 99, 235, 0.25)'
                             }}
                           >
-                            {localPatientId === p.id ? 'เลือกอยู่' : 'ชำระเงิน'}
+                            {localPatientId === p.id ? 'เลือกอยู่' : 'เลือกคนไข้'}
                           </button>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={9} style={{ padding: '24px', textAlign: 'center', color: '#EF4444', background: '#FEF2F2' }}>
+                      <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: '#EF4444', background: '#FEF2F2' }}>
                         ไม่พบข้อมูลผู้ป่วยที่ตรงกับคำค้นหา "{searchQueueInput}"
                       </td>
                     </tr>
@@ -544,11 +602,11 @@ export default function BillingDispensePage({
                 </tr>
               </thead>
               <tbody>
-                {activePatient.medications.map((med, idx) => (
+                {(activePatient?.medications || []).map((med, idx) => (
                   <tr key={idx}>
                     <td className="item-name font-bold">{med.name}</td>
                     <td>{med.dosage}</td>
-                    <td style={{ textAlign: 'right' }}>1</td>
+                    <td style={{ textAlign: 'right' }}>{(med as any).quantity || 1}</td>
                   </tr>
                 ))}
               </tbody>
@@ -576,13 +634,13 @@ export default function BillingDispensePage({
             </div>
 
             <div className="summary-items">
-              {activePatient.medications.map((med, idx) => (
+              {(activePatient?.medications || []).map((med, idx) => (
                 <div key={idx} className="summary-item">
                   <div className="item-details">
                     <div className="item-title">{med.name}</div>
                     <div className="item-sub">{med.dosage}</div>
                   </div>
-                  <div className="item-price">฿ {med.price.toLocaleString()}</div>
+                  <div className="item-price">฿ {(Number(med.price) || 0).toLocaleString()}</div>
                 </div>
               ))}
             </div>

@@ -8,54 +8,80 @@ interface BillingInvoicePageProps {
   onSelectPatientId?: (id: string) => void;
   patientRightsMap?: Record<string, string>;
   onUpdatePatientRights?: (patientId: string, rights: string) => void;
+  onNavigateToDashboard?: () => void;
 }
 
 export default function BillingInvoicePage({ 
   selectedPatientId, 
   onSelectPatientId,
   patientRightsMap,
-  onUpdatePatientRights
+  onUpdatePatientRights,
+  onNavigateToDashboard
 }: BillingInvoicePageProps) {
   const { subscribe } = useWebSocket();
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
 
-  useEffect(() => {
-    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
-      if (data) {
-        const pName = data.patient_name || data.patient?.full_name || `ผู้ป่วย คิว #${data.visit_id || ''}`;
-        const dynamicMedications = data.medications || [];
+  const fetchQueues = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-        const newPatient: PatientConfig = {
-          id: `HN-${data.patient_id || data.visit_id || Date.now()}`,
-          hn: data.hn || `HN-${data.patient_id || data.visit_id || Date.now()}`,
-          nationalId: data.national_id || '1101800234567',
-          queueNumber: data.queue_number || 'Q0001',
-          ticket: 'A-01',
-          name: pName,
-          shortName: pName,
-          gender: 'ชาย',
-          age: 35,
-          dob: '01/01/2534',
-          phone: '081-999-8888',
-          occupation: 'รับจ้างทั่วไป',
-          treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
-          patientType: 'ผู้ป่วยนอก (OPD)',
-          allergies: ['ไม่มีประวัติแพ้ยา'],
-          chronicDiseases: 'ไม่มี',
-          vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-          visitStatus: 'รอรับยา / ชำระเงิน',
-          visitDate: new Date().toLocaleDateString('th-TH'),
-          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-          doctorAdvice: 'พักผ่อนให้เพียงพอ',
-          medications: dynamicMedications,
-        };
-        setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
+      let bRes = await fetch('/api/billing/queues', { headers });
+      if (!bRes.ok) {
+        bRes = await fetch('/api/system/billing/queues');
       }
+      if (bRes.ok) {
+        const bData = await bRes.json();
+        if (bData.status === 'success' && Array.isArray(bData.queues) && bData.queues.length > 0) {
+          const mapped = bData.queues.map((bq: any) => {
+            let parsedMeds = [];
+            if (bq.medications) {
+              try {
+                parsedMeds = typeof bq.medications === 'string' ? JSON.parse(bq.medications) : bq.medications;
+              } catch {}
+            }
+            return {
+              id: String(bq.id),
+              visitId: bq.visit_id || 1,
+              hn: bq.hn || `HN-${bq.id}`,
+              nationalId: bq.national_id || '',
+              queueNumber: bq.queue_number || 'Q0001',
+              ticket: bq.queue_number || 'A-01',
+              name: bq.patient_name || 'ผู้ป่วย',
+              shortName: bq.patient_name || 'ผู้ป่วย',
+              gender: bq.gender || 'ชาย',
+              age: bq.age || 35,
+              treatmentRights: bq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+              patientType: 'ผู้ป่วยนอก (OPD)' as const,
+              allergies: ['ไม่มีประวัติแพ้ยา'],
+              chronicDiseases: 'ไม่มี',
+              vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+              visitStatus: 'รอชำระเงิน',
+              visitDate: new Date(bq.created_at || Date.now()).toLocaleDateString('th-TH'),
+              visitTime: new Date(bq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+              doctorAdvice: bq.doctor_advice || 'พักผ่อนให้เพียงพอ',
+              medications: parsedMeds
+            };
+          });
+          setQueueList(mapped);
+          return;
+        }
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchQueues();
+
+    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      fetchQueues();
     });
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
       if (data && data.action === 'db_reset') {
         setQueueList([]);
+      } else {
+        fetchQueues();
       }
     });
 
@@ -82,8 +108,27 @@ export default function BillingInvoicePage({
     setCashReceived('');
   };
 
-  const handleConfirmPayment = () => {
+  const handleConfirmPayment = async () => {
+    if (!activePatient) return;
     setIsPaymentConfirmed(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      await fetch('/api/billing/confirm', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          visit_id: activePatient.visitId || 1,
+          payment_method: paymentMethod === 'qr' ? 'QR Code' : 'เงินสด',
+          cash_received: parseFloat(cashReceived) || grandTotal
+        })
+      });
+    } catch (err) {
+      console.error('Failed to confirm payment:', err);
+    }
   };
 
   const handlePrintReceipt = () => {
@@ -97,7 +142,9 @@ export default function BillingInvoicePage({
   };
 
   // คำนวณยอดรวม
-  const medTotal = activePatient ? activePatient.medications.reduce((sum, m) => sum + m.price, 0) : 0;
+  const medTotal = activePatient && Array.isArray(activePatient.medications) 
+    ? activePatient.medications.reduce((sum, m) => sum + (Number(m?.price) || 0), 0) 
+    : 0;
   const medicalServiceFee = 800; // 500 (Doctor) + 300 (Clinic)
   const vatTax = Math.round(medTotal * 0.07);
   const grandTotal = medTotal + medicalServiceFee + vatTax;
@@ -401,6 +448,18 @@ export default function BillingInvoicePage({
                       <button className="receipt-btn digital-btn" onClick={handleSendDigitalReceipt}>
                         ส่งใบเสร็จดิจิทัล (SMS/Email)
                       </button>
+                      {onNavigateToDashboard && (
+                        <button 
+                          className="receipt-btn" 
+                          style={{ background: '#1D4ED8', color: 'white', border: 'none', fontWeight: '700', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer' }}
+                          onClick={() => {
+                            setShowQrModal(false);
+                            onNavigateToDashboard();
+                          }}
+                        >
+                          📊 ไปยังหน้า Dashboard (ประวัติการเงิน)
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (

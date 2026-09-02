@@ -143,6 +143,7 @@ function MainApp() {
           onSelectPatientId={setSelectedPatientId}
           patientRightsMap={patientRightsMap}
           onUpdatePatientRights={handleUpdatePatientRights}
+          onNavigateToDashboard={() => setActivePage('billing-dashboard')}
         />;
       case 'billing-dashboard':
         return <BillingDashboardPage />;

@@ -79,6 +79,8 @@ func SetUpRoutes(r *gin.Engine) {
 	billingRoutes := api.Group("/billing")
 	billingRoutes.Use(middleware.RoleRequired("cashier", "pharmacist", "registrar"))
 	{
+		billingRoutes.GET("/queues", controllers.GetBillingQueues)
+		billingRoutes.GET("/history", controllers.GetBillingHistories)
 		billingRoutes.GET("/list", controllers.GetAllBillings)
 		billingRoutes.GET("/visit/:visit_id", controllers.GetBillingByVisit)
 		billingRoutes.POST("/calculate", controllers.CalculateBilling)
@@ -100,6 +102,8 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.POST("/dispense", controllers.ConfirmDispenseAndBill)
 		systemRoutes.GET("/queue/list", controllers.GetQueueList)
 		systemRoutes.GET("/billing/list", controllers.GetAllBillings)
+		systemRoutes.GET("/billing/queues", controllers.GetBillingQueues)
+		systemRoutes.GET("/billing/history", controllers.GetBillingHistories)
 		systemRoutes.GET("/dispensing/:visit_id", controllers.GetDispensingByVisit)
 	}
 }

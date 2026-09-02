@@ -53,32 +53,52 @@ export default function BillingDashboardPage() {
     setHasSearched(false);
   };
 
-  // Sync Real Billings from Supabase DB
-  const fetchBillings = useCallback(() => {
+  // Sync Real Billings & BillingHistory from Supabase DB
+  const fetchBillings = useCallback(async () => {
     const token = localStorage.getItem('token');
-    fetch('/api/billing/list', {
-      headers: {
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+    const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    try {
+      let hRes = await fetch('/api/billing/history', { headers });
+      if (!hRes.ok) {
+        hRes = await fetch('/api/system/billing/history');
       }
-    })
+      if (hRes.ok) {
+        const hData = await hRes.json();
+        if (hData.status === 'success' && Array.isArray(hData.histories) && hData.histories.length > 0) {
+          const formatted: PaymentRecord[] = hData.histories.map((h: any) => ({
+            id: h.receipt_number || `REC-${String(h.id).padStart(4, '0')}`,
+            patientName: h.patient_name || 'ผู้ป่วย',
+            date: h.created_at ? new Date(h.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
+            time: h.created_at ? new Date(h.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '10:00 น.',
+            amount: `฿ ${(h.net_amount || h.total_amount || 0).toFixed(2)}`,
+            method: h.payment_method === 'Cash' || h.payment_method === 'เงินสด' ? 'เงินสด' : 'QR Code',
+            status: 'completed',
+          }));
+          setRecords(formatted);
+          return;
+        }
+      }
+    } catch {}
+
+    // Fallback to /api/billing/list
+    fetch('/api/billing/list', { headers })
       .then(res => res.json())
       .then(data => {
         if (data?.billings && Array.isArray(data.billings)) {
           const formatted: PaymentRecord[] = data.billings.map((b: any) => ({
-            id: `HN-${String(b.visit_id || b.id).padStart(4, '0')}`,
+            id: b.receipt_number || `HN-${String(b.visit_id || b.id).padStart(4, '0')}`,
             patientName: b.patient_name || b.VisitRecord?.Patient?.FullName || `ผู้ป่วย Visit #${b.visit_id || b.id}`,
             date: b.created_at ? new Date(b.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
             time: b.created_at ? new Date(b.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '10:00 น.',
             amount: `฿ ${(b.net_amount || b.total_amount || 0).toFixed(2)}`,
-            method: b.payment_method === 'Cash' ? 'เงินสด' : 'QR Code',
+            method: b.payment_method === 'Cash' || b.payment_method === 'เงินสด' ? 'เงินสด' : 'QR Code',
             status: b.payment_status === 'paid' || b.payment_status === 'completed' ? 'completed' : 'pending',
           }));
           setRecords(formatted);
         }
       })
-      .catch(() => {
-        // Empty on error
-      });
+      .catch(() => {});
   }, []);
 
   // Real-time WebSocket Listeners for Billing & Cashier
@@ -88,6 +108,12 @@ export default function BillingDashboardPage() {
     const unsubPay = subscribe('PAYMENT_CONFIRMED', (data: any) => {
       fetchBillings();
       setLiveNotify(`✓ ชำระเงินสำเร็จ: บิล #${data?.id || ''}`);
+      setTimeout(() => setLiveNotify(null), 4000);
+    });
+
+    const unsubHistory = subscribe('BILLING_HISTORY_CREATED', (data: any) => {
+      fetchBillings();
+      setLiveNotify(`✓ บันทึกประวัติการเงิน: ${data?.patient_name || ''} (${data?.receipt_number || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
     });
 
@@ -119,6 +145,7 @@ export default function BillingDashboardPage() {
 
     return () => {
       unsubPay();
+      unsubHistory();
       unsubBill();
       unsubQueue();
     };

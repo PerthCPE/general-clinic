@@ -58,6 +58,9 @@ func ConnectDB() {
 			&models.Medicine{},
 			&models.Dispensing{},
 			&models.Billing{},
+			&models.BillingQueue{},
+			&models.BillingHistory{},
+			&models.PatientMedicine{},
 			&models.QRPayment{},
 			&models.Document{},
 			&models.DocumentForward{},
@@ -70,6 +73,8 @@ func ConnectDB() {
 		}
 		log.Println("Database Migration Complete.")
 	} else {
+		// Always ensure new models are migrated
+		database.AutoMigrate(&models.PatientMedicine{}, &models.BillingQueue{})
 		log.Println("Database schema already up to date. Skipped redundant AutoMigrate.")
 	}
 

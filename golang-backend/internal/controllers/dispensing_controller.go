@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -109,8 +110,30 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		config.DB.Preload("Medicine").Where("visit_id = ?", req.VisitID).Find(&dispensings)
 	}
 
+	var patient models.Patient
+	if req.VisitID > 0 {
+		var visit models.VisitRecord
+		if err := config.DB.Preload("Patient").First(&visit, req.VisitID).Error; err == nil {
+			patient = visit.Patient
+		}
+	}
+	if patient.ID == 0 && req.HN != "" {
+		config.DB.Where("hn = ? OR hn = ?", req.HN, "HN-"+req.HN).First(&patient)
+	}
+
+	// Fallback: หากยังไม่เจอยา ลองค้นหาจาก Visit ล่าสุดของผู้ป่วยคนนี้
+	if len(dispensings) == 0 && patient.ID > 0 {
+		var latestVisit models.VisitRecord
+		if err := config.DB.Where("patient_id = ?", patient.ID).Order("id desc").First(&latestVisit).Error; err == nil {
+			req.VisitID = latestVisit.ID
+			config.DB.Preload("Medicine").Where("visit_id = ?", latestVisit.ID).Find(&dispensings)
+		}
+	}
+
 	totalAmount := 0.0
 	tx := config.DB.Begin()
+
+	var medList []gin.H
 
 	// วนลูปตัดสต็อกยาแต่ละตัวที่ถูกสั่งจ่าย และรวมราคา
 	for _, d := range dispensings {
@@ -120,7 +143,25 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 				med.StockQuantity -= d.Quantity
 				tx.Save(&med)
 			}
-			totalAmount += float64(d.Quantity) * med.UnitPrice
+			price := med.UnitPrice
+			if price <= 0 {
+				price = 50.0
+			}
+			totalAmount += float64(d.Quantity) * price
+
+			medList = append(medList, gin.H{
+				"medId":        med.MedicineCode,
+				"name":         med.Name,
+				"genericName":  med.GenericName,
+				"category":     med.Category,
+				"properties":   med.Properties,
+				"dosage":       d.Dosage,
+				"instructions": d.Instructions,
+				"price":        price,
+				"quantity":     d.Quantity,
+				"stock":        med.StockQuantity,
+				"stockStatus":  "พร้อมจ่าย",
+			})
 		}
 	}
 
@@ -142,23 +183,12 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 	}
 
 	var queue models.Queue
-	var visit models.VisitRecord
-	var patient models.Patient
-
-	if req.VisitID > 0 {
-		tx.Preload("Patient").First(&visit, req.VisitID)
-		if visit.PatientID > 0 {
-			patient = visit.Patient
-			if err := tx.Where("patient_id = ? AND status != 'completed' AND status != 'เสร็จสิ้น'", visit.PatientID).First(&queue).Error; err == nil {
-				queue.Status = "billing_waiting"
-				queue.Department = "การเงิน"
-				tx.Save(&queue)
-			}
+	if patient.ID > 0 {
+		if err := tx.Where("patient_id = ? AND status != 'completed' AND status != 'เสร็จสิ้น'", patient.ID).First(&queue).Error; err == nil {
+			queue.Status = "billing_waiting"
+			queue.Department = "การเงิน"
+			tx.Save(&queue)
 		}
-	}
-
-	if patient.ID == 0 && req.HN != "" {
-		tx.Where("hn = ? OR hn = ?", req.HN, "HN-"+req.HN).First(&patient)
 	}
 
 	targetHN := patient.HN
@@ -177,13 +207,37 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		targetName = "ผู้ป่วย"
 	}
 
+	age := 35
+	if patient.ID > 0 && patient.BirthDate.Year() > 1900 {
+		age = time.Now().Year() - patient.BirthDate.Year()
+	}
+
+	qNo := queue.QueueNumber
+	if qNo == "" {
+		qNo = "Q0001"
+	}
+
+	// บันทึกลงตาราง BillingQueue โมเดลคิวการเงินโดยเฉพาะ
+	medsJSON, _ := json.Marshal(medList)
+	billingQueue := models.BillingQueue{
+		QueueNumber:  qNo,
+		HN:           targetHN,
+		PatientName:  targetName,
+		NationalID:   patient.NationalID,
+		Gender:       patient.Gender,
+		Age:          age,
+		SchemeType:   patient.SchemeType,
+		VisitID:      req.VisitID,
+		TotalAmount:  totalAmount,
+		Status:       "pending",
+		DoctorAdvice: queue.Note,
+		Medications:  string(medsJSON),
+	}
+	tx.Create(&billingQueue)
+
 	// อัปเดต/สร้างลงตาราง patient_medicines ใน Supabase DB ทันที!
 	var patMed models.PatientMedicine
 	if err := tx.Where("hn = ?", targetHN).First(&patMed).Error; err != nil {
-		age := 35
-		if patient.ID > 0 && patient.BirthDate.Year() > 1900 {
-			age = time.Now().Year() - patient.BirthDate.Year()
-		}
 		patMed = models.PatientMedicine{
 			HN:              targetHN,
 			NationalID:      patient.NationalID,
@@ -207,14 +261,15 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 	billingPayload := gin.H{
 		"id":           billing.ID,
-		"queue_id":     queue.ID,
-		"queue_number": queue.QueueNumber,
+		"queue_id":     billingQueue.ID,
+		"queue_number": qNo,
 		"visit_id":     billing.VisitID,
 		"patient_name": targetName,
 		"hn":           targetHN,
 		"total_amount": billing.TotalAmount,
 		"net_amount":   billing.NetAmount,
 		"status":       billing.PaymentStatus,
+		"medications":  medList,
 		"created_at":   billing.CreatedAt,
 	}
 
@@ -284,4 +339,3 @@ func GetPatientMedicineDetail(c *gin.Context) {
 		"dispensings":      dispensings,
 	})
 }
-
