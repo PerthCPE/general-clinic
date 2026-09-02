@@ -30,7 +30,6 @@ import { ScheduleManagementPage } from './pages/officer/ScheduleManagementPage';
 import { DocumentForwardPage } from './pages/officer/DocumentForwardPage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
 
-// โค้ดฝั่งของคุณ
 import AppointmentForm from './pages/Appointment/AppointmentForm';
 import AppointmentDashboard from './pages/Appointment/AppointmentDashboard';
 import UserManagement from './pages/Admin/UserManagement'; 
@@ -143,11 +142,12 @@ function MainApp() {
           onSelectPatientId={setSelectedPatientId}
           patientRightsMap={patientRightsMap}
           onUpdatePatientRights={handleUpdatePatientRights}
+          onNavigateToDashboard={() => setActivePage('billing-dashboard')}
         />;
       case 'billing-dashboard':
         return <BillingDashboardPage />;
 
-      // ===== Appointment Pages (ของคุณ) =====
+      // ===== Appointment Pages =====
       case 'appointment-form':
         return <AppointmentForm />;
       case 'appointment-dashboard':

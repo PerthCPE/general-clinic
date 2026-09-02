@@ -22,9 +22,15 @@ interface VitalsFormCardProps {
   heartRate: string;
   respiratoryRate: string;
   spo2: string;
+  painScore: string;
+  bloodSugar: string;
   chiefComplaint: string;
   allergies: string;
+  foodAllergies: string;
   medicalHistory: string;
+  currentMedications: string;
+  smokingHistory: string;
+  alcoholHistory: string;
   assignedDoctorId: number;
   doctorOptions: DoctorOption[];
   isAccordionOpen: boolean;
@@ -33,6 +39,7 @@ interface VitalsFormCardProps {
   onSubmit: (e: React.FormEvent) => void;
   onReset: () => void;
   isSaving: boolean;
+  savedDraftTime?: string | null;
 }
 
 export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
@@ -54,9 +61,15 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
   heartRate,
   respiratoryRate,
   spo2,
+  painScore,
+  bloodSugar,
   chiefComplaint,
   allergies,
+  foodAllergies,
   medicalHistory,
+  currentMedications,
+  smokingHistory,
+  alcoholHistory,
   assignedDoctorId,
   doctorOptions,
   isAccordionOpen,
@@ -65,6 +78,7 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
   onSubmit,
   onReset,
   isSaving,
+  savedDraftTime,
 }) => {
   // Clinical flags
   const tempNum = parseFloat(temperature);
@@ -451,13 +465,52 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Row 4: Pain Score & Blood Sugar (DTX) */}
+            <div className="vitals-grid-2">
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">
+                  <span className="vitals-label-title">ระดับความเจ็บปวด (Pain Score)</span>
+                </label>
+                <div className="vitals-input-suffix-wrap">
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    className="vitals-input"
+                    placeholder="เช่น 0 - 10"
+                    value={painScore}
+                    onChange={(e) => onChangeField('painScore', e.target.value)}
+                  />
+                  <span className="vitals-input-suffix">/10</span>
+                </div>
+              </div>
+
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">
+                  <span className="vitals-label-title">ระดับน้ำตาลในเลือด (Blood Sugar / DTX)</span>
+                </label>
+                <div className="vitals-input-suffix-wrap">
+                  <input
+                    type="number"
+                    min="20"
+                    max="600"
+                    className="vitals-input"
+                    placeholder="เช่น 105"
+                    value={bloodSugar}
+                    onChange={(e) => onChangeField('bloodSugar', e.target.value)}
+                  />
+                  <span className="vitals-input-suffix">mg/dL</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Section 3: Clinical Symptoms & Medical History */}
           <div className="vitals-form-section">
             <div className="vitals-section-header">
               <span className="vitals-section-num">3</span>
-              <span className="vitals-section-title">อาการสำคัญและประวัติทางการแพทย์ (Clinical History)</span>
+              <span className="vitals-section-title">ประวัติทางการแพทย์ แพ้ยา และพฤติกรรมสุขภาพ (Clinical & Social History)</span>
             </div>
 
             {/* Chief Complaint */}
@@ -475,11 +528,11 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               ></textarea>
             </div>
 
-            {/* Allergies & Chronic Diseases Grid */}
+            {/* Allergies: Drug & Food Allergies Grid */}
             <div className="vitals-grid-2">
               <div className="vitals-form-group">
                 <label className="vitals-form-label">
-                  ประวัติการแพ้ยา (Allergies)
+                  ประวัติการแพ้ยา (Drug Allergies)
                   {hasAllergy && (
                     <span className="clinical-badge badge-allergy-alert">
                       <svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor" style={{ marginRight: '4px' }}>
@@ -492,20 +545,72 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 <input
                   type="text"
                   className={`vitals-input ${hasAllergy ? 'input-allergy' : ''}`}
-                  placeholder="เช่น แพ้ยา Penicillin, Sulfa หรือ ปฏิเสธการแพ้ยา"
+                  placeholder="เช่น แพ้ยา Penicillin (ผื่นคัน, ลมพิษ) หรือ ปฏิเสธการแพ้ยา"
                   value={allergies}
                   onChange={(e) => onChangeField('allergies', e.target.value)}
                 />
               </div>
 
               <div className="vitals-form-group">
-                <label className="vitals-form-label">โรคประจำตัว (Medical History / Chronic Diseases)</label>
+                <label className="vitals-form-label">
+                  ประวัติการแพ้อาหาร (Food Allergies)
+                </label>
+                <input
+                  type="text"
+                  className="vitals-input"
+                  placeholder="เช่น กุ้ง, อาหารทะเล, ถั่วลิสง หรือ ปฏิเสธการแพ้อาหาร"
+                  value={foodAllergies}
+                  onChange={(e) => onChangeField('foodAllergies', e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Chronic Diseases & Current Medications Grid */}
+            <div className="vitals-grid-2" style={{ marginTop: '12px' }}>
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">โรคประจำตัว (Chronic / Underlying Diseases)</label>
                 <input
                   type="text"
                   className="vitals-input"
                   placeholder="เช่น ความดันโลหิตสูง, เบาหวาน, โรคหัวใจ หรือ ไม่มี"
                   value={medicalHistory}
                   onChange={(e) => onChangeField('medicalHistory', e.target.value)}
+                />
+              </div>
+
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">ยาที่รับประทานประจำ (Current Medications)</label>
+                <input
+                  type="text"
+                  className="vitals-input"
+                  placeholder="เช่น Amlodipine 5mg tab 1x daily (Morning) หรือ ไม่มี"
+                  value={currentMedications}
+                  onChange={(e) => onChangeField('currentMedications', e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Social Habits: Smoking & Alcohol History Grid */}
+            <div className="vitals-grid-2" style={{ marginTop: '12px' }}>
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">ประวัติการสูบบุหรี่ (Smoking History)</label>
+                <input
+                  type="text"
+                  className="vitals-input"
+                  placeholder="เช่น ไม่สูบ, สูบบุหรี่ (10 มวน/วัน 5 ปี) หรือ เลิกสูบแล้ว"
+                  value={smokingHistory}
+                  onChange={(e) => onChangeField('smokingHistory', e.target.value)}
+                />
+              </div>
+
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">ประวัติการดื่มแอลกอฮอล์ (Alcohol History)</label>
+                <input
+                  type="text"
+                  className="vitals-input"
+                  placeholder="เช่น ไม่ดื่ม, ดื่มแอลกอฮอล์ (2-3 ครั้ง/สัปดาห์ 8 ปี) หรือ เลิกดื่มแล้ว"
+                  value={alcoholHistory}
+                  onChange={(e) => onChangeField('alcoholHistory', e.target.value)}
                 />
               </div>
             </div>

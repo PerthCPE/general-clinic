@@ -7,14 +7,23 @@
 // 1. Hospital Number (HN) Formatter: HN + 4-digit Uppercase Hex (HN0001 - HNFFFF)
 export const formatHN = (raw: string | number | undefined | null): string => {
   if (!raw) return 'HN0001';
-  if (typeof raw === 'string' && /^HN[0-9A-Fa-f]{4}$/i.test(raw)) {
-    return raw.toUpperCase();
+  if (typeof raw === 'number' && raw > 0) {
+    return 'HN' + raw.toString(16).toUpperCase().padStart(4, '0');
   }
-  const num = parseInt(String(raw).replace(/\D/g, ''), 10);
-  if (!isNaN(num) && num > 0) {
-    return 'HN' + num.toString(16).toUpperCase().padStart(4, '0');
+  const str = String(raw).trim();
+  if (/^HN[0-9A-Fa-f]{4}$/i.test(str)) {
+    return str.toUpperCase();
   }
-  return String(raw || 'HN0001');
+  const cleanHex = str.replace(/^HN-?/i, '');
+  const hexNum = parseInt(cleanHex, 16);
+  if (!isNaN(hexNum) && hexNum > 0) {
+    return 'HN' + hexNum.toString(16).toUpperCase().padStart(4, '0');
+  }
+  const decNum = parseInt(str.replace(/\D/g, ''), 10);
+  if (!isNaN(decNum) && decNum > 0) {
+    return 'HN' + decNum.toString(16).toUpperCase().padStart(4, '0');
+  }
+  return 'HN0001';
 };
 
 // 2. Queue Number Formatter: Q + 4-digit Uppercase Hex (Q0001 - QFFFF)

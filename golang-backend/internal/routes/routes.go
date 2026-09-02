@@ -4,6 +4,7 @@ import (
 	"clinic-backend/internal/controllers"
 	"clinic-backend/internal/middleware"
 	"clinic-backend/internal/ws"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -84,10 +85,11 @@ func SetUpRoutes(r *gin.Engine) {
 		queueRoutes.PUT("/:id/status", controllers.UpdateQueueStatus)
 	}
 
-	// ===== ระบบย่อยที่ 1: คลังยา (Pharmacy / Dispensing) - Boonkum (B6741990) =====
+	// ===== ระบบย่อยที่ 1: คลังยา (Pharmacy / Dispensing) - Bun =====
 	pharmacyRoutes := api.Group("/pharmacy")
 	pharmacyRoutes.Use(middleware.RoleRequired("pharmacist", "doctor", "registrar"))
 	{
+		pharmacyRoutes.GET("/queues", controllers.GetPharmacyQueues)
 		pharmacyRoutes.GET("/medicines", controllers.GetMedicines)
 		pharmacyRoutes.POST("/medicines", controllers.CreateMedicine)
 		pharmacyRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)
@@ -100,10 +102,12 @@ func SetUpRoutes(r *gin.Engine) {
 		pharmacyRoutes.GET("/patient-medicines/:hn", controllers.GetPatientMedicineDetail)
 	}
 
-	// ===== ระบบย่อยที่ 2: การเงิน (Billing / QRPayment) - Boonkum (B6741990) =====
+	// ===== ระบบย่อยที่ 2: การเงิน (Billing / QRPayment) -Bun =====
 	billingRoutes := api.Group("/billing")
 	billingRoutes.Use(middleware.RoleRequired("cashier", "pharmacist", "registrar"))
 	{
+		billingRoutes.GET("/queues", controllers.GetBillingQueues)
+		billingRoutes.GET("/history", controllers.GetBillingHistories)
 		billingRoutes.GET("/list", controllers.GetAllBillings)
 		billingRoutes.GET("/visit/:visit_id", controllers.GetBillingByVisit)
 		billingRoutes.POST("/calculate", controllers.CalculateBilling)
@@ -117,6 +121,7 @@ func SetUpRoutes(r *gin.Engine) {
 	{
 		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
 		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
+		systemRoutes.GET("/pharmacy/queues", controllers.GetPharmacyQueues)
 		systemRoutes.GET("/medicines", controllers.GetMedicines)
 		systemRoutes.POST("/medicines/create", controllers.CreateMedicine)
 		systemRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)
@@ -125,6 +130,8 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.POST("/dispense", controllers.ConfirmDispenseAndBill)
 		systemRoutes.GET("/queue/list", controllers.GetQueueList)
 		systemRoutes.GET("/billing/list", controllers.GetAllBillings)
+		systemRoutes.GET("/billing/queues", controllers.GetBillingQueues)
+		systemRoutes.GET("/billing/history", controllers.GetBillingHistories)
 		systemRoutes.GET("/dispensing/:visit_id", controllers.GetDispensingByVisit)
 	}
 }

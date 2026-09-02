@@ -74,6 +74,12 @@ export interface ScreeningRecord {
   heartRate: number; // bpm
   respiratoryRate?: number; // ครั้ง/นาที
   spo2?: number; // %
+  painScore?: number; // ระดับความเจ็บปวด 0-10
+  bloodSugar?: number; // mg/dL
+  foodAllergies?: string;
+  currentMedications?: string;
+  smokingHistory?: string;
+  alcoholHistory?: string;
   assignedDoctorId: number;
   assignedDoctorName: string;
   assignedRoom: string;
