@@ -72,6 +72,7 @@ func ConnectDB() {
 			&models.BillingQueue{},
 			&models.BillingHistory{},
 			&models.PatientMedicine{},
+			&models.MedicineQueue{},
 			&models.QRPayment{},
 			&models.Document{},
 			&models.DocumentForward{},
@@ -90,7 +91,7 @@ func ConnectDB() {
 		log.Println("Database Migration Complete.")
 	} else {
 		// Always ensure new models are migrated
-		database.AutoMigrate(&models.PatientMedicine{}, &models.BillingQueue{})
+		database.AutoMigrate(&models.PatientMedicine{}, &models.BillingQueue{}, &models.MedicineQueue{})
 		log.Println("Database schema already up to date. Skipped redundant AutoMigrate.")
 	}
 
@@ -604,46 +605,5 @@ func seedDatabase() {
 			}
 			log.Println("Seeded patient_medicines DB table successfully.")
 		}
-	}
-
-	// 9. Auto Seed billing_queues if empty
-	var bqCount int64
-	DB.Model(&models.BillingQueue{}).Count(&bqCount)
-	if bqCount == 0 {
-		sampleMedsJSON := `[{"medId":"MED-001","name":"Paracetamol 500mg","dosage":"1 เม็ด วันละ 3 ครั้ง หลังอาหาร","price":50,"quantity":2,"stock":240,"stockStatus":"พร้อมจ่าย"},{"medId":"MED-002","name":"Amoxicillin 500mg","dosage":"1 เม็ด เช้า-เย็น","price":120,"quantity":1,"stock":150,"stockStatus":"พร้อมจ่าย"}]`
-		bQueues := []models.BillingQueue{
-			{
-				QueueNumber:  "B-001",
-				HN:           "HN-0094",
-				PatientName:  "เด็กหญิงกัญญา มีทรัพย์",
-				NationalID:   "1104488990123",
-				Gender:       "หญิง",
-				Age:          8,
-				SchemeType:   "บัตรทอง (สปสช.)",
-				VisitID:      1,
-				TotalAmount:  220.0,
-				Status:       "pending",
-				DoctorAdvice: "มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา",
-				Medications:  sampleMedsJSON,
-			},
-			{
-				QueueNumber:  "B-002",
-				HN:           "HN-0095",
-				PatientName:  "นายประเสริฐ ยืนยง",
-				NationalID:   "3102233445567",
-				Gender:       "ชาย",
-				Age:          68,
-				SchemeType:   "สิทธิ์ข้าราชการ",
-				VisitID:      2,
-				TotalAmount:  380.0,
-				Status:       "pending",
-				DoctorAdvice: "ความดันโลหิตสูง รับประทานยาต่อเนื่อง",
-				Medications:  sampleMedsJSON,
-			},
-		}
-		for i := range bQueues {
-			DB.Create(&bQueues[i])
-		}
-		log.Println("Seeded billing_queues DB table successfully.")
 	}
 }

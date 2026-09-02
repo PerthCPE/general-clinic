@@ -25,10 +25,10 @@ type GenerateQRRequest struct {
 	Amount      float64 `json:"amount" binding:"required"`
 }
 
-// GET /api/billing/queues - ดึงรายการคิวรอชำระเงินทั้งหมดจากตาราง billing_queues
+// GET /api/billing/queues - ดึงรายการคิวรอชำระเงินทั้งหมดจากตาราง billing_queues (เรียงคนล่าสุดขึ้นบนสุด)
 func GetBillingQueues(c *gin.Context) {
 	var queues []models.BillingQueue
-	if err := config.DB.Preload("VisitRecord").Preload("VisitRecord.Patient").Where("status = ?", "pending").Order("created_at asc").Find(&queues).Error; err != nil {
+	if err := config.DB.Preload("VisitRecord").Preload("VisitRecord.Patient").Where("status = ?", "pending").Order("id desc, created_at desc").Find(&queues).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billing queues: " + err.Error()})
 		return
 	}
@@ -182,17 +182,20 @@ func ConfirmPayment(c *gin.Context) {
 		return
 	}
 
+	var bQueue models.BillingQueue
+	config.DB.Where("visit_id = ?", req.VisitID).Order("id desc").First(&bQueue)
+
 	var billing models.Billing
 	if err := config.DB.Where("visit_id = ?", req.VisitID).First(&billing).Error; err != nil {
+		total := bQueue.TotalAmount
+		if total <= 0 {
+			total = req.CashReceived
+		}
 		billing = models.Billing{
 			VisitID:       req.VisitID,
-			TotalAmount:   req.CashReceived,
-			NetAmount:     req.CashReceived,
+			TotalAmount:   total,
+			NetAmount:     total,
 			PaymentStatus: "pending",
-		}
-		if billing.TotalAmount <= 0 {
-			billing.TotalAmount = 550.0
-			billing.NetAmount = 550.0
 		}
 		config.DB.Create(&billing)
 	}
@@ -229,17 +232,24 @@ func ConfirmPayment(c *gin.Context) {
 		}
 	}
 
-	// ดึงข้อมูลผู้ป่วยและยามาสร้างประวัติการชำระเงิน BillingHistory
-	var bQueue models.BillingQueue
-	config.DB.Where("visit_id = ?", req.VisitID).Order("id desc").First(&bQueue)
-
 	patName := bQueue.PatientName
-	if patName == "" {
-		patName = "เด็กหญิงกัญญา มีทรัพย์"
-	}
 	hn := bQueue.HN
 	if hn == "" {
 		hn = fmt.Sprintf("HN-%04d", req.VisitID)
+	}
+	if patName == "" {
+		var pat models.Patient
+		if errP := config.DB.Where("hn = ?", hn).First(&pat).Error; errP == nil {
+			patName = pat.FullName
+		} else {
+			patName = "ผู้ป่วย"
+		}
+	}
+
+	docName := "แพทย์ประจำคลินิก"
+	var visitRec models.VisitRecord
+	if errV := config.DB.Preload("Doctor").First(&visitRec, req.VisitID).Error; errV == nil && visitRec.Doctor.FullName != "" {
+		docName = visitRec.Doctor.FullName
 	}
 
 	history := models.BillingHistory{
@@ -248,7 +258,7 @@ func ConfirmPayment(c *gin.Context) {
 		HN:            hn,
 		PatientName:   patName,
 		NationalID:    bQueue.NationalID,
-		DoctorName:    "พญ.สุดา สุขสมบูรณ์",
+		DoctorName:    docName,
 		TotalAmount:   billing.TotalAmount,
 		Discount:      billing.DiscountFromEligibility,
 		NetAmount:     billing.NetAmount,

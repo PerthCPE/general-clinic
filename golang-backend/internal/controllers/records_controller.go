@@ -260,7 +260,8 @@ func buildRecordItem(p models.Patient) dto.DoctorQueueItem {
 	hasQueue := false
 	if err := config.DB.Where("visit_id = ?", visit.ID).
 		Order("id desc").
-		First(&queue).Error; err == nil {
+		Limit(1).
+		Find(&queue).Error; err == nil && queue.ID > 0 {
 		hasQueue = true
 		item.QueueID = queue.ID
 		item.QueueNumber = queue.QueueNumber
@@ -274,7 +275,8 @@ func buildRecordItem(p models.Patient) dto.DoctorQueueItem {
 	if err := config.DB.Preload("ScreenedBy").
 		Where("visit_id = ?", visit.ID).
 		Order("id desc").
-		First(&screening).Error; err == nil {
+		Limit(1).
+		Find(&screening).Error; err == nil && screening.ID > 0 {
 		hasScreening = true
 		brief := toScreeningBrief(screening)
 		item.Screening = &brief
@@ -299,7 +301,8 @@ func buildRecordItem(p models.Patient) dto.DoctorQueueItem {
 	// การวินิจฉัยหลักของครั้งนั้น ใช้โชว์บนการ์ดในหน้าประวัติ
 	var diagnosis models.Diagnosis
 	if err := config.DB.Where("visit_id = ? AND is_primary = ?", visit.ID, true).
-		First(&diagnosis).Error; err == nil {
+		Limit(1).
+		Find(&diagnosis).Error; err == nil && diagnosis.ID > 0 {
 		item.Diagnosis = diagnosis.NameTH
 		if item.Diagnosis == "" {
 			item.Diagnosis = diagnosis.NameEN

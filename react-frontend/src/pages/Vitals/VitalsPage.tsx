@@ -498,6 +498,49 @@ export const VitalsPage: React.FC = () => {
     }
   };
 
+  // Form Randomizer
+  const handleRandomVitals = () => {
+    // 1. Random realistic measurements
+    const randWeight = (50 + Math.random() * 28).toFixed(1);
+    const randHeight = Math.floor(155 + Math.random() * 25).toString();
+    const randTemp = (36.4 + Math.random() * 0.9).toFixed(1);
+    const randSys = Math.floor(115 + Math.random() * 16).toString();
+    const randDia = Math.floor(72 + Math.random() * 14).toString();
+    const randHR = Math.floor(70 + Math.random() * 18).toString();
+    const randRR = Math.floor(16 + Math.random() * 4).toString();
+    const randSpo2 = Math.floor(97 + Math.random() * 3).toString();
+    const randPain = Math.floor(Math.random() * 3).toString();
+    const randDTX = Math.floor(95 + Math.random() * 25).toString();
+
+    const sampleComplaints = [
+      'มีไข้ ไอ เจ็บคอ มีน้ำมูกใส 2 วัน',
+      'ปวดศีรษะ ปวดเมื่อยตามตัว มีไข้ต่ำๆ 1 วัน',
+      'เวียนศีรษะ บ้านหมุน คลื่นไส้เล็กน้อยช่วงเช้า',
+      'ปวดท้อง แน่นจุกเสียด ท้องอืดหลังรับประทานอาหาร',
+      'ไอแห้ง ระคายคอ ไม่มีไข้ หายใจสะดวก 3 วัน',
+      'ปวดหลัง ปวดบั้นเอวจากการยกของหนัก 2 วัน',
+    ];
+    const randComplaint = sampleComplaints[Math.floor(Math.random() * sampleComplaints.length)];
+
+    setWeight(randWeight);
+    setHeight(randHeight);
+    setTemperature(randTemp);
+    setSystolicBP(randSys);
+    setDiastolicBP(randDia);
+    setHeartRate(randHR);
+    setRespiratoryRate(randRR);
+    setSpo2(randSpo2);
+    setPainScore(randPain);
+    setBloodSugar(randDTX);
+    if (!chiefComplaint || chiefComplaint.trim() === '') {
+      setChiefComplaint(randComplaint);
+    }
+    if (!allergies) setAllergies('ปฏิเสธการแพ้ยา');
+    if (!foodAllergies) setFoodAllergies('ปฏิเสธการแพ้อาหาร');
+    if (!medicalHistory) setMedicalHistory('ปฏิเสธโรคประจำตัว');
+    if (!currentMedications) setCurrentMedications('ไม่มี');
+  };
+
   // Form Reset
   const handleResetForm = () => {
     try {
@@ -708,6 +751,7 @@ export const VitalsPage: React.FC = () => {
             isAccordionOpen={isFormOpen}
             onToggleAccordion={() => setIsFormOpen(!isFormOpen)}
             onChangeField={handleChangeField}
+            onRandomVitals={handleRandomVitals}
             onSubmit={handleSubmit}
             onReset={handleResetForm}
             isSaving={isSaving}

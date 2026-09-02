@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -412,6 +414,59 @@ func SaveExamination(c *gin.Context) {
 		"status":   exam.Status,
 	})
 	if signing {
+		var pat models.Patient
+		config.DB.First(&pat, visit.PatientID)
+		age := 35
+		if pat.BirthDate.Year() > 1900 {
+			age = time.Now().Year() - pat.BirthDate.Year()
+		}
+
+		// ดึงรายการยาที่สั่ง (ถ้ามี)
+		var dispensings []models.Dispensing
+		config.DB.Preload("Medicine").Where("visit_id = ?", visit.ID).Find(&dispensings)
+		var medList []gin.H
+		for _, d := range dispensings {
+			medList = append(medList, gin.H{
+				"medId":        d.Medicine.MedicineCode,
+				"name":         d.Medicine.Name,
+				"genericName":  d.Medicine.GenericName,
+				"category":     d.Medicine.Category,
+				"properties":   d.Medicine.Properties,
+				"dosage":       d.Dosage,
+				"instructions": d.Instructions,
+				"price":        d.Medicine.UnitPrice,
+				"quantity":     d.Quantity,
+				"stock":        d.Medicine.StockQuantity,
+				"stockStatus":  "พร้อมจ่าย",
+			})
+		}
+		medsJSON, _ := json.Marshal(medList)
+
+		var existingMQ models.MedicineQueue
+		if err := config.DB.Where("visit_id = ?", visit.ID).First(&existingMQ).Error; err != nil {
+			var mqCount int64
+			config.DB.Model(&models.MedicineQueue{}).Count(&mqCount)
+			mQueueNo := fmt.Sprintf("M-%03d", mqCount+1)
+			if hasQueue && updatedQueue.QueueNumber != "" {
+				mQueueNo = updatedQueue.QueueNumber
+			}
+
+			medQ := models.MedicineQueue{
+				QueueNumber:  mQueueNo,
+				HN:           pat.HN,
+				PatientName:  pat.FullName,
+				NationalID:   pat.NationalID,
+				Gender:       pat.Gender,
+				Age:          age,
+				SchemeType:   pat.SchemeType,
+				VisitID:      visit.ID,
+				DoctorAdvice: req.TreatmentPlan,
+				Status:       "pending",
+				Medications:  string(medsJSON),
+			}
+			config.DB.Create(&medQ)
+		}
+
 		ws.BroadcastEvent("VISIT_UPDATED", visit)
 		if hasQueue {
 			config.DB.Preload("Patient").First(&updatedQueue, updatedQueue.ID)

@@ -20,6 +20,7 @@ export default function BillingInvoicePage({
 }: BillingInvoicePageProps) {
   const { subscribe } = useWebSocket();
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const fetchQueues = async () => {
     try {
@@ -32,7 +33,7 @@ export default function BillingInvoicePage({
       }
       if (bRes.ok) {
         const bData = await bRes.json();
-        if (bData.status === 'success' && Array.isArray(bData.queues) && bData.queues.length > 0) {
+        if (bData.status === 'success' && Array.isArray(bData.queues)) {
           const mapped = bData.queues.map((bq: any) => {
             let parsedMeds = [];
             if (bq.medications) {
@@ -44,9 +45,9 @@ export default function BillingInvoicePage({
               id: String(bq.id),
               visitId: bq.visit_id || 1,
               hn: bq.hn || `HN-${bq.id}`,
-              nationalId: bq.national_id || '',
-              queueNumber: bq.queue_number || 'Q0001',
-              ticket: bq.queue_number || 'A-01',
+              nationalId: bq.national_id || '-',
+              queueNumber: bq.queue_number || 'B-001',
+              ticket: bq.queue_number || 'B-001',
               name: bq.patient_name || 'ผู้ป่วย',
               shortName: bq.patient_name || 'ผู้ป่วย',
               gender: bq.gender || 'ชาย',
@@ -64,16 +65,19 @@ export default function BillingInvoicePage({
             };
           });
           setQueueList(mapped);
+          setLoading(false);
           return;
         }
       }
     } catch {}
+    setQueueList([]);
+    setLoading(false);
   };
 
   useEffect(() => {
     fetchQueues();
 
-    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+    const unsubBill = subscribe('BILLING_CREATED', () => {
       fetchQueues();
     });
 
@@ -91,7 +95,7 @@ export default function BillingInvoicePage({
     };
   }, [subscribe]);
 
-  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === selectedPatientId) || queueList[0] || CLINIC_CONFIG.patients.find(p => p.id === selectedPatientId) || CLINIC_CONFIG.patients[0];
+  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === selectedPatientId) || queueList[0];
   const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
   
   const [showQrModal, setShowQrModal] = useState(false);
@@ -143,17 +147,67 @@ export default function BillingInvoicePage({
 
   // คำนวณยอดรวม
   const medTotal = activePatient && Array.isArray(activePatient.medications) 
-    ? activePatient.medications.reduce((sum, m) => sum + (Number(m?.price) || 0), 0) 
+    ? activePatient.medications.reduce((sum, m) => sum + ((Number(m?.price) || 0) * (Number(m?.quantity) || 1)), 0) 
     : 0;
-  const medicalServiceFee = 800; // 500 (Doctor) + 300 (Clinic)
+  const medicalServiceFee = 50.0; // ค่าบริการทางการแพทย์พื้นฐาน
   const vatTax = Math.round(medTotal * 0.07);
   const grandTotal = medTotal + medicalServiceFee + vatTax;
 
   const cashNumber = parseFloat(cashReceived) || 0;
   const changeAmount = cashNumber >= grandTotal ? cashNumber - grandTotal : 0;
 
+  if (loading) {
+    return (
+      <div className="billing-invoice-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '350px' }}>
+        <div style={{ textAlign: 'center', color: '#64748B' }}>
+          <div className="animate-spin" style={{ width: '40px', height: '40px', border: '3px solid #E2E8F0', borderTopColor: '#0EA5E9', borderRadius: '50%', margin: '0 auto 16px' }}></div>
+          <p style={{ fontSize: '1.1rem', fontWeight: '500' }}>กำลังโหลดข้อมูลบิล...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!activePatient) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#64748B' }}>ไม่พบข้อมูลบิลของผู้ป่วย กรุณารอข้อมูลบิลส่งมาจากการยืนยันจ่ายยา</div>;
+    return (
+      <div className="billing-invoice-container">
+        <div style={{ 
+          background: '#FFFFFF', 
+          borderRadius: '16px', 
+          padding: '48px 24px', 
+          textAlign: 'center', 
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+          maxWidth: '600px',
+          margin: '40px auto'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🧾</div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1E293B', marginBottom: '8px' }}>ไม่มีบิลรอชำระเงินในขณะนี้</h2>
+          <p style={{ color: '#64748B', fontSize: '1rem', marginBottom: '24px', lineHeight: '1.5' }}>
+            ยังไม่มีข้อมูลใบสั่งยาที่ส่งมาจากการจ่ายยาของห้องยา กรุณารอห้องยากดยืนยันการจ่ายยา หรือไปที่หน้ารับชำระเงิน
+          </p>
+          {onNavigateToDashboard && (
+            <button 
+              onClick={onNavigateToDashboard}
+              style={{
+                background: '#0EA5E9',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '12px 24px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              📊 ไปที่แดชบอร์ดการเงิน
+            </button>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (

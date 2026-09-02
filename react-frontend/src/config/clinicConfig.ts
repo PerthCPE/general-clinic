@@ -31,6 +31,7 @@ export interface PatientConfig {
     instructions: string;
     stock: number;
     stockStatus: 'in-stock' | 'low-stock' | 'out-stock';
+    quantity?: number;
     price: number;
     properties: string;
   }[];

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
@@ -129,11 +130,30 @@ func CreateMedicine(c *gin.Context) {
 		return
 	}
 
-	code := req.MedicineCode
+	code := strings.TrimSpace(req.MedicineCode)
 	if code == "" {
+		// หาเลขรหัสยาสูงสุดที่มีอยู่แล้วใน DB เพื่อรันลำดับต่ออัตโนมัติ ไม่ให้ชนกัน
+		var allCodes []string
+		config.DB.Model(&models.Medicine{}).Pluck("medicine_code", &allCodes)
+
+		maxNum := 0
+		for _, cStr := range allCodes {
+			clean := strings.TrimPrefix(cStr, "MED-")
+			clean = strings.TrimPrefix(clean, "MED")
+			if n, err := strconv.Atoi(clean); err == nil {
+				if n > maxNum {
+					maxNum = n
+				}
+			}
+		}
+
 		var count int64
 		config.DB.Model(&models.Medicine{}).Count(&count)
-		code = fmt.Sprintf("MED-%03d", count+1)
+		if int(count) > maxNum {
+			maxNum = int(count)
+		}
+
+		code = fmt.Sprintf("MED-%03d", maxNum+1)
 	}
 
 	medicine := models.Medicine{
@@ -164,19 +184,23 @@ func CreateMedicine(c *gin.Context) {
 
 // DELETE /api/pharmacy/medicines/:id - ลบยาออกจากคลัง
 func DeleteMedicine(c *gin.Context) {
-	param := c.Param("id")
+	param := strings.TrimSpace(c.Param("id"))
 
 	var medicine models.Medicine
 	var err error
 
+	// ค้นหาอย่างยืดหยุ่น: ทั้ง ID ตัวเลข, medicine_code, MED-xxx, และ Name
 	if id, parseErr := strconv.Atoi(param); parseErr == nil {
-		err = config.DB.Where("id = ?", id).First(&medicine).Error
-	} else {
-		err = config.DB.Where("medicine_code = ?", param).First(&medicine).Error
+		err = config.DB.Where("id = ? OR medicine_code = ? OR medicine_code = ?", id, param, fmt.Sprintf("MED-%03d", id)).First(&medicine).Error
+	}
+	if err != nil || medicine.ID == 0 {
+		cleanCode := strings.TrimPrefix(param, "MED-")
+		cleanCode = strings.TrimPrefix(cleanCode, "MED")
+		err = config.DB.Where("medicine_code = ? OR medicine_code = ? OR name = ? OR generic_name = ?", param, "MED-"+cleanCode, param, param).First(&medicine).Error
 	}
 
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Medicine not found: " + err.Error()})
+	if err != nil || medicine.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Medicine not found"})
 		return
 	}
 
@@ -188,11 +212,12 @@ func DeleteMedicine(c *gin.Context) {
 		return
 	}
 
-	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", gin.H{"deleted_code": medicine.MedicineCode})
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", gin.H{"deleted_code": medicine.MedicineCode, "deleted_id": medicine.ID})
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":  "success",
-		"message": "Medicine deleted successfully",
+		"status":       "success",
+		"message":      "Medicine deleted successfully",
+		"deleted_id":   medicine.ID,
+		"deleted_code": medicine.MedicineCode,
 	})
 }
-

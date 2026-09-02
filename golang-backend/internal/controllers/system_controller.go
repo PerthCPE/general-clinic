@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -163,6 +164,7 @@ func SimulateDoctorPrescription(c *gin.Context) {
 			Allergies:       patient.Allergies,
 			ChronicDiseases: patient.ChronicDiseases,
 			PhoneNumber:     patient.PhoneNumber,
+			BloodType:       bloodType,
 			VisitCount:      1,
 		}
 		config.DB.Create(&patMed)
@@ -172,12 +174,33 @@ func SimulateDoctorPrescription(c *gin.Context) {
 	}
 	ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", patMed)
 
+	// 8.6. บันทึกลงตารางคิวห้องยาเฉพาะ medicine_queues
+	var mqCount int64
+	config.DB.Model(&models.MedicineQueue{}).Count(&mqCount)
+	mQueueNo := fmt.Sprintf("M-%03d", mqCount+1)
+	dispensedJSON, _ := json.Marshal(dispensedMeds)
+
+	medicineQueue := models.MedicineQueue{
+		QueueNumber:  mQueueNo,
+		HN:           patient.HN,
+		PatientName:  patient.FullName,
+		NationalID:   patient.NationalID,
+		Gender:       patient.Gender,
+		Age:          age,
+		SchemeType:   patient.SchemeType,
+		VisitID:      visit.ID,
+		DoctorAdvice: "มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา",
+		Status:       "pending",
+		Medications:  string(dispensedJSON),
+	}
+	config.DB.Create(&medicineQueue)
+
 	// 9. Broadcast	// ยิง WebSocket ไปบอกระบบจัดการคิวห้องยา
 	ws.BroadcastEvent("QUEUE_CREATED", gin.H{
-		"id":              queue.ID,
+		"id":              medicineQueue.ID,
 		"patient_id":      patient.ID,
-		"queue_number":    queue.QueueNumber,
-		"status":          queue.Status,
+		"queue_number":    medicineQueue.QueueNumber,
+		"status":          medicineQueue.Status,
 		"patient_name":    patient.FullName,
 		"hn":              patient.HN,
 		"national_id":     patient.NationalID,
