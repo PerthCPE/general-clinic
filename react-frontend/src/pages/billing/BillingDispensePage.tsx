@@ -51,9 +51,55 @@ export default function BillingDispensePage({
 
   // Real-time Queue & Billing Listener
   useEffect(() => {
+    const fetchInitialQueue = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/queue/list', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const billingQueues = data.filter((q: any) => q.status === 'billing_waiting');
+            const mappedQueues = billingQueues.map((q: any) => ({
+              id: `HN-${q.patient_id || q.visit_id}`,
+              hn: q.Patient?.hn || `HN-${q.patient_id}`,
+              nationalId: q.Patient?.national_id || '',
+              queueNumber: q.queue_number || 'Q0000',
+              ticket: q.queue_number || 'A-01',
+              name: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
+              shortName: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
+              gender: q.Patient?.gender || 'ชาย',
+              age: q.Patient ? new Date().getFullYear() - new Date(q.Patient.birthdate).getFullYear() : 35,
+              treatmentRights: q.Patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+              patientType: 'ผู้ป่วยนอก (OPD)',
+              allergies: q.Patient?.allergies ? [q.Patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
+              chronicDiseases: q.Patient?.chronic_diseases || 'ไม่มี',
+              vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+              visitStatus: 'จ่ายยาแล้ว / รอชำระเงิน',
+              visitDate: new Date(q.created_at || Date.now()).toLocaleDateString('th-TH'),
+              visitTime: new Date(q.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+              doctorAdvice: q.note || 'พักผ่อนให้เพียงพอ',
+              medications: q.medications || [] // Assuming API might provide it, otherwise empty initially until clicked
+            }));
+            setQueueList(mappedQueues);
+            if (mappedQueues.length > 0 && !localPatientId) {
+              setLocalPatientId(mappedQueues[0].id);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch initial queue:', err);
+      }
+    };
+    
+    fetchInitialQueue();
+
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
       if (data && data.action === 'db_reset') {
         setQueueList([]);
+      } else {
+        fetchInitialQueue();
       }
     });
 
