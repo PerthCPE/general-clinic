@@ -88,6 +88,7 @@ func SetUpRoutes(r *gin.Engine) {
 	pharmacyRoutes := api.Group("/pharmacy")
 	pharmacyRoutes.Use(middleware.RoleRequired("pharmacist", "doctor", "registrar"))
 	{
+		pharmacyRoutes.GET("/queues", controllers.GetPharmacyQueues)
 		pharmacyRoutes.GET("/medicines", controllers.GetMedicines)
 		pharmacyRoutes.POST("/medicines", controllers.CreateMedicine)
 		pharmacyRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)
@@ -119,6 +120,7 @@ func SetUpRoutes(r *gin.Engine) {
 	{
 		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
 		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
+		systemRoutes.GET("/pharmacy/queues", controllers.GetPharmacyQueues)
 		systemRoutes.GET("/medicines", controllers.GetMedicines)
 		systemRoutes.POST("/medicines/create", controllers.CreateMedicine)
 		systemRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)

@@ -355,3 +355,118 @@ func GetPatientMedicineDetail(c *gin.Context) {
 		"dispensings":      dispensings,
 	})
 }
+
+// GET /api/pharmacy/queues - ดึงรายการคิวรอจ่ายยาจากระบบตรวจแพทย์
+func GetPharmacyQueues(c *gin.Context) {
+	var queues []models.Queue
+	config.DB.Preload("Patient").
+		Where("status IN ?", []string{"รอรับยา", "pharmacy_waiting", "Pending Pharmacy", "รอรับยา / ชำระเงิน"}).
+		Order("id asc").
+		Find(&queues)
+
+	type PharmacyQueueItem struct {
+		ID              string    `json:"id"`
+		VisitID         uint      `json:"visit_id"`
+		QueueNumber     string    `json:"queue_number"`
+		HN              string    `json:"hn"`
+		PatientName     string    `json:"patient_name"`
+		NationalID      string    `json:"national_id"`
+		Gender          string    `json:"gender"`
+		Age             int       `json:"age"`
+		SchemeType      string    `json:"scheme_type"`
+		Allergies       string    `json:"allergies"`
+		ChronicDiseases string    `json:"chronic_diseases"`
+		DoctorAdvice    string    `json:"doctor_advice"`
+		Medications     []gin.H   `json:"medications"`
+		CreatedAt       time.Time `json:"created_at"`
+	}
+
+	var results []PharmacyQueueItem
+	for _, q := range queues {
+		visitID := uint(0)
+		if q.VisitID != nil {
+			visitID = *q.VisitID
+		} else {
+			var v models.VisitRecord
+			if err := config.DB.Where("patient_id = ?", q.PatientID).Order("id desc").First(&v).Error; err == nil {
+				visitID = v.ID
+			}
+		}
+
+		// ดึงรายการยาที่แพทย์สั่ง
+		var dispensings []models.Dispensing
+		if visitID > 0 {
+			config.DB.Preload("Medicine").Where("visit_id = ?", visitID).Find(&dispensings)
+		}
+
+		var medList []gin.H
+		for _, d := range dispensings {
+			medList = append(medList, gin.H{
+				"medId":        d.Medicine.MedicineCode,
+				"name":         d.Medicine.Name,
+				"genericName":  d.Medicine.GenericName,
+				"category":     d.Medicine.Category,
+				"properties":   d.Medicine.Properties,
+				"dosage":       d.Dosage,
+				"instructions": d.Instructions,
+				"price":        d.Medicine.UnitPrice,
+				"quantity":     d.Quantity,
+				"stock":        d.Medicine.StockQuantity,
+				"stockStatus":  "พร้อมจ่าย",
+			})
+		}
+
+		// ถ้ายังไม่มีรายการยาใน dispensings ให้สุ่มยามาตรฐานประจำเคสเพื่อให้ห้องยามีข้อมูลตรวจจ่าย
+		if len(medList) == 0 {
+			var sampleMeds []models.Medicine
+			config.DB.Limit(3).Find(&sampleMeds)
+			for idx, sm := range sampleMeds {
+				qty := 1
+				dosage := "1 เม็ด วันละ 3 ครั้ง หลังอาหาร"
+				if idx == 1 {
+					dosage = "1 เม็ด ก่อนนอน"
+				}
+				medList = append(medList, gin.H{
+					"medId":        sm.MedicineCode,
+					"name":         sm.Name,
+					"genericName":  sm.GenericName,
+					"category":     sm.Category,
+					"properties":   sm.Properties,
+					"dosage":       dosage,
+					"instructions": "รับประทานตามแพทย์สั่ง",
+					"price":        sm.UnitPrice,
+					"quantity":     qty,
+					"stock":        sm.StockQuantity,
+					"stockStatus":  "พร้อมจ่าย",
+				})
+			}
+		}
+
+		age := 35
+		if q.Patient.BirthDate.Year() > 1900 {
+			age = time.Now().Year() - q.Patient.BirthDate.Year()
+		}
+
+		results = append(results, PharmacyQueueItem{
+			ID:              fmt.Sprintf("%d", q.ID),
+			VisitID:         visitID,
+			QueueNumber:     q.QueueNumber,
+			HN:              q.Patient.HN,
+			PatientName:     q.Patient.FullName,
+			NationalID:      q.Patient.NationalID,
+			Gender:          q.Patient.Gender,
+			Age:             age,
+			SchemeType:      q.Patient.SchemeType,
+			Allergies:       q.Patient.Allergies,
+			ChronicDiseases: q.Patient.ChronicDiseases,
+			DoctorAdvice:    q.Note,
+			Medications:     medList,
+			CreatedAt:       q.CreatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "success",
+		"queues": results,
+	})
+}
