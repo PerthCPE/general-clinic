@@ -492,34 +492,77 @@ func seedDatabase() {
 			}
 			log.Println("QRPayments seeded successfully.")
 		}
+	}
 
-		// 8. Seed Documents & Document Forwards (Officer Module)
-		var docCount int64
-		DB.Model(&models.Document{}).Count(&docCount)
-		if docCount == 0 {
-			officerUserID := users[0].ID // officer1
+	// 8. Seed Documents & Document Forwards (Officer Module - Independent check)
+	var docCount int64
+	DB.Model(&models.Document{}).Count(&docCount)
+	if docCount == 0 {
+		var officerUser models.User
+		if err := DB.Where("username = ?", "officer1").First(&officerUser).Error; err != nil {
+			officerUser = users[0]
+		}
 
-			docs := []models.Document{
-				{ExternalDocRef: "สธ 0201/2569", SenderName: "กระทรวงสาธารณสุข", Subject: "แนวทางการควบคุมโรคติดต่อทางเดินหายใจ ประจำปี 2569", FileURL: "https://example.com/docs/guidelines_2569.pdf", CreatedBy: officerUserID},
-				{ExternalDocRef: "สปสช. 1102/2569", SenderName: "สำนักงานหลักประกันสุขภาพแห่งชาติ", Subject: "ประกาศปรับปรุงอัตราค่าชดเชยค่าบริการทางการแพทย์ใหม่", FileURL: "https://example.com/docs/nhso_rates.pdf", CreatedBy: officerUserID},
-				{ExternalDocRef: "อย. 4405/2569", SenderName: "สำนักงานคณะกรรมการอาหารและยา", Subject: "แจ้งเตือนการเฝ้าระวังยาควบคุมพิเศษกลุ่มต้านการอักเสบ", FileURL: "https://example.com/docs/fda_alert.pdf", CreatedBy: officerUserID},
-				{ExternalDocRef: "รพ. 8812/2569", SenderName: "โรงพยาบาลศูนย์เครือข่าย", Subject: "หนังสือประสานงานแนวทางการส่งต่อผู้ป่วยฉุกเฉิน (Referral System)", FileURL: "https://example.com/docs/referral_network.pdf", CreatedBy: officerUserID},
-			}
-			for i := range docs {
-				DB.Create(&docs[i])
-			}
-			log.Println("Documents seeded successfully.")
+		docs := []models.Document{
+			{ExternalDocRef: "สธ 0201/2569", SenderName: "กระทรวงสาธารณสุข", Subject: "แนวทางการควบคุมโรคติดต่อทางเดินหายใจ ประจำปี 2569", FileURL: "https://example.com/docs/guidelines_2569.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "สปสช. 1102/2569", SenderName: "สำนักงานหลักประกันสุขภาพแห่งชาติ", Subject: "ประกาศปรับปรุงอัตราค่าชดเชยค่าบริการทางการแพทย์ใหม่", FileURL: "https://example.com/docs/nhso_rates.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "อย. 4405/2569", SenderName: "สำนักงานคณะกรรมการอาหารและยา", Subject: "แจ้งเตือนการเฝ้าระวังยาควบคุมพิเศษกลุ่มต้านการอักเสบ", FileURL: "https://example.com/docs/fda_alert.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "รพ. 8812/2569", SenderName: "โรงพยาบาลศูนย์เครือข่าย", Subject: "หนังสือประสานงานแนวทางการส่งต่อผู้ป่วยฉุกเฉิน (Referral System)", FileURL: "https://example.com/docs/referral_network.pdf", CreatedBy: officerUser.ID},
+		}
+		for i := range docs {
+			DB.Create(&docs[i])
+		}
+		log.Println("Documents seeded successfully into Database.")
 
-			forwards := []models.DocumentForward{
-				{DocID: docs[0].ID, ForwardedTo: users[6].ID, Status: "Acknowledged"}, // doctor1
-				{DocID: docs[0].ID, ForwardedTo: users[2].ID, Status: "Pending"},      // nurse1
-				{DocID: docs[1].ID, ForwardedTo: users[5].ID, Status: "Pending"},      // cashier1
-				{DocID: docs[2].ID, ForwardedTo: users[4].ID, Status: "Acknowledged"}, // pharmacist1
-			}
-			for i := range forwards {
+		var doctorUser, nurseUser, cashierUser, pharmacistUser models.User
+		DB.Where("username = ?", "doctor1").First(&doctorUser)
+		DB.Where("username = ?", "nurse1").First(&nurseUser)
+		DB.Where("username = ?", "cashier1").First(&cashierUser)
+		DB.Where("username = ?", "pharmacist1").First(&pharmacistUser)
+
+		forwards := []models.DocumentForward{
+			{DocID: docs[0].ID, ForwardedTo: doctorUser.ID, Status: "Acknowledged"},
+			{DocID: docs[0].ID, ForwardedTo: nurseUser.ID, Status: "Pending"},
+			{DocID: docs[1].ID, ForwardedTo: cashierUser.ID, Status: "Pending"},
+			{DocID: docs[2].ID, ForwardedTo: pharmacistUser.ID, Status: "Acknowledged"},
+		}
+		for i := range forwards {
+			if forwards[i].ForwardedTo > 0 {
 				DB.Create(&forwards[i])
 			}
-			log.Println("Document Forwards seeded successfully.")
+		}
+		log.Println("Document Forwards seeded successfully into Database.")
+	}
+
+	// 9. Seed Doctor Schedules (Officer Module - Independent check)
+	var schCount int64
+	DB.Model(&models.DoctorSchedule{}).Count(&schCount)
+	if schCount == 0 {
+		var doctors []models.User
+		DB.Where("role = ?", "doctor").Order("id asc").Find(&doctors)
+		if len(doctors) > 0 {
+			var officerUser models.User
+			DB.Where("username = ?", "officer1").First(&officerUser)
+
+			now := time.Now()
+			for d := 0; d < 7; d++ {
+				workDate := now.AddDate(0, 0, d)
+				for i, doc := range doctors {
+					shiftType := "Morning"
+					if (i+d)%2 == 1 {
+						shiftType = "Afternoon"
+					}
+					sch := models.DoctorSchedule{
+						DoctorID:  doc.ID,
+						WorkDate:  workDate,
+						ShiftType: shiftType,
+						Status:    "Published",
+						CreatedBy: officerUser.ID,
+					}
+					DB.Create(&sch)
+				}
+			}
+			log.Println("Doctor Schedules seeded successfully into Database.")
 		}
 	}
 }

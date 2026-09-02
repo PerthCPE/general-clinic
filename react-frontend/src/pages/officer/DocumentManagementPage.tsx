@@ -68,7 +68,7 @@ export const DocumentManagementPage: React.FC = () => {
   useEffect(() => {
     dmsApi.getDocuments()
       .then((data: BackendDocument[]) => {
-        if (data && Array.isArray(data) && data.length > 0) {
+        if (data && Array.isArray(data)) {
           const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
           const mapped: DocumentItem[] = data.map((d) => {
             const createdAt = new Date(d.created_at || Date.now());
@@ -89,7 +89,7 @@ export const DocumentManagementPage: React.FC = () => {
         }
       })
       .catch(() => {
-        // Fallback to mock
+        // Fallback to mock only if server is offline
       });
   }, []);
 
