@@ -15,7 +15,7 @@ import (
 // Request Structures
 type CreateDocumentReq struct {
 	ExternalDocRef string `json:"external_doc_ref"`
-	SenderName     string `json:"sender_name" binding:"required"`
+	SenderName     string `json:"sender_name"`
 	Subject        string `json:"subject" binding:"required"`
 	FileURL        string `json:"file_url"`
 }
@@ -41,7 +41,7 @@ func GetDocuments(c *gin.Context) {
 func CreateDocument(c *gin.Context) {
 	var req CreateDocumentReq
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณากรอกข้อมูลเอกสารให้ครบถ้วน"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุชื่อเรื่อง / หัวข้อเอกสาร"})
 		return
 	}
 
@@ -64,9 +64,14 @@ func CreateDocument(c *gin.Context) {
 		docRef = "DOC-" + time.Now().Format("2006") + "-" + strconv.FormatInt(count+1, 10)
 	}
 
+	senderName := req.SenderName
+	if senderName == "" {
+		senderName = "-"
+	}
+
 	newDoc := models.Document{
 		ExternalDocRef: docRef,
-		SenderName:     req.SenderName,
+		SenderName:     senderName,
 		Subject:        req.Subject,
 		FileURL:        req.FileURL,
 		CreatedBy:      userID,

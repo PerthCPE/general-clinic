@@ -101,6 +101,13 @@ export const DocumentManagementPage: React.FC = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
+      // Auto-fill subject with file name without extension for speed and convenience
+      const defaultSubject = file.name.replace(/\.[^/.]+$/, '').replace(/[_\\-]/g, ' ');
+      setUploadForm({
+        subject: defaultSubject,
+        senderName: 'เจ้าหน้าที่ธุรการ',
+        externalRef: ''
+      });
       setActiveModal('upload');
     }
     e.target.value = '';
@@ -116,7 +123,7 @@ export const DocumentManagementPage: React.FC = () => {
     try {
       const res = await dmsApi.createDocument({
         external_doc_ref: uploadForm.externalRef || `DOC-2569-${Date.now().toString().slice(-4)}`,
-        sender_name: uploadForm.senderName || 'เจ้าหน้าที่ธุรการ',
+        sender_name: 'เจ้าหน้าที่ธุรการ',
         subject: uploadForm.subject || selectedFile.name,
         file_url: 'https://example.com/docs/' + selectedFile.name,
       });
@@ -155,7 +162,7 @@ export const DocumentManagementPage: React.FC = () => {
         modifiedDate: formattedDate,
         status: 'reviewing',
         subject: uploadForm.subject,
-        senderName: uploadForm.senderName,
+        senderName: 'เจ้าหน้าที่ธุรการ',
         externalRef: uploadForm.externalRef
       };
       
@@ -225,7 +232,7 @@ export const DocumentManagementPage: React.FC = () => {
                 
                 <div className="dms-form-group">
                   <label className="dms-form-label">
-                    ชื่อเรื่อง / หัวข้อเอกสาร (Subject) <span className="text-required">*</span>
+                    ชื่อเรื่อง / หัวข้อเอกสาร <span className="text-required">*</span>
                   </label>
                   <input
                     type="text"
@@ -233,33 +240,20 @@ export const DocumentManagementPage: React.FC = () => {
                     required 
                     value={uploadForm.subject}
                     onChange={e => setUploadForm({...uploadForm, subject: e.target.value})} 
-                    placeholder="เช่น รายงานประจำเดือน ตุลาคม หรือ สัญญาแพทย์"
+                    placeholder="เช่น รายงานประจำเดือน หรือ หนังสือราชการ"
                   />
                 </div>
                 
                 <div className="dms-form-group">
                   <label className="dms-form-label">
-                    ชื่อผู้ส่ง / แผนกต้นทาง (Sender Name)
-                  </label>
-                  <input
-                    type="text"
-                    className="dms-form-input"
-                    value={uploadForm.senderName}
-                    onChange={e => setUploadForm({...uploadForm, senderName: e.target.value})} 
-                    placeholder="เช่น แผนกการเงิน, นพ.สมชาย, สปสช."
-                  />
-                </div>
-                
-                <div className="dms-form-group">
-                  <label className="dms-form-label">
-                    เลขที่อ้างอิงภายนอก (External Reference)
+                    เลขที่อ้างอิงเอกสาร (ถ้ามี)
                   </label>
                   <input
                     type="text"
                     className="dms-form-input"
                     value={uploadForm.externalRef}
                     onChange={e => setUploadForm({...uploadForm, externalRef: e.target.value})} 
-                    placeholder="เช่น EXP-2026-001 หรือ รพ-69-041"
+                    placeholder="เช่น สธ 0201/2569 (หากเว้นว่างระบบจะสร้างอัตโนมัติ)"
                   />
                 </div>
               </div>
@@ -268,7 +262,7 @@ export const DocumentManagementPage: React.FC = () => {
                   ยกเลิก
                 </button>
                 <button type="submit" className="dms-btn-primary">
-                  ยืนยันการอัปโหลด
+                  {uploading ? 'กำลังบันทึก...' : 'บันทึกเอกสาร'}
                 </button>
               </div>
             </form>
