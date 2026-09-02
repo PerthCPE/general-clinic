@@ -88,6 +88,7 @@ export function mapQueueItemToPatient(item: BackendDoctorQueueItem): Patient {
     visitId: item.visit_id || undefined,
     queueId: item.queue_id || undefined,
     patientId: patient.id || undefined,
+    visitCount: item.visit_count ?? 0,
 
     queueNo: item.queue_number,
     hn: patient.hn,

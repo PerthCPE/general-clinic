@@ -527,6 +527,9 @@ func GetDoctorQueue(c *gin.Context) {
 		if visit != nil {
 			item.VisitID = visit.ID
 			item.VN = visit.VN
+			// คิวที่เดินอยู่ย่อมมีการมาตรวจแล้วอย่างน้อยหนึ่งครั้ง
+			// ใส่ค่านี้ให้ตรงกันกับหน้าประวัติ จะได้ไม่ขึ้นป้าย "ผู้ป่วยใหม่" ผิด
+			item.VisitCount = 1
 		}
 
 		if hasScreening {
@@ -756,7 +759,9 @@ func GetMyDoctorProfile(c *gin.Context) {
 	}
 
 	if hasProfile {
-		res["doctor_id"] = profile.DoctorID
+		// เพื่อนร่วมทีมเปลี่ยนชื่อ primary key ของตาราง doctors จาก DoctorID เป็น ID
+		// คีย์ที่ส่งออกยังเป็น doctor_id เหมือนเดิม เพื่อไม่ให้ฝั่งหน้าจอต้องแก้ตาม
+		res["doctor_id"] = profile.ID
 		res["license_number"] = profile.LicenseNumber
 		res["specialty"] = profile.Specialty
 		res["room"] = profile.Room

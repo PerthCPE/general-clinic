@@ -82,7 +82,7 @@ func GetPatientRecords(c *gin.Context) {
 // ถ้าใส่คำค้น จะค้นจากตาราง patients ก่อน แล้วรวมกับผู้ป่วยที่เลข VN ตรงกัน
 func findRecordPatients(keyword string, limit int) ([]models.Patient, error) {
 	if keyword == "" {
-		return recentVisitedPatients(limit)
+		return recentPatients(limit)
 	}
 
 	like := "%" + strings.ToLower(keyword) + "%"
@@ -138,11 +138,13 @@ func findRecordPatients(keyword string, limit int) ([]models.Patient, error) {
 	return patients, nil
 }
 
-// recentVisitedPatients - ผู้ป่วยที่เคยมาตรวจ เรียงจากครั้งล่าสุดก่อน
+// recentPatients - ผู้ป่วยสำหรับหน้าประวัติ เรียงคนที่มาตรวจล่าสุดไว้บนสุด
 //
-// ไล่จากตาราง visit_records แทนที่จะไล่จาก patients เพราะต้องการเรียงตาม
-// วันที่มาตรวจ และไม่อยากได้ผู้ป่วยที่ลงทะเบียนไว้แต่ยังไม่เคยเข้าตรวจเลย
-func recentVisitedPatients(limit int) ([]models.Patient, error) {
+// แฟ้มผู้ป่วยต้องมีตั้งแต่วันที่ลงทะเบียน ไม่ใช่รอให้ตรวจก่อน
+// จึงเรียงเป็นสองชั้น
+//  1. คนที่เคยมาตรวจ เรียงจากครั้งล่าสุด (ไล่จากตาราง visit_records)
+//  2. คนที่เพิ่งลงทะเบียนแต่ยังไม่เคยเข้าตรวจ เรียงจากคนที่ลงทะเบียนล่าสุด
+func recentPatients(limit int) ([]models.Patient, error) {
 	var visits []models.VisitRecord
 	if err := config.DB.
 		Select("patient_id", "visit_date", "id").
@@ -165,26 +167,42 @@ func recentVisitedPatients(limit int) ([]models.Patient, error) {
 		}
 	}
 
-	if len(orderedIDs) == 0 {
-		return []models.Patient{}, nil
-	}
+	sorted := make([]models.Patient, 0, limit)
 
-	var patients []models.Patient
-	if err := config.DB.Where("id IN ?", orderedIDs).Find(&patients).Error; err != nil {
-		return nil, err
-	}
-
-	// เรียงกลับให้ตรงลำดับที่หามาได้ (ฐานข้อมูลคืนมาเรียงตาม id)
-	byID := make(map[uint]models.Patient, len(patients))
-	for _, p := range patients {
-		byID[p.ID] = p
-	}
-
-	sorted := make([]models.Patient, 0, len(orderedIDs))
-	for _, id := range orderedIDs {
-		if p, ok := byID[id]; ok {
-			sorted = append(sorted, p)
+	if len(orderedIDs) > 0 {
+		var visited []models.Patient
+		if err := config.DB.Where("id IN ?", orderedIDs).Find(&visited).Error; err != nil {
+			return nil, err
 		}
+
+		// เรียงกลับให้ตรงลำดับที่หามาได้ (ฐานข้อมูลคืนมาเรียงตาม id)
+		byID := make(map[uint]models.Patient, len(visited))
+		for _, p := range visited {
+			byID[p.ID] = p
+		}
+		for _, id := range orderedIDs {
+			if p, ok := byID[id]; ok {
+				sorted = append(sorted, p)
+			}
+		}
+	}
+
+	// เติมคนที่ลงทะเบียนไว้แล้วแต่ยังไม่เคยเข้าตรวจ ต่อท้ายรายการ
+	if len(sorted) < limit {
+		var fresh []models.Patient
+		q := config.DB.Order("id desc").Limit(limit - len(sorted))
+		if len(seen) > 0 {
+			ids := make([]uint, 0, len(seen))
+			for id := range seen {
+				ids = append(ids, id)
+			}
+			q = q.Where("id NOT IN ?", ids)
+		}
+
+		if err := q.Find(&fresh).Error; err != nil {
+			return nil, err
+		}
+		sorted = append(sorted, fresh...)
 	}
 
 	return sorted, nil
@@ -202,11 +220,16 @@ func buildRecordItem(p models.Patient) dto.DoctorQueueItem {
 		Patient: toPatientBrief(p),
 	}
 
+	// นับว่าเคยมาตรวจกี่ครั้ง หน้าจอใช้แยกว่าเป็นผู้ป่วยใหม่หรือมีประวัติแล้ว
+	var visitCount int64
+	config.DB.Model(&models.VisitRecord{}).Where("patient_id = ?", p.ID).Count(&visitCount)
+	item.VisitCount = int(visitCount)
+
 	var visit models.VisitRecord
 	if err := config.DB.Where("patient_id = ?", p.ID).
 		Order("visit_date desc").
 		First(&visit).Error; err != nil {
-		// ยังไม่เคยมาตรวจ - คืนเฉพาะข้อมูลผู้ป่วย
+		// ยังไม่เคยมาตรวจ - คืนเฉพาะข้อมูลผู้ป่วย รอวันที่เข้ามาตรวจครั้งแรก
 		item.Status = models.VisitStatusWaiting
 		return item
 	}

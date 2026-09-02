@@ -86,31 +86,39 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
 
   // ผู้ป่วยที่ปิดการตรวจไปแล้ว (รวมที่ส่งต่อห้องยา) — มาจาก /patient-records
   // จึงเห็นย้อนหลังได้ทุกวัน ไม่ใช่เฉพาะคิวของวันนี้
+  // ผู้ป่วยที่ลงทะเบียนไว้แล้วแต่ยังไม่เคยเข้าตรวจเลย
+  // แฟ้มมีตั้งแต่วันลงทะเบียน แต่ยังไม่มีประวัติการรักษา จึงไม่นับรวมกับคิวที่รออยู่
+  const isNewPatient = (p: Patient) => (p.visitCount ?? 0) === 0;
+
   const isCompletedPatient = (p: Patient) =>
-    p.status === 'Completed' || p.status === 'Pending Pharmacy';
+    !isNewPatient(p) && (p.status === 'Completed' || p.status === 'Pending Pharmacy');
 
   const isActivePatient = (p: Patient) =>
-    p.status === 'Waiting' ||
-    p.status === 'Screened' ||
-    (p.status as string) === 'In Progress' ||
-    p.status === 'Examining';
+    !isNewPatient(p) &&
+    (p.status === 'Waiting' ||
+      p.status === 'Screened' ||
+      (p.status as string) === 'In Progress' ||
+      p.status === 'Examining');
 
-  const inProgressCount = patients.filter(p => (p.status as string) === 'In Progress' || p.status === 'Examining').length;
-  const waitingCount = patients.filter(p => p.status === 'Waiting').length;
+  const inProgressCount = patients.filter(p => !isNewPatient(p) && ((p.status as string) === 'In Progress' || p.status === 'Examining')).length;
+  const waitingCount = patients.filter(p => !isNewPatient(p) && p.status === 'Waiting').length;
   const completedCount = patients.filter(isCompletedPatient).length;
+  const newPatientCount = patients.filter(isNewPatient).length;
   const activePatientsCount = patients.length;
 
   const filteredPatients = patients.filter(p => {
     if (statusFilter === 'in_progress') {
+      if (isNewPatient(p)) return false;
       if ((p.status as string) !== 'In Progress' && p.status !== 'Examining') return false;
     } else if (statusFilter === 'waiting') {
+      if (isNewPatient(p)) return false;
       if (p.status !== 'Waiting') return false;
     } else if (statusFilter === 'completed') {
       if (!isCompletedPatient(p)) return false;
     } else if (statusFilter === 'all') {
       // ทั้งหมด = ทุกคนที่โหลดมา ทั้งที่ยังรอตรวจและที่ตรวจจบไปแล้ว
       // (เดิมกรองเฉพาะคนที่ยัง active ทำให้ผู้ป่วยที่ตรวจเสร็จแล้วหายไป)
-      if (!isActivePatient(p) && !isCompletedPatient(p) && !search.trim()) return false;
+      if (!isActivePatient(p) && !isCompletedPatient(p) && !isNewPatient(p) && !search.trim()) return false;
     }
 
     if (!search.trim()) return true;
@@ -227,12 +235,19 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                       ? (language === 'th' ? 'ผู้ป่วยรอตรวจ' : 'Waiting Patients')
                       : statusFilter === 'completed'
                       ? (language === 'th' ? 'ผู้ป่วยที่ตรวจเสร็จแล้ว' : 'Completed Patients')
-                      : (language === 'th' ? 'รายชื่อผู้ป่วยทั้งหมด' : 'All Patients')
+                      : (language === 'th' ? 'ผู้ป่วยในระบบทั้งหมด' : 'All Patients in System')
                     }
                   </span>
                   <span className="text-xs font-mono font-bold bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-lg">
                     {filteredPatients.length}
                   </span>
+                  {statusFilter === 'all' && newPatientCount > 0 && (
+                    <span className="text-[11px] font-medium text-slate-500">
+                      {language === 'th'
+                        ? `(ผู้ป่วยใหม่ยังไม่เคยตรวจ ${newPatientCount} คน)`
+                        : `(${newPatientCount} never examined)`}
+                    </span>
+                  )}
                 </h2>
               </div>
 
@@ -335,7 +350,13 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                               </div>
                             </div>
                           </div>
-                          <StatusBadge status={patient.status} />
+                          {isNewPatient(patient) ? (
+                              <span className="bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+                                {language === 'th' ? 'ผู้ป่วยใหม่' : 'New Patient'}
+                              </span>
+                            ) : (
+                              <StatusBadge status={patient.status} />
+                            )}
                         </div>
 
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs space-y-1 font-mono text-slate-600">

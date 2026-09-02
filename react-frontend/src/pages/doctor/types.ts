@@ -94,6 +94,9 @@ export interface Patient {
   queueId?: number;
   patientId?: number;
 
+  // จำนวนครั้งที่เคยมาตรวจ 0 = ผู้ป่วยใหม่ที่ยังไม่เคยเข้าตรวจ
+  visitCount?: number;
+
   queueNo: string;
   hn: string;
   vn: string;

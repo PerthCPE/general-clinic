@@ -319,7 +319,6 @@ export const vitalsApi = {
     request<{ patient_id: string; history: BackendScreening[] }>(`/api/nurse/vitals/history/${patientId}`),
 };
 
-
 // ==============================================================================
 // 6. Doctor API - คิวตรวจของแพทย์, รายละเอียดเคส, เปลี่ยนสถานะการตรวจ
 // ==============================================================================
@@ -386,6 +385,9 @@ export interface BackendDoctorQueueItem {
   // การวินิจฉัยหลักของครั้งนั้น — มีเฉพาะรายการที่แพทย์บันทึกผลตรวจแล้ว
   diagnosis?: string;
   icd_code?: string;
+
+  // จำนวนครั้งที่เคยมาตรวจ 0 = เพิ่งลงทะเบียน ยังไม่เคยเข้าตรวจ
+  visit_count?: number;
 }
 
 export interface BackendDoctorQueueSummary {

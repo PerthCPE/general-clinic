@@ -99,6 +99,10 @@ type DoctorQueueItem struct {
 	// ใช้กับหน้าประวัติเวชระเบียน จึงเว้นว่างได้ในคิวที่ยังไม่ได้ตรวจ
 	Diagnosis string `json:"diagnosis,omitempty"`
 	ICDCode   string `json:"icd_code,omitempty"`
+
+	// จำนวนครั้งที่ผู้ป่วยรายนี้เคยมาตรวจ
+	// 0 = เพิ่งลงทะเบียน ยังไม่เคยเข้าตรวจเลย (หน้าประวัติใช้แยกป้ายสถานะ)
+	VisitCount int `json:"visit_count"`
 }
 
 // DoctorPatientRecordsResponse - ผลลัพธ์ของ GET /api/doctor/patients/records
