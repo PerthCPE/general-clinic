@@ -116,8 +116,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     },
     {
       id: '5',
-      category: 'นัดหมายผู้ป่วย',
-      message: 'แจ้งเตือนนัดติดตามอาการ คุณวิภา ติดดี เวลา 14:00 น.',
+      category: 'การคัดกรองสัญญาณชีพ',
+      message: 'แจ้งเตือนบันทึกสัญญาณชีพผู้ป่วยกลุ่ม Triage ฉุกเฉินเรียบร้อย',
       time: '1 ชั่วโมงที่แล้ว',
       isUnread: false,
     },

@@ -27,6 +27,12 @@ type RecordVitalsReq struct {
 	HeartRate        int     `json:"heart_rate"`
 	RespiratoryRate  int     `json:"respiratory_rate"`
 	SpO2             int     `json:"spo2"`
+	PainScore        int     `json:"pain_score"`
+	BloodSugar       int     `json:"blood_sugar"`
+	FoodAllergies    string  `json:"food_allergies"`
+	CurrentMedications string `json:"current_medications"`
+	SmokingHistory   string  `json:"smoking_history"`
+	AlcoholHistory   string  `json:"alcohol_history"`
 	Allergies        string  `json:"allergies"`
 	MedicalHistory   string  `json:"medical_history"`
 	NurseNotes       string  `json:"nurse_notes"`
@@ -38,7 +44,7 @@ func RecordVitalsAndTriage(c *gin.Context) {
 	var req RecordVitalsReq
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลสัญญาณชีพไม่ถูกต้อง"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("ข้อมูลสัญญาณชีพไม่ถูกต้อง: %v", err)})
 		return
 	}
 
@@ -183,6 +189,12 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		HeartRate:        req.HeartRate,
 		RespiratoryRate:  req.RespiratoryRate,
 		SpO2:             req.SpO2,
+		PainScore:        req.PainScore,
+		BloodSugar:       req.BloodSugar,
+		FoodAllergies:    req.FoodAllergies,
+		CurrentMedications: req.CurrentMedications,
+		SmokingHistory:   req.SmokingHistory,
+		AlcoholHistory:   req.AlcoholHistory,
 	}
 
 	if err := config.DB.Create(&newScreening).Error; err != nil {
@@ -191,11 +203,25 @@ func RecordVitalsAndTriage(c *gin.Context) {
 	}
 
 	// 8. อัปเดตสถานะคิวคนไข้เป็น "รอพบแพทย์" เฉพาะคิวนี้คิวเดียวเท่านั้น (Single Queue Update)
-	deptName := "ห้องตรวจ 1"
+	// กำหนดเลขห้องตรวจ strictly เป็น 1, 2 หรือ 3 เท่านั้น
+	roomNumber := 1
+	docID := assignedDoctorID
 	if doctor.ID > 0 {
-		deptName = fmt.Sprintf("ห้องตรวจ %d (%s)", doctor.ID, doctor.FullName)
-	} else if assignedDoctorID > 0 {
-		deptName = fmt.Sprintf("ห้องตรวจ %d", assignedDoctorID)
+		docID = doctor.ID
+	}
+	if docID == 4 || docID == 1 {
+		roomNumber = 1
+	} else if docID == 5 || docID == 2 {
+		roomNumber = 2
+	} else if docID == 6 || docID == 3 {
+		roomNumber = 3
+	} else if docID > 0 {
+		roomNumber = int((docID-1)%3) + 1
+	}
+
+	deptName := fmt.Sprintf("ห้องตรวจ %d", roomNumber)
+	if doctor.ID > 0 && doctor.FullName != "" {
+		deptName = fmt.Sprintf("ห้องตรวจ %d (%s)", roomNumber, doctor.FullName)
 	}
 	noteText := fmt.Sprintf("คัดกรองแล้ว: %s (BP: %d/%d, T: %.1f°C, HR: %d)", triageLevel, req.SystolicBP, req.DiastolicBP, temp, req.HeartRate)
 
