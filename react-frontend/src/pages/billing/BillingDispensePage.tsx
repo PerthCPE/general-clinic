@@ -64,25 +64,30 @@ export default function BillingDispensePage({
     const fetchInitialQueue = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await fetch('/api/queue/list', {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-        });
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        
+        let res = await fetch('/api/queue/list', { headers });
+        if (!res.ok) {
+          res = await fetch('/api/system/queue/list');
+        }
+        
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data)) {
-            const billingQueues = data.filter((q: any) => q.status === 'billing_waiting');
+            const billingQueues = data.filter((q: any) => q.status === 'billing_waiting' || q.status === 'pharmacy_dispensed');
             const mappedQueues = billingQueues.map((q: any) => ({
-              id: `HN-${q.patient_id || q.visit_id}`,
-              hn: q.Patient?.hn || `HN-${q.patient_id}`,
+              id: String(q.id),
+              visitId: q.visit_id || q.id || 1,
+              hn: q.Patient?.hn || q.hn || `HN-${q.patient_id}`,
               nationalId: q.Patient?.national_id || '',
               queueNumber: q.queue_number || 'Q0000',
               ticket: q.queue_number || 'A-01',
               name: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
               shortName: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
               gender: q.Patient?.gender || 'ชาย',
-              age: q.Patient ? new Date().getFullYear() - new Date(q.Patient.birthdate).getFullYear() : 35,
+              age: q.Patient ? (new Date().getFullYear() - new Date(q.Patient.birthdate).getFullYear()) : 35,
               treatmentRights: q.Patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
-              patientType: 'ผู้ป่วยนอก (OPD)',
+              patientType: 'ผู้ป่วยนอก (OPD)' as const,
               allergies: q.Patient?.allergies ? [q.Patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
               chronicDiseases: q.Patient?.chronic_diseases || 'ไม่มี',
               vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
@@ -90,8 +95,9 @@ export default function BillingDispensePage({
               visitDate: new Date(q.created_at || Date.now()).toLocaleDateString('th-TH'),
               visitTime: new Date(q.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
               doctorAdvice: q.note || 'พักผ่อนให้เพียงพอ',
-              medications: q.medications || [] // Assuming API might provide it, otherwise empty initially until clicked
+              medications: []
             }));
+            
             setQueueList(mappedQueues);
             setLocalPatientId(prev => {
               if (mappedQueues.length > 0) {
@@ -121,16 +127,13 @@ export default function BillingDispensePage({
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
       if (data) {
         const pName = data.patient_name || data.patient?.full_name || `ผู้ป่วย คิว #${data.visit_id || ''}`;
-        
-        // Use dynamic medications from WebSocket payload or fallback to empty
-        const dynamicMedications = data.medications || [];
-
         const newPatient: PatientConfig = {
-          id: `HN-${data.patient_id || data.visit_id || Date.now()}`,
+          id: String(data.queue_id || data.id || data.visit_id || Date.now()),
+          visitId: data.visit_id || 1,
           hn: data.hn || `HN-${data.patient_id || data.visit_id || Date.now()}`,
           nationalId: data.national_id || '1101800234567',
           queueNumber: data.queue_number || 'Q0001',
-          ticket: 'A-01',
+          ticket: data.queue_number || 'A-01',
           name: pName,
           shortName: pName,
           gender: 'ชาย',
@@ -143,13 +146,14 @@ export default function BillingDispensePage({
           allergies: ['ไม่มีประวัติแพ้ยา'],
           chronicDiseases: 'ไม่มี',
           vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-          visitStatus: 'รอรับยา / ชำระเงิน',
+          visitStatus: 'จ่ายยาแล้ว / รอชำระเงิน',
           visitDate: new Date().toLocaleDateString('th-TH'),
           visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
           doctorAdvice: 'พักผ่อนให้เพียงพอ',
-          medications: dynamicMedications,
+          medications: data.medications || [],
         };
         setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
+        triggerToast(`ได้รับคิวใหม่จากการจัดการยา: ${pName}`, 'doctor');
       }
     });
 
@@ -158,6 +162,48 @@ export default function BillingDispensePage({
       unsubBill();
     };
   }, [subscribe]);
+
+  // Real-time Query Medications from DB for Active Billing Patient
+  useEffect(() => {
+    if (activePatient && activePatient.visitId) {
+      const fetchMeds = async () => {
+        try {
+          let res = await fetch(`/api/pharmacy/dispensing/${activePatient.visitId}`);
+          if (!res.ok) {
+            res = await fetch(`/api/system/dispensing/${activePatient.visitId}`);
+          }
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
+              const fetchedMeds = data.dispensing.map((item: any) => ({
+                medId: item.Medicine?.code || `MED-${item.medicine_id}`,
+                name: item.Medicine?.name || 'ยาบรรเทาอาการ',
+                genericName: item.Medicine?.generic_name || '',
+                category: item.Medicine?.category || 'ยาสามัญ',
+                properties: item.Medicine?.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
+                dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
+                instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
+                price: item.Medicine?.unit_price || 50,
+                quantity: item.quantity || 1,
+                stock: item.Medicine?.stock_quantity || 100,
+                stockStatus: (item.Medicine?.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
+              }));
+              
+              setQueueList(prev => prev.map(q => {
+                if (q.id === activePatient.id) {
+                  return { ...q, medications: fetchedMeds };
+                }
+                return q;
+              }));
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch medications for billing visit:', err);
+        }
+      };
+      fetchMeds();
+    }
+  }, [activePatient?.id, activePatient?.visitId]);
 
   const triggerToast = (message: string, type: 'success' | 'error' | 'doctor') => {
     setIsToastFading(false);
