@@ -43,7 +43,7 @@ export default function BillingDispensePage({
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
 
   // Current active patient object
-  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0];
+  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0] || CLINIC_CONFIG.patients.find(p => p.id === localPatientId) || CLINIC_CONFIG.patients[0];
   const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
 
   const filteredQueue = queueList.filter(p => {
@@ -76,7 +76,7 @@ export default function BillingDispensePage({
         }
         if (bRes.ok) {
           const bData = await bRes.json();
-          if (bData.status === 'success' && Array.isArray(bData.queues)) {
+          if (bData.status === 'success' && Array.isArray(bData.queues) && bData.queues.length > 0) {
             const mapped = bData.queues.map((bq: any) => {
               let parsedMeds = [];
               if (bq.medications) {
@@ -116,6 +116,9 @@ export default function BillingDispensePage({
               }
               return prev;
             });
+          } else {
+            setQueueList(CLINIC_CONFIG.patients);
+            setLocalPatientId(prev => prev || CLINIC_CONFIG.patients[0]?.id);
           }
         }
       } catch (err) {

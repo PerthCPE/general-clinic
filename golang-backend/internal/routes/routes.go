@@ -4,6 +4,7 @@ import (
 	"clinic-backend/internal/controllers"
 	"clinic-backend/internal/middleware"
 	"clinic-backend/internal/ws"
+
 	"github.com/gin-gonic/gin"
 )
 

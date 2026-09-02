@@ -91,7 +91,7 @@ export default function BillingInvoicePage({
     };
   }, [subscribe]);
 
-  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === selectedPatientId) || queueList[0];
+  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === selectedPatientId) || queueList[0] || CLINIC_CONFIG.patients.find(p => p.id === selectedPatientId) || CLINIC_CONFIG.patients[0];
   const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
   
   const [showQrModal, setShowQrModal] = useState(false);
