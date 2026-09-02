@@ -527,11 +527,20 @@ func GetPatientMedicines(c *gin.Context) {
 // GET /api/pharmacy/patient-medicines/:hn - ดึงประวัติการรับยาของป่วยรายบุคคลตาม HN พร้อมผลตรวจและสัญญาณชีพจริง
 func GetPatientMedicineDetail(c *gin.Context) {
 	hn := c.Param("hn")
+	cleanHN := strings.TrimLeft(strings.TrimPrefix(strings.TrimPrefix(hn, "HN-"), "HN"), "0")
+	var hnVariants []string
+	if hn != "" {
+		hnVariants = append(hnVariants, hn)
+	}
+	if cleanHN != "" {
+		hnVariants = append(hnVariants, "HN"+cleanHN, "HN-"+cleanHN, fmt.Sprintf("HN%04s", cleanHN), fmt.Sprintf("HN-%04s", cleanHN), cleanHN)
+	}
+
 	var patient models.Patient
-	config.DB.Where("hn = ? OR hn = ?", hn, "HN-"+hn).First(&patient)
+	config.DB.Where("hn IN ?", hnVariants).First(&patient)
 
 	var patMed models.PatientMedicine
-	config.DB.Where("hn = ? OR hn = ?", hn, "HN-"+hn).First(&patMed)
+	config.DB.Where("hn IN ?", hnVariants).First(&patMed)
 
 	if patient.ID == 0 && patMed.ID == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Patient history not found"})
@@ -576,9 +585,19 @@ func GetPatientMedicineDetail(c *gin.Context) {
 		config.DB.Preload("Medicine").Preload("Doctor").Where("visit_id IN ?", visitIDs).Order("id desc").Find(&dispensings)
 	}
 
+	// เติมข้อมูล Medicine ถ้า UnitPrice เป็น 0
+	for i := range dispensings {
+		if dispensings[i].Medicine.UnitPrice <= 0 && dispensings[i].MedicineID > 0 {
+			var med models.Medicine
+			if config.DB.First(&med, dispensings[i].MedicineID).Error == nil {
+				dispensings[i].Medicine = med
+			}
+		}
+	}
+
 	// Fallback 1: ดึงจาก MedicineQueue
 	var medQueues []models.MedicineQueue
-	config.DB.Where("hn = ? OR hn = ?", hn, "HN-"+hn).Order("id desc").Find(&medQueues)
+	config.DB.Where("hn IN ?", hnVariants).Order("id desc").Find(&medQueues)
 	doctorAdvice := ""
 	for _, mq := range medQueues {
 		if doctorAdvice == "" && mq.DoctorAdvice != "" {
@@ -590,27 +609,73 @@ func GetPatientMedicineDetail(c *gin.Context) {
 				for _, mObj := range parsed {
 					mName, _ := mObj["name"].(string)
 					mCode, _ := mObj["medId"].(string)
+					if mCode == "" {
+						mCode, _ = mObj["medicine_code"].(string)
+					}
 					dosage, _ := mObj["dosage"].(string)
 					inst, _ := mObj["instructions"].(string)
 					props, _ := mObj["properties"].(string)
+					genName, _ := mObj["genericName"].(string)
+					cat, _ := mObj["category"].(string)
 					if props == "" {
 						props = "ยาตามแพทย์สั่งจ่าย"
 					}
 					qty := 1
 					if qVal, ok := mObj["quantity"]; ok {
-						if qNum, ok := qVal.(float64); ok {
+						if qNum, ok := qVal.(float64); ok && qNum > 0 {
 							qty = int(qNum)
 						}
 					}
+
+					var med models.Medicine
+					if mCode != "" {
+						config.DB.Where("medicine_code = ?", mCode).First(&med)
+					}
+					if med.ID == 0 && mName != "" {
+						config.DB.Where("name ILIKE ?", "%"+mName+"%").First(&med)
+					}
+					unitPrice := 0.0
+					if pVal, ok := mObj["price"]; ok {
+						if pNum, ok := pVal.(float64); ok && pNum > 0 {
+							unitPrice = pNum
+						}
+					}
+					if unitPrice <= 0 && med.UnitPrice > 0 {
+						unitPrice = med.UnitPrice
+					}
+					if unitPrice <= 0 {
+						unitPrice = 50.0
+					}
+
+					if mName == "" && med.Name != "" {
+						mName = med.Name
+					}
+					if mCode == "" && med.MedicineCode != "" {
+						mCode = med.MedicineCode
+					}
+					if genName == "" && med.GenericName != "" {
+						genName = med.GenericName
+					}
+					if cat == "" && med.Category != "" {
+						cat = med.Category
+					}
+					if props == "" && med.Properties != "" {
+						props = med.Properties
+					}
+
 					dispensings = append(dispensings, models.Dispensing{
 						VisitID:      mq.VisitID,
 						Quantity:     qty,
 						Dosage:       dosage,
 						Instructions: inst,
 						Medicine: models.Medicine{
-							MedicineCode: mCode,
-							Name:         mName,
-							Properties:   props,
+							MedicineCode:  mCode,
+							Name:          mName,
+							GenericName:   genName,
+							Category:      cat,
+							Properties:    props,
+							UnitPrice:     unitPrice,
+							StockQuantity: med.StockQuantity,
 						},
 						CreatedAt: mq.CreatedAt,
 					})
@@ -622,7 +687,7 @@ func GetPatientMedicineDetail(c *gin.Context) {
 	// Fallback 2: ดึงจาก BillingQueue
 	if len(dispensings) == 0 {
 		var bQueues []models.BillingQueue
-		config.DB.Where("hn = ? OR hn = ?", hn, "HN-"+hn).Order("id desc").Find(&bQueues)
+		config.DB.Where("hn IN ?", hnVariants).Order("id desc").Find(&bQueues)
 		for _, bq := range bQueues {
 			if bq.Medications != "" {
 				var parsed []map[string]interface{}
@@ -630,23 +695,70 @@ func GetPatientMedicineDetail(c *gin.Context) {
 					for _, mObj := range parsed {
 						mName, _ := mObj["name"].(string)
 						mCode, _ := mObj["medId"].(string)
+						if mCode == "" {
+							mCode, _ = mObj["medicine_code"].(string)
+						}
 						dosage, _ := mObj["dosage"].(string)
 						inst, _ := mObj["instructions"].(string)
+						props, _ := mObj["properties"].(string)
+						genName, _ := mObj["genericName"].(string)
+						cat, _ := mObj["category"].(string)
 						qty := 1
 						if qVal, ok := mObj["quantity"]; ok {
-							if qNum, ok := qVal.(float64); ok {
+							if qNum, ok := qVal.(float64); ok && qNum > 0 {
 								qty = int(qNum)
 							}
 						}
+
+						var med models.Medicine
+						if mCode != "" {
+							config.DB.Where("medicine_code = ?", mCode).First(&med)
+						}
+						if med.ID == 0 && mName != "" {
+							config.DB.Where("name ILIKE ?", "%"+mName+"%").First(&med)
+						}
+						unitPrice := 0.0
+						if pVal, ok := mObj["price"]; ok {
+							if pNum, ok := pVal.(float64); ok && pNum > 0 {
+								unitPrice = pNum
+							}
+						}
+						if unitPrice <= 0 && med.UnitPrice > 0 {
+							unitPrice = med.UnitPrice
+						}
+						if unitPrice <= 0 {
+							unitPrice = 50.0
+						}
+
+						if mName == "" && med.Name != "" {
+							mName = med.Name
+						}
+						if mCode == "" && med.MedicineCode != "" {
+							mCode = med.MedicineCode
+						}
+						if genName == "" && med.GenericName != "" {
+							genName = med.GenericName
+						}
+						if cat == "" && med.Category != "" {
+							cat = med.Category
+						}
+						if props == "" && med.Properties != "" {
+							props = med.Properties
+						}
+
 						dispensings = append(dispensings, models.Dispensing{
 							VisitID:      bq.VisitID,
 							Quantity:     qty,
 							Dosage:       dosage,
 							Instructions: inst,
 							Medicine: models.Medicine{
-								MedicineCode: mCode,
-								Name:         mName,
-								Properties:   "ยาตามแพทย์สั่งจ่าย",
+								MedicineCode:  mCode,
+								Name:          mName,
+								GenericName:   genName,
+								Category:      cat,
+								Properties:    props,
+								UnitPrice:     unitPrice,
+								StockQuantity: med.StockQuantity,
 							},
 							CreatedAt: bq.CreatedAt,
 						})

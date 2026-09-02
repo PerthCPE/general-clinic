@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"clinic-backend/internal/config"
@@ -55,14 +56,24 @@ func GetBillingQueues(c *gin.Context) {
 			}
 		}
 
+		cleanHN := strings.TrimLeft(strings.TrimPrefix(strings.TrimPrefix(bq.HN, "HN-"), "HN"), "0")
+		var hnVariants []string
+		if bq.HN != "" {
+			hnVariants = append(hnVariants, bq.HN)
+		}
+		if cleanHN != "" {
+			hnVariants = append(hnVariants, "HN"+cleanHN, "HN-"+cleanHN, fmt.Sprintf("HN%04s", cleanHN), fmt.Sprintf("HN-%04s", cleanHN), cleanHN)
+		}
+
 		// ดึงรายการยาจริงจากตาราง dispensings ที่แพทย์สั่ง
 		var dispensings []models.Dispensing
 		if bq.VisitID > 0 {
 			config.DB.Preload("Medicine").Where("visit_id = ?", bq.VisitID).Find(&dispensings)
 		}
-		if len(dispensings) == 0 && bq.HN != "" {
+		if len(dispensings) == 0 {
 			var pat models.Patient
-			if config.DB.Where("hn = ?", bq.HN).First(&pat).Error == nil && pat.ID > 0 {
+			config.DB.Where("hn IN ? OR full_name = ?", hnVariants, bq.PatientName).First(&pat)
+			if pat.ID > 0 {
 				var visits []models.VisitRecord
 				config.DB.Where("patient_id = ?", pat.ID).Order("id desc").Find(&visits)
 				var vIDs []uint
@@ -79,7 +90,14 @@ func GetBillingQueues(c *gin.Context) {
 			var medList []gin.H
 			totalAmount := 0.0
 			for _, disp := range dispensings {
-				unitPrice := disp.Medicine.UnitPrice
+				var med models.Medicine
+				if disp.Medicine.ID > 0 {
+					med = disp.Medicine
+				} else if disp.MedicineID > 0 {
+					config.DB.First(&med, disp.MedicineID)
+				}
+
+				unitPrice := med.UnitPrice
 				if unitPrice <= 0 {
 					unitPrice = 50.0
 				}
@@ -89,39 +107,132 @@ func GetBillingQueues(c *gin.Context) {
 				}
 				totalAmount += unitPrice * float64(qty)
 				medList = append(medList, gin.H{
-					"medId":        disp.Medicine.MedicineCode,
-					"name":         disp.Medicine.Name,
-					"genericName":  disp.Medicine.GenericName,
-					"category":     disp.Medicine.Category,
-					"properties":   disp.Medicine.Properties,
+					"medId":        med.MedicineCode,
+					"name":         med.Name,
+					"genericName":  med.GenericName,
+					"category":     med.Category,
+					"properties":   med.Properties,
 					"dosage":       disp.Dosage,
 					"instructions": disp.Instructions,
 					"price":        unitPrice,
 					"unit_price":   unitPrice,
 					"quantity":     qty,
-					"stock":        disp.Medicine.StockQuantity,
+					"stock":        med.StockQuantity,
 					"stockStatus":  "พร้อมจ่าย",
 				})
 			}
 			medsBytes, _ := json.Marshal(medList)
 			bq.Medications = string(medsBytes)
 			bq.TotalAmount = totalAmount
-		} else if bq.Medications == "" || bq.Medications == "[]" || bq.Medications == "null" {
+		} else {
 			// Fallback: ดึงจาก MedicineQueue
 			var mq models.MedicineQueue
 			if bq.VisitID > 0 {
-				config.DB.Where("visit_id = ?", bq.VisitID).First(&mq)
+				config.DB.Where("visit_id = ?", bq.VisitID).Order("id desc").First(&mq)
 			}
-			if mq.ID == 0 && bq.HN != "" {
-				config.DB.Where("hn = ?", bq.HN).First(&mq)
+			if mq.ID == 0 {
+				config.DB.Where("hn IN ? OR patient_name = ?", hnVariants, bq.PatientName).Order("id desc").First(&mq)
 			}
 			if mq.Medications != "" && mq.Medications != "[]" && mq.Medications != "null" {
-				bq.Medications = mq.Medications
+				var parsed []map[string]interface{}
+				if err := json.Unmarshal([]byte(mq.Medications), &parsed); err == nil && len(parsed) > 0 {
+					var medList []gin.H
+					totalAmount := 0.0
+					for _, mObj := range parsed {
+						mName, _ := mObj["name"].(string)
+						mCode, _ := mObj["medId"].(string)
+						if mCode == "" {
+							mCode, _ = mObj["medicine_code"].(string)
+						}
+						dosage, _ := mObj["dosage"].(string)
+						inst, _ := mObj["instructions"].(string)
+						props, _ := mObj["properties"].(string)
+						genName, _ := mObj["genericName"].(string)
+						if genName == "" {
+							genName, _ = mObj["generic_name"].(string)
+						}
+						cat, _ := mObj["category"].(string)
+
+						// Query real unit price and details from medicines table
+						var med models.Medicine
+						if mCode != "" {
+							config.DB.Where("medicine_code = ?", mCode).First(&med)
+						}
+						if med.ID == 0 && mName != "" {
+							config.DB.Where("name ILIKE ?", "%"+mName+"%").First(&med)
+						}
+
+						unitPrice := 0.0
+						if pVal, ok := mObj["price"]; ok {
+							if pNum, ok := pVal.(float64); ok && pNum > 0 {
+								unitPrice = pNum
+							}
+						}
+						if unitPrice <= 0 {
+							if pVal, ok := mObj["unit_price"]; ok {
+								if pNum, ok := pVal.(float64); ok && pNum > 0 {
+									unitPrice = pNum
+								}
+							}
+						}
+						if unitPrice <= 0 && med.UnitPrice > 0 {
+							unitPrice = med.UnitPrice
+						}
+						if unitPrice <= 0 {
+							unitPrice = 50.0
+						}
+
+						qty := 1
+						if qVal, ok := mObj["quantity"]; ok {
+							if qNum, ok := qVal.(float64); ok && qNum > 0 {
+								qty = int(qNum)
+							}
+						}
+
+						if mName == "" && med.Name != "" {
+							mName = med.Name
+						}
+						if mCode == "" && med.MedicineCode != "" {
+							mCode = med.MedicineCode
+						}
+						if genName == "" && med.GenericName != "" {
+							genName = med.GenericName
+						}
+						if cat == "" && med.Category != "" {
+							cat = med.Category
+						}
+						if props == "" && med.Properties != "" {
+							props = med.Properties
+						}
+
+						totalAmount += unitPrice * float64(qty)
+						medList = append(medList, gin.H{
+							"medId":        mCode,
+							"name":         mName,
+							"genericName":  genName,
+							"category":     cat,
+							"properties":   props,
+							"dosage":       dosage,
+							"instructions": inst,
+							"price":        unitPrice,
+							"unit_price":   unitPrice,
+							"quantity":     qty,
+							"stock":        med.StockQuantity,
+							"stockStatus":  "พร้อมจ่าย",
+						})
+					}
+					medsBytes, _ := json.Marshal(medList)
+					bq.Medications = string(medsBytes)
+					bq.TotalAmount = totalAmount
+				}
+			}
+			if mq.DoctorAdvice != "" && (bq.DoctorAdvice == "" || bq.DoctorAdvice == "พักผ่อนให้เพียงพอ" || bq.DoctorAdvice == "ชำระเงินแล้ว รอจัดยาและรับคำแนะนำการใช้ยา") {
+				bq.DoctorAdvice = mq.DoctorAdvice
 			}
 		}
 
 		// ดึงคำแนะนำแพทย์
-		if bq.DoctorAdvice == "" || bq.DoctorAdvice == "พักผ่อนให้เพียงพอ" {
+		if bq.DoctorAdvice == "" || bq.DoctorAdvice == "พักผ่อนให้เพียงพอ" || bq.DoctorAdvice == "ชำระเงินแล้ว รอจัดยาและรับคำแนะนำการใช้ยา" {
 			var mq models.MedicineQueue
 			if bq.VisitID > 0 {
 				config.DB.Where("visit_id = ?", bq.VisitID).First(&mq)
