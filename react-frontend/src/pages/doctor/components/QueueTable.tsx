@@ -5,7 +5,7 @@ import { CopyableText } from './CopyableText';
 import { Stethoscope, Clock, AlertCircle, Search, X, Edit3 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
-import { generateVN } from '../utils/vnGenerator';
+import { displayVN } from '../utils/vnGenerator';
 import { matchPatientSearch } from '../utils/searchUtils';
 
 /**
@@ -167,7 +167,7 @@ export const QueueTable: React.FC<QueueTableProps> = ({
 
                   {/* VN */}
                   <td className="py-5 px-6 text-slate-600 font-medium">
-                    <CopyableText value={patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)} />
+                    <CopyableText value={displayVN(patient.vn)} />
                   </td>
 
                   {/* Patient Name */}
@@ -208,7 +208,18 @@ export const QueueTable: React.FC<QueueTableProps> = ({
                       ) : (
                         <Stethoscope className="w-3.5 h-3.5 shrink-0" />
                       )}
-                      <span>{patient.status === 'Completed' ? t('editRecordBtn') : t('examineBtn')}</span>
+                      {/*
+                        เคสที่บันทึกฉบับร่างค้างไว้จะมีสถานะ "กำลังตรวจ" อยู่
+                        ปุ่มจึงต้องบอกว่า "ตรวจต่อ" ไม่ใช่ "ตรวจผู้ป่วย"
+                        เพื่อให้รู้ว่ากดเข้าไปแล้วข้อมูลเดิมยังอยู่ครบ
+                      */}
+                      <span>
+                        {patient.status === 'Completed'
+                          ? t('editRecordBtn')
+                          : patient.status === 'Examining' || (patient.status as string) === 'In Progress'
+                          ? t('continueExamBtn')
+                          : t('examineBtn')}
+                      </span>
                     </button>
                   </td>
                 </tr>
