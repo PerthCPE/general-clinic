@@ -117,9 +117,7 @@ export default function BillingInvoicePage({
   const currentSelectedId = selectedPatientId || localStorage.getItem('billing_active_patient') || '';
   const activePatient: PatientConfig | undefined = 
     queueList.find(p => p.id === currentSelectedId) || 
-    queueList[0] || 
-    CLINIC_CONFIG.patients.find(p => p.id === currentSelectedId) || 
-    CLINIC_CONFIG.patients[0];
+    queueList[0];
   const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
   
   const [showQrModal, setShowQrModal] = useState(false);
