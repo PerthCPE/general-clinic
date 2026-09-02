@@ -7,23 +7,23 @@ import (
 	"time"
 
 	"clinic-backend/internal/models"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"golang.org/x/crypto/bcrypt"
 )
 
 // define global db for handler/controller
-var	DB *gorm.DB
+var DB *gorm.DB
 
 func ConnectDB() {
 	// ประกอบ Data from AppConfig
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=Asia/Bangkok",
-			AppConfig.DBHost,	
-			AppConfig.DBUser,	
-			AppConfig.DBPassword,	
-			AppConfig.DBName,	
-			AppConfig.DBPort,
-			AppConfig.DBSSLMode,	
+		AppConfig.DBHost,
+		AppConfig.DBUser,
+		AppConfig.DBPassword,
+		AppConfig.DBName,
+		AppConfig.DBPort,
+		AppConfig.DBSSLMode,
 	)
 
 	// gorm connect to db (เปิด PreferSimpleProtocol: true เพื่อรองรับ Supabase / PgBouncer Pooler)
@@ -42,15 +42,26 @@ func ConnectDB() {
 
 	// Smart Migration: ตรวจสอบว่ามี Table หลักในระบบแล้วหรือยัง
 	// หากมีครบแล้ว จะข้าม AutoMigrate เพื่อลดเวลา Startup จาก ~105 วินาที เหลือเพียง ~1 วินาที
+	//
+	// รายการที่ตรวจต้องครอบคลุมตารางของทุก Role ไม่ใช่แค่สี่ตารางหลัก
+	// เพราะถ้าตรวจแค่ users/patients/queues/screenings ฐานข้อมูลที่มีสี่ตารางนั้นอยู่แล้ว
+	// จะข้าม AutoMigrate ทั้งก้อน ตารางที่เพิ่มเข้ามาทีหลัง (patient_medicines และ
+	// ตารางฝั่งแพทย์) จะไม่ถูกสร้างเลย แล้ว backend จะพังตอน query
 	var tableCount int64
-	database.Raw("SELECT count(*) FROM information_schema.tables WHERE table_schema = CURRENT_SCHEMA() AND table_name IN ('users', 'patients', 'queues', 'screenings')").Scan(&tableCount)
+	database.Raw(`SELECT count(*) FROM information_schema.tables
+		WHERE table_schema = CURRENT_SCHEMA()
+		  AND table_name IN (
+			'users', 'patients', 'queues', 'screenings',
+			'patient_medicines', 'patient_histories', 'examinations', 'diagnoses'
+		)`).Scan(&tableCount)
 
-	if tableCount < 4 {
+	if tableCount < 8 {
 		log.Println("Tables missing or incomplete. Running AutoMigrate...")
 		err = database.AutoMigrate(
 			&models.User{},
 			&models.Doctor{},
 			&models.Patient{},
+			&models.PatientMedicine{},
 			&models.MedicalEligibility{},
 			&models.VisitRecord{},
 			&models.Queue{},
@@ -67,6 +78,11 @@ func ConnectDB() {
 			&models.DoctorSchedule{},
 			&models.LeaveRequest{},
 			&models.ShiftSwapRequest{},
+			// --- ระบบจัดการข้อมูลการรักษาของแพทย์ (Role แพทย์) ---
+			// models.Doctor{} ถูก migrate ไปแล้วด้านบน จึงไม่ใส่ซ้ำตรงนี้
+			&models.PatientHistory{},
+			&models.Examination{},
+			&models.Diagnosis{},
 		)
 		if err != nil {
 			log.Fatal("Database Migration Failed. Error: ", err)
@@ -81,6 +97,51 @@ func ConnectDB() {
 	DB = database
 
 	seedDatabase()
+	seedDoctorProfiles()
+}
+
+// seedDoctorProfiles - สร้างโปรไฟล์แพทย์ให้กับ user ที่มี role = doctor
+//
+// แยกออกมาจาก seedDatabase() เพราะ seedDatabase() เช็คแค่ userCount == 0
+// ถ้ารวมไว้ในนั้น ฐานข้อมูลที่มี user อยู่แล้วจะไม่ได้ข้อมูลชุดนี้เลย
+func seedDoctorProfiles() {
+	var doctorUsers []models.User
+	if err := DB.Where("role = ?", "doctor").Order("id asc").Find(&doctorUsers).Error; err != nil {
+		log.Println("Skip doctor profile seeding:", err)
+		return
+	}
+
+	specialties := []string{"อายุรกรรมทั่วไป", "เวชศาสตร์ครอบครัว", "กุมารเวชกรรม"}
+	created := 0
+
+	for i, u := range doctorUsers {
+		var count int64
+		DB.Model(&models.Doctor{}).Where("user_id = ?", u.ID).Count(&count)
+		if count > 0 {
+			continue
+		}
+
+		profile := models.Doctor{
+			UserID:        u.ID,
+			FullName:      u.FullName,
+			LicenseNumber: fmt.Sprintf("MD-%05d", u.ID),
+			Specialty:     specialties[i%len(specialties)],
+			Phone:         u.Phone,
+			Email:         fmt.Sprintf("%s@clinic.local", u.Username),
+			Room:          fmt.Sprintf("ห้องตรวจ %d", i+1),
+			IsActive:      true,
+		}
+
+		if err := DB.Create(&profile).Error; err != nil {
+			log.Printf("Failed to seed doctor profile for user %d: %v", u.ID, err)
+			continue
+		}
+		created++
+	}
+
+	if created > 0 {
+		log.Printf("Doctor profiles seeded successfully (%d records).", created)
+	}
 }
 
 func seedDatabase() {

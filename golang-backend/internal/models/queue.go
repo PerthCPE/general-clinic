@@ -13,6 +13,13 @@ type Queue struct {
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 
-	Patient   Patient `gorm:"foreignKey:PatientID" json:"patient"`
-	CreatedBy User    `gorm:"foreignKey:CreatedByUserID" json:"created_by"` // ดึงข้อมูล Registrar ผู้ออกคิว
+	// --- เพิ่มสำหรับ Role แพทย์ ---
+	// ตอนออกคิวยังไม่มี visit จึงเป็น nullable แล้วมาเติมทีหลัง
+	VisitID          *uint      `gorm:"index" json:"visit_id"`
+	AssignedDoctorID *uint      `gorm:"index" json:"assigned_doctor_id"` // แพทย์เจ้าของคิว (ใช้ query แทนการอ่านจากข้อความใน department)
+	CalledAt         *time.Time `json:"called_at"`                       // เวลาที่แพทย์เรียกคิวนี้
+
+	Patient     Patient      `gorm:"foreignKey:PatientID" json:"patient"`
+	CreatedBy   User         `gorm:"foreignKey:CreatedByUserID" json:"created_by"` // ดึงข้อมูล Registrar ผู้ออกคิว
+	VisitRecord *VisitRecord `gorm:"foreignKey:VisitID" json:"visit_record,omitempty"`
 }

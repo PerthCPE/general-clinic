@@ -3,7 +3,7 @@ import type { Patient, QueueStatus, PrescriptionItem, LabOrderItem, ImagingOrder
 import { CopyableText } from './CopyableText';
 import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
-import { generateVN } from '../utils/vnGenerator';
+import { displayVN } from '../utils/vnGenerator';
 import {
   Stethoscope,
   HeartPulse,
@@ -65,6 +65,17 @@ import {
  * - COMMON_LABS / COMMON_IMAGING: รายการส่งตรวจ Lab / X-Ray
  * - handleSaveAndComplete: ฟังก์ชันบันทึกข้อมูลการตรวจและเปลี่ยนสถานะคิวเป็น Completed
  */
+/**
+ * id ของกล่องข้อมูลที่ต้องกรอกก่อนปิดการตรวจ
+ * ใช้คู่กับ focusIssue() เพื่อเลื่อนจอไปหาช่องที่ยังขาด
+ */
+const EXAM_ANCHOR = {
+  chiefComplaint: 'exam-anchor-chief-complaint',
+  vitals: 'exam-anchor-vitals',
+  diagnosis: 'exam-anchor-diagnosis',
+  prescription: 'exam-anchor-prescription',
+} as const;
+
 interface ExaminationViewProps {
   patient: Patient;
   onBackToQueue: () => void;
@@ -610,7 +621,18 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   const [followUpInstructions, setFollowUpInstructions] = useState(patient.followUp?.instructions || '');
 
   // Validation Warnings
-  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  /**
+   * รายการที่ยังกรอกไม่ครบก่อนปิดการตรวจ
+   *
+   * เก็บ tab กับ anchor ไว้ด้วย เพื่อให้เลื่อนจอไปยังจุดที่ขาดได้
+   * (anchor คือ id ของกล่องข้อมูลในหน้าจอ ดูที่ ExamAnchor ด้านล่าง)
+   */
+  type ValidationIssue = {
+    message: string;
+    tab: 'notes' | 'diagnosis' | 'prescription' | 'referral' | 'followup';
+    anchor: string;
+  };
+  const [validationWarnings, setValidationWarnings] = useState<ValidationIssue[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState<string | null>(null);
 
   // Success Feedback Modal State
@@ -632,6 +654,57 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     confirmLabel: string;
     onConfirm: () => void;
   } | null>(null);
+
+  /**
+   * เลื่อนจอไปยังช่องที่ยังกรอกไม่ครบ พร้อมสลับแท็บให้ถ้าอยู่คนละแท็บ
+   *
+   * ต้องหน่วงด้วย requestAnimationFrame เพราะการสลับแท็บทำให้ React วาดใหม่
+   * ถ้าเรียก scrollIntoView ทันทีจะยังหา element ไม่เจอ
+   */
+  const focusIssue = (issue: ValidationIssue) => {
+    if (activeTab !== issue.tab) {
+      setActiveTab(issue.tab);
+    }
+
+    requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        const el = document.getElementById(issue.anchor);
+        if (!el) return;
+
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // ไฮไลต์กรอบสีเหลืองชั่วคราว ให้เห็นชัดว่าคือช่องไหน
+        el.classList.add('ring-2', 'ring-amber-400', 'ring-offset-2', 'rounded-xl');
+        window.setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-amber-400', 'ring-offset-2', 'rounded-xl');
+        }, 2400);
+
+        // ถ้าในกล่องนั้นมีช่องกรอกได้ ให้เคอร์เซอร์ไปรออยู่ที่ช่องแรกเลย
+        const input = el.querySelector<HTMLElement>('input, textarea, select');
+        if (input) {
+          input.focus({ preventScroll: true });
+        }
+      }, 60);
+    });
+  };
+
+  /**
+   * ข้อมูลจากจุดคัดกรองที่ยังไม่ครบ
+   *
+   * อาการสำคัญกับสัญญาณชีพเป็นช่องอ่านอย่างเดียว พยาบาลเป็นคนบันทึกตอนคัดกรอง
+   * แพทย์แก้เองไม่ได้ จึงไม่ควรเอามาเป็นเงื่อนไขห้ามปิดการตรวจ
+   * แค่แจ้งให้ทราบว่าข้อมูลไม่ครบ เพื่อจะได้ประสานกับพยาบาล
+   */
+  const triageGaps = React.useMemo(() => {
+    const gaps: string[] = [];
+    if (!chiefComplaint.trim()) {
+      gaps.push(language === 'th' ? 'อาการสำคัญ (Chief Complaint)' : 'Chief Complaint (CC)');
+    }
+    if (!bp.trim() || pulse <= 0 || temp <= 0) {
+      gaps.push(language === 'th' ? 'สัญญาณชีพ (ความดัน / ชีพจร / อุณหภูมิ)' : 'Vital Signs (BP / Pulse / Temp)');
+    }
+    return gaps;
+  }, [chiefComplaint, bp, pulse, temp, language]);
 
   // Allergy warning check on medicine selection
   const allergyAlert = React.useMemo(() => {
@@ -750,8 +823,13 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       isOpen: true,
       title: language === 'th' ? 'บันทึกฉบับร่างแล้ว' : 'Draft Saved',
       message: language === 'th'
-        ? `เก็บข้อมูลการตรวจของ ${patient.name} (HN: ${patient.hn}) ไว้เรียบร้อย สถานะยังเป็น "กำลังตรวจ" กลับมาทำต่อได้ทุกเมื่อ`
-        : `Examination data for ${patient.name} (HN: ${patient.hn}) has been saved. The visit remains "Examining" so you can continue later.`
+        ? `เก็บข้อมูลการตรวจของ ${patient.name} (HN: ${patient.hn}) ไว้เรียบร้อย สถานะยังเป็น "กำลังตรวจ" กดปุ่ม "ตรวจต่อ" ในหน้าคิวผู้ป่วยเพื่อกลับมาทำต่อได้ทุกเมื่อ`
+        : `Examination data for ${patient.name} (HN: ${patient.hn}) has been saved. The visit remains "Examining" — use the "Continue Exam" button in the patient queue to resume.`,
+      // กลับไปหน้าคิวผู้ป่วยเหมือนตอนกดบันทึกผลการตรวจ
+      // เพื่อให้แพทย์เรียกคิวถัดไปได้ทันที แล้วค่อยกด "ตรวจต่อ" กลับมาทีหลัง
+      onConfirm: () => {
+        onBackToQueue();
+      }
     });
   };
 
@@ -789,25 +867,30 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
   // Complete Visit Validation & Execution
   const handleCompleteVisit = () => {
-    const warnings: string[] = [];
+    const warnings: ValidationIssue[] = [];
 
-    // Required Screening Validation Checks
-    if (!chiefComplaint.trim()) {
-      warnings.push(language === 'th' ? 'กรุณาระบุอาการสำคัญ (Chief Complaint)' : 'Required Field Missing: Chief Complaint (CC) is required.');
-    }
-    if (!bp.trim() || pulse <= 0 || temp <= 0) {
-      warnings.push(language === 'th' ? 'กรุณาบันทึกสัญญาณชีพให้ครบถ้วน (ความดัน, ชีพจร, อุณหภูมิ)' : 'Required Field Missing: Complete Vital Signs (BP, Pulse, Body Temp) are required.');
-    }
-
+    // เช็คเฉพาะสิ่งที่ "แพทย์กรอกเองได้" เท่านั้น
+    // ข้อมูลจากจุดคัดกรอง (อาการสำคัญ, สัญญาณชีพ) แสดงเป็นหมายเหตุแทน
+    // เพราะเป็นช่องอ่านอย่างเดียว แพทย์แก้ไม่ได้ ดู triageGaps ด้านบน
     if (!primaryDiag || !primaryDiag.code) {
-      warnings.push(language === 'th' ? 'กรุณาระบุการวินิจฉัยโรคหลัก (ICD-10) อย่างน้อย 1 รายการ' : 'Required Field Missing: Require at least one Primary Diagnosis (ICD-10) before completing the visit.');
+      warnings.push({
+        message: language === 'th' ? 'กรุณาระบุการวินิจฉัยโรคหลัก (ICD-10) อย่างน้อย 1 รายการ' : 'Required Field Missing: Require at least one Primary Diagnosis (ICD-10) before completing the visit.',
+        tab: 'diagnosis',
+        anchor: EXAM_ANCHOR.diagnosis,
+      });
     }
     if (allergyAlert) {
-      warnings.push(allergyAlert);
+      warnings.push({
+        message: allergyAlert,
+        tab: 'prescription',
+        anchor: EXAM_ANCHOR.prescription,
+      });
     }
 
     if (warnings.length > 0) {
       setValidationWarnings(warnings);
+      // พาไปที่ช่องแรกที่ยังขาดทันที ไม่ต้องให้ผู้ใช้ไล่หาเอง
+      focusIssue(warnings[0]);
       return;
     }
 
@@ -818,13 +901,21 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       message: language === 'th'
         ? `ปิดการตรวจของ ${patient.name} (HN: ${patient.hn}) และเปลี่ยนสถานะเป็น "ตรวจเสร็จสิ้น"`
         : `This will close the visit for ${patient.name} (HN: ${patient.hn}) and set the status to "Completed".`,
-      hint: prescriptions.length > 0
-        ? (language === 'th'
-            ? `ระบบจะส่งรายการสั่งยา ${prescriptions.length} รายการไปยังห้องยาโดยอัตโนมัติ`
-            : `${prescriptions.length} prescription item(s) will be sent to the pharmacy queue automatically.`)
-        : (language === 'th'
-            ? 'การตรวจนี้ไม่มีรายการสั่งยา'
-            : 'No prescription items in this visit.'),
+      hint: [
+        prescriptions.length > 0
+          ? (language === 'th'
+              ? `ระบบจะส่งรายการสั่งยา ${prescriptions.length} รายการไปยังห้องยาโดยอัตโนมัติ`
+              : `${prescriptions.length} prescription item(s) will be sent to the pharmacy queue automatically.`)
+          : (language === 'th'
+              ? 'การตรวจนี้ไม่มีรายการสั่งยา'
+              : 'No prescription items in this visit.'),
+        // เตือนอีกรอบตอนจะปิดเคส ถ้าข้อมูลจากจุดคัดกรองยังไม่ครบ
+        triageGaps.length > 0
+          ? (language === 'th'
+              ? `หมายเหตุ: ยังไม่ได้รับ ${triageGaps.join(' และ ')} จากจุดคัดกรอง`
+              : `Note: ${triageGaps.join(' and ')} not received from triage.`)
+          : '',
+      ].filter(Boolean).join('\n'),
       confirmLabel: language === 'th' ? 'ยืนยันบันทึก' : 'Confirm & Complete',
       onConfirm: runCompleteVisit
     });
@@ -843,8 +934,8 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       isOpen: true,
       title: language === 'th' ? 'บันทึกสำเร็จ!' : 'Success!',
       message: language === 'th'
-        ? `บันทึกและเสร็จสิ้นการตรวจเรียบร้อยแล้วสำหรับผู้ป่วย ${patient.name} (HN: ${patient.hn}, VN: ${patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)})${rxNotice}`
-        : `Examination completed successfully for patient ${patient.name} (HN: ${patient.hn}, VN: ${patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)})${rxNotice}`,
+        ? `บันทึกและเสร็จสิ้นการตรวจเรียบร้อยแล้วสำหรับผู้ป่วย ${patient.name} (HN: ${patient.hn}, VN: ${displayVN(patient.vn)})${rxNotice}`
+        : `Examination completed successfully for patient ${patient.name} (HN: ${patient.hn}, VN: ${displayVN(patient.vn)})${rxNotice}`,
       onConfirm: () => {
         onBackToQueue();
       }
@@ -1019,6 +1110,30 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         </div>
       )}
 
+      {/* แจ้งว่าข้อมูลจากจุดคัดกรองยังไม่ครบ — ไม่ได้ห้ามปิดเคส แค่ให้รู้ */}
+      {triageGaps.length > 0 && (
+        <div className="bg-sky-50 border border-sky-200 p-4 rounded-2xl text-sky-900 text-xs space-y-1.5">
+          <div className="font-bold flex items-center gap-1.5">
+            <ClipboardCheck className="w-4 h-4 text-sky-600" />
+            <span>
+              {language === 'th'
+                ? 'ยังไม่ได้รับข้อมูลบางส่วนจากจุดคัดกรอง'
+                : 'Some triage data has not been received'}
+            </span>
+          </div>
+          <p className="font-medium text-sky-800">
+            {language === 'th'
+              ? `ขาด: ${triageGaps.join(' , ')}`
+              : `Missing: ${triageGaps.join(' , ')}`}
+          </p>
+          <p className="text-[11px] text-sky-700">
+            {language === 'th'
+              ? 'ช่องเหล่านี้พยาบาลเป็นผู้บันทึกตอนคัดกรอง แพทย์แก้ไขเองไม่ได้ — ยังบันทึกผลการตรวจต่อได้ตามปกติ'
+              : 'These fields are recorded by the nurse during triage and cannot be edited here. You can still complete the visit.'}
+          </p>
+        </div>
+      )}
+
       {/* Validation Warnings Panel */}
       {validationWarnings.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl text-amber-900 text-xs space-y-2">
@@ -1026,9 +1141,18 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             <AlertTriangle className="w-4 h-4 text-amber-600" />
             <span>{language === 'th' ? 'รายการตรวจสอบความถูกต้องก่อนบันทึกการตรวจ' : 'Pre-Completion Validation Checks'}</span>
           </div>
+          {/* กดที่แต่ละบรรทัดเพื่อกระโดดไปยังช่องที่ยังกรอกไม่ครบ */}
           <ul className="list-disc list-inside space-y-1 text-amber-800 font-medium">
             {validationWarnings.map((w, idx) => (
-              <li key={idx}>{w}</li>
+              <li key={idx}>
+                <button
+                  type="button"
+                  onClick={() => focusIssue(w)}
+                  className="text-left underline decoration-amber-400 underline-offset-2 hover:text-amber-950 cursor-pointer"
+                >
+                  {w.message}
+                </button>
+              </li>
             ))}
           </ul>
         </div>
@@ -1052,7 +1176,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? `คิว #${patient.queueNo}` : `Queue #${patient.queueNo}`}
                   </span>
                   <CopyableText label="HN" value={patient.hn} className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
-                  <CopyableText label="VN" value={patient.vn || generateVN(patient.visitDate, patient.visitTime, 1)} className="bg-purple-50 text-purple-700 border border-purple-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
+                  <CopyableText label="VN" value={displayVN(patient.vn)} className="bg-purple-50 text-purple-700 border border-purple-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
                   <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={nationalId} className="bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
                   <span className="bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold px-2.5 py-0.5 rounded-full">
                     {language === 'th'
@@ -1196,7 +1320,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         {activeTab === 'notes' && (
           <div className="p-6 space-y-6">
             {/* Chief Complaint (CC) - Sent from Triage (Read-only for doctor) */}
-            <div className="space-y-1.5">
+            <div id={EXAM_ANCHOR.chiefComplaint} className="space-y-1.5 scroll-mt-28">
               <label className="text-[13px] font-bold text-slate-800 uppercase tracking-wider block">
                 {language === 'th' ? 'อาการสำคัญ' : 'Chief Complaint (CC)'}
               </label>
@@ -1250,7 +1374,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             </div>
 
             {/* VITAL SIGNS (Data Display Container) */}
-            <div className="space-y-3 pt-2 border-t border-slate-100">
+            <div id={EXAM_ANCHOR.vitals} className="space-y-3 pt-2 border-t border-slate-100 scroll-mt-28">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Activity className="w-4 h-4 text-blue-600" />
                 <span>{language === 'th' ? 'สัญญาณชีพ' : 'Vital Signs'}</span>
@@ -1668,7 +1792,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             </div>
             
             {/* 1. ICD-10 SEARCH & AUTOCOMPLETE */}
-            <div className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200 relative">
+            <div id={EXAM_ANCHOR.diagnosis} className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200 relative scroll-mt-28">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-200/80">
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   <Search className="w-4 h-4 text-blue-600 shrink-0" />
@@ -2054,7 +2178,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         {activeTab === 'prescription' && (
           <div className="p-6 space-y-6">
             {/* Add New Medicine Form */}
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4">
+            <div id={EXAM_ANCHOR.prescription} className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 scroll-mt-28">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                 <Plus className="w-4 h-4 text-[#2563eb]" />
                 <span>{language === 'th' ? 'ค้นหาและสั่งจ่ายยา' : 'Search & Prescribe Medicine'}</span>
@@ -2711,7 +2835,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   }`}
                 />
                 <span
-                  className={`text-[12px] leading-relaxed ${
+                  className={`text-[12px] leading-relaxed whitespace-pre-line ${
                     confirmDialog.tone === 'danger' ? 'text-red-800' : 'text-blue-800'
                   }`}
                 >
