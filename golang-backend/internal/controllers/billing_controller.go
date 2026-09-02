@@ -25,6 +25,20 @@ type GenerateQRRequest struct {
 	Amount      float64 `json:"amount" binding:"required"`
 }
 
+// GET /api/billing/list - ดึงรายการบิลการเงินทั้งหมดจาก Database
+func GetAllBillings(c *gin.Context) {
+	var billings []models.Billing
+	if err := config.DB.Preload("VisitRecord").Preload("VisitRecord.Patient").Order("created_at desc").Find(&billings).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billings: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":   "success",
+		"billings": billings,
+	})
+}
+
 // GET /api/billing/visit/:visit_id - ดึงข้อมูลบิลตาม Visit ID
 func GetBillingByVisit(c *gin.Context) {
 	visitID := c.Param("visit_id")

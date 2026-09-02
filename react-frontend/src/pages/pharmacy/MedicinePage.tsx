@@ -20,100 +20,11 @@ interface Medicine {
   dispensedToday: number;
 }
 
-const initialMedicines: Medicine[] = [
-  { 
-    id: 'MED-0231', 
-    medicine_code: 'MED-0231',
-    name: 'Paracetamol 500mg', 
-    genericName: 'Paracetamol (Acetaminophen)',
-    category: 'ยาลดไข้ บรรเทาปวด (Analgesic / Antipyretic)',
-    properties: 'บรรเทาอาการปวดในระดับเล็กน้อยถึงปานกลาง เช่น ปวดศีรษะ ปวดฟัน ปวดกล้ามเนื้อ และลดไข้',
-    dosage: 'รับประทานครั้งละ 1-2 เม็ด ทุก 4-6 ชั่วโมง เมื่อมีอาการ (ห้ามรับประทานเกินวันละ 8 เม็ด หรือ 4,000mg)',
-    precautions: 'ระวังการใช้ในผู้ป่วยโรคตับ ไต หรือผู้ที่ดื่มแอลกอฮอล์เป็นประจำ ไม่ควรทานติดต่อกันเกิน 5 วันโดยไม่มีคำสั่งแพทย์',
-    price: '฿ 80.00 / กล่อง (10 แผง)',
-    unit_price: 80.0,
-    manufacturer: 'บริษัท สยามเภสัช จำกัด (Siam Pharmaceutical)',
-    stock: 342, 
-    stock_quantity: 342,
-    status: 'In Stock', 
-    dispensedToday: 12 
-  },
-  { 
-    id: 'MED-0187', 
-    medicine_code: 'MED-0187',
-    name: 'Amoxicillin 250mg', 
-    genericName: 'Amoxicillin Trihydrate',
-    category: 'ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย (Penicillin Antibiotic)',
-    properties: 'รักษาการติดเชื้อแบคทีเรียในระบบทางเดินหายใจ ทางเดินปัสสาวะ หู คอ จมูก และผิวหนัง',
-    dosage: 'รับประทานครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร (ต้องรับประทานติดต่อกันจนหมดตามแพทย์สั่งอย่างเคร่งครัด)',
-    precautions: 'ห้ามใช้ในผู้ที่มีประวัติแพ้ยาในกลุ่มเพนิซิลลิน (Penicillin) หากเกิดผื่นคัน แน่นหน้าอก ให้หยุดยาและพบแพทย์ทันที',
-    price: '฿ 150.00 / กล่อง (10 แผง)',
-    unit_price: 150.0,
-    manufacturer: 'บริษัท องค์การเภสัชกรรม (GPO)',
-    stock: 48, 
-    stock_quantity: 48,
-    status: 'Low Stock', 
-    dispensedToday: 8 
-  },
-  { 
-    id: 'MED-0402', 
-    medicine_code: 'MED-0402',
-    name: 'Ibuprofen 400mg', 
-    genericName: 'Ibuprofen (NSAID)',
-    category: 'ยาต้านการอักเสบชนิดไม่ใช่สเตียรอยด์ (NSAIDs)',
-    properties: 'ลดการอักเสบ ปวดข้อ ปวดกล้ามเนื้อ ปวดฟัน และปวดประจำเดือน',
-    dosage: 'รับประทานครั้งละ 1 เม็ด วันละ 2-3 ครั้ง หลังอาหารทันที แล้วดื่มน้ำตามมากๆ',
-    precautions: 'ระวังในผู้ป่วยโรคกระเพาะอาหาร เป็นแผลในกระเพาะ โรคไต หรือโรคหัวใจ ห้ามทานตอนท้องว่าง',
-    price: '฿ 120.00 / กล่อง (10 แผง)',
-    unit_price: 120.0,
-    manufacturer: 'บริษัท เบอร์ลินซัพพลาย จำกัด',
-    stock: 0, 
-    stock_quantity: 0,
-    status: 'Out of Stock', 
-    dispensedToday: 3 
-  },
-  { 
-    id: 'MED-0119', 
-    medicine_code: 'MED-0119',
-    name: 'Cetirizine 10mg', 
-    genericName: 'Cetirizine Dihydrochloride',
-    category: 'ยาแก้อาการแพ้ ต้านฮิสตามีน (Second-Generation Antihistamine)',
-    properties: 'รักษาอาการแพ้อากาศ ลมพิษ น้ำมูกไหล จาม คันตา คันผิวหนัง',
-    dosage: 'รับประทานครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนนอน หรือเมื่อมีอาการแพ้',
-    precautions: 'อาจทำให้ง่วงซึมเล็กน้อย ควรระวังการขับขี่ยานพาหนะหรือทำงานเกี่ยวกับเครื่องจักร',
-    price: '฿ 90.00 / กล่อง (10 แผง)',
-    unit_price: 90.0,
-    manufacturer: 'บริษัท เมดฮับ ฟาร์มาซูติคอล จำกัด',
-    stock: 215, 
-    stock_quantity: 215,
-    status: 'In Stock', 
-    dispensedToday: 5 
-  },
-  { 
-    id: 'MED-0356', 
-    medicine_code: 'MED-0356',
-    name: 'Omeprazole 20mg', 
-    genericName: 'Omeprazole Magnesium',
-    category: 'ยาลดกรดในกระเพาะอาหาร (Proton Pump Inhibitor - PPI)',
-    properties: 'รักษาโรคกรดไหลย้อน แผลในกระเพาะอาหาร และลดการหลั่งกรดเกินในกระเพาะ',
-    dosage: 'รับประทานครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนอาหารเช้าประมาณ 30 นาที (กลืนทั้งเม็ด ห้ามเคี้ยว)',
-    precautions: 'ไม่ควรกินติดต่อกันเป็นเวลานานเกิน 8 สัปดาห์โดยไม่มีแพทย์ดูแล',
-    price: '฿ 180.00 / กล่อง (14 แคปซูล)',
-    unit_price: 180.0,
-    manufacturer: 'บริษัท แอสตร้าเซนเนก้า จำกัด',
-    stock: 76, 
-    stock_quantity: 76,
-    status: 'In Stock', 
-    dispensedToday: 9 
-  },
-];
-
 export default function MedicinePage() {
-  const [medicines, setMedicines] = useState<Medicine[]>(initialMedicines);
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
   const { isConnected, subscribe } = useWebSocket();
 
-  const [searchMedId, setSearchMedId] = useState('');
-  const [searchMedName, setSearchMedName] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all');
   
@@ -122,39 +33,62 @@ export default function MedicinePage() {
 
   // Sync with Backend API
   const fetchMedicines = useCallback(() => {
-    fetch('/api/pharmacy/medicines')
-      .then(res => res.json())
-      .then(data => {
-        if (data?.medicines && Array.isArray(data.medicines) && data.medicines.length > 0) {
-          const formatted: Medicine[] = data.medicines.map((m: any) => {
-            const stock = m.stock_quantity ?? 0;
-            let status: 'In Stock' | 'Low Stock' | 'Out of Stock' = 'In Stock';
-            if (stock === 0) status = 'Out of Stock';
-            else if (stock < 50) status = 'Low Stock';
+    const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            return {
-              id: m.medicine_code || `MED-${m.id}`,
-              medicine_code: m.medicine_code || `MED-${m.id}`,
-              name: m.name,
-              genericName: m.generic_name || m.name,
-              category: m.category || 'ยารักษาโรคทั่วไป',
-              properties: m.properties || 'ยารักษาโรคและบรรเทาอาการตามแพทย์สั่ง',
-              dosage: m.dosage || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
-              precautions: 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
-              price: `฿ ${(m.unit_price || 0).toFixed(2)}`,
-              unit_price: m.unit_price || 0,
-              manufacturer: m.manufacturer || 'บริษัท เภสัชกรรม จำกัด',
-              stock: stock,
-              stock_quantity: stock,
-              status: status,
-              dispensedToday: 0,
-            };
-          });
-          setMedicines(formatted);
+    const processMedicinesData = (data: any) => {
+      if (data?.medicines && Array.isArray(data.medicines) && data.medicines.length > 0) {
+        const formatted: Medicine[] = data.medicines.map((m: any) => {
+          const stock = m.stock_quantity ?? 0;
+          let status: 'In Stock' | 'Low Stock' | 'Out of Stock' = 'In Stock';
+          if (stock === 0) status = 'Out of Stock';
+          else if (stock < 50) status = 'Low Stock';
+
+          return {
+            id: m.medicine_code || `MED-${m.id}`,
+            medicine_code: m.medicine_code || `MED-${m.id}`,
+            name: m.name,
+            genericName: m.generic_name || m.name,
+            category: m.category || 'ยารักษาโรคทั่วไป',
+            properties: m.properties || 'ยารักษาโรคและบรรเทาอาการตามแพทย์สั่ง',
+            dosage: m.dosage || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
+            precautions: 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
+            price: `฿ ${(m.unit_price || 0).toFixed(2)}`,
+            unit_price: m.unit_price || 0,
+            manufacturer: m.manufacturer || 'บริษัท เภสัชกรรม จำกัด',
+            stock: stock,
+            stock_quantity: stock,
+            status: status,
+            dispensedToday: 0,
+          };
+        });
+        setMedicines(formatted);
+        return true;
+      }
+      return false;
+    };
+
+    fetch('/api/pharmacy/medicines', { headers })
+      .then(res => {
+        if (!res.ok) throw new Error('Auth or API error');
+        return res.json();
+      })
+      .then(data => {
+        if (!processMedicinesData(data)) {
+          // Fallback to system endpoint
+          fetch('/api/system/medicines')
+            .then(res => res.json())
+            .then(sysData => processMedicinesData(sysData))
+            .catch(err => console.error('Fallback fetch medicines failed:', err));
         }
       })
       .catch(() => {
-        // Fallback to initialMedicines on network error
+        // Fallback to system endpoint on 401 or network error
+        fetch('/api/system/medicines')
+          .then(res => res.json())
+          .then(sysData => processMedicinesData(sysData))
+          .catch(err => console.error('Fallback fetch medicines failed:', err));
       });
   }, []);
 
@@ -185,6 +119,21 @@ export default function MedicinePage() {
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
   const [detailModalMed, setDetailModalMed] = useState<Medicine | null>(null);
 
+  // Add Medicine Form state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [addMedCode, setAddMedCode] = useState('');
+  const [addMedName, setAddMedName] = useState('');
+  const [addGenericName, setAddGenericName] = useState('');
+  const [addCategory, setAddCategory] = useState('ยารักษาโรคทั่วไป');
+  const [addProperties, setAddProperties] = useState('');
+  const [addDosage, setAddDosage] = useState('');
+  const [addManufacturer, setAddManufacturer] = useState('');
+  const [addStock, setAddStock] = useState<number | ''>(100);
+  const [addUnitPrice, setAddUnitPrice] = useState<number | ''>(20);
+
+  // Delete Confirmation state
+  const [deleteConfirmMed, setDeleteConfirmMed] = useState<Medicine | null>(null);
+
   const [updateMode, setUpdateMode] = useState<'add' | 'reduce'>('add');
   const [quantity, setQuantity] = useState<number | ''>('');
   
@@ -199,6 +148,97 @@ export default function MedicinePage() {
     setIsModalOpen(false);
     setSelectedMedicine(null);
     setQuantity('');
+  };
+
+  // Add Medicine Handler
+  const handleAddMedicineSubmit = () => {
+    if (!addMedName.trim()) return;
+
+    const payload = {
+      medicine_code: addMedCode.trim() || undefined,
+      name: addMedName.trim(),
+      generic_name: addGenericName.trim() || addMedName.trim(),
+      category: addCategory.trim() || 'ยารักษาโรคทั่วไป',
+      properties: addProperties.trim() || 'บรรเทาอาการตามแพทย์สั่ง',
+      dosage: addDosage.trim() || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
+      manufacturer: addManufacturer.trim() || 'บริษัท เภสัชกรรม จำกัด',
+      stock_quantity: Number(addStock) || 0,
+      unit_price: Number(addUnitPrice) || 0
+    };
+
+    const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    fetch('/api/pharmacy/medicines', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Primary API failed');
+      return res.json();
+    })
+    .then(() => {
+      fetchMedicines();
+      setShowSuccessBadge(true);
+      setTimeout(() => setShowSuccessBadge(false), 3000);
+    })
+    .catch(() => {
+      // Fallback to system endpoint
+      fetch('/api/system/medicines/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        fetchMedicines();
+        setShowSuccessBadge(true);
+        setTimeout(() => setShowSuccessBadge(false), 3000);
+      });
+    });
+
+    setIsAddModalOpen(false);
+    setAddMedCode('');
+    setAddMedName('');
+    setAddGenericName('');
+    setAddCategory('ยารักษาโรคทั่วไป');
+    setAddProperties('');
+    setAddDosage('');
+    setAddManufacturer('');
+    setAddStock(100);
+    setAddUnitPrice(20);
+  };
+
+  // Delete Medicine Handler
+  const handleConfirmDelete = () => {
+    if (!deleteConfirmMed) return;
+
+    const targetCode = deleteConfirmMed.medicine_code || deleteConfirmMed.id;
+
+    setMedicines(prev => prev.filter(m => m.id !== deleteConfirmMed.id && m.medicine_code !== deleteConfirmMed.medicine_code));
+
+    const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    fetch(`/api/pharmacy/medicines/${encodeURIComponent(targetCode)}`, {
+      method: 'DELETE',
+      headers
+    })
+    .then(res => {
+      if (!res.ok) throw new Error('Primary delete failed');
+      fetchMedicines();
+    })
+    .catch(() => {
+      fetch(`/api/system/medicines/${encodeURIComponent(targetCode)}`, {
+        method: 'DELETE'
+      }).then(() => fetchMedicines());
+    });
+
+    setDeleteConfirmMed(null);
+    setShowSuccessBadge(true);
+    setTimeout(() => setShowSuccessBadge(false), 3000);
   };
   
   const handleSaveChanges = () => {
@@ -242,23 +282,30 @@ export default function MedicinePage() {
   };
 
   const filteredMedicines = medicines.filter(med => {
-    const rawIdQuery = searchMedId.trim().toLowerCase();
-    let matchId = !rawIdQuery;
-    if (rawIdQuery) {
+    const q = searchQuery.trim().toLowerCase();
+    
+    let matchSearch = !q;
+    if (q) {
       const codeStr = (med.medicine_code || med.id).toLowerCase();
       const codeDigits = codeStr.replace(/\D/g, '');
-      const queryDigits = rawIdQuery.replace(/\D/g, '');
+      const queryDigits = q.replace(/\D/g, '');
 
-      matchId = codeStr.includes(rawIdQuery) || 
+      const matchId = codeStr.includes(q) || 
         (queryDigits !== '' && (
           codeDigits.includes(queryDigits) || 
           (parseInt(codeDigits, 10) > 0 && parseInt(codeDigits, 10) === parseInt(queryDigits, 10))
         ));
-    }
 
-    const matchName = !searchMedName.trim() || 
-      med.name.toLowerCase().includes(searchMedName.trim().toLowerCase()) ||
-      med.genericName.toLowerCase().includes(searchMedName.trim().toLowerCase());
+      const searchTerms = q.split(/\s+/).filter(Boolean);
+      const nameStr = (med.name || '').toLowerCase();
+      const genericStr = (med.genericName || '').toLowerCase();
+
+      const matchName = searchTerms.length > 0 && searchTerms.every(term => 
+        nameStr.includes(term) || genericStr.includes(term)
+      );
+        
+      matchSearch = matchId || matchName;
+    }
       
     let matchCategory = true;
     if (categoryFilter !== 'all') {
@@ -270,12 +317,11 @@ export default function MedicinePage() {
     else if (stockStatusFilter === 'low-stock') matchStatus = med.status === 'Low Stock';
     else if (stockStatusFilter === 'out-of-stock') matchStatus = med.status === 'Out of Stock';
 
-    return matchId && matchName && matchCategory && matchStatus;
+    return matchSearch && matchCategory && matchStatus;
   });
   
   const handleResetFilters = () => {
-    setSearchMedId('');
-    setSearchMedName('');
+    setSearchQuery('');
     setCategoryFilter('all');
     setStockStatusFilter('all');
   };
@@ -415,22 +461,13 @@ export default function MedicinePage() {
 
       <div className="search-card card">
         <div className="search-inputs">
-          <div className="input-group">
-            <label>รหัสยา</label>
+          <div className="input-group" style={{ flex: 2 }}>
+            <label>ค้นหายา (รหัสยา หรือ ชื่อยา)</label>
             <input
               type="text"
-              placeholder="เช่น 001, 231 หรือ MED-0231"
-              value={searchMedId}
-              onChange={(e) => setSearchMedId(e.target.value)}
-            />
-          </div>
-          <div className="input-group">
-            <label>ชื่อยา</label>
-            <input
-              type="text"
-              placeholder="เช่น Paracetamol"
-              value={searchMedName}
-              onChange={(e) => setSearchMedName(e.target.value)}
+              placeholder="เช่น 001, MED-0231, หรือ Paracetamol"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <div className="input-group">
@@ -454,7 +491,7 @@ export default function MedicinePage() {
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="search-btn" type="button">ค้นหา</button>
-          {(searchMedId || searchMedName || stockStatusFilter !== 'all') && (
+          {(searchQuery || stockStatusFilter !== 'all') && (
             <button 
               className="search-btn" 
               type="button" 
@@ -483,6 +520,27 @@ export default function MedicinePage() {
             </h3>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsAddModalOpen(true);
+              }}
+              style={{
+                padding: '6px 14px', borderRadius: '8px',
+                background: '#16A34A', color: '#FFFFFF', border: 'none',
+                fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)', transition: 'all 0.2s ease',
+                marginRight: '6px'
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              เพิ่มรายการยาใหม่
+            </button>
             {showSuccessBadge && (
               <span className="success-badge" style={{ background: '#DCFCE7', color: '#166534', fontWeight: 'bold', padding: '4px 12px', borderRadius: '16px', fontSize: '13px' }}>
                 ✓ อัปเดตคลังยาเรียบร้อยแล้ว
@@ -582,13 +640,28 @@ export default function MedicinePage() {
                           </span>
                         </td>
                         <td className="dispensed-cell" style={{ textAlign: 'center' }}>{med.dispensedToday} เม็ด</td>
-                        <td style={{ textAlign: 'right' }}>
-                          <button
-                            className="update-stock-btn"
-                            onClick={() => handleUpdateClick(med)}
-                          >
-                            ปรับสต็อก
-                          </button>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', gap: '8px', justifyContent: 'flex-end' }}>
+                            <button
+                              className="update-stock-btn"
+                              onClick={() => handleUpdateClick(med)}
+                            >
+                              ปรับสต็อก
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmMed(med)}
+                              style={{
+                                padding: '6px 12px', borderRadius: '8px',
+                                background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5',
+                                fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                                transition: 'all 0.2s ease'
+                              }}
+                              title="ลบรายการยานี้ออกจากคลัง"
+                            >
+                              ลบยา
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -751,6 +824,165 @@ export default function MedicinePage() {
             <div className="med-detail-footer">
               <button className="primary-btn-close" onClick={() => setDetailModalMed(null)}>
                 ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add New Medicine Modal */}
+      {isAddModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-card card" style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">+ เพิ่มรายการยาใหม่เข้าคลัง</h3>
+              <button className="close-btn" onClick={() => setIsAddModalOpen(false)}>✕</button>
+            </div>
+
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '70vh', overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>รหัสยา (Medicine Code)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น MED-013 (ว่างไว้ให้ระบบสร้างให้)"
+                    value={addMedCode}
+                    onChange={(e) => setAddMedCode(e.target.value)}
+                  />
+                </div>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ชื่อยา * (Trade Name)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น Paracetamol 500mg"
+                    value={addMedName}
+                    onChange={(e) => setAddMedName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ชื่อสามัญทางยา (Generic Name)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น Acetaminophen"
+                    value={addGenericName}
+                    onChange={(e) => setAddGenericName(e.target.value)}
+                  />
+                </div>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ชนิด / หมวดหมู่ยา</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น ยาลดไข้ บรรเทาปวด"
+                    value={addCategory}
+                    onChange={(e) => setAddCategory(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label style={{ fontSize: '13px', fontWeight: '600' }}>สรรพคุณและข้อบ่งใช้ (Properties)</label>
+                <input
+                  type="text"
+                  placeholder="เช่น บรรเทาอาการปวดและลดไข้"
+                  value={addProperties}
+                  onChange={(e) => setAddProperties(e.target.value)}
+                />
+              </div>
+
+              <div className="input-group">
+                <label style={{ fontSize: '13px', fontWeight: '600' }}>ขนาดและวิธีรับประทาน (Dosage)</label>
+                <input
+                  type="text"
+                  placeholder="เช่น ครั้งละ 1-2 เม็ด ทุก 4-6 ชั่วโมง"
+                  value={addDosage}
+                  onChange={(e) => setAddDosage(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="input-group">
+                  <label style={{ fontSize: '13.5px', fontWeight: '600', color: '#334155' }}>จำนวนสต็อกรับเข้าแรกเริ่ม (เม็ด)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="100"
+                    value={addStock}
+                    onChange={(e) => setAddStock(e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                </div>
+                <div className="input-group">
+                  <label style={{ fontSize: '13.5px', fontWeight: '600', color: '#334155' }}>ราคาจำหน่ายต่อหน่วย (บาท)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    placeholder="20"
+                    value={addUnitPrice}
+                    onChange={(e) => setAddUnitPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                  />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label style={{ fontSize: '13.5px', fontWeight: '600', color: '#334155' }}>บริษัทผู้ผลิต / ผู้จัดจำหน่าย (Manufacturer)</label>
+                <input
+                  type="text"
+                  placeholder="เช่น บริษัท สยามเภสัช จำกัด, องค์การเภสัชกรรม (GPO)"
+                  value={addManufacturer}
+                  onChange={(e) => setAddManufacturer(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer" style={{ marginTop: '16px' }}>
+              <button className="cancel-btn" onClick={() => setIsAddModalOpen(false)}>ยกเลิก</button>
+              <button
+                className="save-btn"
+                disabled={!addMedName.trim()}
+                onClick={handleAddMedicineSubmit}
+                style={{ background: '#16A34A' }}
+              >
+                + เพิ่มรายการยาเข้าคลัง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmMed && (
+        <div className="modal-overlay">
+          <div className="modal-card card" style={{ maxWidth: '420px', textAlign: 'center' }}>
+            <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+              </div>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+                ยืนยันการลบรายการยา
+              </h3>
+              <p style={{ margin: 0, fontSize: '14px', color: '#64748B', lineHeight: '1.5' }}>
+                คุณต้องการลบยา <strong style={{ color: '#0F172A' }}>{deleteConfirmMed.name}</strong> ({deleteConfirmMed.medicine_code || deleteConfirmMed.id}) ออกจากฐานข้อมูลคลังยาใช่หรือไม่?
+              </p>
+            </div>
+            <div className="modal-footer" style={{ justifyContent: 'center', gap: '12px', background: '#F8FAFC', padding: '16px 20px', borderRadius: '0 0 12px 12px' }}>
+              <button className="cancel-btn" onClick={() => setDeleteConfirmMed(null)}>ยกเลิก</button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                style={{
+                  padding: '10px 20px', borderRadius: '8px',
+                  background: '#DC2626', color: '#FFFFFF', border: 'none',
+                  fontSize: '14px', fontWeight: '700', cursor: 'pointer'
+                }}
+              >
+                ยืนยันการลบยา
               </button>
             </div>
           </div>

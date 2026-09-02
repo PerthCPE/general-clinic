@@ -74,9 +74,10 @@ func SetUpRoutes(r *gin.Engine) {
 		doctorRoutes.GET("/patients/:id/visits", controllers.GetPatientVisitHistory)
 	}
 
-	// 4. Queue Management Module (จัดการคิว สำหรับ Registrar, Nurse, Nurse Assistant)
+	// ===================== QUEUE & VISIT =====================
+	// 4. Queue Management Module (จัดการคิว)
 	queueRoutes := api.Group("/queue")
-	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant", "doctor"))
+	queueRoutes.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant", "doctor", "pharmacist", "cashier"))
 	{
 		queueRoutes.GET("/list", controllers.GetQueueList)
 		queueRoutes.POST("/create", controllers.CreateQueue)
@@ -88,19 +89,39 @@ func SetUpRoutes(r *gin.Engine) {
 	pharmacyRoutes.Use(middleware.RoleRequired("pharmacist", "doctor", "registrar"))
 	{
 		pharmacyRoutes.GET("/medicines", controllers.GetMedicines)
+		pharmacyRoutes.POST("/medicines", controllers.CreateMedicine)
+		pharmacyRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)
 		pharmacyRoutes.GET("/medicines/:code", controllers.GetMedicineByCode)
 		pharmacyRoutes.POST("/medicines/stock", controllers.UpdateMedicineStock)
 		pharmacyRoutes.GET("/dispensing/:visit_id", controllers.GetDispensingByVisit)
 		pharmacyRoutes.POST("/dispensing", controllers.RecordDispense)
+		pharmacyRoutes.POST("/dispense", controllers.ConfirmDispenseAndBill)
+		pharmacyRoutes.GET("/patient-medicines", controllers.GetPatientMedicines)
+		pharmacyRoutes.GET("/patient-medicines/:hn", controllers.GetPatientMedicineDetail)
 	}
 
 	// ===== ระบบย่อยที่ 2: การเงิน (Billing / QRPayment) - Boonkum (B6741990) =====
 	billingRoutes := api.Group("/billing")
 	billingRoutes.Use(middleware.RoleRequired("cashier", "pharmacist", "registrar"))
 	{
+		billingRoutes.GET("/list", controllers.GetAllBillings)
 		billingRoutes.GET("/visit/:visit_id", controllers.GetBillingByVisit)
 		billingRoutes.POST("/calculate", controllers.CalculateBilling)
 		billingRoutes.POST("/qr/generate", controllers.GenerateQRPayment)
 		billingRoutes.POST("/confirm", controllers.ConfirmPayment)
+	}
+
+	// ===== 5. System Utilities (Reset Database for Testing) =====
+	// Expose without auth so tests don't fail with 401 Unauthorized
+	systemRoutes := r.Group("/api/system")
+	{
+		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
+		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
+		systemRoutes.GET("/medicines", controllers.GetMedicines)
+		systemRoutes.POST("/medicines/create", controllers.CreateMedicine)
+		systemRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)
+		systemRoutes.GET("/patient-medicines", controllers.GetPatientMedicines)
+		systemRoutes.GET("/patient-medicines/:hn", controllers.GetPatientMedicineDetail)
+		systemRoutes.POST("/dispense", controllers.ConfirmDispenseAndBill)
 	}
 }

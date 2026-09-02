@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import './DetailPage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
+import { useWebSocket } from '../../context/WebSocketContext';
 
 interface ToastState {
   message: string;
@@ -28,22 +29,21 @@ export default function DetailPage({
   patientRightsMap,
   onUpdatePatientRights
 }: DetailPageProps) {
+  const { subscribe } = useWebSocket();
   const [patientIdInput, setPatientIdInput] = useState('');
   const [localPatientId, setLocalPatientId] = useState<string>(selectedPatientId || '');
   const [isSearchExpanded, setIsSearchExpanded] = useState(true);
   const [isPrescriptionExpanded, setIsPrescriptionExpanded] = useState(true);
   const [selectedMedInfo, setSelectedMedInfo] = useState<{ name: string; medId: string; properties: string } | null>(null);
-  // คิวเริ่มต้น - ใช้รหัสจาก config เป็นตัวอย่าง
-  const [queueList, setQueueList] = useState<PatientConfig[]>(CLINIC_CONFIG.patients.slice());
+  
+  // คิวเริ่มต้น - เริ่มจากตารางว่างเปล่าแบบ Clean State
+  const [queueList, setQueueList] = useState<PatientConfig[]>([]);
   
   // Current active patient object
-  const activePatient: PatientConfig | undefined = CLINIC_CONFIG.patients.find(p => p.id === localPatientId);
+  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || CLINIC_CONFIG.patients.find(p => p.id === localPatientId);
   const currentRights = activePatient ? ((patientRightsMap && patientRightsMap[activePatient.id]) || activePatient.treatmentRights) : '';
 
-  const [toast, setToast] = useState<ToastState | null>({
-    message: 'ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์เรียบร้อยแล้ว',
-    type: 'doctor'
-  });
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [isToastFading, setIsToastFading] = useState(false);
 
   const triggerToast = (message: string, type: 'success' | 'error' | 'doctor') => {
@@ -58,45 +58,240 @@ export default function DetailPage({
     }, 3500);
   };
 
-  // ค้างไว้ 3.5 วินาที แล้วค่อยๆ จางหายไปเมื่อโหลดหน้าเว็บครั้งแรก
+  // Real-time Queue Listener
   useEffect(() => {
-    const timer1 = setTimeout(() => {
-      setIsToastFading(true);
-      const timer2 = setTimeout(() => {
-        setToast(null);
-        setIsToastFading(false);
-      }, 400);
-      return () => clearTimeout(timer2);
-    }, 3500);
-    return () => clearTimeout(timer1);
-  }, []);
+    // โหลดข้อมูลจาก API ทันทีที่เปิดหน้า
+    const fetchQueues = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/queue/list', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const mappedQueues = data.map((q: any) => ({
+              id: String(q.id),
+              visitId: q.visit_id || 1,
+              hn: q.Patient?.hn || q.hn || `HN-${q.patient_id}`,
+              nationalId: q.Patient?.national_id || '',
+              queueNumber: q.queue_number || 'Q0000',
+              ticket: q.queue_number || 'A-01',
+              name: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
+              shortName: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
+              gender: q.Patient?.gender || 'ชาย',
+              age: q.Patient ? new Date().getFullYear() - new Date(q.Patient.birthdate).getFullYear() : 0,
+              treatmentRights: q.Patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+              patientType: 'ผู้ป่วยนอก (OPD)' as const,
+              allergies: q.Patient?.allergies ? [q.Patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
+              chronicDiseases: q.Patient?.chronic_diseases || 'ไม่มี',
+              vitals: 'รอตรวจสอบ',
+              visitStatus: q.status === 'pharmacy_waiting' ? 'รอรับยา / ชำระเงิน' : (q.status === 'billing_waiting' ? 'จ่ายยาแล้ว / รอชำระเงิน' : 'เสร็จสิ้น'),
+              visitDate: new Date(q.created_at || Date.now()).toLocaleDateString('th-TH'),
+              visitTime: new Date(q.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+              doctorAdvice: q.note || '',
+              medications: [] // will load detail on click
+            }));
+            setQueueList(mappedQueues);
+            if (mappedQueues.length > 0) setLocalPatientId(mappedQueues[0].id);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch queues:', err);
+      }
+    };
+
+    fetchQueues();
+
+    const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
+      if (data && data.action === 'db_reset') {
+        setQueueList([]);
+      } else {
+        fetchQueues();
+      }
+    });
+
+    const unsubCreated = subscribe('QUEUE_CREATED', (data: any) => {
+      if (data) {
+        const pName = data.patient?.full_name || data.patient_name || `ผู้ป่วยคิว ${data.queue_number || ''}`;
+        
+        // Optimistic UI update in case fetchQueues fails (e.g. auth issues during demo)
+        const newPatient: PatientConfig = {
+          id: String(data.id) || `Q-${Date.now()}`,
+          visitId: data.visit_id || 1,
+          hn: data.hn || `HN-${data.patient_id || data.id || Date.now()}`,
+          nationalId: data.national_id || '',
+          queueNumber: data.queue_number || 'Q0000',
+          ticket: data.queue_number || 'A-01',
+          name: pName,
+          shortName: pName,
+          gender: data.gender || 'ชาย',
+          age: data.age || 0,
+          treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+          patientType: 'ผู้ป่วยนอก (OPD)',
+          allergies: data.allergies ? [data.allergies] : ['ไม่มีประวัติแพ้ยา'],
+          chronicDiseases: data.chronic_diseases || 'ไม่มี',
+          vitals: 'รอตรวจสอบ',
+          visitStatus: 'รอรับยา / ชำระเงิน',
+          visitDate: new Date().toLocaleDateString('th-TH'),
+          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+          doctorAdvice: data.note || '',
+          medications: data.medications || []
+        };
+        
+        setQueueList(prev => {
+          // Add if not exist
+          if (!prev.find(q => q.id === newPatient.id)) {
+            return [...prev, newPatient];
+          }
+          return prev;
+        });
+
+        fetchQueues(); // Still try to fetch from server
+        triggerToast(`ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์: ${pName}`, 'doctor');
+      }
+    });
+
+    return () => {
+      unsubQueue();
+      unsubCreated();
+    };
+  }, [subscribe]);
+
+  // Real-time Query Medications from DB for Active Patient Visit
+  useEffect(() => {
+    if (activePatient && activePatient.visitId) {
+      fetch(`/api/pharmacy/dispensing/${activePatient.visitId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
+            const fetchedMeds = data.dispensing.map((item: any) => ({
+              medId: item.Medicine?.code || `MED-${item.medicine_id}`,
+              name: item.Medicine?.name || 'ยาบรรเทาอาการ',
+              genericName: item.Medicine?.generic_name || '',
+              category: item.Medicine?.category || 'ยาสามัญ',
+              properties: item.Medicine?.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
+              dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
+              instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
+              price: item.Medicine?.unit_price || 50,
+              quantity: item.quantity || 1,
+              stock: item.Medicine?.stock_quantity || 100,
+              stockStatus: (item.Medicine?.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
+            }));
+            
+            setQueueList(prev => prev.map(q => {
+              if (q.id === activePatient.id) {
+                return { ...q, medications: fetchedMeds };
+              }
+              return q;
+            }));
+          }
+        })
+        .catch(err => console.error('Failed to fetch medications for visit:', err));
+    }
+  }, [activePatient?.id, activePatient?.visitId]);
 
 
 
-  // จำลองแพทย์ส่งคนไข้ใหม่ - เพิ่มเข้าคิวล่างสุด อย่า auto-select
-  const handleSimulateDoctorSubmit = () => {
-    // หาคนไข้ที่ยังไม่อยู่ในคิว เพิ่มใหม่
-    const allPatients = CLINIC_CONFIG.patients;
-    const nextPatient = allPatients.find(p => !queueList.some(q => q.id === p.id));
-    if (nextPatient) {
-      setQueueList(prev => [...prev, nextPatient]);
-      triggerToast(`แพทย์ส่งใบสั่งยาเข้ามาใหม่: ${nextPatient.name} (เพิ่มเข้าคิว)`, 'doctor');
-    } else {
-      // ถ้าคนไข้อยู่ในคิวหมดแล้ว เพิ่มซ้ำจากต้น
-      const cyclePatient = allPatients[queueList.length % allPatients.length];
-      const hexNum = Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
-      setQueueList(prev => [...prev, { ...cyclePatient, id: cyclePatient.id + '_' + Date.now(), hn: 'HN' + hexNum }]);
-      triggerToast(`แพทย์ส่งคนไข้เข้าคิวใหม่`, 'doctor');
+  // จำลองแพทย์ส่งคนไข้ใหม่ - บันทึกลง DB จริงแบบ Real-time
+  const handleSimulateDoctorSubmit = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/system/simulate-prescription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const pName = data.patient_name || 'ผู้ป่วยใหม่';
+        const qNo = data.queue?.queue_number || 'Q0001';
+        const qId = String(data.queue?.id || Date.now());
+
+        const newPatient: PatientConfig = {
+          id: qId,
+          visitId: data.visit_id || 1,
+          hn: data.hn || `HN-${Date.now()}`,
+          nationalId: data.patient?.national_id || '',
+          queueNumber: qNo,
+          ticket: qNo,
+          name: pName,
+          shortName: pName,
+          gender: data.patient?.gender || 'ชาย',
+          age: data.patient?.birthdate ? (new Date().getFullYear() - new Date(data.patient.birthdate).getFullYear()) : 35,
+          treatmentRights: data.patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+          patientType: 'ผู้ป่วยนอก (OPD)',
+          allergies: data.patient?.allergies ? [data.patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
+          chronicDiseases: data.patient?.chronic_diseases || 'ไม่มี',
+          vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+          visitStatus: 'รอรับยา / ชำระเงิน',
+          visitDate: new Date().toLocaleDateString('th-TH'),
+          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+          doctorAdvice: data.queue?.note || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
+          medications: data.medications || []
+        };
+
+        setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
+        setLocalPatientId(newPatient.id);
+        if (onSelectPatientId) onSelectPatientId(newPatient.id);
+
+        triggerToast(`แพทย์ส่งใบสั่งยาลง DB จริงสำเร็จ: ${pName} (${data.hn || ''})`, 'doctor');
+      } else {
+        fallbackSimulate();
+      }
+    } catch {
+      fallbackSimulate();
     }
   };
 
-  // กดยืนยันการจ่ายยา: ลบคนไข้ออกจากคิว + รีเซ็ต selection
-  const handleSendToBilling = () => {
+  const fallbackSimulate = () => {
+    // Backend fetch failed, do not use CLINIC_CONFIG mock data anymore.
+    // Ensure you start the backend before clicking this.
+    triggerToast(`ข้อผิดพลาด: ไม่สามารถเชื่อมต่อกับฐานข้อมูลหลังบ้านได้ โปรดเปิดเซิร์ฟเวอร์`, 'error');
+  };
+
+  // กดยืนยันการจ่ายยา: ส่งข้อมูลเข้า DB การเงินจริง + อัปเดต PatientMedicine DB + ลบคนไข้ออกจากคิว
+  const handleSendToBilling = async () => {
     if (!activePatient) return;
-    triggerToast(`ยืนยันการจ่ายยาเรียบร้อย! ส่งข้อมูลใบสั่งยาของ ${activePatient.name} ไปยังระบบการเงินแล้ว`, 'success');
-    // ลบคนไข้ออกจากคิว
+    const pName = activePatient.name;
+    const vId = activePatient.visitId || 1;
+
+    const payload = {
+      visit_id: vId,
+      hn: activePatient.hn,
+      patient_name: activePatient.name
+    };
+
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      let res = await fetch('/api/pharmacy/dispense', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        await fetch('/api/system/dispense', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+    } catch {
+      await fetch('/api/system/dispense', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).catch(() => {});
+    }
+
+    triggerToast(`ยืนยันการจ่ายยาเรียบร้อย! ส่งข้อมูลใบสั่งยาของ ${pName} ไปยังระบบการเงินแล้ว`, 'success');
     setQueueList(prev => prev.filter(p => p.id !== activePatient.id));
-    // รีเซ็ต selection
     setLocalPatientId('');
     if (onSelectPatientId) onSelectPatientId('');
   };

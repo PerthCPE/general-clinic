@@ -30,20 +30,11 @@ interface DetailedPatientRecord {
   clinicFee: number;
 }
 
-const mockPaymentRecords: PaymentRecord[] = [
-  { id: 'HN0045', patientName: 'นายบุญค้ำ โยลัย', date: '23/07/2026', time: '10:15 น.', amount: '฿ 1,175.00', method: 'QR Code', status: 'completed' },
-  { id: 'HN0112', patientName: 'นางสาวกานดา มณีรัตน์', date: '23/07/2026', time: '11:00 น.', amount: '฿ 1,175.00', method: 'เงินสด', status: 'completed' },
-  { id: 'HN0018', patientName: 'นายสมชาย ใจดี', date: '23/07/2026', time: '11:45 น.', amount: '฿ 1,500.00', method: 'QR Code', status: 'pending' },
-  { id: 'HN0884', patientName: 'นางสาวสวย งามตา', date: '23/07/2026', time: '13:20 น.', amount: '฿ 600.00', method: 'เงินสด', status: 'pending' },
-  { id: 'HN0105', patientName: 'นางสาวแมว อานนท์', date: '23/07/2026', time: '14:00 น.', amount: '฿ 800.00', method: 'QR Code', status: 'completed' },
-  { id: 'HN0309', patientName: 'นางสาววุฒิศรี ร้อยสาย', date: '23/07/2026', time: '14:05 น.', amount: '฿ 400.00', method: 'เงินสด', status: 'pending' },
-  { id: 'HN0512', patientName: 'นางสาวจินตนา มานิน', date: '23/07/2026', time: '15:10 น.', amount: '฿ 700.00', method: 'QR Code', status: 'completed' },
-  { id: 'HN0640', patientName: 'นางสาวสุภาสิทธิ์ ดวงใจ', date: '23/07/2026', time: '15:30 น.', amount: '฿ 850.00', method: 'เงินสด', status: 'completed' },
-  { id: 'HN0789', patientName: 'นางสาวกุหลาบ สุขี', date: '23/07/2026', time: '16:20 น.', amount: '฿ 100.00', method: 'เงินสด', status: 'completed' },
-];
+const mockPaymentRecords: PaymentRecord[] = [];
 
 export default function BillingDashboardPage() {
   const { isConnected, subscribe } = useWebSocket();
+  const [records, setRecords] = useState<PaymentRecord[]>(mockPaymentRecords);
   const [patientId, setPatientId] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
@@ -62,20 +53,68 @@ export default function BillingDashboardPage() {
     setHasSearched(false);
   };
 
+  // Sync Real Billings from Supabase DB
+  const fetchBillings = useCallback(() => {
+    const token = localStorage.getItem('token');
+    fetch('/api/billing/list', {
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data?.billings && Array.isArray(data.billings)) {
+          const formatted: PaymentRecord[] = data.billings.map((b: any) => ({
+            id: `HN-${String(b.visit_id || b.id).padStart(4, '0')}`,
+            patientName: b.patient_name || b.VisitRecord?.Patient?.FullName || `ผู้ป่วย Visit #${b.visit_id || b.id}`,
+            date: b.created_at ? new Date(b.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
+            time: b.created_at ? new Date(b.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '10:00 น.',
+            amount: `฿ ${(b.net_amount || b.total_amount || 0).toFixed(2)}`,
+            method: b.payment_method === 'Cash' ? 'เงินสด' : 'QR Code',
+            status: b.payment_status === 'paid' || b.payment_status === 'completed' ? 'completed' : 'pending',
+          }));
+          setRecords(formatted);
+        }
+      })
+      .catch(() => {
+        // Empty on error
+      });
+  }, []);
+
   // Real-time WebSocket Listeners for Billing & Cashier
   useEffect(() => {
+    fetchBillings();
+
     const unsubPay = subscribe('PAYMENT_CONFIRMED', (data: any) => {
+      fetchBillings();
       setLiveNotify(`✓ ชำระเงินสำเร็จ: บิล #${data?.id || ''}`);
       setTimeout(() => setLiveNotify(null), 4000);
     });
 
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      if (data) {
+        const newRec: PaymentRecord = {
+          id: `HN-${String(data.visit_id || data.id).padStart(4, '0')}`,
+          patientName: data.patient_name || `ผู้ป่วย Visit #${data.visit_id || data.id}`,
+          date: new Date().toLocaleDateString('th-TH'),
+          time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+          amount: `฿ ${(data.net_amount || data.total_amount || 0).toFixed(2)}`,
+          method: 'QR Code',
+          status: 'pending',
+        };
+        setRecords(prev => [newRec, ...prev.filter(r => r.id !== newRec.id)]);
+      }
+      fetchBillings();
       setLiveNotify(`⚡ มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
     });
 
-    const unsubQueue = subscribe('QUEUE_UPDATED', () => {
-      // Refresh or notify queue update
+    const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
+      if (data && data.action === 'db_reset') {
+        setRecords([]);
+      } else {
+        fetchBillings();
+      }
     });
 
     return () => {
@@ -83,9 +122,9 @@ export default function BillingDashboardPage() {
       unsubBill();
       unsubQueue();
     };
-  }, [subscribe]);
+  }, [fetchBillings, subscribe]);
 
-  const filteredRecords = mockPaymentRecords.filter(record => {
+  const filteredRecords = records.filter(record => {
     const query = patientId.trim().toLowerCase();
     const matchSearch = !query || record.id.toLowerCase().includes(query) || record.patientName.toLowerCase().includes(query);
     const matchStatus = statusFilter === 'all' || record.status === statusFilter;
