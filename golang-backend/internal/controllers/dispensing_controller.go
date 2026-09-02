@@ -34,6 +34,22 @@ func GetDispensingByVisit(c *gin.Context) {
 		return
 	}
 
+	// ถ้าไม่พบจาก visit_id โดยตรง ให้ลองหาจาก VisitRecord หรือ Patient
+	if len(items) == 0 {
+		var vr models.VisitRecord
+		if config.DB.First(&vr, visitID).Error == nil && vr.PatientID > 0 {
+			var allVisits []models.VisitRecord
+			config.DB.Where("patient_id = ?", vr.PatientID).Order("id desc").Find(&allVisits)
+			var vIDs []uint
+			for _, v := range allVisits {
+				vIDs = append(vIDs, v.ID)
+			}
+			if len(vIDs) > 0 {
+				config.DB.Preload("Medicine").Preload("Doctor").Where("visit_id IN ?", vIDs).Order("id desc").Find(&items)
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":     "success",
 		"dispensing": items,

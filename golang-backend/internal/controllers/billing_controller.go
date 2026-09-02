@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -39,6 +40,96 @@ func GetBillingQueues(c *gin.Context) {
 	if err := config.DB.Preload("VisitRecord").Preload("VisitRecord.Patient").Where("status = ?", "pending").Order("id desc, created_at desc").Find(&queues).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billing queues: " + err.Error()})
 		return
+	}
+
+	for i := range queues {
+		bq := &queues[i]
+		if bq.PatientName == "" || bq.PatientName == "ผู้ป่วย" {
+			if bq.VisitRecord.Patient.FullName != "" {
+				bq.PatientName = bq.VisitRecord.Patient.FullName
+			}
+		}
+		if bq.HN == "" {
+			if bq.VisitRecord.Patient.HN != "" {
+				bq.HN = bq.VisitRecord.Patient.HN
+			}
+		}
+
+		// ดึงรายการยาจริงจากตาราง dispensings ที่แพทย์สั่ง
+		var dispensings []models.Dispensing
+		if bq.VisitID > 0 {
+			config.DB.Preload("Medicine").Where("visit_id = ?", bq.VisitID).Find(&dispensings)
+		}
+		if len(dispensings) == 0 && bq.HN != "" {
+			var pat models.Patient
+			if config.DB.Where("hn = ?", bq.HN).First(&pat).Error == nil && pat.ID > 0 {
+				var visits []models.VisitRecord
+				config.DB.Where("patient_id = ?", pat.ID).Order("id desc").Find(&visits)
+				var vIDs []uint
+				for _, v := range visits {
+					vIDs = append(vIDs, v.ID)
+				}
+				if len(vIDs) > 0 {
+					config.DB.Preload("Medicine").Where("visit_id IN ?", vIDs).Order("id desc").Find(&dispensings)
+				}
+			}
+		}
+
+		if len(dispensings) > 0 {
+			var medList []gin.H
+			totalAmount := 0.0
+			for _, disp := range dispensings {
+				unitPrice := disp.Medicine.UnitPrice
+				if unitPrice <= 0 {
+					unitPrice = 50.0
+				}
+				qty := disp.Quantity
+				if qty <= 0 {
+					qty = 1
+				}
+				totalAmount += unitPrice * float64(qty)
+				medList = append(medList, gin.H{
+					"medId":        disp.Medicine.MedicineCode,
+					"name":         disp.Medicine.Name,
+					"genericName":  disp.Medicine.GenericName,
+					"category":     disp.Medicine.Category,
+					"properties":   disp.Medicine.Properties,
+					"dosage":       disp.Dosage,
+					"instructions": disp.Instructions,
+					"price":        unitPrice,
+					"unit_price":   unitPrice,
+					"quantity":     qty,
+					"stock":        disp.Medicine.StockQuantity,
+					"stockStatus":  "พร้อมจ่าย",
+				})
+			}
+			medsBytes, _ := json.Marshal(medList)
+			bq.Medications = string(medsBytes)
+			bq.TotalAmount = totalAmount
+		} else if bq.Medications == "" || bq.Medications == "[]" || bq.Medications == "null" {
+			// Fallback: ดึงจาก MedicineQueue
+			var mq models.MedicineQueue
+			if bq.VisitID > 0 {
+				config.DB.Where("visit_id = ?", bq.VisitID).First(&mq)
+			}
+			if mq.ID == 0 && bq.HN != "" {
+				config.DB.Where("hn = ?", bq.HN).First(&mq)
+			}
+			if mq.Medications != "" && mq.Medications != "[]" && mq.Medications != "null" {
+				bq.Medications = mq.Medications
+			}
+		}
+
+		// ดึงคำแนะนำแพทย์
+		if bq.DoctorAdvice == "" || bq.DoctorAdvice == "พักผ่อนให้เพียงพอ" {
+			var mq models.MedicineQueue
+			if bq.VisitID > 0 {
+				config.DB.Where("visit_id = ?", bq.VisitID).First(&mq)
+			}
+			if mq.DoctorAdvice != "" {
+				bq.DoctorAdvice = mq.DoctorAdvice
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

@@ -187,36 +187,78 @@ export default function BillingDispensePage({
 
   // Real-time Query Medications from DB for Active Billing Patient
   useEffect(() => {
-    if (activePatient && activePatient.visitId) {
+    if (activePatient) {
       const fetchMeds = async () => {
         try {
-          let res = await fetch(`/api/pharmacy/dispensing/${activePatient.visitId}`);
-          if (!res.ok) {
-            res = await fetch(`/api/system/dispensing/${activePatient.visitId}`);
+          if (activePatient.visitId) {
+            let res = await fetch(`/api/pharmacy/dispensing/${activePatient.visitId}`);
+            if (!res.ok) {
+              res = await fetch(`/api/system/dispensing/${activePatient.visitId}`);
+            }
+            if (res.ok) {
+              const data = await res.json();
+              if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
+                const fetchedMeds = data.dispensing.map((item: any) => ({
+                  medId: item.Medicine?.medicine_code || item.Medicine?.code || `MED-${item.medicine_id}`,
+                  name: item.Medicine?.name || 'ยาบรรเทาอาการ',
+                  genericName: item.Medicine?.generic_name || '',
+                  category: item.Medicine?.category || 'ยาสามัญ',
+                  properties: item.Medicine?.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
+                  dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
+                  instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
+                  price: Number(item.Medicine?.unit_price || item.price || 50),
+                  unit_price: Number(item.Medicine?.unit_price || item.price || 50),
+                  quantity: Number(item.quantity || 1),
+                  stock: item.Medicine?.stock_quantity || 100,
+                  stockStatus: (item.Medicine?.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
+                }));
+                
+                setQueueList(prev => prev.map(q => {
+                  if (q.id === activePatient.id) {
+                    return { ...q, medications: fetchedMeds };
+                  }
+                  return q;
+                }));
+                return;
+              }
+            }
           }
-          if (res.ok) {
-            const data = await res.json();
-            if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
-              const fetchedMeds = data.dispensing.map((item: any) => ({
-                medId: item.Medicine?.code || `MED-${item.medicine_id}`,
-                name: item.Medicine?.name || 'ยาบรรเทาอาการ',
-                genericName: item.Medicine?.generic_name || '',
-                category: item.Medicine?.category || 'ยาสามัญ',
-                properties: item.Medicine?.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
-                dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
-                instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
-                price: item.Medicine?.unit_price || 50,
-                quantity: item.quantity || 1,
-                stock: item.Medicine?.stock_quantity || 100,
-                stockStatus: (item.Medicine?.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
-              }));
-              
-              setQueueList(prev => prev.map(q => {
-                if (q.id === activePatient.id) {
-                  return { ...q, medications: fetchedMeds };
-                }
-                return q;
-              }));
+
+          // Fallback: ดึงจาก patient-medicines ตาม HN
+          if (activePatient.hn) {
+            let hnRes = await fetch(`/api/pharmacy/patient-medicines/${encodeURIComponent(activePatient.hn)}`);
+            if (!hnRes.ok) {
+              hnRes = await fetch(`/api/system/patient-medicines/${encodeURIComponent(activePatient.hn)}`);
+            }
+            if (hnRes.ok) {
+              const hnData = await hnRes.json();
+              if (hnData.status === 'success' && Array.isArray(hnData.dispensings) && hnData.dispensings.length > 0) {
+                const fetchedMeds = hnData.dispensings.map((item: any) => ({
+                  medId: item.Medicine?.medicine_code || item.Medicine?.code || `MED-${item.medicine_id}`,
+                  name: item.Medicine?.name || item.name || 'ยาบรรเทาอาการ',
+                  genericName: item.Medicine?.generic_name || '',
+                  category: item.Medicine?.category || 'ยาสามัญ',
+                  properties: item.Medicine?.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
+                  dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
+                  instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
+                  price: Number(item.Medicine?.unit_price || item.price || 50),
+                  unit_price: Number(item.Medicine?.unit_price || item.price || 50),
+                  quantity: Number(item.quantity || 1),
+                  stock: item.Medicine?.stock_quantity || 100,
+                  stockStatus: 'พร้อมจ่าย'
+                }));
+
+                setQueueList(prev => prev.map(q => {
+                  if (q.id === activePatient.id) {
+                    return { 
+                      ...q, 
+                      medications: fetchedMeds,
+                      doctorAdvice: hnData.doctor_advice || q.doctorAdvice
+                    };
+                  }
+                  return q;
+                }));
+              }
             }
           }
         } catch (err) {
@@ -225,7 +267,7 @@ export default function BillingDispensePage({
       };
       fetchMeds();
     }
-  }, [activePatient?.id, activePatient?.visitId]);
+  }, [activePatient?.id, activePatient?.visitId, activePatient?.hn]);
 
   const triggerToast = (message: string, type: 'success' | 'error' | 'doctor') => {
     setIsToastFading(false);
@@ -249,10 +291,11 @@ export default function BillingDispensePage({
       return () => clearTimeout(timer2);
     }, 3500);
     return () => clearTimeout(timer1);
-  }, []);
+  }, [toast]);
 
   const handleSelectPatient = (id: string) => {
     setLocalPatientId(id);
+    localStorage.setItem('billing_active_patient', id);
     if (onSelectPatientId) {
       onSelectPatientId(id);
     }
@@ -580,7 +623,9 @@ export default function BillingDispensePage({
                     <div className="item-title">{med.name}</div>
                     <div className="item-sub">{med.dosage}</div>
                   </div>
-                  <div className="item-price">฿ {(Number(med.price) || 0).toLocaleString()}</div>
+                  <div className="item-price">
+                    ฿ {(((Number(med.price || (med as any).unit_price) || 0) * (Number((med as any).quantity) || 1))).toLocaleString()}
+                  </div>
                 </div>
               ))}
             </div>
