@@ -205,6 +205,32 @@
   transition: stroke 0.5s ease;
 }
 
+/* ===== กันสไตล์จากหน้าอื่นมาทับไอคอนแว่นขยาย =====
+   ".search-icon" เป็นชื่อคลาสกลางที่หน้าอื่นก็ใช้ และประกาศไว้แบบไม่ผูกกับหน้าตัวเอง
+     pages/officer/DocumentManagementPage.css   -> position: absolute; width: 16px
+     pages/ScreeningHistory/ScreeningHistoryPage.css -> margin-right: 10px
+   ไฟล์พวกนั้นถูกโหลดหลัง Topbar.css และมี specificity เท่ากัน (0,1,0) จึงชนะ
+   ทำให้ไอคอนหลุดออกจาก flex ไปทับตัวหนังสือในช่องค้นหาทุก role
+
+   แก้โดยเขียนซ้ำแบบผูกกับ .search-container ให้ specificity สูงขึ้นเป็น (0,2,0)
+   จำกัดผลอยู่แค่แถบบนสุด หน้าอื่นที่ใช้ .search-icon ของตัวเองไม่กระทบ
+   ทางแก้ที่ถูกต้องกว่าคือให้เจ้าของหน้านั้นผูกคลาสกับหน้าตัวเอง */
+.search-container .search-icon {
+  position: static;
+  left: auto;
+  right: auto;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  margin-right: 8px;
+  pointer-events: auto;
+}
+
+.search-container .search-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
 .search-input {
   flex: 1;
   border: none;

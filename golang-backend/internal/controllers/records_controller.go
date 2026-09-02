@@ -256,33 +256,44 @@ func buildRecordItem(p models.Patient) dto.DoctorQueueItem {
 		}
 	}
 
-	// เวลารอของครั้งนั้น นับจากเวลาที่ออกคิวถึงเวลาที่แพทย์เรียกเข้าตรวจ
 	var queue models.Queue
+	hasQueue := false
 	if err := config.DB.Where("visit_id = ?", visit.ID).
 		Order("id desc").
 		First(&queue).Error; err == nil {
+		hasQueue = true
 		item.QueueID = queue.ID
 		item.QueueNumber = queue.QueueNumber
 		item.QueueStatus = queue.Status
 		item.Note = queue.Note
 		item.QueuedAt = queue.CreatedAt
-
-		endTime := time.Now()
-		if queue.CalledAt != nil {
-			endTime = *queue.CalledAt
-		}
-		if minutes := int(endTime.Sub(queue.CreatedAt).Minutes()); minutes > 0 {
-			item.WaitingMinutes = minutes
-		}
 	}
 
 	var screening models.Screening
+	hasScreening := false
 	if err := config.DB.Preload("ScreenedBy").
 		Where("visit_id = ?", visit.ID).
 		Order("id desc").
 		First(&screening).Error; err == nil {
+		hasScreening = true
 		brief := toScreeningBrief(screening)
 		item.Screening = &brief
+	}
+
+	// เวลารอ นับจากคัดกรองเสร็จ ถึงเวลาที่แพทย์เรียกเข้าตรวจ
+	// ใช้เกณฑ์เดียวกับหน้าคิว (ดู waitingMinutesSince ใน doctor_controller.go)
+	// ถ้าครั้งนั้นไม่มีผลคัดกรอง ให้ถอยไปนับจากเวลาที่ออกคิวแทน
+	if hasQueue || hasScreening {
+		waitFrom := queue.CreatedAt
+		if hasScreening && !screening.CreatedAt.IsZero() {
+			waitFrom = screening.CreatedAt
+		}
+
+		var calledAt *time.Time
+		if hasQueue {
+			calledAt = queue.CalledAt
+		}
+		item.WaitingMinutes = waitingMinutesSince(waitFrom, calledAt)
 	}
 
 	// การวินิจฉัยหลักของครั้งนั้น ใช้โชว์บนการ์ดในหน้าประวัติ

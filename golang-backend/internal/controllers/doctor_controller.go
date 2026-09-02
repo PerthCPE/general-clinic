@@ -137,23 +137,87 @@ func visitStatusToQueueStatus(status string) string {
 	return queueStatusWaitingDoctor
 }
 
-// triageInfo - แปลงระดับ triage ภาษาไทยของพยาบาล เป็นรูปแบบ Level 1-5
-// ที่ ExaminationView ใช้ พร้อมระดับความสำคัญ
+// ==============================================================================
+// ระดับการคัดแยก (Triage) จากจุดคัดกรอง -> ค่าที่หน้าจอแพทย์ใช้
+// ==============================================================================
+// จุดคัดกรองใช้สเกล 4 ระดับ ตามปุ่มใน TriageWidget ของพยาบาล
+// หน้าจอแพทย์จึงต้องแสดงเลขระดับให้ตรงกัน จะได้ไม่ต้องแปลเลขในหัวตอนคุยกัน
+//
+// ค่าที่ลงฐานข้อมูลได้มีสองชุด เพราะมาจากคนละที่และสะกดไม่เหมือนกัน
+//  1. พยาบาลกดเลือกเอง        -> key ของ TRIAGE_LEVELS ใน TriageWidget.tsx
+//  2. backend เดาจากสัญญาณชีพ -> ใช้เมื่อพยาบาลไม่ได้เลือก (vitals_controller.go)
+//
+// จึงต้องจับคู่ค่าตรงๆ ทั้งสองชุด
+//
+// ห้ามไล่ด้วย strings.Contains อย่างเดียว เพราะ "กึ่งฉุกเฉิน" มีคำว่า "ฉุกเฉิน"
+// อยู่ข้างใน เคส Level 3 จะโดนดักเป็น Level 2 ทั้งหมด
+var triageByLabel = map[string][2]string{
+	// พยาบาลกดเลือกเอง
+	"ฉุกเฉินวิกฤต (Resuscitation)": {"Level 1: Resuscitation", "High"},
+	"ฉุกเฉินเร่งด่วน (Urgent)":     {"Level 2: Emergency", "High"},
+	"กึ่งฉุกเฉิน (Semi-Urgent)":    {"Level 3: Urgent", "Medium"},
+	"ปกติ (Normal)":                {"Level 4: Less Urgent", "Low"},
+
+	// backend เดาจากสัญญาณชีพ
+	"วิกฤต (Resuscitation)": {"Level 1: Resuscitation", "High"},
+	"ฉุกเฉิน (Emergency)":   {"Level 2: Emergency", "High"},
+	"เร่งด่วน (Urgent)":     {"Level 3: Urgent", "Medium"},
+}
+
+// triageInfo - แปลงระดับ triage ของพยาบาล เป็นรูปแบบที่ ExaminationView ใช้
+//
+// code     ลงช่อง "ระดับความรุนแรง"  เช่น Level 3: Urgent
+// priority ลงช่อง "ระดับความสำคัญ"   High / Medium / Low
 func triageInfo(thai string) (code string, priority string) {
 	t := strings.TrimSpace(thai)
-	switch {
-	case t == "":
+	if t == "" {
 		return "", ""
+	}
+
+	if hit, ok := triageByLabel[t]; ok {
+		return hit[0], hit[1]
+	}
+
+	// เผื่อข้อความเก่าในฐานข้อมูลที่สะกดไม่ตรงกับสองชุดข้างบน
+	// ต้องไล่จากคำที่เจาะจงที่สุดก่อน "กึ่งฉุกเฉิน" ต้องมาก่อน "ฉุกเฉิน"
+	switch {
 	case strings.Contains(t, "วิกฤต"), strings.Contains(t, "Resuscitation"):
 		return "Level 1: Resuscitation", "High"
+	case strings.Contains(t, "กึ่งฉุกเฉิน"), strings.Contains(t, "Semi-Urgent"):
+		return "Level 3: Urgent", "Medium"
 	case strings.Contains(t, "ฉุกเฉิน"), strings.Contains(t, "Emergency"):
 		return "Level 2: Emergency", "High"
 	case strings.Contains(t, "เร่งด่วน"), strings.Contains(t, "Urgent"):
 		return "Level 3: Urgent", "Medium"
-	case strings.Contains(t, "ปกติ"), strings.Contains(t, "Normal"):
-		return "Level 5: Non-Urgent", "Low"
 	}
+
 	return "Level 4: Less Urgent", "Low"
+}
+
+// waitingMinutesSince - เวลารอของผู้ป่วย นับเป็นนาที
+//
+// นับตั้งแต่ "คัดกรองเสร็จ" ไม่ใช่ตั้งแต่เวชระเบียนออกคิว
+// เพราะช่องนี้อยู่ในคิวของแพทย์ ตัวเลขจึงต้องหมายถึงเวลาที่ผู้ป่วยรอแพทย์จริงๆ
+// ถ้านับจากตอนออกคิว ผู้ป่วยที่เพิ่งคัดกรองเสร็จจะขึ้นเลขสูงตั้งแต่นาทีแรก
+// เพราะรวมเวลาที่ยืนรอคัดกรองเข้ามาด้วย ซึ่งไม่ใช่ความรับผิดชอบของห้องตรวจ
+//
+// start    เวลาที่คัดกรองเสร็จ (ถ้ายังไม่คัดกรอง ผู้เรียกส่งเวลาที่ออกคิวมาแทน)
+// calledAt เวลาที่แพทย์กดเรียกเข้าตรวจ ถ้ายังไม่เรียกจะนับถึงตอนนี้
+func waitingMinutesSince(start time.Time, calledAt *time.Time) int {
+	if start.IsZero() {
+		return 0
+	}
+
+	end := time.Now()
+	if calledAt != nil {
+		end = *calledAt
+	}
+
+	minutes := int(end.Sub(start).Minutes())
+	if minutes < 0 {
+		return 0
+	}
+	return minutes
 }
 
 // formatBP - รวมความดันเป็นสตริงเดียว "120/80" ตามที่ vitals.bp ต้องการ
@@ -481,15 +545,13 @@ func GetDoctorQueue(c *gin.Context) {
 			}
 		}
 
-		// เวลารอ: ถ้าถูกเรียกแล้วนับถึงเวลาที่เรียก ถ้ายังไม่ถูกเรียกนับถึงตอนนี้
-		endTime := time.Now()
-		if q.CalledAt != nil {
-			endTime = *q.CalledAt
+		// เวลารอ นับจากตอนคัดกรองเสร็จ
+		// คิวที่ยังไม่ผ่านคัดกรองยังไม่ถือว่ารอแพทย์ จึงนับจากเวลาที่ออกคิวไปก่อน
+		waitFrom := q.CreatedAt
+		if hasScreening && !screening.CreatedAt.IsZero() {
+			waitFrom = screening.CreatedAt
 		}
-		waitMinutes := int(endTime.Sub(q.CreatedAt).Minutes())
-		if waitMinutes < 0 {
-			waitMinutes = 0
-		}
+		waitMinutes := waitingMinutesSince(waitFrom, q.CalledAt)
 
 		// สถานะที่หน้าจออ่าน เอาจาก visit ก่อน ถ้าไม่มีค่อยแปลงจากสถานะคิว
 		status := ""

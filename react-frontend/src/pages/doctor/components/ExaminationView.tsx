@@ -69,6 +69,37 @@ import {
  * id ของกล่องข้อมูลที่ต้องกรอกก่อนปิดการตรวจ
  * ใช้คู่กับ focusIssue() เพื่อเลื่อนจอไปหาช่องที่ยังขาด
  */
+/**
+ * สีของระดับการคัดแยกผู้ป่วย (Triage)
+ * ----------------------------------------------------------------------------
+ * ใช้ค่าสีชุดเดียวกับ TRIAGE_LEVELS ใน
+ * react-frontend/src/pages/Vitals/components/TriageWidget.tsx
+ * เพื่อให้ระดับเดียวกันเป็นสีเดียวกันทั้งจอพยาบาลและจอแพทย์
+ * แดง = วิกฤต, ส้ม = เร่งด่วน, เหลือง = กึ่งฉุกเฉิน, เขียว = ปกติ
+ *
+ * key คือค่าที่ backend ส่งมาใน screening.triage_code (ดู triageInfo ใน
+ * doctor_controller.go) ถ้าเพิ่มระดับใหม่ ต้องเพิ่มทั้งสองที่ให้ตรงกัน
+ */
+type TriageTone = { dot: string; bg: string; border: string; text: string };
+
+const TRIAGE_TONES: Record<string, TriageTone> = {
+  'Level 1: Resuscitation': { dot: '#EF4444', bg: '#FEE2E2', border: '#FCA5A5', text: '#7F1D1D' },
+  'Level 2: Emergency':     { dot: '#F97316', bg: '#FFEDD5', border: '#FDBA74', text: '#7C2D12' },
+  'Level 3: Urgent':        { dot: '#EAB308', bg: '#FEF9C3', border: '#FDE047', text: '#713F12' },
+  'Level 4: Less Urgent':   { dot: '#10B981', bg: '#D1FAE5', border: '#6EE7B7', text: '#064E3B' },
+  'Level 5: Non-Urgent':    { dot: '#10B981', bg: '#D1FAE5', border: '#6EE7B7', text: '#064E3B' },
+};
+
+/** สีเทา สำหรับเคสที่ยังไม่ได้คัดกรอง หรือได้ค่าที่ไม่รู้จัก */
+const TRIAGE_TONE_UNKNOWN: TriageTone = {
+  dot: '#94A3B8', bg: '#F1F5F9', border: '#CBD5E1', text: '#0F172A',
+};
+
+function triageTone(level: string | undefined): TriageTone {
+  if (!level) return TRIAGE_TONE_UNKNOWN;
+  return TRIAGE_TONES[level] || TRIAGE_TONE_UNKNOWN;
+}
+
 const EXAM_ANCHOR = {
   chiefComplaint: 'exam-anchor-chief-complaint',
   vitals: 'exam-anchor-vitals',
@@ -326,6 +357,9 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   const [triageLevel, setTriageLevel] = useState(patient.triage?.level || 'Level 4: Less Urgent');
   const [priorityLevel, setPriorityLevel] = useState(patient.triage?.priority || 'Medium');
   const [triageNotes, setTriageNotes] = useState(patient.triage?.notes || 'Screened at Triage Desk. Patient is conscious and stable.');
+
+  // สีของกล่องคัดกรอง ยึดตามระดับที่พยาบาลเลือก ไม่ใช่สีคงที่
+  const tone = triageTone(triageLevel || patient.triage?.level);
 
   // Additional Notes
   const [nurseNotes, setNurseNotes] = useState(patient.nurseNotes || '');
@@ -1355,8 +1389,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <label className="text-[13px] font-bold text-slate-800 block">
                     {language === 'th' ? 'ระดับความรุนแรง' : 'Triage Level'}
                   </label>
-                  <div className="w-full h-10 px-3 bg-purple-50/70 border border-purple-200/80 rounded-xl text-sm font-bold text-purple-950 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0"></span>
+                  <div
+                    className="w-full h-10 px-3 border rounded-xl text-sm font-bold flex items-center gap-1.5"
+                    style={{ backgroundColor: tone.bg, borderColor: tone.border, color: tone.text }}
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tone.dot }}></span>
                     <span>{triageLevel || patient.triage?.level || (language === 'th' ? 'ระดับ 4: ไม่ฉุกเฉิน' : 'Level 4: Less Urgent')}</span>
                   </div>
                 </div>
@@ -1365,8 +1402,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <label className="text-[13px] font-bold text-slate-800 block">
                     {language === 'th' ? 'ระดับความสำคัญ' : 'Priority Level'}
                   </label>
-                  <div className="w-full h-10 px-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-sm font-bold text-amber-950 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                  <div
+                    className="w-full h-10 px-3 border rounded-xl text-sm font-bold flex items-center gap-1.5"
+                    style={{ backgroundColor: tone.bg, borderColor: tone.border, color: tone.text }}
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tone.dot }}></span>
                     <span>{priorityLevel || patient.triage?.priority || (language === 'th' ? 'ความสำคัญปานกลาง' : 'Medium Priority')}</span>
                   </div>
                 </div>
