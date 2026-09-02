@@ -496,8 +496,8 @@ func GetDoctorQueue(c *gin.Context) {
 
 	// คิวที่ยังเดินอยู่ดึงมาทั้งหมดไม่จำกัดวัน (กันคิวค้างข้ามวันหาย)
 	// ส่วนคิวที่จบแล้วเอาเฉพาะของวันนี้ ไว้ให้แดชบอร์ดนับ
-	activeStatuses := []string{queueStatusWaitingDoctor, queueStatusExamining}
-	finishedStatuses := []string{queueStatusWaitingMed, queueStatusWaitingPay, queueStatusDone}
+	activeStatuses := []string{queueStatusWaitingDoctor, queueStatusExamining, "รอพบแพทย์", "กำลังตรวจ", "waiting", "examining", "รอตรวจ"}
+	finishedStatuses := []string{queueStatusWaitingMed, queueStatusWaitingPay, queueStatusDone, "รอรับยา", "รอชำระเงิน", "เสร็จสิ้น", "completed"}
 
 	var queues []models.Queue
 	err := config.DB.Preload("Patient").
@@ -551,8 +551,10 @@ func GetDoctorQueue(c *gin.Context) {
 			q.AssignedDoctorID = &assignedID
 		}
 
-		// คิวที่ยังไม่ระบุแพทย์ ให้แสดงกับทุกคน จะได้ไม่มีคิวตกหล่น
-		if !showAll && assignedID > 0 && assignedID != doctorID {
+		// คิวสถานะ "รอพบแพทย์" (Waiting) ให้แพทย์ทุกคนบนวอร์ดสามารถเห็นและเรียกตรวจได้
+		// ส่วนคิวที่กำลังตรวจหรือตรวจเสร็จแล้วจะกรองตามแพทย์ผู้ตรวจ (ยกเว้นระบุ ?scope=all)
+		isWaitingState := q.Status == queueStatusWaitingDoctor || q.Status == "รอพบแพทย์" || q.Status == "รอตรวจ" || q.Status == "waiting" || (visit != nil && (visit.Status == models.VisitStatusWaiting || visit.Status == models.VisitStatusScreened))
+		if !showAll && !isWaitingState && assignedID > 0 && assignedID != doctorID {
 			continue
 		}
 
