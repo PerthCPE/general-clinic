@@ -149,7 +149,7 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		tx.Preload("Patient").First(&visit, req.VisitID)
 		if visit.PatientID > 0 {
 			patient = visit.Patient
-			if err := tx.Where("patient_id = ? AND status = 'pharmacy_waiting'", visit.PatientID).First(&queue).Error; err == nil {
+			if err := tx.Where("patient_id = ? AND status != 'completed' AND status != 'เสร็จสิ้น'", visit.PatientID).First(&queue).Error; err == nil {
 				queue.Status = "billing_waiting"
 				queue.Department = "การเงิน"
 				tx.Save(&queue)
@@ -207,6 +207,8 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 	billingPayload := gin.H{
 		"id":           billing.ID,
+		"queue_id":     queue.ID,
+		"queue_number": queue.QueueNumber,
 		"visit_id":     billing.VisitID,
 		"patient_name": targetName,
 		"hn":           targetHN,

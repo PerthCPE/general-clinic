@@ -123,5 +123,8 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.GET("/patient-medicines", controllers.GetPatientMedicines)
 		systemRoutes.GET("/patient-medicines/:hn", controllers.GetPatientMedicineDetail)
 		systemRoutes.POST("/dispense", controllers.ConfirmDispenseAndBill)
+		systemRoutes.GET("/queue/list", controllers.GetQueueList)
+		systemRoutes.GET("/billing/list", controllers.GetAllBillings)
+		systemRoutes.GET("/dispensing/:visit_id", controllers.GetDispensingByVisit)
 	}
 }

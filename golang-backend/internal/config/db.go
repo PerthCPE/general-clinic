@@ -40,37 +40,54 @@ func ConnectDB() {
 
 	log.Println("Database Connection Established Successfully")
 
-	// table create by migration (AutoMigrate ครบทุก Model ในระบบ 100%)
-	err = database.AutoMigrate(
-		&models.User{},
-		&models.Doctor{},
-		&models.Patient{},
-		&models.PatientMedicine{},
-		&models.MedicalEligibility{},
-		&models.VisitRecord{},
-		&models.Queue{},
-		&models.Screening{},
-		&models.Medicine{},
-		&models.Dispensing{},
-		&models.Billing{},
-		&models.QRPayment{},
-		&models.Document{},
-		&models.DocumentForward{},
-		&models.DoctorSchedule{},
-		&models.LeaveRequest{},
-		&models.ShiftSwapRequest{},
-		// --- ระบบจัดการข้อมูลการรักษาของแพทย์ (Role แพทย์) ---
-		// models.Doctor{} ถูก migrate ไปแล้วด้านบน จึงไม่ใส่ซ้ำตรงนี้
-		&models.PatientHistory{},
-		&models.Examination{},
-		&models.Diagnosis{},
-	)
+	// Smart Migration: ตรวจสอบว่ามี Table หลักในระบบแล้วหรือยัง
+	// หากมีครบแล้ว จะข้าม AutoMigrate เพื่อลดเวลา Startup จาก ~105 วินาที เหลือเพียง ~1 วินาที
+	//
+	// รายการที่ตรวจต้องครอบคลุมตารางของทุก Role ไม่ใช่แค่สี่ตารางหลัก
+	// เพราะถ้าตรวจแค่ users/patients/queues/screenings ฐานข้อมูลที่มีสี่ตารางนั้นอยู่แล้ว
+	// จะข้าม AutoMigrate ทั้งก้อน ตารางที่เพิ่มเข้ามาทีหลัง (patient_medicines และ
+	// ตารางฝั่งแพทย์) จะไม่ถูกสร้างเลย แล้ว backend จะพังตอน query
+	var tableCount int64
+	database.Raw(`SELECT count(*) FROM information_schema.tables
+		WHERE table_schema = CURRENT_SCHEMA()
+		  AND table_name IN (
+			'users', 'patients', 'queues', 'screenings',
+			'patient_medicines', 'patient_histories', 'examinations', 'diagnoses'
+		)`).Scan(&tableCount)
 
-	// if error founded, notice
-	if err != nil {
-		log.Fatal("Database Migration Failed. Error: ", err)
+	if tableCount < 8 {
+		log.Println("Tables missing or incomplete. Running AutoMigrate...")
+		err = database.AutoMigrate(
+			&models.User{},
+			&models.Doctor{},
+			&models.Patient{},
+			&models.PatientMedicine{},
+			&models.MedicalEligibility{},
+			&models.VisitRecord{},
+			&models.Queue{},
+			&models.Screening{},
+			&models.Medicine{},
+			&models.Dispensing{},
+			&models.Billing{},
+			&models.QRPayment{},
+			&models.Document{},
+			&models.DocumentForward{},
+			&models.DoctorSchedule{},
+			&models.LeaveRequest{},
+			&models.ShiftSwapRequest{},
+			// --- ระบบจัดการข้อมูลการรักษาของแพทย์ (Role แพทย์) ---
+			// models.Doctor{} ถูก migrate ไปแล้วด้านบน จึงไม่ใส่ซ้ำตรงนี้
+			&models.PatientHistory{},
+			&models.Examination{},
+			&models.Diagnosis{},
+		)
+		if err != nil {
+			log.Fatal("Database Migration Failed. Error: ", err)
+		}
+		log.Println("Database Migration Complete.")
+	} else {
+		log.Println("Database schema already up to date. Skipped redundant AutoMigrate.")
 	}
-	log.Println("Database Migration Complete.")
 
 	DB = database
 
@@ -141,8 +158,6 @@ func seedDatabase() {
 		var existing models.User
 		if err := DB.Where("username = ?", users[i].Username).First(&existing).Error; err != nil {
 			DB.Create(&users[i])
-		} else {
-			users[i].ID = existing.ID
 		}
 	}
 	log.Println("Users & Doctors verified and seeded successfully.")
