@@ -14,7 +14,6 @@ import { ScreeningDetailModal } from './components/ScreeningDetailModal';
 import { vitalsApi, type BackendScreening } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatQueueNo, formatNationalId, formatPhone, formatHN } from '../../utils/formatters';
-import toast from 'react-hot-toast';
 import './ScreeningHistoryPage.css';
 
 export { formatQueueNo };
@@ -141,7 +140,6 @@ export const ScreeningHistoryPage: React.FC = () => {
     // ดักฟัง Real-time เมื่อมีการบันทึกคัดกรองหรือสัญญาณชีพใหม่
     const unsubVitals = subscribe('VITALS_RECORDED', () => {
       fetchHistory();
-      toast.success('มีรายการคัดกรองสัญญาณชีพใหม่ถูกบันทึกเข้าระบบ', { id: 'vitals-recorded-toast' });
     });
 
     return () => {

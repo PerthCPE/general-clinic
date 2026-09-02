@@ -5,7 +5,6 @@ import type { Patient, SchemeType } from './types';
 import { patientApi, queueApi, type BackendPatient, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
-import toast from 'react-hot-toast';
 import './RegistrationPage.css';
 
 export { formatHN, formatQueueNo, formatNationalId, formatPhone };
@@ -68,7 +67,6 @@ function RegistrationPage() {
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searchResult, setSearchResult] = useState<Patient | null>(null);
   const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
   const [isRecentOpen, setIsRecentOpen] = useState(true);
   const { subscribe } = useWebSocket();
@@ -221,8 +219,6 @@ function RegistrationPage() {
     setSearchResult(null);
     setNotFoundQuery(null);
     setSelectedPatientModal(null);
-
-    showToast(`เพิ่มผู้ป่วย "${patient.fullName}" (HN: ${patient.hn}) เข้าคิวตรวจเรียบร้อยแล้ว`);
   };
 
   // ลงทะเบียนผู้ป่วยใหม่ บันทึกลง Database จริง
@@ -264,12 +260,10 @@ function RegistrationPage() {
         const newUI = mapBackendPatientToUI(res.patient);
         setPatients((prev) => [newUI, ...prev.filter((p) => p.hn !== newUI.hn && p.id !== newUI.id)]);
         setSearchResult(null);
-        showToast(`บันทึกและลงทะเบียนผู้ป่วย "${newUI.fullName}" (HN: ${newUI.hn}) เรียบร้อยแล้ว`);
         return;
       }
     } catch (err: any) {
       console.warn('Register error:', err);
-      showToast(err?.message || 'ไม่สามารถลงทะเบียนได้');
     }
 
     // Fallback UI
@@ -295,19 +289,10 @@ function RegistrationPage() {
 
     setPatients((prev) => [newPatient, ...prev]);
     setSearchResult(null);
-    showToast(`บันทึกและลงทะเบียนผู้ป่วย "${newPatient.fullName}" (HN: ${newPatient.hn}) เรียบร้อยแล้ว`);
   };
 
   const scrollToForm = () => {
     formSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    toast.success(msg, { id: msg });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 4000);
   };
 
   const getSchemeClass = (scheme: string) => {
@@ -327,19 +312,6 @@ function RegistrationPage() {
 
   return (
     <div className="registration-page">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="reg-toast">
-          <svg className="toast-icon" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span>{toastMessage}</span>
-        </div>
-      )}
 
       {/* Page Header */}
       <div className="registration-header">

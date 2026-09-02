@@ -14,7 +14,6 @@ import { VitalsFormCard } from './components/VitalsFormCard';
 import { queueApi, vitalsApi, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
-import toast from 'react-hot-toast';
 import './VitalsPage.css';
 
 export { formatHN, formatQueueNo };
@@ -193,7 +192,6 @@ export const VitalsPage: React.FC = () => {
   // Accordion and UI States
   const [isFormOpen, setIsFormOpen] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Searchable Queue Dropdown State
   const [searchQuery, setSearchQuery] = useState<string>(() => initialDraft?.searchQuery || '');
@@ -581,9 +579,6 @@ export const VitalsPage: React.FC = () => {
         assigned_doctor_id: docObj.doctorId,
         triage_level: selectedTriage,
       });
-      if (res && res.message) {
-        toast.success(res.message, { id: 'vitals-success-toast' });
-      }
 
       // 1. ดึงรายการคิวล่าสุดจากฐานข้อมูลทันที
       const freshQueues = await fetchQueues();
@@ -606,9 +601,6 @@ export const VitalsPage: React.FC = () => {
       }
     } catch (err: any) {
       console.warn('Record vitals API error:', err);
-      if (err?.message) {
-        toast.error(`แจ้งเตือน: ${err.message}`, { id: 'vitals-error-toast' });
-      }
 
       // Local fallback กรณีเครือข่ายมีปัญหา (อัปเดตเฉพาะคิวที่เลือกเท่านั้น ไม่อ้างอิงตาม patientId)
       const updatedQueueList = queueList.map((q) =>
@@ -629,33 +621,10 @@ export const VitalsPage: React.FC = () => {
     }
 
     setIsSaving(false);
-    const msg = `บันทึกข้อมูลการคัดกรองของ ${selectedPatient.fullName} (${selectedPatient.queueNo}) สำเร็จ! ส่งต่อไปยัง ${docObj.roomName} (${docObj.fullName}) เรียบร้อยแล้ว`;
-    setToastMessage(msg);
-    toast.success(msg, { id: 'vitals-local-toast' });
-
-    // Auto dismiss toast after 5s
-    setTimeout(() => setToastMessage(null), 5000);
   };
 
   return (
     <div className="vitals-page-container">
-      {/* Toast Alert Notification */}
-      {toastMessage && (
-        <div className="vitals-toast-alert">
-          <div className="toast-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          </div>
-          <div className="toast-text">{toastMessage}</div>
-          <button className="toast-close" onClick={() => setToastMessage(null)} aria-label="Close notification">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-      )}
 
       {/* 1. Header Banner */}
       <div className="vitals-page-header">
