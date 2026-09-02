@@ -318,3 +318,65 @@ export const vitalsApi = {
   getPatientHistory: (patientId: number | string) =>
     request<{ patient_id: string; history: BackendScreening[] }>(`/api/nurse/vitals/history/${patientId}`),
 };
+
+// 6. Officer DMS (Document Management & Forwarding) API
+export interface BackendUser {
+  id: number;
+  username: string;
+  fullname?: string;
+  role: string;
+  phone?: string;
+}
+
+export interface BackendDocument {
+  id: number;
+  external_doc_ref: string;
+  sender_name: string;
+  subject: string;
+  file_url: string;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+  creator?: BackendUser;
+}
+
+export interface BackendDocumentForward {
+  id: number;
+  doc_id: number;
+  forwarded_to: number;
+  status: 'Pending' | 'Acknowledged';
+  acknowledged_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  document?: BackendDocument;
+  recipient?: BackendUser;
+}
+
+export const dmsApi = {
+  getDocuments: () => request<BackendDocument[]>('/api/officer/documents'),
+  createDocument: (payload: {
+    external_doc_ref?: string;
+    sender_name: string;
+    subject: string;
+    file_url?: string;
+  }) =>
+    request<{ message: string; document: BackendDocument }>('/api/officer/documents', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getForwards: () => request<BackendDocumentForward[]>('/api/officer/documents/forwards'),
+  forwardDocument: (payload: {
+    doc_id: number;
+    forwarded_to: number;
+  }) =>
+    request<{ message: string; forward: BackendDocumentForward }>('/api/officer/documents/forward', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  acknowledgeForward: (id: number | string) =>
+    request<{ message: string; forward: BackendDocumentForward }>(`/api/officer/documents/forwards/${id}/ack`, {
+      method: 'PUT',
+    }),
+  getRecipients: () => request<BackendUser[]>('/api/officer/recipients'),
+};
+

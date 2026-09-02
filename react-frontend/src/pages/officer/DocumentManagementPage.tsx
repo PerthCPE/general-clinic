@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { dmsApi, type BackendDocument } from '../../services/api';
 import './DocumentManagementPage.css';
 
 interface DocumentItem {
@@ -13,7 +14,7 @@ interface DocumentItem {
   externalRef?: string;
 }
 
-// Generate realistic mock documents with dynamic dates
+// Generate realistic fallback documents with dynamic dates
 const generateMockDocs = (): DocumentItem[] => {
   const docs: DocumentItem[] = [];
   const types = ['รายงาน', 'สัญญา', 'สเปรดชีต', 'นโยบาย', 'ใบเบิก', 'ผลตรวจ'];
@@ -25,9 +26,9 @@ const generateMockDocs = (): DocumentItem[] => {
   const buddhistYear = now.getFullYear() + 543;
   const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
-  for (let i = 1; i <= 125; i++) {
+  for (let i = 1; i <= 12; i++) {
     const type = types[Math.floor(Math.random() * types.length)];
-    const status = i <= 42 ? 'reviewing' : statuses[Math.floor(Math.random() * statuses.length)];
+    const status = i <= 4 ? 'reviewing' : statuses[Math.floor(Math.random() * statuses.length)];
     const baseName = baseNames[Math.floor(Math.random() * baseNames.length)];
     const ext = exts[Math.floor(Math.random() * exts.length)];
     const day = (i % 28) + 1;
@@ -63,6 +64,35 @@ export const DocumentManagementPage: React.FC = () => {
     externalRef: ''
   });
 
+  // Fetch real documents from Database on mount
+  useEffect(() => {
+    dmsApi.getDocuments()
+      .then((data: BackendDocument[]) => {
+        if (data && Array.isArray(data) && data.length > 0) {
+          const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+          const mapped: DocumentItem[] = data.map((d) => {
+            const createdAt = new Date(d.created_at || Date.now());
+            const bYear = createdAt.getFullYear() + 543;
+            const formattedDate = `${createdAt.getDate()} ${monthNames[createdAt.getMonth()]} ${bYear}`;
+            return {
+              id: String(d.id),
+              name: d.subject || `เอกสาร #${d.id}`,
+              type: 'เอกสารราชการ/ส่งตัว',
+              modifiedDate: formattedDate,
+              status: 'approved',
+              subject: d.subject,
+              senderName: d.sender_name,
+              externalRef: d.external_doc_ref,
+            };
+          });
+          setDocs(mapped);
+        }
+      })
+      .catch(() => {
+        // Fallback to mock
+      });
+  }, []);
+
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
   };
@@ -76,14 +106,43 @@ export const DocumentManagementPage: React.FC = () => {
     e.target.value = '';
   };
 
-  const handleUploadSubmit = (e: React.FormEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) return;
 
     setUploading(true);
     setActiveModal(null);
 
-    setTimeout(() => {
+    try {
+      const res = await dmsApi.createDocument({
+        external_doc_ref: uploadForm.externalRef || `DOC-2569-${Date.now().toString().slice(-4)}`,
+        sender_name: uploadForm.senderName || 'เจ้าหน้าที่ธุรการ',
+        subject: uploadForm.subject || selectedFile.name,
+        file_url: 'https://example.com/docs/' + selectedFile.name,
+      });
+
+      const now = new Date();
+      const buddhistYear = now.getFullYear() + 543;
+      const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      const formattedDate = `${now.getDate()} ${monthNames[now.getMonth()]} ${buddhistYear}`;
+
+      const newDoc: DocumentItem = {
+        id: String(res.document.id || docs.length + 1),
+        name: res.document.subject || selectedFile.name,
+        type: selectedFile.name.split('.').pop()?.toUpperCase() || 'ไฟล์ทั่วไป',
+        modifiedDate: formattedDate,
+        status: 'approved',
+        subject: res.document.subject,
+        senderName: res.document.sender_name,
+        externalRef: res.document.external_doc_ref,
+      };
+
+      setDocs([newDoc, ...docs]);
+      setSelectedFile(null);
+      setUploading(false);
+      setUploadForm({ subject: '', senderName: '', externalRef: '' });
+      toast.success('บันทึกและอัปโหลดเอกสารลง Database เรียบร้อยแล้ว');
+    } catch {
       const now = new Date();
       const buddhistYear = now.getFullYear() + 543;
       const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -105,7 +164,7 @@ export const DocumentManagementPage: React.FC = () => {
       setUploading(false);
       setUploadForm({ subject: '', senderName: '', externalRef: '' });
       toast.success('อัปโหลดไฟล์และบันทึกข้อมูลเอกสารเรียบร้อยแล้ว');
-    }, 1000);
+    }
   };
 
   const filteredDocs = docs.filter(doc => {

@@ -79,4 +79,16 @@ func SetUpRoutes(r *gin.Engine) {
 		billingRoutes.POST("/qr/generate", controllers.GenerateQRPayment)
 		billingRoutes.POST("/confirm", controllers.ConfirmPayment)
 	}
+
+	// ===== ระบบย่อยที่ 3: จัดการเอกสารและตารางงานแพทย์ (Officer / DMS) =====
+	officerRoutes := api.Group("/officer")
+	officerRoutes.Use(middleware.RoleRequired("officer", "registrar", "doctor", "nurse", "nurse_assistant", "pharmacist", "cashier"))
+	{
+		officerRoutes.GET("/documents", controllers.GetDocuments)
+		officerRoutes.POST("/documents", controllers.CreateDocument)
+		officerRoutes.GET("/documents/forwards", controllers.GetDocumentForwards)
+		officerRoutes.POST("/documents/forward", controllers.ForwardDocument)
+		officerRoutes.PUT("/documents/forwards/:id/ack", controllers.AcknowledgeDocumentForward)
+		officerRoutes.GET("/recipients", controllers.GetRecipients)
+	}
 }

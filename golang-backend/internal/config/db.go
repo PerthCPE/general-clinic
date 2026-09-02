@@ -76,6 +76,7 @@ func seedDatabase() {
 
 	// 1. Seed Users & Doctors (Always ensure all required roles and doctors exist in DB)
 	users := []models.User{
+		{Username: "officer1", Password: passStr, Role: "officer", FullName: "คุณสมจิต ดีใจ", Phone: "081-555-0001"},
 		{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
 		{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
 		{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
@@ -490,6 +491,35 @@ func seedDatabase() {
 				DB.Create(&qrPayments[i])
 			}
 			log.Println("QRPayments seeded successfully.")
+		}
+
+		// 8. Seed Documents & Document Forwards (Officer Module)
+		var docCount int64
+		DB.Model(&models.Document{}).Count(&docCount)
+		if docCount == 0 {
+			officerUserID := users[0].ID // officer1
+
+			docs := []models.Document{
+				{ExternalDocRef: "สธ 0201/2569", SenderName: "กระทรวงสาธารณสุข", Subject: "แนวทางการควบคุมโรคติดต่อทางเดินหายใจ ประจำปี 2569", FileURL: "https://example.com/docs/guidelines_2569.pdf", CreatedBy: officerUserID},
+				{ExternalDocRef: "สปสช. 1102/2569", SenderName: "สำนักงานหลักประกันสุขภาพแห่งชาติ", Subject: "ประกาศปรับปรุงอัตราค่าชดเชยค่าบริการทางการแพทย์ใหม่", FileURL: "https://example.com/docs/nhso_rates.pdf", CreatedBy: officerUserID},
+				{ExternalDocRef: "อย. 4405/2569", SenderName: "สำนักงานคณะกรรมการอาหารและยา", Subject: "แจ้งเตือนการเฝ้าระวังยาควบคุมพิเศษกลุ่มต้านการอักเสบ", FileURL: "https://example.com/docs/fda_alert.pdf", CreatedBy: officerUserID},
+				{ExternalDocRef: "รพ. 8812/2569", SenderName: "โรงพยาบาลศูนย์เครือข่าย", Subject: "หนังสือประสานงานแนวทางการส่งต่อผู้ป่วยฉุกเฉิน (Referral System)", FileURL: "https://example.com/docs/referral_network.pdf", CreatedBy: officerUserID},
+			}
+			for i := range docs {
+				DB.Create(&docs[i])
+			}
+			log.Println("Documents seeded successfully.")
+
+			forwards := []models.DocumentForward{
+				{DocID: docs[0].ID, ForwardedTo: users[6].ID, Status: "Acknowledged"}, // doctor1
+				{DocID: docs[0].ID, ForwardedTo: users[2].ID, Status: "Pending"},      // nurse1
+				{DocID: docs[1].ID, ForwardedTo: users[5].ID, Status: "Pending"},      // cashier1
+				{DocID: docs[2].ID, ForwardedTo: users[4].ID, Status: "Acknowledged"}, // pharmacist1
+			}
+			for i := range forwards {
+				DB.Create(&forwards[i])
+			}
+			log.Println("Document Forwards seeded successfully.")
 		}
 	}
 }
