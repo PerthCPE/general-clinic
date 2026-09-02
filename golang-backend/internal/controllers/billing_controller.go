@@ -33,10 +33,10 @@ type GenerateQRRequest struct {
 	Amount      float64 `json:"amount" binding:"required"`
 }
 
-// GET /api/billing/queues - ดึงรายการคิวรอชำระเงินทั้งหมดจากตาราง billing_queues
+// GET /api/billing/queues - ดึงรายการคิวรอชำระเงินทั้งหมดจากตาราง billing_queues (เรียงคนล่าสุดขึ้นบนสุด)
 func GetBillingQueues(c *gin.Context) {
 	var queues []models.BillingQueue
-	if err := config.DB.Preload("VisitRecord").Preload("VisitRecord.Patient").Where("status = ?", "pending").Order("created_at asc").Find(&queues).Error; err != nil {
+	if err := config.DB.Preload("VisitRecord").Preload("VisitRecord.Patient").Where("status = ?", "pending").Order("id desc, created_at desc").Find(&queues).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billing queues: " + err.Error()})
 		return
 	}

@@ -205,22 +205,32 @@ func RecordVitalsAndTriage(c *gin.Context) {
 	// 8. อัปเดตสถานะคิวคนไข้เป็น "รอพบแพทย์" เฉพาะคิวนี้คิวเดียวเท่านั้น (Single Queue Update)
 	// กำหนดเลขห้องตรวจ strictly เป็น 1, 2 หรือ 3 เท่านั้น
 	roomNumber := 1
+	shortDocName := ""
 	docID := assignedDoctorID
 	if doctor.ID > 0 {
 		docID = doctor.ID
 	}
-	if docID == 4 || docID == 1 {
+	if docID == 4 || docID == 1 || strings.Contains(doctor.FullName, "สุดา") {
 		roomNumber = 1
-	} else if docID == 5 || docID == 2 {
+		shortDocName = "พญ.สุดา"
+	} else if docID == 5 || docID == 2 || strings.Contains(doctor.FullName, "วิชัย") {
 		roomNumber = 2
-	} else if docID == 6 || docID == 3 {
+		shortDocName = "นพ.วิชัย"
+	} else if docID == 6 || docID == 3 || strings.Contains(doctor.FullName, "เกศรา") {
 		roomNumber = 3
+		shortDocName = "พญ.เกศรา"
 	} else if docID > 0 {
 		roomNumber = int((docID-1)%3) + 1
+		parts := strings.Split(doctor.FullName, " ")
+		if len(parts) > 0 {
+			shortDocName = parts[0]
+		}
 	}
 
 	deptName := fmt.Sprintf("ห้องตรวจ %d", roomNumber)
-	if doctor.ID > 0 && doctor.FullName != "" {
+	if shortDocName != "" {
+		deptName = fmt.Sprintf("ห้องตรวจ %d (%s)", roomNumber, shortDocName)
+	} else if doctor.FullName != "" {
 		deptName = fmt.Sprintf("ห้องตรวจ %d (%s)", roomNumber, doctor.FullName)
 	}
 	noteText := fmt.Sprintf("คัดกรองแล้ว: %s (BP: %d/%d, T: %.1f°C, HR: %d)", triageLevel, req.SystolicBP, req.DiastolicBP, temp, req.HeartRate)

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # 🏥 Clinic Management System (ระบบจัดการคลินิกทั่วไป)
 ### ENG23 3031 System Analysis and Design | Team T08
 

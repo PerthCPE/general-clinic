@@ -24,6 +24,7 @@ export default function BillingInvoicePage({
   const { subscribe } = useWebSocket();
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
   const receiptRef = useRef<HTMLDivElement>(null);
+  const [loading, setLoading] = useState(false);
 
   // PromptPay Phone / National ID (สามารถแก้ไขเบอร์พร้อมเพย์ได้)
   const [promptPayNumber, setPromptPayNumber] = useState<string>(() => {
@@ -47,7 +48,7 @@ export default function BillingInvoicePage({
       }
       if (bRes.ok) {
         const bData = await bRes.json();
-        if (bData.status === 'success' && Array.isArray(bData.queues) && bData.queues.length > 0) {
+        if (bData.status === 'success' && Array.isArray(bData.queues)) {
           const mapped = bData.queues.map((bq: any) => {
             let parsedMeds = [];
             if (bq.medications) {
@@ -61,8 +62,8 @@ export default function BillingInvoicePage({
               visitId: bq.visit_id || 1,
               hn: bq.hn || `HN-${bq.id}`,
               nationalId: bq.national_id || '-',
-              queueNumber: bq.queue_number || 'Q0001',
-              ticket: bq.queue_number || 'A-01',
+              queueNumber: bq.queue_number || 'B-001',
+              ticket: bq.queue_number || 'B-001',
               name: bq.patient_name || 'ผู้ป่วย',
               shortName: bq.patient_name || 'ผู้ป่วย',
               gender: bq.gender || 'ชาย',
@@ -83,10 +84,13 @@ export default function BillingInvoicePage({
             };
           });
           setQueueList(mapped);
+          setLoading(false);
           return;
         }
       }
     } catch {}
+    setQueueList([]);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -116,7 +120,6 @@ export default function BillingInvoicePage({
     queueList[0] || 
     CLINIC_CONFIG.patients.find(p => p.id === currentSelectedId) || 
     CLINIC_CONFIG.patients[0];
-
   const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
   
   const [showQrModal, setShowQrModal] = useState(false);
@@ -223,12 +226,55 @@ export default function BillingInvoicePage({
     setTimeout(() => setReceiptSent(null), 3000);
   };
 
+  if (loading) {
+    return (
+      <div className="billing-invoice-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '350px' }}>
+        <div style={{ textAlign: 'center', color: '#64748B' }}>
+          <div className="animate-spin" style={{ width: '40px', height: '40px', border: '3px solid #E2E8F0', borderTopColor: '#0EA5E9', borderRadius: '50%', margin: '0 auto 16px' }}></div>
+          <p style={{ fontSize: '1.1rem', fontWeight: '500' }}>กำลังโหลดข้อมูลบิล...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!activePatient) {
     return (
       <div className="billing-invoice-container">
-        <div className="card" style={{ padding: '40px', textAlign: 'center', color: '#64748B' }}>
-          <h3>ไม่พบข้อมูลบิลของผู้ป่วย</h3>
-          <p>กรุณารอข้อมูลบิลส่งมาจากการยืนยันจ่ายยา หรือเลือกลำดับคิวจากหน้าคิดเงิน</p>
+        <div style={{ 
+          background: '#FFFFFF', 
+          borderRadius: '16px', 
+          padding: '48px 24px', 
+          textAlign: 'center', 
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)',
+          maxWidth: '600px',
+          margin: '40px auto'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🧾</div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1E293B', marginBottom: '8px' }}>ไม่มีบิลรอชำระเงินในขณะนี้</h2>
+          <p style={{ color: '#64748B', fontSize: '1rem', marginBottom: '24px', lineHeight: '1.5' }}>
+            ยังไม่มีข้อมูลใบสั่งยาที่ส่งมาจากการจ่ายยาของห้องยา กรุณารอห้องยากดยืนยันการจ่ายยา หรือไปที่หน้ารับชำระเงิน
+          </p>
+          {onNavigateToDashboard && (
+            <button 
+              onClick={onNavigateToDashboard}
+              style={{
+                background: '#0EA5E9',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '10px',
+                padding: '12px 24px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              📊 ไปที่แดชบอร์ดการเงิน
+            </button>
+          )}
         </div>
       </div>
     );

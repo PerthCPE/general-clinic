@@ -86,15 +86,13 @@ function RegistrationPage() {
         const allMapped = patientsData.map(mapBackendPatientToUI);
         setAllPatients(allMapped);
 
-        // หา ID ของผู้ป่วยที่กำลังอยู่ในคิวตรวจ (ยังไม่เสร็จสิ้น / ไม่ถูกยกเลิก)
-        const activeQueuedPatientIds = new Set(
-          (Array.isArray(queuesData) ? queuesData : [])
-            .filter((q) => q.status !== 'เสร็จสิ้น' && q.status !== 'ยกเลิกคิว')
-            .map((q) => q.patient_id)
+        // หา ID ของผู้ป่วยทั้งหมดที่มีคิวแล้วในระบบ (เพื่อไม่ให้ผู้ป่วยที่ออกบัตรคิวไปแล้วโผล่มาในตาราง "รอเข้าคิว")
+        const queuedPatientIds = new Set(
+          (Array.isArray(queuesData) ? queuesData : []).map((q) => q.patient_id)
         );
 
-        // กรองเอาเฉพาะผู้ป่วยที่ยังไม่ได้เข้าคิวสำหรับตารางลงทะเบียนล่าสุด
-        const unqueued = patientsData.filter((p) => !activeQueuedPatientIds.has(p.id));
+        // กรองเอาเฉพาะผู้ป่วยที่ยังไม่ได้ออกบัตรคิวเข้าตรวจ
+        const unqueued = patientsData.filter((p) => !queuedPatientIds.has(p.id));
         setPatients(unqueued.map(mapBackendPatientToUI));
       }
     } catch (err) {
@@ -107,17 +105,21 @@ function RegistrationPage() {
   useEffect(() => {
     fetchPatients();
 
-    // ดักฟัง Real-time เมื่อมีคนไข้ลงทะเบียนใหม่ หรือมีคิวใหม่
+    // ดักฟัง Real-time เมื่อมีคนไข้ลงทะเบียนใหม่ หรือมีการสร้าง/อัปเดตคิว
     const unsubPatient = subscribe('PATIENT_REGISTERED', () => {
       fetchPatients();
     });
     const unsubQueue = subscribe('QUEUE_CREATED', () => {
       fetchPatients();
     });
+    const unsubQueueUpdate = subscribe('QUEUE_UPDATED', () => {
+      fetchPatients();
+    });
 
     return () => {
       unsubPatient();
       unsubQueue();
+      unsubQueueUpdate();
     };
   }, [fetchPatients, subscribe]);
 

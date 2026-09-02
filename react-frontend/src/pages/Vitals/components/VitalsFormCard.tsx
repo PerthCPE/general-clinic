@@ -36,6 +36,7 @@ interface VitalsFormCardProps {
   isAccordionOpen: boolean;
   onToggleAccordion: () => void;
   onChangeField: (field: string, value: string | number) => void;
+  onRandomVitals?: () => void;
   onSubmit: (e: React.FormEvent) => void;
   onReset: () => void;
   isSaving: boolean;
@@ -75,6 +76,7 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
   isAccordionOpen,
   onToggleAccordion,
   onChangeField,
+  onRandomVitals,
   onSubmit,
   onReset,
   isSaving,
@@ -156,47 +158,30 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               <div className="combobox-input-wrap">
                 <span className="combobox-search-icon">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                    <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </span>
                 <input
-                  id="queue-select-input"
-                  name="queue_patient_search_no_autofill"
                   type="text"
                   className="combobox-input"
-                  placeholder="พิมพ์ค้นหาด้วยเลขคิว (เช่น Q0001), ชื่อผู้ป่วย, HN (เช่น HN0001), หรือเลขบัตรประชาชน..."
+                  placeholder="ค้นหาด้วยชื่อ, นามสกุล, HN, เลขคิว หรือคลิกลูกศรเพื่อเลือกผู้ป่วย..."
                   value={searchQuery}
+                  onChange={(e) => {
+                    onSearchQueryChange(e.target.value);
+                    if (!isQueueDropdownOpen) onToggleQueueDropdown(true);
+                  }}
                   onFocus={() => onToggleQueueDropdown(true)}
-                  onClick={() => onToggleQueueDropdown(true)}
-                  onChange={(e) => onSearchQueryChange(e.target.value)}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  data-lpignore="true"
-                  data-form-type="other"
+                  aria-label="ค้นหาคิวผู้ป่วย"
                 />
-                {searchQuery && (
+                {selectedPatient && (
                   <button
                     type="button"
                     className="combobox-clear-btn"
-                    onClick={() => {
-                      onSearchQueryChange('');
-                      onResetSelection();
-                      onToggleQueueDropdown(true);
-                    }}
-                    title="ล้างการค้นหา"
+                    onClick={onResetSelection}
+                    title="ล้างการเลือกคิว"
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
+                    ✕
                   </button>
                 )}
                 <button
@@ -287,9 +272,35 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
           </div>
           {/* Section 2: Physical Measurements */}
           <div className="vitals-form-section">
-            <div className="vitals-section-header">
-              <span className="vitals-section-num">2</span>
-              <span className="vitals-section-title">สรีรวิทยาและสัญญาณชีพพื้นฐาน (Physical & Vitals)</span>
+            <div className="vitals-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="vitals-section-num">2</span>
+                <span className="vitals-section-title">สรีรวิทยาและสัญญาณชีพพื้นฐาน (Physical & Vitals)</span>
+              </div>
+              {onRandomVitals && (
+                <button
+                  type="button"
+                  className="vitals-random-btn"
+                  onClick={onRandomVitals}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#EFF6FF',
+                    color: '#2563EB',
+                    border: '1px solid #BFDBFE',
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  title="สุ่มกรอกข้อมูลสัญญาณชีพและอาการสำคัญสำหรับการทดสอบ"
+                >
+                  🎲 สุ่มข้อมูลสัญญาณชีพ
+                </button>
+              )}
             </div>
 
             <div className="vitals-grid-3">

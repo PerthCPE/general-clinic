@@ -52,7 +52,7 @@ export default function DetailPage({
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
   
   // Current active patient object
-  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || CLINIC_CONFIG.patients.find(p => p.id === localPatientId);
+  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0];
   const currentRights = activePatient ? ((patientRightsMap && patientRightsMap[activePatient.id]) || activePatient.treatmentRights) : '';
 
   const [toast, setToast] = useState<ToastState | null>(null);
@@ -85,7 +85,7 @@ export default function DetailPage({
         }
         if (pRes.ok) {
           const pData = await pRes.json();
-          if (pData.status === 'success' && Array.isArray(pData.queues) && pData.queues.length > 0) {
+          if (pData.status === 'success' && Array.isArray(pData.queues)) {
             const mappedQueues = pData.queues.map((pq: any) => ({
               id: String(pq.id),
               visitId: pq.visit_id || 1,
@@ -114,56 +114,20 @@ export default function DetailPage({
                 if (!prev || !mappedQueues.find((q: any) => q.id === prev)) {
                   return mappedQueues[0].id;
                 }
+                return prev;
               }
-              return prev;
+              return '';
             });
             return;
           }
         }
 
-        // 2. Fallback: /api/queue/list
-        const res = await fetch('/api/queue/list', { headers });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            const waitingQueues = data.filter((q: any) => 
-              q.status === 'รอรับยา' || q.status === 'pharmacy_waiting' || q.status === 'Pending Pharmacy' || q.status === 'รอรับยา / ชำระเงิน'
-            );
-            const mappedQueues = waitingQueues.map((q: any) => ({
-              id: String(q.id),
-              visitId: q.visit_id || 1,
-              hn: q.Patient?.hn || q.hn || `HN-${q.patient_id}`,
-              nationalId: q.Patient?.national_id || '',
-              queueNumber: q.queue_number || 'Q0000',
-              ticket: q.queue_number || 'A-01',
-              name: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
-              shortName: q.Patient?.fullname || q.patient_name || 'ผู้ป่วย',
-              gender: q.Patient?.gender || 'ชาย',
-              age: q.Patient ? new Date().getFullYear() - new Date(q.Patient.birthdate).getFullYear() : 0,
-              treatmentRights: q.Patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
-              patientType: 'ผู้ป่วยนอก (OPD)' as const,
-              allergies: q.Patient?.allergies ? [q.Patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
-              chronicDiseases: q.Patient?.chronic_diseases || 'ไม่มี',
-              vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-              visitStatus: 'รอรับยา / ชำระเงิน',
-              visitDate: new Date(q.created_at || Date.now()).toLocaleDateString('th-TH'),
-              visitTime: new Date(q.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-              doctorAdvice: q.note || '',
-              medications: []
-            }));
-            setQueueList(mappedQueues);
-            setLocalPatientId(prev => {
-              if (mappedQueues.length > 0) {
-                if (!prev || !mappedQueues.find((q: any) => q.id === prev)) {
-                  return mappedQueues[0].id;
-                }
-              }
-              return prev;
-            });
-          }
-        }
+        setQueueList([]);
+        setLocalPatientId('');
       } catch (err) {
         console.error('Failed to fetch queues:', err);
+        setQueueList([]);
+        setLocalPatientId('');
       }
     };
 
@@ -277,7 +241,7 @@ export default function DetailPage({
           medications: data.medications || []
         };
 
-        setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
+        setQueueList(prev => [newPatient, ...prev.filter(q => q.id !== newPatient.id)]);
         setLocalPatientId(newPatient.id);
         if (onSelectPatientId) onSelectPatientId(newPatient.id);
 
@@ -303,6 +267,8 @@ export default function DetailPage({
     const vId = activePatient.visitId || 1;
 
     const payload = {
+      queue_id: Number(activePatient.id) || 0,
+      queue_number: activePatient.queueNumber || activePatient.ticket,
       visit_id: vId,
       hn: activePatient.hn,
       patient_name: activePatient.name,
@@ -313,7 +279,8 @@ export default function DetailPage({
       allergies: (activePatient.allergies || []).join(', '),
       chronic_diseases: activePatient.chronicDiseases || '',
       phone_number: activePatient.phone || '',
-      doctor_advice: activePatient.doctorAdvice
+      doctor_advice: activePatient.doctorAdvice,
+      medications: activePatient.medications || []
     };
 
     try {

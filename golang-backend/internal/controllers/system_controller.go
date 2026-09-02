@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -13,28 +14,43 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// POST /api/system/reset-db - รีเซ็ตข้อมูลทดสอบให้กลับมาเป็นค่าเริ่มต้นสำหรับ Re-testing
+// POST /api/system/reset-db - ลบข้อมูลทดสอบในระบบ
 func ResetTestDatabase(c *gin.Context) {
-	// ลบข้อมูลการทดสอบชั่วคราวออกทั้งหมด
-	config.DB.Exec("DELETE FROM qr_payments")
-	config.DB.Exec("DELETE FROM billings")
-	config.DB.Exec("DELETE FROM dispensings")
-	config.DB.Exec("DELETE FROM prescription_items")
-	config.DB.Exec("DELETE FROM screenings")
-	config.DB.Exec("DELETE FROM patient_medicines")
-	config.DB.Exec("DELETE FROM queues")
-	config.DB.Exec("DELETE FROM visit_records")
+	db := config.DB
 
-	// รีเซ็ตสต็อกยาทุกตัวกลับค่าเดิม (100)
-	config.DB.Model(&models.Medicine{}).Where("1=1").Update("stock_quantity", 100)
+	// ลบข้อมูลตารางลูกที่อ้างอิง Foreign Key ก่อนตามลำดับ เพื่อให้ DELETE FROM patients และ visit_records สำเร็จ 100%
+	tables := []string{
+		"qr_payments",
+		"billings",
+		"billing_queues",
+		"billing_histories",
+		"medicine_queues",
+		"dispensings",
+		"prescription_items",
+		"examinations",
+		"diagnoses",
+		"patient_medicines",
+		"patient_histories",
+		"screenings",
+		"queues",
+		"visit_records",
+		"medical_eligibilities",
+		"patients",
+	}
+	for _, tbl := range tables {
+		if err := db.Exec("DELETE FROM " + tbl).Error; err != nil {
+			// Fallback TRUNCATE CASCADE if exists
+			db.Exec("TRUNCATE TABLE " + tbl + " CASCADE")
+		}
+	}
 
 	// กระจายข่าวผ่าน WebSocket ให้ทุกหน้าจอรีเฟรชทันที
 	ws.BroadcastEvent("QUEUE_UPDATED", gin.H{"action": "db_reset"})
-	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", gin.H{"action": "db_reset"})
+	ws.BroadcastEvent("PATIENT_REGISTERED", gin.H{"action": "db_reset"})
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",
-		"message": "Database reset successfully for E2E testing",
+		"message": "ล้างข้อมูลทดสอบทั้งหมดในระบบเรียบร้อยแล้ว",
 	})
 }
 
@@ -81,8 +97,8 @@ func SimulateDoctorPrescription(c *gin.Context) {
 		systemUser.ID = 1
 	}
 
-	// 6. สร้าง Queue
-	queueNo := fmt.Sprintf("Q-%03d", rng.Intn(999)+1)
+	// 6. สร้าง Queue (มาตรฐาน Hexadecimal 4 หลัก Q0001 - QFFFF)
+	queueNo := fmt.Sprintf("Q%04X", rng.Intn(0xFFFF)+1)
 	queue := models.Queue{
 		PatientID:       patient.ID,
 		CreatedByUserID: systemUser.ID,
@@ -163,6 +179,7 @@ func SimulateDoctorPrescription(c *gin.Context) {
 			Allergies:       patient.Allergies,
 			ChronicDiseases: patient.ChronicDiseases,
 			PhoneNumber:     patient.PhoneNumber,
+			BloodType:       bloodType,
 			VisitCount:      1,
 		}
 		config.DB.Create(&patMed)
@@ -172,12 +189,33 @@ func SimulateDoctorPrescription(c *gin.Context) {
 	}
 	ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", patMed)
 
+	// 8.6. บันทึกลงตารางคิวห้องยาเฉพาะ medicine_queues
+	var mqCount int64
+	config.DB.Model(&models.MedicineQueue{}).Count(&mqCount)
+	mQueueNo := fmt.Sprintf("M-%03d", mqCount+1)
+	dispensedJSON, _ := json.Marshal(dispensedMeds)
+
+	medicineQueue := models.MedicineQueue{
+		QueueNumber:  mQueueNo,
+		HN:           patient.HN,
+		PatientName:  patient.FullName,
+		NationalID:   patient.NationalID,
+		Gender:       patient.Gender,
+		Age:          age,
+		SchemeType:   patient.SchemeType,
+		VisitID:      visit.ID,
+		DoctorAdvice: "มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา",
+		Status:       "pending",
+		Medications:  string(dispensedJSON),
+	}
+	config.DB.Create(&medicineQueue)
+
 	// 9. Broadcast	// ยิง WebSocket ไปบอกระบบจัดการคิวห้องยา
 	ws.BroadcastEvent("QUEUE_CREATED", gin.H{
-		"id":              queue.ID,
+		"id":              medicineQueue.ID,
 		"patient_id":      patient.ID,
-		"queue_number":    queue.QueueNumber,
-		"status":          queue.Status,
+		"queue_number":    medicineQueue.QueueNumber,
+		"status":          medicineQueue.Status,
 		"patient_name":    patient.FullName,
 		"hn":              patient.HN,
 		"national_id":     patient.NationalID,
