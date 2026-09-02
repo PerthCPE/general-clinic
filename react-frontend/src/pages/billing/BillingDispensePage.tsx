@@ -246,40 +246,13 @@ export default function BillingDispensePage({
     }
   };
 
-  const handleConfirmPayment = async () => {
+  const handleProceedToInvoice = () => {
     if (!activePatient) return;
-    triggerToast(`ชำระเงินเรียบร้อยแล้วสำหรับ ${activePatient.name} (ออกใบเสร็จชำระเงินสำเร็จ)`, 'success');
-    
-    try {
-      const token = localStorage.getItem('token');
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      await fetch('/api/billing/confirm', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          visit_id: activePatient.visitId || 1,
-          payment_method: 'Cash',
-          cash_received: medTotal
-        })
-      });
-    } catch {}
-
     if (onSelectPatientId) {
       onSelectPatientId(activePatient.id);
     }
-
-    setQueueList(prev => prev.filter(p => p.id !== activePatient.id));
-    if (queueList.length > 1) {
-      const nextP = queueList.find(p => p.id !== activePatient.id);
-      if (nextP) setLocalPatientId(nextP.id);
-    }
-    
     if (onNavigateToBilling) {
-      setTimeout(() => {
-        onNavigateToBilling();
-      }, 900);
+      onNavigateToBilling();
     }
   };
 
@@ -596,15 +569,15 @@ export default function BillingDispensePage({
               <span className="total-price">฿ {medTotal.toLocaleString()}</span>
             </div>
 
-            <button className="submit-billing-btn" onClick={handleConfirmPayment}>
+            <button className="submit-billing-btn" onClick={handleProceedToInvoice}>
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
-                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                <polyline points="22 4 12 14.01 9 11.01"/>
+                <rect x="2" y="5" width="20" height="14" rx="2"/>
+                <line x1="2" y1="10" x2="22" y2="10"/>
               </svg>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: '1.3' }}>
-                <span style={{ fontSize: '1rem', fontWeight: '800' }}>ยืนยันการจ่ายยา & ส่งข้อมูลไปการเงิน</span>
+                <span style={{ fontSize: '1rem', fontWeight: '800' }}>ออกใบแจ้งหนี้ & สร้าง QR Code ชำระเงิน</span>
                 <span style={{ fontSize: '0.85rem', fontWeight: '500', opacity: 0.95 }}>
-                  (Confirm & Send to Billing)
+                  (Generate Invoice & QR Code Payment)
                 </span>
               </div>
             </button>

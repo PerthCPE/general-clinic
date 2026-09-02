@@ -310,6 +310,9 @@ export default function DetailPage({
       gender: activePatient.gender,
       age: activePatient.age,
       scheme_type: currentRights || activePatient.treatmentRights,
+      allergies: (activePatient.allergies || []).join(', '),
+      chronic_diseases: activePatient.chronicDiseases || '',
+      phone_number: activePatient.phone || '',
       doctor_advice: activePatient.doctorAdvice
     };
 

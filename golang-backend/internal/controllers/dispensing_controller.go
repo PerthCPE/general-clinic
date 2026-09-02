@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"clinic-backend/internal/config"
@@ -96,14 +97,18 @@ func RecordDispense(c *gin.Context) {
 // POST /api/pharmacy/dispense - ยืนยันการจ่ายยา ตัดสต็อก และสร้างบิลการเงิน พร้อมยิง WebSocket
 func ConfirmDispenseAndBill(c *gin.Context) {
 	var req struct {
-		VisitID      uint   `json:"visit_id"`
-		HN           string `json:"hn"`
-		PatientName  string `json:"patient_name"`
-		NationalID   string `json:"national_id"`
-		Gender       string `json:"gender"`
-		Age          int    `json:"age"`
-		SchemeType   string `json:"scheme_type"`
-		DoctorAdvice string `json:"doctor_advice"`
+		VisitID         uint   `json:"visit_id"`
+		HN              string `json:"hn"`
+		PatientName     string `json:"patient_name"`
+		NationalID      string `json:"national_id"`
+		Gender          string `json:"gender"`
+		Age             int    `json:"age"`
+		BloodType       string `json:"blood_type"`
+		SchemeType      string `json:"scheme_type"`
+		Allergies       string `json:"allergies"`
+		ChronicDiseases string `json:"chronic_diseases"`
+		PhoneNumber     string `json:"phone_number"`
+		DoctorAdvice    string `json:"doctor_advice"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil && req.VisitID == 0 && req.HN == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -251,8 +256,10 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 	tx.Create(&billingQueue)
 
 	// อัปเดต/สร้างลงตาราง patient_medicines ใน Supabase DB ทันที!
+	cleanHN := strings.TrimPrefix(targetHN, "HN-")
+	cleanHN = strings.TrimPrefix(cleanHN, "HN")
 	var patMed models.PatientMedicine
-	if err := tx.Where("hn = ?", targetHN).First(&patMed).Error; err != nil {
+	if err := tx.Where("hn = ? OR hn = ? OR hn = ?", targetHN, "HN"+cleanHN, "HN-"+cleanHN).First(&patMed).Error; err != nil {
 		patMed = models.PatientMedicine{
 			HN:              targetHN,
 			NationalID:      nationalID,
@@ -260,13 +267,41 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 			Gender:          req.Gender,
 			Age:             age,
 			SchemeType:      schemeType,
-			Allergies:       patient.Allergies,
-			ChronicDiseases: patient.ChronicDiseases,
-			PhoneNumber:     patient.PhoneNumber,
+			Allergies:       req.Allergies,
+			ChronicDiseases: req.ChronicDiseases,
+			PhoneNumber:     req.PhoneNumber,
+			BloodType:       req.BloodType,
 			VisitCount:      1,
+		}
+		if patMed.Allergies == "" {
+			patMed.Allergies = patient.Allergies
+		}
+		if patMed.ChronicDiseases == "" {
+			patMed.ChronicDiseases = patient.ChronicDiseases
+		}
+		if patMed.PhoneNumber == "" {
+			patMed.PhoneNumber = patient.PhoneNumber
+		}
+		if patMed.Gender == "" {
+			patMed.Gender = patient.Gender
 		}
 		tx.Create(&patMed)
 	} else {
+		patMed.FullName = targetName
+		patMed.NationalID = nationalID
+		patMed.SchemeType = schemeType
+		if req.Allergies != "" {
+			patMed.Allergies = req.Allergies
+		}
+		if req.ChronicDiseases != "" {
+			patMed.ChronicDiseases = req.ChronicDiseases
+		}
+		if req.PhoneNumber != "" {
+			patMed.PhoneNumber = req.PhoneNumber
+		}
+		if req.BloodType != "" {
+			patMed.BloodType = req.BloodType
+		}
 		patMed.VisitCount += 1
 		tx.Save(&patMed)
 	}
