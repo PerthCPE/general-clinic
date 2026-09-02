@@ -325,8 +325,15 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		"created_at":   billing.CreatedAt,
 	}
 
+	// ปรับสถานะคิวตรวจของคลินิกเป็น รอชำระเงิน (Real-time update to normal Queue)
+	config.DB.Model(&models.Queue{}).Where("visit_id = ?", req.VisitID).Update("status", "รอชำระเงิน")
+	if patient.ID > 0 {
+		config.DB.Model(&models.Queue{}).Where("patient_id = ? AND status IN ('รอรับยา', 'pharmacy_waiting', 'Pending Pharmacy')", patient.ID).Update("status", "รอชำระเงิน")
+	}
+
 	ws.BroadcastEvent("DISPENSE_RECORDED", gin.H{"visit_id": req.VisitID, "action": "dispensed"})
 	ws.BroadcastEvent("BILLING_CREATED", billingPayload)
+	ws.BroadcastEvent("QUEUE_UPDATED", gin.H{"action": "status_changed", "status": "รอชำระเงิน", "visit_id": req.VisitID})
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "success",

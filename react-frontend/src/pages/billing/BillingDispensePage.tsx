@@ -156,13 +156,29 @@ export default function BillingDispensePage({
           doctorAdvice: data.doctor_advice || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
           medications: data.medications || [],
         };
-        setQueueList(prev => [...prev.filter(q => q.id !== newPatient.id), newPatient]);
+        setQueueList(prev => [newPatient, ...prev.filter(q => q.id !== newPatient.id)]);
+        setLocalPatientId(newPatient.id);
+        if (onSelectPatientId) onSelectPatientId(newPatient.id);
         triggerToast(`ได้รับคิวใหม่จากการจัดการยา: ${pName} (${data.queue_number || ''})`, 'doctor');
       }
     });
 
+    const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
+      if (data && data.action === 'db_reset') {
+        setQueueList([]);
+      } else {
+        fetchInitialQueue();
+      }
+    });
+
+    const unsubPay = subscribe('PAYMENT_CONFIRMED', () => {
+      fetchInitialQueue();
+    });
+
     return () => {
       unsubBill();
+      unsubQueue();
+      unsubPay();
     };
   }, [subscribe]);
 

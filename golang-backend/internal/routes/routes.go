@@ -102,7 +102,7 @@ func SetUpRoutes(r *gin.Engine) {
 		pharmacyRoutes.GET("/patient-medicines/:hn", controllers.GetPatientMedicineDetail)
 	}
 
-	// ===== ระบบย่อยที่ 2: การเงิน (Billing / QRPayment) - Boonkum (B6741990) =====
+	// ===== ระบบย่อยที่ 2: การเงิน (Billing / QRPayment) -Bun =====
 	billingRoutes := api.Group("/billing")
 	billingRoutes.Use(middleware.RoleRequired("cashier", "pharmacist", "registrar"))
 	{
