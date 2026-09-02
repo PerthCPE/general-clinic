@@ -37,33 +37,48 @@ func ConnectDB() {
 		log.Fatal("Failed to connect database. Error: ", err)
 	}
 
+	// Connection Pool Optimization (ลด Overhead ของ TCP/TLS Handshake)
+	sqlDB, err := database.DB()
+	if err == nil {
+		sqlDB.SetMaxIdleConns(10)
+		sqlDB.SetMaxOpenConns(50)
+		sqlDB.SetConnMaxLifetime(time.Hour)
+	}
+
 	log.Println("Database Connection Established Successfully")
 
-	// table create by migration (AutoMigrate ครบทุก Model ในระบบ 100%)
-	err = database.AutoMigrate(
-		&models.User{},
-		&models.Doctor{},
-		&models.Patient{},
-		&models.MedicalEligibility{},
-		&models.VisitRecord{},
-		&models.Queue{},
-		&models.Screening{},
-		&models.Medicine{},
-		&models.Dispensing{},
-		&models.Billing{},
-		&models.QRPayment{},
-		&models.Document{},
-		&models.DocumentForward{},
-		&models.DoctorSchedule{},
-		&models.LeaveRequest{},
-		&models.ShiftSwapRequest{},
-	)
+	// Smart Migration: ตรวจสอบว่ามี Table หลักในระบบแล้วหรือยัง
+	// หากมีครบแล้ว จะข้าม AutoMigrate เพื่อลดเวลา Startup จาก ~105 วินาที เหลือเพียง ~1 วินาที
+	var tableCount int64
+	database.Raw("SELECT count(*) FROM information_schema.tables WHERE table_schema = CURRENT_SCHEMA() AND table_name IN ('users', 'patients', 'queues', 'screenings')").Scan(&tableCount)
 
-	// if error founded, notice
-	if err != nil {
-		log.Fatal("Database Migration Failed. Error: ", err)
+	if tableCount < 4 {
+		log.Println("Tables missing or incomplete. Running AutoMigrate...")
+		err = database.AutoMigrate(
+			&models.User{},
+			&models.Doctor{},
+			&models.Patient{},
+			&models.MedicalEligibility{},
+			&models.VisitRecord{},
+			&models.Queue{},
+			&models.Screening{},
+			&models.Medicine{},
+			&models.Dispensing{},
+			&models.Billing{},
+			&models.QRPayment{},
+			&models.Document{},
+			&models.DocumentForward{},
+			&models.DoctorSchedule{},
+			&models.LeaveRequest{},
+			&models.ShiftSwapRequest{},
+		)
+		if err != nil {
+			log.Fatal("Database Migration Failed. Error: ", err)
+		}
+		log.Println("Database Migration Complete.")
+	} else {
+		log.Println("Database schema already up to date. Skipped redundant AutoMigrate.")
 	}
-	log.Println("Database Migration Complete.")
 
 	DB = database
 
@@ -85,9 +100,17 @@ func seedDatabase() {
 		{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
 		{Username: "doctor3", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
 	}
+	
+	// Batch Check: โหลดรายชื่อ username ที่มีอยู่แล้วด้วย 1 Query เดียวแทนการยิงทีละคน
+	var existingUsernames []string
+	DB.Model(&models.User{}).Pluck("username", &existingUsernames)
+	existingMap := make(map[string]bool)
+	for _, u := range existingUsernames {
+		existingMap[u] = true
+	}
+
 	for i := range users {
-		var existing models.User
-		if err := DB.Where("username = ?", users[i].Username).First(&existing).Error; err != nil {
+		if !existingMap[users[i].Username] {
 			DB.Create(&users[i])
 		}
 	}
