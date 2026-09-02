@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	config.AppConfig = config.Config{
+	config.AppConfig = &config.Config{
 		DBHost:     "aws-0-ap-southeast-1.pooler.supabase.com",
 		DBUser:     "postgres.kcazbnexepowjvuhmwkl",
 		DBPassword: "SACLINICDATABASEPASSWORD",

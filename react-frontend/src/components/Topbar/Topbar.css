@@ -481,6 +481,21 @@
   justify-content: center !important;
 }
 
+.dropdown-item-reset {
+  color: #2563EB;
+  text-align: center !important;
+  justify-content: center !important;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dropdown-item-reset:hover {
+  background-color: #EFF6FF !important;
+  color: #1D4ED8 !important;
+}
+
 .dropdown-logout-btn {
   color: #EF4444;
   text-align: center !important;
@@ -754,6 +769,15 @@ body.dark-mode .dropdown-menu-item:not(:last-child) {
 body.dark-mode .dropdown-menu-item:hover {
   background-color: #373E47;
   color: #FFFFFF;
+}
+
+body.dark-mode .dropdown-item-reset {
+  color: #58A6FF;
+}
+
+body.dark-mode .dropdown-item-reset:hover {
+  background-color: rgba(56, 139, 253, 0.15) !important;
+  color: #79C0FF !important;
 }
 
 body.dark-mode .dropdown-logout-btn {

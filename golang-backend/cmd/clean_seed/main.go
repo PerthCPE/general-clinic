@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"fmt"
@@ -17,34 +17,30 @@ func main() {
 	log.Println("Starting database cleanup for B6706265 modules...")
 
 	// 1. Delete dependent records first to maintain referential integrity
-	if err := db.Exec("DELETE FROM screenings").Error; err != nil {
-		log.Println("Error deleting screenings:", err)
-	} else {
-		log.Println("Cleaned table: screenings")
+	tables := []string{
+		"qr_payments",
+		"billings",
+		"billing_queues",
+		"billing_histories",
+		"medicine_queues",
+		"dispensings",
+		"prescription_items",
+		"examinations",
+		"diagnoses",
+		"patient_medicines",
+		"patient_histories",
+		"screenings",
+		"queues",
+		"visit_records",
+		"medical_eligibilities",
+		"patients",
 	}
-
-	if err := db.Exec("DELETE FROM visit_records").Error; err != nil {
-		log.Println("Error deleting visit_records:", err)
-	} else {
-		log.Println("Cleaned table: visit_records")
-	}
-
-	if err := db.Exec("DELETE FROM queues").Error; err != nil {
-		log.Println("Error deleting queues:", err)
-	} else {
-		log.Println("Cleaned table: queues")
-	}
-
-	if err := db.Exec("DELETE FROM medical_eligibilities").Error; err != nil {
-		log.Println("Error deleting medical_eligibilities:", err)
-	} else {
-		log.Println("Cleaned table: medical_eligibilities")
-	}
-
-	if err := db.Exec("DELETE FROM patients").Error; err != nil {
-		log.Println("Error deleting patients:", err)
-	} else {
-		log.Println("Cleaned table: patients")
+	for _, tbl := range tables {
+		if err := db.Exec("DELETE FROM " + tbl).Error; err != nil {
+			log.Printf("Clean table %s note: %v", tbl, err)
+		} else {
+			log.Println("Cleaned table:", tbl)
+		}
 	}
 
 	log.Println("All test data cleaned successfully! Now seeding fresh clean records...")
@@ -64,15 +60,36 @@ func main() {
 	db.Where("username = ?", "doctor2").First(&doc2)
 	db.Where("username = ?", "doctor3").First(&doc3)
 
+	if doc1.ID == 0 {
+		var anyDoc models.User
+		db.Where("role = ?", "doctor").First(&anyDoc)
+		doc1 = anyDoc
+	}
+	if doc2.ID == 0 {
+		doc2 = doc1
+	}
+	if doc3.ID == 0 {
+		doc3 = doc1
+	}
+	if nurse.ID == 0 {
+		db.Where("role = ?", "nurse").First(&nurse)
+	}
+	if assistant.ID == 0 {
+		assistant = nurse
+	}
+	if registrar.ID == 0 {
+		db.Where("role = ?", "registrar").First(&registrar)
+	}
+
 	parseDate := func(d string) time.Time {
 		t, _ := time.Parse("2006-01-02", d)
 		return t
 	}
 
-	// 2. Seed Standard 8 Patients
+	// 2. Seed Standard 8 Patients (HN0001 - HN0008)
 	patients := []models.Patient{
 		{
-			HN:               "HN-0089",
+			HN:               "HN0001",
 			NationalID:       "1234567890123",
 			FullName:         "นายสมชาย ใจดี",
 			Gender:           "ชาย",
@@ -85,7 +102,7 @@ func main() {
 			ChronicDiseases:  "ความดันโลหิตสูง (คุมได้ดี)",
 		},
 		{
-			HN:               "HN-0090",
+			HN:               "HN0002",
 			NationalID:       "3100598765432",
 			FullName:         "นางสาววิภาดา มณีรัตน์",
 			Gender:           "หญิง",
@@ -98,7 +115,7 @@ func main() {
 			ChronicDiseases:  "ไมเกรน",
 		},
 		{
-			HN:               "HN-0091",
+			HN:               "HN0003",
 			NationalID:       "1101455443219",
 			FullName:         "นายอาทิตย์ มีสุข",
 			Gender:           "ชาย",
@@ -111,7 +128,7 @@ func main() {
 			ChronicDiseases:  "ความดันโลหิตสูง",
 		},
 		{
-			HN:               "HN-0092",
+			HN:               "HN0004",
 			NationalID:       "5102011223345",
 			FullName:         "นางสมศรี รักษาดี",
 			Gender:           "หญิง",
@@ -124,7 +141,7 @@ func main() {
 			ChronicDiseases:  "เบาหวานชนิดที่ 2",
 		},
 		{
-			HN:               "HN-0093",
+			HN:               "HN0005",
 			NationalID:       "1103377889901",
 			FullName:         "นายธนกฤต กิตติพงษ์",
 			Gender:           "ชาย",
@@ -137,7 +154,7 @@ func main() {
 			ChronicDiseases:  "ไม่มี",
 		},
 		{
-			HN:               "HN-0094",
+			HN:               "HN0006",
 			NationalID:       "1104488990123",
 			FullName:         "เด็กหญิงกัญญา มีทรัพย์",
 			Gender:           "หญิง",
@@ -150,7 +167,7 @@ func main() {
 			ChronicDiseases:  "ไม่มี",
 		},
 		{
-			HN:               "HN-0095",
+			HN:               "HN0007",
 			NationalID:       "3102233445567",
 			FullName:         "นายประเสริฐ ยืนยง",
 			Gender:           "ชาย",
@@ -163,7 +180,7 @@ func main() {
 			ChronicDiseases:  "โรคหัวใจขาดเลือด, ความดันโลหิตสูง",
 		},
 		{
-			HN:               "HN-0096",
+			HN:               "HN0008",
 			NationalID:       "2105566778890",
 			FullName:         "นางสาวมณีรัตน์ วงศ์สว่าง",
 			Gender:           "หญิง",
@@ -178,7 +195,11 @@ func main() {
 	}
 
 	for i := range patients {
-		db.Create(&patients[i])
+		if err := db.Create(&patients[i]).Error; err != nil {
+			log.Printf("Error seeding patient %s: %v", patients[i].FullName, err)
+		} else {
+			log.Printf("Seeded patient %s (ID: %d, HN: %s)", patients[i].FullName, patients[i].ID, patients[i].HN)
+		}
 	}
 	log.Printf("Seeded %d patients successfully.", len(patients))
 
@@ -206,14 +227,14 @@ func main() {
 
 	// 4. Seed Clean Standard Queues (Q0001 - Q0008)
 	queues := []models.Queue{
-		{PatientID: patients[0].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0001", Status: "รอคัดกรอง", Department: "แผนกคัดกรอง", Note: "รอวัดความดันโลหิตและสัญญาณชีพ"},
+		{PatientID: patients[0].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0001", Status: "รอคัดกรอง", Department: "จุดคัดกรอง", Note: "รอวัดความดันโลหิตและสัญญาณชีพ"},
 		{PatientID: patients[1].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0002", Status: "รอพบแพทย์", Department: "ห้องตรวจ 1 (พญ.สุดา)", Note: "คัดกรองแล้ว: เร่งด่วน (Urgent) (BP: 142/92, HR: 98)"},
-		{PatientID: patients[2].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0003", Status: "รอคัดกรอง", Department: "แผนกคัดกรอง", Note: "ผู้ป่วย Walk-in มีอาการปวดศีรษะ"},
-		{PatientID: patients[3].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0004", Status: "กำลังตรวจ", Department: "ห้องตรวจ 2 (นพ.วิชัย)", Note: "เข้าห้องตรวจแพทย์แล้ว"},
-		{PatientID: patients[4].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0005", Status: "รอคัดกรอง", Department: "แผนกคัดกรอง", Note: "ตรวจสุขภาพทั่วไป"},
-		{PatientID: patients[5].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0006", Status: "รอทำหัตถการ", Department: "ห้องทำแผลและฉีดยา (หัตถการ)", Note: "ส่งทำแผล / ฉีดยา / พ่นยา"},
-		{PatientID: patients[6].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0007", Status: "รอชำระเงิน", Department: "การเงินและชำระเงิน", Note: "ตรวจเสร็จสิ้น รอสรุปค่ารักษาพยาบาล"},
-		{PatientID: patients[7].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0008", Status: "รอรับยา", Department: "ห้องจ่ายยาและเภสัชกรรม", Note: "ชำระเงินแล้ว รอจัดยาและรับคำแนะนำ"},
+		{PatientID: patients[2].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0003", Status: "รอพบแพทย์", Department: "ห้องตรวจ 2 (นพ.วิชัย)", Note: "ผู้ป่วย Walk-in มีอาการปวดศีรษะ"},
+		{PatientID: patients[3].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0004", Status: "กำลังตรวจ", Department: "ห้องตรวจ 3 (พญ.เกศรา)", Note: "เข้าห้องตรวจกุมารแพทย์แล้ว"},
+		{PatientID: patients[4].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0005", Status: "รอทำหัตถการ", Department: "ห้องหัตถการ (ทำแผล/ฉีดยา)", Note: "ส่งทำแผล / ฉีดยา / พ่นยา"},
+		{PatientID: patients[5].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0006", Status: "รอชำระเงิน", Department: "ห้องการเงิน (แคชเชียร์)", Note: "ตรวจเสร็จสิ้น รอชำระค่ารักษาพยาบาล"},
+		{PatientID: patients[6].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0007", Status: "รอรับยา", Department: "ห้องจ่ายยาและเภสัชกรรม", Note: "ชำระเงินแล้ว รอจัดยาและรับคำแนะนำ"},
+		{PatientID: patients[7].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0008", Status: "เสร็จสิ้น", Department: "ห้องจ่ายยาและเภสัชกรรม", Note: "รับยาและเสร็จสิ้นขั้นตอนการรักษา"},
 	}
 	for i := range queues {
 		db.Create(&queues[i])

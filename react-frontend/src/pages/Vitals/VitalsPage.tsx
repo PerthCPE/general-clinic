@@ -60,9 +60,9 @@ const getInitialDraft = (): VitalsDraftPayload | null => {
 
 // Initial Fallback Doctors
 const DEFAULT_DOCTORS: DoctorOption[] = [
-  { doctorId: 4, fullName: 'พญ.สุดา สุขสมบูรณ์', specialty: 'เวชปฏิบัติทั่วไป', roomName: 'ห้องตรวจ 1' },
-  { doctorId: 5, fullName: 'นพ.วิชัย ชาญการแพทย์', specialty: 'อายุรกรรมทั่วไป', roomName: 'ห้องตรวจ 2' },
-  { doctorId: 6, fullName: 'พญ.เกศรา รักษาดี', specialty: 'กุมารเวชศาสตร์', roomName: 'ห้องตรวจ 3' },
+  { doctorId: 4, fullName: 'พญ.สุดา สุขสมบูรณ์', specialty: 'เวชปฏิบัติทั่วไป', roomName: 'ห้องตรวจ 1 (พญ.สุดา)' },
+  { doctorId: 5, fullName: 'นพ.วิชัย ชาญการแพทย์', specialty: 'อายุรกรรมทั่วไป', roomName: 'ห้องตรวจ 2 (นพ.วิชัย)' },
+  { doctorId: 6, fullName: 'พญ.เกศรา รักษาดี', specialty: 'กุมารเวชศาสตร์', roomName: 'ห้องตรวจ 3 (พญ.เกศรา)' },
 ];
 
 const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
@@ -131,12 +131,22 @@ export const VitalsPage: React.FC = () => {
     try {
       const data = await vitalsApi.getDoctors();
       if (Array.isArray(data) && data.length > 0) {
-        const mapped: DoctorOption[] = data.map((d, index) => ({
-          doctorId: d.id,
-          fullName: d.fullname,
-          specialty: index === 0 ? 'เวชปฏิบัติทั่วไป' : index === 1 ? 'อายุรกรรมทั่วไป' : 'กุมารเวชศาสตร์',
-          roomName: `ห้องตรวจ ${index + 1}`,
-        }));
+        const mapped: DoctorOption[] = data.map((d, index) => {
+          const shortName = d.fullname.includes('สุดา')
+            ? 'พญ.สุดา'
+            : d.fullname.includes('วิชัย')
+            ? 'นพ.วิชัย'
+            : d.fullname.includes('เกศรา')
+            ? 'พญ.เกศรา'
+            : d.fullname.split(' ')[0] || '';
+          const roomLabel = `ห้องตรวจ ${index + 1}${shortName ? ` (${shortName})` : ''}`;
+          return {
+            doctorId: d.id,
+            fullName: d.fullname,
+            specialty: index === 0 ? 'เวชปฏิบัติทั่วไป' : index === 1 ? 'อายุรกรรมทั่วไป' : 'กุมารเวชศาสตร์',
+            roomName: roomLabel,
+          };
+        });
         setDoctorList(mapped);
       }
     } catch (err) {
