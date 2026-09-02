@@ -1,21 +1,23 @@
 package main
+
 import (
-	"fmt"
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"fmt"
 )
+
 func main() {
 	config.AppConfig = config.Config{
-		DBHost: "aws-0-ap-southeast-1.pooler.supabase.com",
-		DBUser: "postgres.kcazbnexepowjvuhmwkl",
+		DBHost:     "aws-0-ap-southeast-1.pooler.supabase.com",
+		DBUser:     "postgres.kcazbnexepowjvuhmwkl",
 		DBPassword: "SACLINICDATABASEPASSWORD",
-		DBName: "postgres",
-		DBPort: "6543",
-		DBSSLMode: "require",
+		DBName:     "postgres",
+		DBPort:     "6543",
+		DBSSLMode:  "require",
 	}
 	config.ConnectDB()
 	db := config.DB
-	
+
 	var pc, vc, sc, mc, dc, bc, qc int64
 	db.Model(&models.Patient{}).Count(&pc)
 	db.Model(&models.VisitRecord{}).Count(&vc)

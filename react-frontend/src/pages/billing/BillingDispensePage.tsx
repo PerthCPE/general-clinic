@@ -26,7 +26,17 @@ export default function BillingDispensePage({
   const { subscribe } = useWebSocket();
   const [searchPatient, setSearchPatient] = useState('');
   const [searchQueueInput, setSearchQueueInput] = useState('');
-  const [localPatientId, setLocalPatientId] = useState<string>(selectedPatientId || '');
+  const [localPatientId, setLocalPatientId] = useState<string>(() => {
+    return selectedPatientId || localStorage.getItem('billing_active_patient') || '';
+  });
+
+  useEffect(() => {
+    if (localPatientId) {
+      localStorage.setItem('billing_active_patient', localPatientId);
+    } else {
+      localStorage.removeItem('billing_active_patient');
+    }
+  }, [localPatientId]);
   const [isSearchExpanded, setIsSearchExpanded] = useState(true);
   
   // คิวเริ่มต้น - เริ่มจากตารางว่างเปล่าแบบ Clean State
@@ -83,9 +93,14 @@ export default function BillingDispensePage({
               medications: q.medications || [] // Assuming API might provide it, otherwise empty initially until clicked
             }));
             setQueueList(mappedQueues);
-            if (mappedQueues.length > 0 && !localPatientId) {
-              setLocalPatientId(mappedQueues[0].id);
-            }
+            setLocalPatientId(prev => {
+              if (mappedQueues.length > 0) {
+                if (!prev || !mappedQueues.find((q: any) => q.id === prev)) {
+                  return mappedQueues[0].id;
+                }
+              }
+              return prev;
+            });
           }
         }
       } catch (err) {

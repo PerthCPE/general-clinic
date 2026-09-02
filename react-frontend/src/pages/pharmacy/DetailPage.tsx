@@ -31,7 +31,19 @@ export default function DetailPage({
 }: DetailPageProps) {
   const { subscribe } = useWebSocket();
   const [patientIdInput, setPatientIdInput] = useState('');
-  const [localPatientId, setLocalPatientId] = useState<string>(selectedPatientId || '');
+  const [localPatientId, setLocalPatientId] = useState<string>(() => {
+    return selectedPatientId || localStorage.getItem('pharmacy_active_patient') || '';
+  });
+
+  // Save active patient to localStorage whenever it changes
+  useEffect(() => {
+    if (localPatientId) {
+      localStorage.setItem('pharmacy_active_patient', localPatientId);
+    } else {
+      localStorage.removeItem('pharmacy_active_patient');
+    }
+  }, [localPatientId]);
+
   const [isSearchExpanded, setIsSearchExpanded] = useState(true);
   const [isPrescriptionExpanded, setIsPrescriptionExpanded] = useState(true);
   const [selectedMedInfo, setSelectedMedInfo] = useState<{ name: string; medId: string; properties: string } | null>(null);
@@ -93,7 +105,15 @@ export default function DetailPage({
               medications: [] // will load detail on click
             }));
             setQueueList(mappedQueues);
-            if (mappedQueues.length > 0) setLocalPatientId(mappedQueues[0].id);
+            setLocalPatientId(prev => {
+              if (mappedQueues.length > 0) {
+                // If we don't have one selected, or the currently selected one is not in the queue anymore
+                if (!prev || !mappedQueues.find((q: any) => q.id === prev)) {
+                  return mappedQueues[0].id;
+                }
+              }
+              return prev;
+            });
           }
         }
       } catch (err) {
