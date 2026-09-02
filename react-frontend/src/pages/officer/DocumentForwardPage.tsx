@@ -105,7 +105,7 @@ export const DocumentForwardPage: React.FC = () => {
               id: `FWD-${String(fwd.id).padStart(4, '0')}`,
               forwardId: fwd.id,
               title: fwd.document?.subject || `เอกสารส่งต่อ #${fwd.doc_id}`,
-              sender: fwd.document?.sender_name || 'ธุรการ (คุณสมจิต ดีใจ)',
+              sender: fwd.document?.creator?.fullname || 'ธุรการ (คุณสมจิต ดีใจ)',
               recipient: fwd.recipient?.fullname || fwd.recipient?.username || 'เจ้าหน้าที่ปลายทาง',
               receivedDate: formattedDate,
               type: 'เอกสารราชการ',
@@ -136,7 +136,6 @@ export const DocumentForwardPage: React.FC = () => {
       // 1. Create document first
       const docRes = await dmsApi.createDocument({
         external_doc_ref: `DOC-2569-${Date.now().toString().slice(-4)}`,
-        sender_name: 'ธุรการ (คุณสมจิต ดีใจ)',
         subject: newDocTitle,
       });
 

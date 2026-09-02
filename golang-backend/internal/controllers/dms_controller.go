@@ -15,7 +15,6 @@ import (
 // Request Structures
 type CreateDocumentReq struct {
 	ExternalDocRef string `json:"external_doc_ref"`
-	SenderName     string `json:"sender_name"`
 	Subject        string `json:"subject" binding:"required"`
 	FileURL        string `json:"file_url"`
 }
@@ -64,14 +63,8 @@ func CreateDocument(c *gin.Context) {
 		docRef = "DOC-" + time.Now().Format("2006") + "-" + strconv.FormatInt(count+1, 10)
 	}
 
-	senderName := req.SenderName
-	if senderName == "" {
-		senderName = "-"
-	}
-
 	newDoc := models.Document{
 		ExternalDocRef: docRef,
-		SenderName:     senderName,
 		Subject:        req.Subject,
 		FileURL:        req.FileURL,
 		CreatedBy:      userID,

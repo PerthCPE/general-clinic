@@ -331,7 +331,6 @@ export interface BackendUser {
 export interface BackendDocument {
   id: number;
   external_doc_ref: string;
-  sender_name: string;
   subject: string;
   file_url: string;
   created_by: number;
@@ -356,7 +355,6 @@ export const dmsApi = {
   getDocuments: () => request<BackendDocument[]>('/api/officer/documents'),
   createDocument: (payload: {
     external_doc_ref?: string;
-    sender_name: string;
     subject: string;
     file_url?: string;
   }) =>

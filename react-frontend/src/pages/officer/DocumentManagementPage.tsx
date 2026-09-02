@@ -10,7 +10,6 @@ interface DocumentItem {
   modifiedDate: string;
   status: 'approved' | 'reviewing' | 'draft';
   subject?: string;
-  senderName?: string;
   externalRef?: string;
 }
 
@@ -60,7 +59,6 @@ export const DocumentManagementPage: React.FC = () => {
   // Upload Form State based on Document model attributes
   const [uploadForm, setUploadForm] = useState({
     subject: '',
-    senderName: '',
     externalRef: ''
   });
 
@@ -81,7 +79,6 @@ export const DocumentManagementPage: React.FC = () => {
               modifiedDate: formattedDate,
               status: 'approved',
               subject: d.subject,
-              senderName: d.sender_name,
               externalRef: d.external_doc_ref,
             };
           });
@@ -105,7 +102,6 @@ export const DocumentManagementPage: React.FC = () => {
       const defaultSubject = file.name.replace(/\.[^/.]+$/, '').replace(/[_\\-]/g, ' ');
       setUploadForm({
         subject: defaultSubject,
-        senderName: 'เจ้าหน้าที่ธุรการ',
         externalRef: ''
       });
       setActiveModal('upload');
@@ -123,7 +119,6 @@ export const DocumentManagementPage: React.FC = () => {
     try {
       const res = await dmsApi.createDocument({
         external_doc_ref: uploadForm.externalRef || `DOC-2569-${Date.now().toString().slice(-4)}`,
-        sender_name: 'เจ้าหน้าที่ธุรการ',
         subject: uploadForm.subject || selectedFile.name,
         file_url: 'https://example.com/docs/' + selectedFile.name,
       });
@@ -140,14 +135,13 @@ export const DocumentManagementPage: React.FC = () => {
         modifiedDate: formattedDate,
         status: 'approved',
         subject: res.document.subject,
-        senderName: res.document.sender_name,
         externalRef: res.document.external_doc_ref,
       };
 
       setDocs([newDoc, ...docs]);
       setSelectedFile(null);
       setUploading(false);
-      setUploadForm({ subject: '', senderName: '', externalRef: '' });
+      setUploadForm({ subject: '', externalRef: '' });
       toast.success('บันทึกและอัปโหลดเอกสารลง Database เรียบร้อยแล้ว');
     } catch {
       const now = new Date();
@@ -162,14 +156,13 @@ export const DocumentManagementPage: React.FC = () => {
         modifiedDate: formattedDate,
         status: 'reviewing',
         subject: uploadForm.subject,
-        senderName: 'เจ้าหน้าที่ธุรการ',
         externalRef: uploadForm.externalRef
       };
       
       setDocs([newDoc, ...docs]);
       setSelectedFile(null);
       setUploading(false);
-      setUploadForm({ subject: '', senderName: '', externalRef: '' });
+      setUploadForm({ subject: '', externalRef: '' });
       toast.success('อัปโหลดไฟล์และบันทึกข้อมูลเอกสารเรียบร้อยแล้ว');
     }
   };

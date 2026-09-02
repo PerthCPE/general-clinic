@@ -504,10 +504,10 @@ func seedDatabase() {
 		}
 
 		docs := []models.Document{
-			{ExternalDocRef: "สธ 0201/2569", SenderName: "กระทรวงสาธารณสุข", Subject: "แนวทางการควบคุมโรคติดต่อทางเดินหายใจ ประจำปี 2569", FileURL: "https://example.com/docs/guidelines_2569.pdf", CreatedBy: officerUser.ID},
-			{ExternalDocRef: "สปสช. 1102/2569", SenderName: "สำนักงานหลักประกันสุขภาพแห่งชาติ", Subject: "ประกาศปรับปรุงอัตราค่าชดเชยค่าบริการทางการแพทย์ใหม่", FileURL: "https://example.com/docs/nhso_rates.pdf", CreatedBy: officerUser.ID},
-			{ExternalDocRef: "อย. 4405/2569", SenderName: "สำนักงานคณะกรรมการอาหารและยา", Subject: "แจ้งเตือนการเฝ้าระวังยาควบคุมพิเศษกลุ่มต้านการอักเสบ", FileURL: "https://example.com/docs/fda_alert.pdf", CreatedBy: officerUser.ID},
-			{ExternalDocRef: "รพ. 8812/2569", SenderName: "โรงพยาบาลศูนย์เครือข่าย", Subject: "หนังสือประสานงานแนวทางการส่งต่อผู้ป่วยฉุกเฉิน (Referral System)", FileURL: "https://example.com/docs/referral_network.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "สธ 0201/2569", Subject: "แนวทางการควบคุมโรคติดต่อทางเดินหายใจ ประจำปี 2569", FileURL: "https://example.com/docs/guidelines_2569.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "สปสช. 1102/2569", Subject: "ประกาศปรับปรุงอัตราค่าชดเชยค่าบริการทางการแพทย์ใหม่", FileURL: "https://example.com/docs/nhso_rates.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "อย. 4405/2569", Subject: "แจ้งเตือนการเฝ้าระวังยาควบคุมพิเศษกลุ่มต้านการอักเสบ", FileURL: "https://example.com/docs/fda_alert.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "รพ. 8812/2569", Subject: "หนังสือประสานงานแนวทางการส่งต่อผู้ป่วยฉุกเฉิน (Referral System)", FileURL: "https://example.com/docs/referral_network.pdf", CreatedBy: officerUser.ID},
 		}
 		for i := range docs {
 			DB.Create(&docs[i])
