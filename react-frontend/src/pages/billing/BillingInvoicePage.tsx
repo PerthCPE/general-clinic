@@ -135,14 +135,14 @@ export default function BillingInvoicePage({
               if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
                 const fetchedMeds = data.dispensing.map((item: any) => ({
                   medId: item.Medicine?.medicine_code || item.Medicine?.code || `MED-${item.medicine_id}`,
-                  name: item.Medicine?.name || 'ยาบรรเทาอาการ',
+                  name: item.Medicine?.name || item.name || 'ยาบรรเทาอาการ',
                   genericName: item.Medicine?.generic_name || '',
                   category: item.Medicine?.category || 'ยาสามัญ',
                   properties: item.Medicine?.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
                   dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
                   instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
-                  price: Number(item.Medicine?.unit_price || item.price || 50),
-                  unit_price: Number(item.Medicine?.unit_price || item.price || 50),
+                  price: Number(item.Medicine?.unit_price ?? item.unit_price ?? item.price ?? 0),
+                  unit_price: Number(item.Medicine?.unit_price ?? item.unit_price ?? item.price ?? 0),
                   quantity: Number(item.quantity || 1),
                   stock: item.Medicine?.stock_quantity || 100,
                   stockStatus: 'พร้อมจ่าย'
@@ -176,8 +176,8 @@ export default function BillingInvoicePage({
                   properties: item.Medicine?.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
                   dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
                   instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
-                  price: Number(item.Medicine?.unit_price || item.price || 50),
-                  unit_price: Number(item.Medicine?.unit_price || item.price || 50),
+                  price: Number(item.Medicine?.unit_price ?? item.unit_price ?? item.price ?? 0),
+                  unit_price: Number(item.Medicine?.unit_price ?? item.unit_price ?? item.price ?? 0),
                   quantity: Number(item.quantity || 1),
                   stock: item.Medicine?.stock_quantity || 100,
                   stockStatus: 'พร้อมจ่าย'

@@ -91,15 +91,18 @@ func GetBillingQueues(c *gin.Context) {
 			totalAmount := 0.0
 			for _, disp := range dispensings {
 				var med models.Medicine
-				if disp.Medicine.ID > 0 {
+				if disp.Medicine.UnitPrice > 0 && disp.Medicine.Name != "" {
 					med = disp.Medicine
 				} else if disp.MedicineID > 0 {
 					config.DB.First(&med, disp.MedicineID)
 				}
+				if med.UnitPrice <= 0 || med.Name == "" {
+					med = FindMedicineByNameOrCode(disp.Medicine.MedicineCode, disp.Medicine.Name)
+				}
 
 				unitPrice := med.UnitPrice
 				if unitPrice <= 0 {
-					unitPrice = 50.0
+					unitPrice = 10.0
 				}
 				qty := disp.Quantity
 				if qty <= 0 {
@@ -154,18 +157,14 @@ func GetBillingQueues(c *gin.Context) {
 						cat, _ := mObj["category"].(string)
 
 						// Query real unit price and details from medicines table
-						var med models.Medicine
-						if mCode != "" {
-							config.DB.Where("medicine_code = ?", mCode).First(&med)
-						}
-						if med.ID == 0 && mName != "" {
-							config.DB.Where("name ILIKE ?", "%"+mName+"%").First(&med)
-						}
+						med := FindMedicineByNameOrCode(mCode, mName)
 
-						unitPrice := 0.0
-						if pVal, ok := mObj["price"]; ok {
-							if pNum, ok := pVal.(float64); ok && pNum > 0 {
-								unitPrice = pNum
+						unitPrice := med.UnitPrice
+						if unitPrice <= 0 {
+							if pVal, ok := mObj["price"]; ok {
+								if pNum, ok := pVal.(float64); ok && pNum > 0 {
+									unitPrice = pNum
+								}
 							}
 						}
 						if unitPrice <= 0 {
@@ -175,11 +174,8 @@ func GetBillingQueues(c *gin.Context) {
 								}
 							}
 						}
-						if unitPrice <= 0 && med.UnitPrice > 0 {
-							unitPrice = med.UnitPrice
-						}
 						if unitPrice <= 0 {
-							unitPrice = 50.0
+							unitPrice = 10.0
 						}
 
 						qty := 1

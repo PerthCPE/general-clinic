@@ -24,6 +24,67 @@ type RecordDispenseRequest struct {
 	Instructions string `json:"instructions"`
 }
 
+// FindMedicineByNameOrCode ค้นหายาและราคาต่อหน่วยจริงจากตาราง medicines
+func FindMedicineByNameOrCode(code, name string) models.Medicine {
+	var med models.Medicine
+	code = strings.TrimSpace(code)
+	name = strings.TrimSpace(name)
+
+	if code != "" {
+		if err := config.DB.Where("medicine_code = ? OR medicine_code ILIKE ?", code, code).First(&med).Error; err == nil && med.ID > 0 {
+			return med
+		}
+	}
+	if name == "" {
+		return med
+	}
+
+	// 1. Exact match name
+	if err := config.DB.Where("name = ? OR name ILIKE ?", name, name).First(&med).Error; err == nil && med.ID > 0 {
+		return med
+	}
+
+	// 2. Fetch all medicines and match smartly (handles "Amoxicillin 500mg (10 เม็ด)", "Paracetamol 500mg tab", etc.)
+	var allMeds []models.Medicine
+	if config.DB.Find(&allMeds).Error == nil && len(allMeds) > 0 {
+		lowerName := strings.ToLower(name)
+		for _, m := range allMeds {
+			mNameLower := strings.ToLower(m.Name)
+			gNameLower := strings.ToLower(m.GenericName)
+			cLower := strings.ToLower(m.MedicineCode)
+
+			if strings.Contains(lowerName, mNameLower) || strings.Contains(mNameLower, lowerName) {
+				return m
+			}
+			if gNameLower != "" && (strings.Contains(lowerName, gNameLower) || strings.Contains(gNameLower, lowerName)) {
+				return m
+			}
+			if cLower != "" && lowerName == cLower {
+				return m
+			}
+
+			fields := strings.Fields(mNameLower)
+			if len(fields) >= 2 && strings.Contains(lowerName, fields[0]) && strings.Contains(lowerName, fields[1]) {
+				return m
+			}
+			if len(fields) == 1 && strings.Contains(lowerName, fields[0]) {
+				return m
+			}
+		}
+
+		nameFields := strings.Fields(lowerName)
+		if len(nameFields) > 0 {
+			for _, m := range allMeds {
+				if strings.Contains(strings.ToLower(m.Name), nameFields[0]) || (m.GenericName != "" && strings.Contains(strings.ToLower(m.GenericName), nameFields[0])) {
+					return m
+				}
+			}
+		}
+	}
+
+	return med
+}
+
 // GET /api/pharmacy/dispensing/:visit_id - ดึงรายการจ่ายยาตาม Visit ID
 func GetDispensingByVisit(c *gin.Context) {
 	visitID := c.Param("visit_id")
@@ -46,6 +107,16 @@ func GetDispensingByVisit(c *gin.Context) {
 			}
 			if len(vIDs) > 0 {
 				config.DB.Preload("Medicine").Preload("Doctor").Where("visit_id IN ?", vIDs).Order("id desc").Find(&items)
+			}
+		}
+	}
+
+	// เติมข้อมูล Medicine จากตารางยาเสมอ เพื่อให้ได้ราคาจริงตามตารางยา
+	for i := range items {
+		if items[i].Medicine.UnitPrice <= 0 || items[i].Medicine.Name == "" {
+			realMed := FindMedicineByNameOrCode(items[i].Medicine.MedicineCode, items[i].Medicine.Name)
+			if realMed.ID > 0 {
+				items[i].Medicine = realMed
 			}
 		}
 	}

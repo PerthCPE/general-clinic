@@ -436,14 +436,8 @@ func SaveExamination(c *gin.Context) {
 		var medList []gin.H
 
 		for _, p := range req.Prescriptions {
-			var med models.Medicine
-			// ค้นหายาตามรหัสยา หรือชื่อยา
-			if p.MedicineCode != "" {
-				config.DB.Where("medicine_code = ?", p.MedicineCode).First(&med)
-			}
-			if med.ID == 0 && p.MedicineName != "" {
-				config.DB.Where("name ILIKE ? OR generic_name ILIKE ?", "%"+p.MedicineName+"%", "%"+p.MedicineName+"%").First(&med)
-			}
+			// ค้นหายาและราคาต่อหน่วยจริงจากตาราง medicines
+			med := FindMedicineByNameOrCode(p.MedicineCode, p.MedicineName)
 			if med.ID == 0 && p.MedicineID > 0 {
 				config.DB.First(&med, p.MedicineID)
 			}
@@ -452,12 +446,12 @@ func SaveExamination(c *gin.Context) {
 			if medID == 0 {
 				medID = 1
 			}
-			unitPrice := p.UnitPrice
-			if unitPrice <= 0 && med.UnitPrice > 0 {
-				unitPrice = med.UnitPrice
+			unitPrice := med.UnitPrice
+			if unitPrice <= 0 && p.UnitPrice > 0 {
+				unitPrice = p.UnitPrice
 			}
 			if unitPrice <= 0 {
-				unitPrice = 50.0
+				unitPrice = 10.0
 			}
 			qty := p.Quantity
 			if qty <= 0 {
