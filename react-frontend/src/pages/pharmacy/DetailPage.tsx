@@ -3,7 +3,7 @@ import './DetailPage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
-import { Check } from 'lucide-react';
+import { Check, Plus, Minus } from 'lucide-react';
 
 interface ToastState {
   message: string;
@@ -761,60 +761,138 @@ export default function DetailPage({
               <div className="patient-title-row">
                 <h3 className="patient-name">{activePatient.name}</h3>
                 <div className="patient-badges" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  <span className="badge ticket-badge">{activePatient.ticket}</span>
-                  <span className="badge hn-badge" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                    <CopyableText label="HN" value={activePatient.hn.replace(/[-]/g, '')} color="#FFFFFF" />
+                  <span style={{ 
+                    background: '#DCFCE7', 
+                    color: '#15803D', 
+                    border: '1.5px solid #86EFAC', 
+                    padding: '4px 10px', 
+                    borderRadius: '8px', 
+                    fontWeight: '800', 
+                    fontSize: '13px', 
+                    fontFamily: 'monospace' 
+                  }}>
+                    {activePatient.ticket}
+                  </span>
+                  <span style={{ 
+                    display: 'inline-flex', 
+                    alignItems: 'center', 
+                    background: '#DBEAFE', 
+                    border: '1.5px solid #93C5FD', 
+                    padding: '3px 8px', 
+                    borderRadius: '8px' 
+                  }}>
+                    <CopyableText label="HN" value={activePatient.hn.replace(/[-]/g, '')} color="#1E40AF" />
                   </span>
                   {activePatient.status === 'dispensed' && (
-                    <span style={{ background: '#DCFCE7', color: '#15803D', border: '1px solid #86EFAC', padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>
+                    <span style={{ background: '#DCFCE7', color: '#15803D', border: '1.5px solid #86EFAC', padding: '4px 10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '700' }}>
                       ✓ จ่ายยาแล้ว
                     </span>
                   )}
                 </div>
               </div>
-              <div className="patient-details" style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', fontSize: '0.95rem', color: '#CBD5E1' }}>
-                <span>เพศ {activePatient.gender}</span>
-                <span>อายุ {activePatient.age} ปี</span>
-                <span>เบอร์โทร: {activePatient.phone || '-'}</span>
+              <div className="patient-details" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center', fontSize: '0.95rem' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                  <span style={{ color: '#64748B', fontWeight: '500' }}>เพศ:</span> {activePatient.gender}
+                </span>
+                <span style={{ color: '#CBD5E1' }}>•</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                  <span style={{ color: '#64748B', fontWeight: '500' }}>อายุ:</span> {activePatient.age} ปี
+                </span>
+                <span style={{ color: '#CBD5E1' }}>•</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                  <span style={{ color: '#64748B', fontWeight: '500' }}>เบอร์โทร:</span> {activePatient.phone || '-'}
+                </span>
                 {activePatient.nationalId && (
-                  <span>เลขบัตร: <CopyableText value={activePatient.nationalId} color="#E2E8F0" /></span>
+                  <>
+                    <span style={{ color: '#CBD5E1' }}>•</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                      <CopyableText label="เลขบัตร ปชช." value={activePatient.nationalId} color="#0F172A" />
+                    </span>
+                  </>
                 )}
               </div>
             </div>
           </div>
 
           <div className="patient-card-footer">
-
               <div className="info-box">
-                <span className="info-label">สิทธิการรักษา (TREATMENT RIGHTS)</span>
-                <span className="info-val" style={{ color: '#60A5FA', fontWeight: 'bold' }}>
+                <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
+                  สิทธิการรักษา (TREATMENT RIGHTS)
+                </span>
+                <span className="info-val" style={{ color: '#1D4ED8', fontWeight: '800', fontSize: '15px' }}>
                   {currentRights}
                 </span>
               </div>
               <div className="info-box">
-                <span className="info-label">เวลาเข้ารักษา (VISIT TIME)</span>
-                <span className="info-val">{activePatient.visitDate} ({activePatient.visitTime})</span>
+                <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
+                  เวลาเข้ารักษา (VISIT TIME)
+                </span>
+                <span className="info-val" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>
+                  {activePatient.visitDate} ({activePatient.visitTime})
+                </span>
               </div>
               <div className="info-box">
-                <span className="info-label">ประวัติแพ้ยา (KNOWN ALLERGIES)</span>
+                <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
+                  ประวัติแพ้ยา (KNOWN ALLERGIES)
+                </span>
                 <div className="badge-wrapper">
-                  {activePatient.allergies.map((a, i) => (
-                    <span key={i} className="badge allergy-badge">{a}</span>
-                  ))}
+                  {activePatient.allergies.map((a, i) => {
+                    const hasAllergy = !a.includes('ไม่มี') && !a.includes('ปฏิเสธ');
+                    return (
+                      <span
+                        key={i}
+                        style={{
+                          background: hasAllergy ? '#FEE2E2' : '#DCFCE7',
+                          color: hasAllergy ? '#DC2626' : '#15803D',
+                          border: `1.5px solid ${hasAllergy ? '#FCA5A5' : '#86EFAC'}`,
+                          fontWeight: '700',
+                          padding: '3px 10px',
+                          borderRadius: '6px',
+                          fontSize: '12.5px',
+                          display: 'inline-flex',
+                          alignItems: 'center'
+                        }}
+                      >
+                        {a}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
               <div className="info-box">
-                <span className="info-label">โรคประจำตัว (CHRONIC DISEASES)</span>
-                <span className="info-val">{activePatient.chronicDiseases}</span>
+                <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
+                  โรคประจำตัว (CHRONIC DISEASES)
+                </span>
+                <span className="info-val" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>
+                  {activePatient.chronicDiseases || 'ไม่มี'}
+                </span>
               </div>
               <div className="info-box">
-                <span className="info-label">สัญญาณชีพ (CURRENT VITALS)</span>
-                <span className="info-val">{activePatient.vitals}</span>
+                <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
+                  สัญญาณชีพ (CURRENT VITALS)
+                </span>
+                <span className="info-val" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>
+                  {activePatient.vitals || 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C'}
+                </span>
               </div>
               <div className="info-box">
-                <span className="info-label">สถานะ (VISIT STATUS)</span>
+                <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
+                  สถานะ (VISIT STATUS)
+                </span>
                 <div className="badge-wrapper">
-                  <span className="badge status-badge-examining">{activePatient.visitStatus}</span>
+                  <span style={{
+                    background: activePatient.status === 'dispensed' ? '#DCFCE7' : '#DBEAFE',
+                    color: activePatient.status === 'dispensed' ? '#15803D' : '#1E40AF',
+                    border: `1.5px solid ${activePatient.status === 'dispensed' ? '#86EFAC' : '#93C5FD'}`,
+                    fontWeight: '700',
+                    padding: '4px 12px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    display: 'inline-flex',
+                    alignItems: 'center'
+                  }}>
+                    {activePatient.visitStatus}
+                  </span>
                 </div>
               </div>
             </div>
@@ -909,17 +987,55 @@ export default function DetailPage({
                                 <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>คำแนะนำ: {med.instructions}</div>
                               </td>
                               <td style={{ padding: '12px', textAlign: 'center' }}>
-                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#F8FAFC', padding: '4px 8px', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
+                                <div style={{ 
+                                  display: 'inline-flex', 
+                                  alignItems: 'center', 
+                                  background: '#F8FAFC', 
+                                  border: '1.5px solid #E2E8F0', 
+                                  borderRadius: '9999px', 
+                                  padding: '4px 6px', 
+                                  gap: '6px',
+                                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                                  transition: 'all 0.2s ease'
+                                }}>
                                   <button 
                                     type="button" 
                                     onClick={() => handleUpdateMedQty(index, Math.max(1, qty - 1))}
+                                    disabled={qty <= 1}
                                     style={{
-                                      width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #CBD5E1',
-                                      background: '#FFFFFF', cursor: 'pointer', fontWeight: '800', fontSize: '15px',
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569'
+                                      width: '28px',
+                                      height: '28px',
+                                      borderRadius: '50%',
+                                      border: '1px solid #E2E8F0',
+                                      background: qty <= 1 ? '#F1F5F9' : '#FFFFFF',
+                                      color: qty <= 1 ? '#CBD5E1' : '#334155',
+                                      cursor: qty <= 1 ? 'not-allowed' : 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: qty <= 1 ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.06)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      if (qty > 1) {
+                                        e.currentTarget.style.background = '#EF4444';
+                                        e.currentTarget.style.borderColor = '#EF4444';
+                                        e.currentTarget.style.color = '#FFFFFF';
+                                        e.currentTarget.style.transform = 'scale(1.08)';
+                                      }
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      if (qty > 1) {
+                                        e.currentTarget.style.background = '#FFFFFF';
+                                        e.currentTarget.style.borderColor = '#E2E8F0';
+                                        e.currentTarget.style.color = '#334155';
+                                        e.currentTarget.style.transform = 'scale(1)';
+                                      }
                                     }}
                                     title="ลดจำนวน"
-                                  >-</button>
+                                  >
+                                    <Minus size={13} strokeWidth={2.8} />
+                                  </button>
                                   <input 
                                     type="number" 
                                     min="1"
@@ -927,22 +1043,59 @@ export default function DetailPage({
                                     value={qty}
                                     onChange={(e) => handleUpdateMedQty(index, Math.max(1, parseInt(e.target.value) || 1))}
                                     style={{
-                                      width: '52px', height: '28px', textAlign: 'center', fontWeight: '800',
-                                      borderRadius: '6px', border: '1.5px solid #2563EB', fontSize: '14px',
-                                      color: '#0F172A', background: '#FFFFFF'
+                                      width: '42px',
+                                      height: '28px',
+                                      textAlign: 'center',
+                                      fontWeight: '800',
+                                      fontSize: '15px',
+                                      fontFamily: 'ui-monospace, monospace',
+                                      border: 'none',
+                                      background: 'transparent',
+                                      color: '#0F172A',
+                                      outline: 'none',
+                                      padding: '0'
                                     }}
                                   />
                                   <button 
                                     type="button" 
                                     onClick={() => handleUpdateMedQty(index, qty + 1)}
                                     style={{
-                                      width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #CBD5E1',
-                                      background: '#FFFFFF', cursor: 'pointer', fontWeight: '800', fontSize: '15px',
-                                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569'
+                                      width: '28px',
+                                      height: '28px',
+                                      borderRadius: '50%',
+                                      border: 'none',
+                                      background: '#2563EB',
+                                      color: '#FFFFFF',
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      boxShadow: '0 2px 4px rgba(37, 99, 235, 0.3)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.style.background = '#1D4ED8';
+                                      e.currentTarget.style.transform = 'scale(1.08)';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.style.background = '#2563EB';
+                                      e.currentTarget.style.transform = 'scale(1)';
                                     }}
                                     title="เพิ่มจำนวน"
-                                  >+</button>
-                                  <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: '600', marginLeft: '2px' }}>เม็ด</span>
+                                  >
+                                    <Plus size={13} strokeWidth={2.8} />
+                                  </button>
+                                  <span style={{
+                                    fontSize: '12px',
+                                    fontWeight: '700',
+                                    color: '#475569',
+                                    background: '#E2E8F0',
+                                    padding: '2px 8px',
+                                    borderRadius: '9999px',
+                                    marginLeft: '2px'
+                                  }}>
+                                    เม็ด
+                                  </span>
                                 </div>
                               </td>
                               <td style={{ padding: '12px', textAlign: 'center', fontWeight: '700', fontSize: '14.5px', color: '#0F172A' }}>
