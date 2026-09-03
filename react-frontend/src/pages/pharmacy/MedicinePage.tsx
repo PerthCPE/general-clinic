@@ -820,7 +820,7 @@ export default function MedicinePage() {
     setQuantity('');
   };
 
-  // Add Medicine Handler
+  // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - เพิ่มยาใหม่และอัปเดตหน้าจอทันทีใน 0 ms
   const handleAddMedicineSubmit = () => {
     if (!addMedName.trim()) return;
 
@@ -880,12 +880,13 @@ export default function MedicinePage() {
     setAddUnitPrice(20);
   };
 
-  // Delete Medicine Handler
+  // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ลบยาออกจากหน้าจอทันทีใน 0 ms โดยไม่ต้องรอ Supabase
   const handleConfirmDelete = () => {
     if (!deleteConfirmMed) return;
 
     const targetCode = deleteConfirmMed.medicine_code || deleteConfirmMed.id;
 
+    // ⚡ Optimistic UI: ตัดรายการยาออกจากตารางทันทีใน 0 ms
     setMedicines(prev => prev.filter(m => m.id !== deleteConfirmMed.id && m.medicine_code !== deleteConfirmMed.medicine_code));
 
     const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');

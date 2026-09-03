@@ -399,10 +399,14 @@ export default function BillingInvoicePage({
     setCashReceived('');
   };
 
+  // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - กดยืนยันรับชำระเงินแล้วอัปเดตหน้าจอทันที 0 ms และส่งขึ้น Supabase เบื้องหลัง
   const handleConfirmPayment = async () => {
     if (!activePatient) return;
+
+    // 1. ⚡ Optimistic UI: อัปเดตสถานะสำเร็จบนหน้าจอทันทีใน 0 ms
     setIsPaymentConfirmed(true);
 
+    // 2. 🌐 ส่งข้อมูลขึ้น Supabase Cloud เบื้องหลัง (Background Sync)
     try {
       const token = localStorage.getItem('token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };

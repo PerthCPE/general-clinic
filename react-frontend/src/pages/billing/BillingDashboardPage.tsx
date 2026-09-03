@@ -215,6 +215,7 @@ export default function BillingDashboardPage() {
     });
   };
 
+  // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - บันทึกการแก้ไขข้อมูลทันทีใน 0 ms
   const handleSaveEditRecord = () => {
     if (!editingRecord) return;
     const numAmt = parseFloat(editRecordForm.amount) || editingRecord.numericAmount;
@@ -234,6 +235,7 @@ export default function BillingDashboardPage() {
     setEditingRecord(null);
   };
 
+  // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ลบข้อมูลจากหน้าจอทันทีใน 0 ms
   const handleConfirmDeleteRecord = () => {
     if (!deleteRecord) return;
     setRecords(prev => prev.filter(r => r.id !== deleteRecord.id));

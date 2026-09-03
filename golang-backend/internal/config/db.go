@@ -1,10 +1,12 @@
-﻿package config
+package config
 
 import (
 	"fmt"
 	"log"
+	"time" // [เพิ่ม] ใช้งานสำหรับตั้งค่า Connection Pool Timeouts Bun เพิ่มมา
 
 	"clinic-backend/internal/models"
+
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -35,6 +37,20 @@ func ConnectDB() {
 	if err != nil {
 		log.Fatal("Failed to connect database. Error: ", err)
 	}
+
+	// ========================================================================= Bun เพิ่มมา
+	// [เพิ่มตรงนี้] ⚡ ตั้งค่า Database Connection Pool เพื่อเพิ่มความเร็วในการ Query
+	// ช่วย Reuse TCP/SSL Connection เดิม ไม่ต้องเสียเวลา Handshake ใหม่ทุกครั้งที่ส่งคำสั่ง SQL
+	// =========================================================================
+	sqlDB, err := database.DB()
+	if err == nil {
+		sqlDB.SetMaxIdleConns(10)                  // จำนวน Connection สำรองรอใช้งาน (ลดเวลาสร้าง connection ใหม่)
+		sqlDB.SetMaxOpenConns(50)                  // จำนวน Connection สูงสุดที่เปิดพร้อมกัน
+		sqlDB.SetConnMaxLifetime(time.Hour)        // อายุสูงสุดของ Connection (1 ชั่วโมง)
+		sqlDB.SetConnMaxIdleTime(10 * time.Minute) // ระยะเวลาพัก Connection ถ้าไม่ได้ใช้งาน
+		log.Println("Database Connection Pool Configured Successfully (Idle: 10, Max: 50)")
+	}
+	// =========================================================================
 
 	log.Println("Database Connection Established Successfully")
 
@@ -90,6 +106,14 @@ func ConnectDB() {
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS current_medications text DEFAULT ''")
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS smoking_history text DEFAULT ''")
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS alcohol_history text DEFAULT ''")
+
+	// ⚡ Database Indexes สำหรับเร่งความเร็วการ Query คิว, คนไข้, ประวัติการเงิน บน Supabase
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_created_at ON queues(created_at)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_status ON queues(status)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_billing_queues_status ON billing_queues(status)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_billing_histories_created_at ON billing_histories(created_at)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_patient_medicines_hn ON patient_medicines(hn)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_patients_hn ON patients(hn)")
 
 	DB = database
 

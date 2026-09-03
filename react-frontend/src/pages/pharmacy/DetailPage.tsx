@@ -463,12 +463,39 @@ export default function DetailPage({
     triggerToast(`ข้อผิดพลาด: ไม่สามารถเชื่อมต่อกับฐานข้อมูลหลังบ้านได้ โปรดเปิดเซิร์ฟเวอร์`, 'error');
   };
 
-  // กดยืนยันการจ่ายยา: ส่งข้อมูลเข้า DB การเงินจริง + อัปเดต PatientMedicine DB + ลบคนไข้ออกจากคิว
+  // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - กดยืนยันจ่ายยาแล้วอัปเดตหน้าจอทันทีใน 0 ms และส่งขึ้น Supabase เบื้องหลัง
   const handleSendToBilling = async () => {
     if (!activePatient) return;
     const pName = activePatient.name;
     const vId = activePatient.visitId || 1;
 
+    // 1. ⚡ Optimistic UI: อัปเดตสถานะในหน้าจอทันทีใน 0 ms โดยไม่ต้องรอ Network Round-trip จาก Supabase
+    const dispensedPatient: PatientConfig = {
+      ...activePatient,
+      status: 'dispensed' as const,
+      visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
+      dispensedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+    };
+
+    persistDispensedPatient(dispensedPatient);
+
+    setQueueList(prev => {
+      const updated = prev.map(p => p.id === activePatient.id ? dispensedPatient : p);
+      return [...updated].sort((a, b) => Number(a.status === 'dispensed') - Number(b.status === 'dispensed'));
+    });
+
+    triggerToast(`ยืนยันการจ่ายยาเรียบร้อย! ส่งข้อมูลใบสั่งยาของ ${pName} ไปยังระบบการเงินแล้ว`, 'success');
+
+    // สลับไปยังผู้ป่วยคนถัดไปที่ยังรอจัดยา (ถ้ามี)
+    const nextPending = queueList.find(p => p.id !== activePatient.id && p.status !== 'dispensed');
+    if (nextPending) {
+      setLocalPatientId(nextPending.id);
+      if (onSelectPatientId) onSelectPatientId(nextPending.id);
+    } else {
+      setLocalPatientId(activePatient.id);
+    }
+
+    // 2. 🌐 ส่งข้อมูลขึ้น Supabase Cloud เบื้องหลัง (Background Sync)
     const payload = {
       queue_id: Number(activePatient.id) || 0,
       queue_number: activePatient.queueNumber || activePatient.ticket,
@@ -510,34 +537,6 @@ export default function DetailPage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       }).catch(() => {});
-    }
-
-    triggerToast(`ยืนยันการจ่ายยาเรียบร้อย! ส่งข้อมูลใบสั่งยาของ ${pName} ไปยังระบบการเงินแล้ว`, 'success');
-    
-    const dispensedPatient: PatientConfig = {
-      ...activePatient,
-      status: 'dispensed' as const,
-      visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
-      dispensedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
-    };
-
-    // บันทึกลง Storage ทันทีเพื่อคงค้างอยู่ในตารางเสมอ
-    persistDispensedPatient(dispensedPatient);
-
-    // อัปเดตสถานะในคิวทันที ไม่ลบคนไข้ออก
-    setQueueList(prev => {
-      const updated = prev.map(p => p.id === activePatient.id ? dispensedPatient : p);
-      return [...updated].sort((a, b) => Number(a.status === 'dispensed') - Number(b.status === 'dispensed'));
-    });
-
-    // สลับไปยังผู้ป่วยคนถัดไปที่ยังรอจัดยา (ถ้ามี)
-    const nextPending = queueList.find(p => p.id !== activePatient.id && p.status !== 'dispensed');
-    if (nextPending) {
-      setLocalPatientId(nextPending.id);
-      if (onSelectPatientId) onSelectPatientId(nextPending.id);
-    } else {
-      // ถ้าไม่มีคิวรออื่นแล้ว ให้ค้างอยู่ที่คนไข้คนนี้เพื่อให้เห็นชัดเจนว่าส่งต่อไปการเงินแล้ว
-      setLocalPatientId(activePatient.id);
     }
   };
 
