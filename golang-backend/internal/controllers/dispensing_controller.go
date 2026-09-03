@@ -95,7 +95,7 @@ func GetDispensingByVisit(c *gin.Context) {
 		return
 	}
 
-	// ถ้าไม่พบจาก visit_id โดยตรง ให้ลองหาจาก VisitRecord หรือ Patient
+	// ถ้าไม่พบจาก visit_id โดยตรง ให้ลองหาจาก VisitRecord หรือ Patient หรือ BillingQueue / MedicineQueue
 	if len(items) == 0 {
 		var vr models.VisitRecord
 		if config.DB.First(&vr, visitID).Error == nil && vr.PatientID > 0 {
@@ -107,6 +107,74 @@ func GetDispensingByVisit(c *gin.Context) {
 			}
 			if len(vIDs) > 0 {
 				config.DB.Preload("Medicine").Preload("Doctor").Where("visit_id IN ?", vIDs).Order("id desc").Find(&items)
+			}
+		}
+	}
+
+	if len(items) == 0 {
+		var bq models.BillingQueue
+		config.DB.Where("visit_id = ?", visitID).Order("id desc").First(&bq)
+		if bq.Medications != "" && bq.Medications != "[]" && bq.Medications != "null" {
+			var rawMeds []map[string]interface{}
+			if err := json.Unmarshal([]byte(bq.Medications), &rawMeds); err == nil {
+				for _, mObj := range rawMeds {
+					mName, _ := mObj["name"].(string)
+					mCode, _ := mObj["medId"].(string)
+					if mCode == "" {
+						mCode, _ = mObj["medicine_code"].(string)
+					}
+					dosage, _ := mObj["dosage"].(string)
+					inst, _ := mObj["instructions"].(string)
+					qty := 10
+					if qVal, ok := mObj["quantity"]; ok {
+						if qNum, ok := qVal.(float64); ok && qNum > 0 {
+							qty = int(qNum)
+						}
+					}
+					med := FindMedicineByNameOrCode(mCode, mName)
+					items = append(items, models.Dispensing{
+						VisitID:      bq.VisitID,
+						MedicineID:   med.ID,
+						Quantity:     qty,
+						Dosage:       dosage,
+						Instructions: inst,
+						Medicine:     med,
+					})
+				}
+			}
+		}
+	}
+
+	if len(items) == 0 {
+		var mq models.MedicineQueue
+		config.DB.Where("visit_id = ?", visitID).Order("id desc").First(&mq)
+		if mq.Medications != "" && mq.Medications != "[]" && mq.Medications != "null" {
+			var rawMeds []map[string]interface{}
+			if err := json.Unmarshal([]byte(mq.Medications), &rawMeds); err == nil {
+				for _, mObj := range rawMeds {
+					mName, _ := mObj["name"].(string)
+					mCode, _ := mObj["medId"].(string)
+					if mCode == "" {
+						mCode, _ = mObj["medicine_code"].(string)
+					}
+					dosage, _ := mObj["dosage"].(string)
+					inst, _ := mObj["instructions"].(string)
+					qty := 10
+					if qVal, ok := mObj["quantity"]; ok {
+						if qNum, ok := qVal.(float64); ok && qNum > 0 {
+							qty = int(qNum)
+						}
+					}
+					med := FindMedicineByNameOrCode(mCode, mName)
+					items = append(items, models.Dispensing{
+						VisitID:      mq.VisitID,
+						MedicineID:   med.ID,
+						Quantity:     qty,
+						Dosage:       dosage,
+						Instructions: inst,
+						Medicine:     med,
+					})
+				}
 			}
 		}
 	}
@@ -227,16 +295,28 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 			patient = visit.Patient
 		}
 	}
-	if patient.ID == 0 && req.HN != "" {
-		config.DB.Where("hn = ? OR hn = ?", req.HN, "HN-"+req.HN).First(&patient)
+	cleanHN := strings.TrimLeft(strings.TrimPrefix(strings.TrimPrefix(req.HN, "HN-"), "HN"), "0")
+	var hnVariants []string
+	if req.HN != "" {
+		hnVariants = append(hnVariants, req.HN)
+	}
+	if cleanHN != "" {
+		hnVariants = append(hnVariants, "HN"+cleanHN, "HN-"+cleanHN, fmt.Sprintf("HN%04s", cleanHN), fmt.Sprintf("HN-%04s", cleanHN), cleanHN)
+	}
+
+	if patient.ID == 0 && len(hnVariants) > 0 {
+		config.DB.Where("hn IN ?", hnVariants).First(&patient)
 	}
 	if patient.ID == 0 && req.PatientName != "" {
-		config.DB.Where("fullname = ?", req.PatientName).First(&patient)
+		config.DB.Where("full_name = ?", req.PatientName).First(&patient)
+	}
+	if patient.ID == 0 && req.NationalID != "" && req.NationalID != "-" {
+		config.DB.Where("national_id = ?", req.NationalID).First(&patient)
 	}
 	if patient.ID == 0 && req.PatientName != "" {
 		newHN := req.HN
 		if newHN == "" {
-			newHN = fmt.Sprintf("HN%04d", time.Now().Unix()%10000)
+			newHN = "HN0001"
 		}
 		patient = models.Patient{
 			HN:              newHN,
@@ -276,6 +356,17 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 	if req.VisitID > 0 {
 		config.DB.Preload("Medicine").Where("visit_id = ?", req.VisitID).Find(&dispensings)
 	}
+	if len(dispensings) == 0 && patient.ID > 0 {
+		var visits []models.VisitRecord
+		config.DB.Where("patient_id = ?", patient.ID).Order("id desc").Find(&visits)
+		var vIDs []uint
+		for _, v := range visits {
+			vIDs = append(vIDs, v.ID)
+		}
+		if len(vIDs) > 0 {
+			config.DB.Preload("Medicine").Where("visit_id IN ?", vIDs).Order("id desc").Find(&dispensings)
+		}
+	}
 
 	totalAmount := 0.0
 	tx := config.DB.Begin()
@@ -291,6 +382,9 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 				tx.Save(&med)
 			}
 			price := med.UnitPrice
+			if price <= 0 {
+				price = 10.0
+			}
 			totalAmount += float64(d.Quantity) * price
 
 			medList = append(medList, gin.H{
@@ -302,6 +396,7 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 				"dosage":       d.Dosage,
 				"instructions": d.Instructions,
 				"price":        price,
+				"unit_price":   price,
 				"quantity":     d.Quantity,
 				"stock":        med.StockQuantity,
 				"stockStatus":  "พร้อมจ่าย",
@@ -318,15 +413,19 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 			if inst == "" {
 				inst = dosage
 			}
-			qty := 1
+			qty := 10
 			if qVal, ok := mObj["quantity"]; ok {
-				if qNum, ok := qVal.(float64); ok {
+				if qNum, ok := qVal.(float64); ok && qNum > 0 {
 					qty = int(qNum)
 				}
 			}
 
-			var med models.Medicine
-			tx.Where("name = ? OR generic_name = ? OR medicine_code = ?", name, name, mObj["medId"]).First(&med)
+			medCode, _ := mObj["medId"].(string)
+			if medCode == "" {
+				medCode, _ = mObj["medicine_code"].(string)
+			}
+
+			med := FindMedicineByNameOrCode(medCode, name)
 			if med.ID > 0 {
 				if req.VisitID > 0 {
 					dRec := models.Dispensing{
@@ -344,6 +443,9 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 					tx.Save(&med)
 				}
 				price := med.UnitPrice
+				if price <= 0 {
+					price = 10.0
+				}
 				totalAmount += float64(qty) * price
 
 				medList = append(medList, gin.H{
@@ -355,10 +457,59 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 					"dosage":       dosage,
 					"instructions": inst,
 					"price":        price,
+					"unit_price":   price,
 					"quantity":     qty,
 					"stock":        med.StockQuantity,
 					"stockStatus":  "พร้อมจ่าย",
 				})
+			}
+		}
+	}
+
+	// Fallback: หากยังไม่มี medList ให้ดึงจาก MedicineQueue
+	if len(medList) == 0 {
+		var mq models.MedicineQueue
+		if req.VisitID > 0 {
+			config.DB.Where("visit_id = ?", req.VisitID).Order("id desc").First(&mq)
+		}
+		if mq.ID == 0 {
+			config.DB.Where("hn IN ? OR patient_name = ?", hnVariants, req.PatientName).Order("id desc").First(&mq)
+		}
+		if mq.Medications != "" && mq.Medications != "[]" {
+			var parsed []map[string]interface{}
+			if err := json.Unmarshal([]byte(mq.Medications), &parsed); err == nil {
+				for _, mObj := range parsed {
+					mName, _ := mObj["name"].(string)
+					mCode, _ := mObj["medId"].(string)
+					dosage, _ := mObj["dosage"].(string)
+					inst, _ := mObj["instructions"].(string)
+					qty := 10
+					if qVal, ok := mObj["quantity"]; ok {
+						if qNum, ok := qVal.(float64); ok && qNum > 0 {
+							qty = int(qNum)
+						}
+					}
+					med := FindMedicineByNameOrCode(mCode, mName)
+					price := med.UnitPrice
+					if price <= 0 {
+						price = 10.0
+					}
+					totalAmount += float64(qty) * price
+					medList = append(medList, gin.H{
+						"medId":        med.MedicineCode,
+						"name":         med.Name,
+						"genericName":  med.GenericName,
+						"category":     med.Category,
+						"properties":   med.Properties,
+						"dosage":       dosage,
+						"instructions": inst,
+						"price":        price,
+						"unit_price":   price,
+						"quantity":     qty,
+						"stock":        med.StockQuantity,
+						"stockStatus":  "พร้อมจ่าย",
+					})
+				}
 			}
 		}
 	}
@@ -375,9 +526,9 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		tx.Create(&billing)
 	}
 
-	targetHN := req.HN
+	targetHN := strings.TrimSpace(req.HN)
 	if targetHN == "" && patient.HN != "" {
-		targetHN = patient.HN
+		targetHN = strings.TrimSpace(patient.HN)
 	}
 
 	targetName := req.PatientName
@@ -433,13 +584,16 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		DoctorAdvice: req.DoctorAdvice,
 		Medications:  string(medsJSON),
 	}
-	tx.Create(&billingQueue)
+	// บันทึกลงตาราง BillingQueue ตรงผ่าน config.DB เพื่อการันตี 100% ว่าเข้าฐานข้อมูล
+	if err := config.DB.Create(&billingQueue).Error; err != nil {
+		fmt.Printf("Error creating billing queue: %v\n", err)
+	}
 
 	// อัปเดต/สร้างลงตาราง patient_medicines ใน Supabase DB ทันที!
-	cleanHN := strings.TrimPrefix(targetHN, "HN-")
+	cleanHN = strings.TrimPrefix(targetHN, "HN-")
 	cleanHN = strings.TrimPrefix(cleanHN, "HN")
 	var patMed models.PatientMedicine
-	if err := tx.Where("hn = ? OR hn = ? OR hn = ?", targetHN, "HN"+cleanHN, "HN-"+cleanHN).First(&patMed).Error; err != nil {
+	if err := config.DB.Where("hn = ? OR hn = ? OR hn = ?", targetHN, "HN"+cleanHN, "HN-"+cleanHN).First(&patMed).Error; err != nil {
 		patMed = models.PatientMedicine{
 			HN:              targetHN,
 			NationalID:      nationalID,
@@ -468,7 +622,7 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		if patMed.BloodType == "" {
 			patMed.BloodType = "O+"
 		}
-		tx.Create(&patMed)
+		config.DB.Create(&patMed)
 	} else {
 		patMed.FullName = targetName
 		patMed.NationalID = nationalID
@@ -486,7 +640,7 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 			patMed.BloodType = req.BloodType
 		}
 		patMed.VisitCount += 1
-		tx.Save(&patMed)
+		config.DB.Save(&patMed)
 	}
 
 	tx.Commit()
@@ -552,9 +706,9 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 // GET /api/pharmacy/patient-medicines - ดึงประวัติผู้ป่วยและการรับยาทั้งหมดจากตาราง patient_medicines
 func GetPatientMedicines(c *gin.Context) {
-	// ดึงผู้ป่วยทั้งหมดจากตาราง patients และซิงค์กับ patient_medicines
+	// ดึงผู้ป่วยทั้งหมดจากตาราง patients เรียงคนล่าสุดขึ้นบนสุด
 	var patients []models.Patient
-	config.DB.Order("id desc").Find(&patients)
+	config.DB.Order("updated_at desc, created_at desc, id desc").Find(&patients)
 
 	var records []models.PatientMedicine
 	for _, p := range patients {

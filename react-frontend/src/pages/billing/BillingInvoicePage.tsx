@@ -116,7 +116,7 @@ export default function BillingInvoicePage({
       unit_price: unitPrice,
       quantity: qty,
       stock: m.stock_quantity || 100,
-      stockStatus: 'พร้อมจ่าย'
+      stockStatus: (m.stock_quantity || 100) > 10 ? ('in-stock' as const) : ('low-stock' as const)
     };
   };
 
@@ -169,21 +169,58 @@ export default function BillingInvoicePage({
               medications: parsedMeds
             };
           });
-          setQueueList(mapped);
+          setQueueList(prev => {
+            if (mapped.length === 0) return prev;
+            const existingIds = new Set(mapped.map((m: any) => m.id));
+            const keepPrev = prev.filter(p => !existingIds.has(p.id) && p.visitStatus === 'รอชำระเงิน');
+            return [...mapped, ...keepPrev];
+          });
           setLoading(false);
           return;
         }
       }
-    } catch {}
-    setQueueList([]);
+    } catch (err) {
+      console.error('Failed to fetch queues in billing invoice:', err);
+    }
     setLoading(false);
   };
 
   useEffect(() => {
     fetchQueues();
 
-    const unsubBill = subscribe('BILLING_CREATED', () => {
-      fetchQueues();
+    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      if (data) {
+        const pName = data.patient_name || 'ผู้ป่วย';
+        const newPatient: PatientConfig = {
+          id: String(data.queue_id || data.id || data.visit_id || Date.now()),
+          visitId: data.visit_id || 1,
+          hn: data.hn || `HN-${Date.now()}`,
+          nationalId: data.national_id || '-',
+          queueNumber: data.queue_number || 'B-001',
+          ticket: data.queue_number || 'B-001',
+          name: pName,
+          shortName: pName,
+          gender: data.gender || 'ชาย',
+          age: data.age || 35,
+          treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+          patientType: 'ผู้ป่วยนอก (OPD)' as const,
+          allergies: ['ไม่มีประวัติแพ้ยา'],
+          chronicDiseases: 'ไม่มี',
+          vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+          dob: '01/01/2534',
+          phone: '081-999-8888',
+          occupation: 'รับจ้างทั่วไป',
+          visitStatus: 'รอชำระเงิน',
+          visitDate: new Date(data.created_at || Date.now()).toLocaleDateString('th-TH'),
+          visitTime: new Date(data.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+          doctorAdvice: data.doctor_advice || 'พักผ่อนให้เพียงพอ',
+          medications: Array.isArray(data.medications) ? data.medications.map((m: any) => parseDispensedMed(m, masterMedicines)) : []
+        };
+        setQueueList(prev => [newPatient, ...prev.filter(q => q.id !== newPatient.id)]);
+      }
+      setTimeout(() => {
+        fetchQueues();
+      }, 500);
     });
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
@@ -198,7 +235,7 @@ export default function BillingInvoicePage({
       unsubBill();
       unsubQueue();
     };
-  }, [subscribe]);
+  }, [subscribe, masterMedicines.length]);
 
   const currentSelectedId = selectedPatientId || localStorage.getItem('billing_active_patient') || '';
   const activePatient: PatientConfig | undefined = 
@@ -232,7 +269,7 @@ export default function BillingInvoicePage({
             }
           }
 
-          // Fallback: ดึงจาก patient-medicines ตาม HN
+          // Fallback 1: ดึงจาก patient-medicines ตาม HN
           if (activePatient.hn) {
             let hnRes = await fetch(`/api/pharmacy/patient-medicines/${encodeURIComponent(activePatient.hn)}`);
             if (!hnRes.ok) {
@@ -253,6 +290,31 @@ export default function BillingInvoicePage({
                   }
                   return q;
                 }));
+                return;
+              }
+            }
+          }
+
+          // Fallback 2: ดึงจาก /api/billing/queues
+          let bRes = await fetch('/api/billing/queues');
+          if (!bRes.ok) bRes = await fetch('/api/system/billing/queues');
+          if (bRes.ok) {
+            const bData = await bRes.json();
+            if (bData.status === 'success' && Array.isArray(bData.queues)) {
+              const match = bData.queues.find((q: any) => String(q.id) === activePatient.id || q.hn === activePatient.hn || q.patient_name === activePatient.name);
+              if (match && match.medications) {
+                try {
+                  const rawMeds = typeof match.medications === 'string' ? JSON.parse(match.medications) : match.medications;
+                  if (Array.isArray(rawMeds) && rawMeds.length > 0) {
+                    const fetchedMeds = rawMeds.map((item: any) => parseDispensedMed(item, masterMedicines));
+                    setQueueList(prev => prev.map(q => {
+                      if (q.id === activePatient.id) {
+                        return { ...q, medications: fetchedMeds };
+                      }
+                      return q;
+                    }));
+                  }
+                } catch {}
               }
             }
           }

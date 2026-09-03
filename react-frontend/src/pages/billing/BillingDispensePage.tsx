@@ -62,6 +62,27 @@ export default function BillingDispensePage({
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isToastFading, setIsToastFading] = useState(false);
+  const [copiedHn, setCopiedHn] = useState<string | null>(null);
+
+  const handleCopyHn = (hn: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!hn) return;
+    const clean = hn.replace(/[-]/g, '');
+    try {
+      navigator.clipboard.writeText(clean);
+      setCopiedHn(clean);
+      setTimeout(() => setCopiedHn(null), 1500);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = clean;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedHn(clean);
+      setTimeout(() => setCopiedHn(null), 1500);
+    }
+  };
 
   const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
 
@@ -89,7 +110,7 @@ export default function BillingDispensePage({
     let category = m.category || 'ยาสามัญ';
     let properties = m.properties || 'ยาตามแพทย์สั่งจ่าย';
     let unitPrice = Number(m.unit_price ?? m.price ?? item.unit_price ?? item.price ?? 0);
-    const qty = Number(item.quantity ?? item.qty ?? m.quantity ?? 1);
+    const qty = Number(item.quantity ?? item.qty ?? m.quantity ?? 10) || 10;
     const dosage = item.dosage || m.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
     const instructions = item.instructions || m.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น';
 
@@ -142,7 +163,7 @@ export default function BillingDispensePage({
       unit_price: unitPrice,
       quantity: qty,
       stock: m.stock_quantity || 100,
-      stockStatus: (m.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
+      stockStatus: (m.stock_quantity || 100) > 10 ? ('in-stock' as const) : ('low-stock' as const)
     };
   };
 
@@ -193,7 +214,59 @@ export default function BillingDispensePage({
                 medications: parsedMeds
               };
             });
-            setQueueList(mapped);
+            if (mapped.length === 0) {
+              // Fallback: ดึงจากคิวกลางของคลินิก /api/queue/list หากยังไม่มีใน billing_queues
+              try {
+                let qRes = await fetch('/api/queue/list', { headers });
+                if (!qRes.ok) qRes = await fetch('/api/system/queues');
+                if (qRes.ok) {
+                  const qData = await qRes.json();
+                  const list = Array.isArray(qData) ? qData : (qData.queues || []);
+                  const waitingPayment = list.filter((q: any) => 
+                    ['รอชำระเงิน', 'รอรับยา'].includes(q.status) || ['รอชำระเงิน', 'รอรับยา'].includes(q.queueStatus)
+                  );
+                  if (waitingPayment.length > 0) {
+                    const mappedFallback = waitingPayment.map((q: any) => {
+                      const p = q.patient || {};
+                      const hn = p.hn || q.hn || `HN${q.id || 1}`;
+                      const pName = p.fullname || q.patientName || q.name || 'ผู้ป่วย';
+                      return {
+                        id: String(q.id),
+                        visitId: q.visit_id || q.visitId || 1,
+                        hn: hn.replace(/[-]/g, ''),
+                        nationalId: p.national_id || q.idCard || '-',
+                        queueNumber: q.queue_number || q.queueNo || 'B-001',
+                        ticket: q.queue_number || q.queueNo || 'B-001',
+                        name: pName,
+                        shortName: pName,
+                        gender: p.gender || 'หญิง',
+                        age: p.age || 35,
+                        treatmentRights: p.scheme_type || 'บัตรทอง (สปสช.)',
+                        patientType: 'ผู้ป่วยนอก (OPD)' as const,
+                        allergies: ['ไม่มีประวัติแพ้ยา'],
+                        chronicDiseases: 'ไม่มี',
+                        vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+                        visitStatus: 'รอรับยา / ชำระเงิน',
+                        visitDate: new Date().toLocaleDateString('th-TH'),
+                        visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+                        doctorAdvice: q.note || 'ตรวจเรียบร้อย รอชำระเงินและรับยา',
+                        medications: []
+                      };
+                    });
+                    setQueueList(mappedFallback);
+                    setLocalPatientId(mappedFallback[0].id);
+                    return;
+                  }
+                }
+              } catch {}
+            }
+
+            setQueueList(prev => {
+              if (mapped.length === 0) return prev;
+              const existingIds = new Set(mapped.map((m: any) => m.id));
+              const keepPrev = prev.filter(p => !existingIds.has(p.id) && p.visitStatus === 'รอรับยา / ชำระเงิน');
+              return [...mapped, ...keepPrev];
+            });
             setLocalPatientId(prev => {
               if (mapped.length > 0) {
                 if (!prev || !mapped.find((q: any) => q.id === prev)) {
@@ -201,17 +274,13 @@ export default function BillingDispensePage({
                 }
                 return prev;
               }
-              return '';
+              return prev;
             });
             return;
           }
         }
-        setQueueList([]);
-        setLocalPatientId('');
       } catch (err) {
         console.error('Failed to fetch initial billing queue:', err);
-        setQueueList([]);
-        setLocalPatientId('');
       }
     };
     
@@ -243,18 +312,32 @@ export default function BillingDispensePage({
           visitDate: new Date().toLocaleDateString('th-TH'),
           visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
           doctorAdvice: data.doctor_advice || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
-          medications: data.medications || [],
+          medications: Array.isArray(data.medications) ? data.medications.map((m: any) => parseDispensedMed(m, masterMedicines)) : [],
         };
         setQueueList(prev => [newPatient, ...prev.filter(q => q.id !== newPatient.id)]);
         setLocalPatientId(newPatient.id);
         if (onSelectPatientId) onSelectPatientId(newPatient.id);
-        triggerToast(`ได้รับคิวใหม่จากการจัดการยา: ${pName} (${data.queue_number || ''})`, 'doctor');
+        triggerToast(`ได้รับคิวใหม่สำหรับการเงิน: ${pName} (${data.queue_number || ''})`, 'doctor');
       }
+      fetchInitialQueue();
+    });
+
+    const unsubExam = subscribe('EXAMINATION_SAVED', () => {
+      fetchInitialQueue();
+    });
+
+    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', () => {
+      fetchInitialQueue();
+    });
+
+    const unsubDispense = subscribe('DISPENSE_RECORDED', () => {
+      fetchInitialQueue();
     });
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
       if (data && data.action === 'db_reset') {
         setQueueList([]);
+        setLocalPatientId('');
       } else {
         fetchInitialQueue();
       }
@@ -266,10 +349,13 @@ export default function BillingDispensePage({
 
     return () => {
       unsubBill();
+      unsubExam();
+      unsubMedQ();
+      unsubDispense();
       unsubQueue();
       unsubPay();
     };
-  }, [subscribe]);
+  }, [subscribe, masterMedicines.length]);
 
   // Real-time Query Medications from DB for Active Billing Patient
   useEffect(() => {
@@ -297,7 +383,7 @@ export default function BillingDispensePage({
             }
           }
 
-          // Fallback: ดึงจาก patient-medicines ตาม HN
+          // Fallback 1: ดึงจาก patient-medicines ตาม HN
           if (activePatient.hn) {
             let hnRes = await fetch(`/api/pharmacy/patient-medicines/${encodeURIComponent(activePatient.hn)}`);
             if (!hnRes.ok) {
@@ -318,6 +404,31 @@ export default function BillingDispensePage({
                   }
                   return q;
                 }));
+                return;
+              }
+            }
+          }
+
+          // Fallback 2: ดึงจาก /api/billing/queues
+          let bRes = await fetch('/api/billing/queues');
+          if (!bRes.ok) bRes = await fetch('/api/system/billing/queues');
+          if (bRes.ok) {
+            const bData = await bRes.json();
+            if (bData.status === 'success' && Array.isArray(bData.queues)) {
+              const match = bData.queues.find((q: any) => String(q.id) === activePatient.id || q.hn === activePatient.hn || q.patient_name === activePatient.name);
+              if (match && match.medications) {
+                try {
+                  const rawMeds = typeof match.medications === 'string' ? JSON.parse(match.medications) : match.medications;
+                  if (Array.isArray(rawMeds) && rawMeds.length > 0) {
+                    const fetchedMeds = rawMeds.map((item: any) => parseDispensedMed(item, masterMedicines));
+                    setQueueList(prev => prev.map(q => {
+                      if (q.id === activePatient.id) {
+                        return { ...q, medications: fetchedMeds };
+                      }
+                      return q;
+                    }));
+                  }
+                } catch {}
               }
             }
           }
@@ -327,7 +438,7 @@ export default function BillingDispensePage({
       };
       fetchMeds();
     }
-  }, [activePatient?.id, activePatient?.visitId, activePatient?.hn]);
+  }, [activePatient?.id, activePatient?.visitId, activePatient?.hn, masterMedicines.length]);
 
   const triggerToast = (message: string, type: 'success' | 'error' | 'doctor') => {
     setIsToastFading(false);
@@ -383,7 +494,7 @@ export default function BillingDispensePage({
   };
 
   const medTotal = activePatient && Array.isArray(activePatient.medications) 
-    ? activePatient.medications.reduce((sum, m) => sum + (Number(m?.price) || 0), 0) 
+    ? activePatient.medications.reduce((sum, m: any) => sum + ((Number(m?.price || m?.unit_price) || 0) * (Number(m?.quantity) || 1)), 0) 
     : 0;
 
   return (
@@ -559,8 +670,50 @@ export default function BillingDispensePage({
                           </span>
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                          <span style={{ fontSize: '14.5px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
-                            {p.hn.replace(/[-]/g, '')}
+                          <span
+                            onClick={(e) => handleCopyHn(p.hn, e)}
+                            title={copiedHn === p.hn.replace(/[-]/g, '') ? 'คัดลอกแล้ว!' : 'คลิกเพื่อคัดลอก HN'}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              cursor: 'pointer',
+                              position: 'relative',
+                              userSelect: 'none'
+                            }}
+                          >
+                            <span style={{ fontSize: '14.5px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                              {p.hn.replace(/[-]/g, '')}
+                            </span>
+                            {copiedHn === p.hn.replace(/[-]/g, '') ? (
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            ) : (
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                            )}
+                            {copiedHn === p.hn.replace(/[-]/g, '') && (
+                              <span style={{
+                                position: 'absolute',
+                                top: '-24px',
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                backgroundColor: '#0F172A',
+                                color: '#FFFFFF',
+                                fontSize: '10px',
+                                fontWeight: 'bold',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                whiteSpace: 'nowrap',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                                zIndex: 50
+                              }}>
+                                คัดลอกแล้ว!
+                              </span>
+                            )}
                           </span>
                         </td>
                         <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'left' }}>
@@ -618,7 +771,60 @@ export default function BillingDispensePage({
           {/* Prescription List */}
           <div className="prescription-card card">
             <div className="card-top-row">
-              <h2 className="card-heading">รายการยา - {activePatient.name}</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <h2 className="card-heading" style={{ margin: 0 }}>
+                  รายการยา - {activePatient.name}
+                </h2>
+                <span
+                  onClick={(e) => handleCopyHn(activePatient.hn, e)}
+                  title={copiedHn === activePatient.hn.replace(/[-]/g, '') ? 'คัดลอกแล้ว!' : 'คลิกเพื่อคัดลอก HN'}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    userSelect: 'none',
+                    background: '#F8FAFC',
+                    padding: '3px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid #E2E8F0'
+                  }}
+                >
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', fontFamily: 'monospace' }}>
+                    {activePatient.hn.replace(/[-]/g, '')}
+                  </span>
+                  {copiedHn === activePatient.hn.replace(/[-]/g, '') ? (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  ) : (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  )}
+                  {copiedHn === activePatient.hn.replace(/[-]/g, '') && (
+                    <span style={{
+                      position: 'absolute',
+                      top: '-24px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      backgroundColor: '#0F172A',
+                      color: '#FFFFFF',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                      zIndex: 50
+                    }}>
+                      คัดลอกแล้ว!
+                    </span>
+                  )}
+                </span>
+              </div>
               <select className="doctor-select">
                 <option>ใบสั่งยาของแพทย์ประจำวัน</option>
               </select>
@@ -634,24 +840,39 @@ export default function BillingDispensePage({
               />
             </div>
 
-
-
             <table className="dispense-table">
               <thead>
                 <tr>
                   <th>ชื่อรายการยา</th>
                   <th>ขนาด/วิธีใช้</th>
+                  <th style={{ textAlign: 'right' }}>ราคา/หน่วย</th>
                   <th style={{ textAlign: 'right' }}>จำนวน</th>
+                  <th style={{ textAlign: 'right' }}>รวมเงิน</th>
                 </tr>
               </thead>
               <tbody>
-                {(activePatient?.medications || []).map((med, idx) => (
-                  <tr key={idx}>
-                    <td className="item-name font-bold">{med.name}</td>
-                    <td>{med.dosage}</td>
-                    <td style={{ textAlign: 'right' }}>{(med as any).quantity || 1}</td>
+                {(activePatient?.medications && activePatient.medications.length > 0) ? (
+                  activePatient.medications.map((med, idx) => {
+                    const uPrice = Number((med as any).price || (med as any).unit_price) || 0;
+                    const qty = Number((med as any).quantity) || 10;
+                    const lineTotal = uPrice * qty;
+                    return (
+                      <tr key={idx}>
+                        <td className="item-name font-bold">{med.name}</td>
+                        <td>{med.dosage}</td>
+                        <td style={{ textAlign: 'right', color: '#64748B' }}>฿ {uPrice.toLocaleString()}</td>
+                        <td style={{ textAlign: 'right', fontWeight: '600' }}>{qty}</td>
+                        <td style={{ textAlign: 'right', fontWeight: '700', color: '#0F172A' }}>฿ {lineTotal.toLocaleString()}</td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: '#64748B', fontStyle: 'italic' }}>
+                      กำลังดึงรายการยาและราคาจากแพทย์...
+                    </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -677,17 +898,22 @@ export default function BillingDispensePage({
             </div>
 
             <div className="summary-items">
-              {(activePatient?.medications || []).map((med, idx) => (
-                <div key={idx} className="summary-item">
-                  <div className="item-details">
-                    <div className="item-title">{med.name}</div>
-                    <div className="item-sub">{med.dosage}</div>
+              {(activePatient?.medications || []).map((med: any, idx) => {
+                const uPrice = Number(med.price || med.unit_price) || 0;
+                const qty = Number(med.quantity) || 1;
+                const itemTotal = uPrice * qty;
+                return (
+                  <div key={idx} className="summary-item">
+                    <div className="item-details">
+                      <div className="item-title">{med.name} (x{qty})</div>
+                      <div className="item-sub">{med.dosage}</div>
+                    </div>
+                    <div className="item-price">
+                      ฿ {itemTotal.toLocaleString()}
+                    </div>
                   </div>
-                  <div className="item-price">
-                    ฿ {(((Number(med.price || (med as any).unit_price) || 0) * (Number((med as any).quantity) || 1))).toLocaleString()}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="summary-divider"></div>

@@ -86,28 +86,35 @@ export default function DetailPage({
         if (pRes.ok) {
           const pData = await pRes.json();
           if (pData.status === 'success' && Array.isArray(pData.queues)) {
-            const mappedQueues = pData.queues.map((pq: any) => ({
-              id: String(pq.id),
-              visitId: pq.visit_id || 1,
-              hn: pq.hn || `HN-${pq.id}`,
-              nationalId: pq.national_id || '',
-              queueNumber: pq.queue_number || 'Q0001',
-              ticket: pq.queue_number || 'A-01',
-              name: pq.patient_name || 'ผู้ป่วย',
-              shortName: pq.patient_name || 'ผู้ป่วย',
-              gender: pq.gender || 'ชาย',
-              age: pq.age || 35,
-              treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
-              patientType: 'ผู้ป่วยนอก (OPD)' as const,
-              allergies: pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา'],
-              chronicDiseases: pq.chronic_diseases || 'ไม่มี',
-              vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-              visitStatus: 'รอรับยา / ชำระเงิน',
-              visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
-              visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-              doctorAdvice: pq.doctor_advice || 'พักผ่อนให้เพียงพอ ทานยาตามแพทย์สั่ง',
-              medications: pq.medications || []
-            }));
+            const mappedQueues = pData.queues.map((pq: any) => {
+              const cleanHN = (pq.hn || pq.patient?.hn || '').replace(/[-]/g, '');
+              let rawMeds = pq.medications || [];
+              if (typeof rawMeds === 'string') {
+                try { rawMeds = JSON.parse(rawMeds); } catch { rawMeds = []; }
+              }
+              return {
+                id: String(pq.id),
+                visitId: pq.visit_id || 1,
+                hn: cleanHN || `HN0001`,
+                nationalId: pq.national_id || '',
+                queueNumber: pq.queue_number || 'Q0001',
+                ticket: pq.queue_number || 'A-01',
+                name: pq.patient_name || 'ผู้ป่วย',
+                shortName: pq.patient_name || 'ผู้ป่วย',
+                gender: pq.gender || 'ชาย',
+                age: pq.age || 35,
+                treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+                patientType: 'ผู้ป่วยนอก (OPD)' as const,
+                allergies: pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา'],
+                chronicDiseases: pq.chronic_diseases || 'ไม่มี',
+                vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+                visitStatus: 'รอรับยา / ชำระเงิน',
+                visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
+                visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+                doctorAdvice: pq.doctor_advice || 'พักผ่อนให้เพียงพอ ทานยาตามแพทย์สั่ง',
+                medications: rawMeds
+              };
+            });
             setQueueList(mappedQueues);
             setLocalPatientId(prev => {
               if (mappedQueues.length > 0) {
@@ -158,46 +165,89 @@ export default function DetailPage({
       }
     });
 
+    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', (data: any) => {
+      fetchQueues();
+      triggerToast('ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์', 'doctor');
+    });
+
     return () => {
       unsubQueue();
       unsubExam();
       unsubVisit();
       unsubCreated();
+      unsubMedQ();
     };
   }, [subscribe]);
 
   // Real-time Query Medications from DB for Active Patient Visit
   useEffect(() => {
-    if (activePatient && activePatient.visitId) {
-      fetch(`/api/pharmacy/dispensing/${activePatient.visitId}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
-            const fetchedMeds = data.dispensing.map((item: any) => ({
-              medId: item.Medicine?.code || `MED-${item.medicine_id}`,
-              name: item.Medicine?.name || 'ยาบรรเทาอาการ',
-              genericName: item.Medicine?.generic_name || '',
-              category: item.Medicine?.category || 'ยาสามัญ',
-              properties: item.Medicine?.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
-              dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
-              instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
-              price: item.Medicine?.unit_price || 50,
-              quantity: item.quantity || 1,
-              stock: item.Medicine?.stock_quantity || 100,
-              stockStatus: (item.Medicine?.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
-            }));
-            
-            setQueueList(prev => prev.map(q => {
-              if (q.id === activePatient.id) {
-                return { ...q, medications: fetchedMeds };
+    if (activePatient && (activePatient.visitId || activePatient.hn)) {
+      const fetchPatientMeds = async () => {
+        try {
+          let medsFound = false;
+          if (activePatient.visitId) {
+            let res = await fetch(`/api/pharmacy/dispensing/${activePatient.visitId}`);
+            if (!res.ok) res = await fetch(`/api/system/dispensing/${activePatient.visitId}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
+                const fetchedMeds = data.dispensing.map((item: any) => {
+                  const m = item.medicine || item.Medicine || item;
+                  return {
+                    medId: m.medicine_code || m.code || `MED-${item.medicine_id || 1}`,
+                    name: m.name || item.name || 'ยาบรรเทาอาการ',
+                    genericName: m.generic_name || '',
+                    category: m.category || 'ยาสามัญ',
+                    properties: m.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
+                    dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
+                    instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
+                    price: m.unit_price || m.price || 10,
+                    unit_price: m.unit_price || m.price || 10,
+                    quantity: item.quantity || 10,
+                    stock: m.stock_quantity || 100,
+                    stockStatus: (m.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
+                  };
+                });
+                setQueueList(prev => prev.map(q => q.id === activePatient.id ? { ...q, medications: fetchedMeds } : q));
+                medsFound = true;
               }
-              return q;
-            }));
+            }
           }
-        })
-        .catch(err => console.error('Failed to fetch medications for visit:', err));
+
+          if (!medsFound && activePatient.hn) {
+            let hnRes = await fetch(`/api/pharmacy/patient-medicines/${encodeURIComponent(activePatient.hn)}`);
+            if (!hnRes.ok) hnRes = await fetch(`/api/system/patient-medicines/${encodeURIComponent(activePatient.hn)}`);
+            if (hnRes.ok) {
+              const hnData = await hnRes.json();
+              if (hnData.status === 'success' && Array.isArray(hnData.dispensings) && hnData.dispensings.length > 0) {
+                const fetchedMeds = hnData.dispensings.map((item: any) => {
+                  const m = item.medicine || item.Medicine || item;
+                  return {
+                    medId: m.medicine_code || m.code || `MED-${item.medicine_id || 1}`,
+                    name: m.name || item.name || 'ยาบรรเทาอาการ',
+                    genericName: m.generic_name || '',
+                    category: m.category || 'ยาสามัญ',
+                    properties: m.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
+                    dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
+                    instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
+                    price: m.unit_price || m.price || 10,
+                    unit_price: m.unit_price || m.price || 10,
+                    quantity: item.quantity || 10,
+                    stock: m.stock_quantity || 100,
+                    stockStatus: (m.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
+                  };
+                });
+                setQueueList(prev => prev.map(q => q.id === activePatient.id ? { ...q, medications: fetchedMeds, doctorAdvice: hnData.doctor_advice || q.doctorAdvice } : q));
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Failed to fetch medications for visit:', err);
+        }
+      };
+      fetchPatientMeds();
     }
-  }, [activePatient?.id, activePatient?.visitId]);
+  }, [activePatient?.id, activePatient?.visitId, activePatient?.hn]);
 
 
 

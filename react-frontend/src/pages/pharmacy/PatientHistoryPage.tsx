@@ -18,6 +18,8 @@ interface Patient {
   queueNumber?: string;
   visitTime?: string;
   doctorAdvice?: string;
+  createdAt?: string;
+  updatedAt?: string;
   vitals?: {
     bp?: string;
     pulse?: number;
@@ -131,6 +133,28 @@ export default function PatientHistoryPage() {
   const [riskFilter, setRiskFilter] = useState<'all' | 'hypertension' | 'fever' | 'allergies'>('all');
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [copiedHn, setCopiedHn] = useState<string | null>(null);
+
+  const handleCopyHn = (hn: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!hn) return;
+    const clean = hn.replace(/[-]/g, '');
+    try {
+      navigator.clipboard.writeText(clean);
+      setCopiedHn(clean);
+      setTimeout(() => setCopiedHn(null), 1500);
+    } catch {
+      const textArea = document.createElement('textarea');
+      textArea.value = clean;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedHn(clean);
+      setTimeout(() => setCopiedHn(null), 1500);
+    }
+  };
+
   const fetchPatientMedicines = async () => {
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
@@ -146,9 +170,10 @@ export default function PatientHistoryPage() {
         if (data.patient_medicines && Array.isArray(data.patient_medicines) && data.patient_medicines.length > 0) {
           const mapped: Patient[] = data.patient_medicines.map((pm: any) => {
             const rawDiseases = pm.chronic_diseases ? pm.chronic_diseases.split(',').map((d: string) => d.trim()).filter(Boolean) : [];
+            const cleanHN = (pm.hn || '').replace(/[-]/g, '');
             return {
               id: `PT-${pm.id || pm.hn}`,
-              hn: pm.hn || '',
+              hn: cleanHN,
               name: pm.fullname || pm.full_name || 'ผู้ป่วย',
               age: pm.age || 35,
               bloodType: pm.blood_type || 'O+',
@@ -157,9 +182,22 @@ export default function PatientHistoryPage() {
               treatmentRights: pm.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
               visitCount: pm.visit_count || 1,
               allergies: pm.allergies || 'ปฏิเสธการแพ้ยา',
-              phone: pm.phone_number
+              phone: pm.phone_number,
+              createdAt: pm.created_at || pm.CreatedAt,
+              updatedAt: pm.updated_at || pm.UpdatedAt
             };
           });
+
+          // คนล่าสุดอยู่บนตารางเสมอ (Sort latest on top)
+          mapped.sort((a, b) => {
+            const aDate = new Date(a.updatedAt || a.createdAt || 0).getTime();
+            const bDate = new Date(b.updatedAt || b.createdAt || 0).getTime();
+            if (bDate !== aDate) return bDate - aDate;
+            const aId = parseInt(a.id.replace(/\D/g, '')) || 0;
+            const bId = parseInt(b.id.replace(/\D/g, '')) || 0;
+            return bId - aId;
+          });
+
           setPatients(mapped);
           setLoading(false);
           return;
@@ -401,7 +439,53 @@ export default function PatientHistoryPage() {
                       const rights = patient.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
                       return (
                         <tr key={patient.id}>
-                          <td className="hn-cell" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>{patient.hn.replace(/[-]/g, '')}</td>
+                          <td className="hn-cell">
+                            <span
+                              onClick={(e) => handleCopyHn(patient.hn, e)}
+                              title={copiedHn === patient.hn.replace(/[-]/g, '') ? 'คัดลอกแล้ว!' : 'คลิกเพื่อคัดลอก HN'}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '5px',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                userSelect: 'none'
+                              }}
+                            >
+                              <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '15px', fontFamily: 'monospace' }}>
+                                {patient.hn.replace(/[-]/g, '')}
+                              </span>
+                              {copiedHn === patient.hn.replace(/[-]/g, '') ? (
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              ) : (
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                                </svg>
+                              )}
+                              {copiedHn === patient.hn.replace(/[-]/g, '') && (
+                                <span style={{
+                                  position: 'absolute',
+                                  top: '-24px',
+                                  left: '50%',
+                                  transform: 'translateX(-50%)',
+                                  backgroundColor: '#0F172A',
+                                  color: '#FFFFFF',
+                                  fontSize: '10px',
+                                  fontWeight: 'bold',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  whiteSpace: 'nowrap',
+                                  boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                                  zIndex: 50
+                                }}>
+                                  คัดลอกแล้ว!
+                                </span>
+                              )}
+                            </span>
+                          </td>
                           <td 
                             className="patient-name-cell clickable-patient-history"
                             onClick={() => handleSelectPatient(patient)}
@@ -491,8 +575,11 @@ export default function PatientHistoryPage() {
                 <h2 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
                   รายละเอียดประวัติสุขภาพ & ข้อมูลการรับยา
                 </h2>
-                <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B' }}>
-                  หมายเลขคิว <span style={{ color: '#2563EB', fontWeight: '700' }}>Q0001</span> • {selectedPatientModal.name}
+                <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  หมายเลขคิว <span style={{ color: '#2563EB', fontWeight: '700' }}>{selectedPatientModal.queueNumber || 'Q0001'}</span> • {selectedPatientModal.name}
+                  <span style={{ background: '#DCFCE7', color: '#15803D', border: '1px solid #86EFAC', padding: '2px 8px', borderRadius: '10px', fontSize: '11.5px', fontWeight: '700' }}>
+                    ประวัติคิวตรวจ & รับยา
+                  </span>
                 </p>
               </div>
               <button 
@@ -514,9 +601,53 @@ export default function PatientHistoryPage() {
                   <span style={{ color: '#64748B', fontSize: '13.5px' }}>ชื่อคนไข้:</span>
                   <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>{selectedPatientModal.name}</span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ color: '#64748B', fontSize: '13.5px' }}>เลขบัตรประชาชน / HN:</span>
-                  <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>{selectedPatientModal.hn}</span>
+                  <span
+                    onClick={(e) => handleCopyHn(selectedPatientModal.hn, e)}
+                    title={copiedHn === selectedPatientModal.hn.replace(/[-]/g, '') ? 'คัดลอกแล้ว!' : 'คลิกเพื่อคัดลอก HN'}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      cursor: 'pointer',
+                      position: 'relative',
+                      userSelect: 'none'
+                    }}
+                  >
+                    <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px', fontFamily: 'monospace' }}>
+                      {selectedPatientModal.hn.replace(/[-]/g, '')}
+                    </span>
+                    {copiedHn === selectedPatientModal.hn.replace(/[-]/g, '') ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                      </svg>
+                    )}
+                    {copiedHn === selectedPatientModal.hn.replace(/[-]/g, '') && (
+                      <span style={{
+                        position: 'absolute',
+                        top: '-24px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        backgroundColor: '#0F172A',
+                        color: '#FFFFFF',
+                        fontSize: '10px',
+                        fontWeight: 'bold',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        whiteSpace: 'nowrap',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                        zIndex: 50
+                      }}>
+                        คัดลอกแล้ว!
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748B', fontSize: '13.5px' }}>เวลารับคิว:</span>

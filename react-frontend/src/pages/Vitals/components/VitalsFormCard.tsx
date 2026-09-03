@@ -167,19 +167,29 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                   className="combobox-input"
                   placeholder="ค้นหาด้วยชื่อ, นามสกุล, HN, เลขคิว หรือคลิกลูกศรเพื่อเลือกผู้ป่วย..."
                   value={searchQuery}
+                  onClick={() => onToggleQueueDropdown(true)}
                   onChange={(e) => {
                     onSearchQueryChange(e.target.value);
                     if (!isQueueDropdownOpen) onToggleQueueDropdown(true);
                   }}
-                  onFocus={() => onToggleQueueDropdown(true)}
+                  onFocus={(e) => {
+                    onToggleQueueDropdown(true);
+                    if (searchQuery.includes(' - ') || searchQuery.includes('HN:') || searchQuery.includes('มาถึง')) {
+                      e.target.select();
+                    }
+                  }}
                   aria-label="ค้นหาคิวผู้ป่วย"
                 />
-                {selectedPatient && (
+                {(searchQuery || selectedPatient) && (
                   <button
                     type="button"
                     className="combobox-clear-btn"
-                    onClick={onResetSelection}
-                    title="ล้างการเลือกคิว"
+                    onClick={() => {
+                      onSearchQueryChange('');
+                      onResetSelection();
+                      onToggleQueueDropdown(true);
+                    }}
+                    title="ล้างคำค้นหา / ดูคิวทั้งหมด"
                   >
                     ✕
                   </button>
@@ -207,7 +217,26 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 <div className="combobox-dropdown-menu">
                   <div className="combobox-menu-header">
                     <span>ผู้ป่วยที่รอคัดกรอง ({filteredWaitingQueues.length} คิว)</span>
-                    {searchQuery && <span className="search-hint">คลิกเลือกผู้ป่วย</span>}
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSearchQueryChange('');
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#2563EB',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          padding: 0
+                        }}
+                      >
+                        แสดงคิวทั้งหมด ({waitingCount} คิว)
+                      </button>
+                    )}
                   </div>
                   <div className="combobox-options-list">
                     {filteredWaitingQueues.length > 0 ? (
@@ -245,8 +274,26 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                         );
                       })
                     ) : (
-                      <div className="combobox-empty-item">
-                        <span>ไม่พบคิวผู้ป่วยที่ตรงกับคำค้นหา "{searchQuery}"</span>
+                      <div className="combobox-empty-item" style={{ padding: '20px 16px', textAlign: 'center' }}>
+                        <div style={{ color: '#64748B', fontSize: '13px', marginBottom: '10px' }}>
+                          ไม่พบคิวผู้ป่วยที่ตรงกับคำค้นหา "{searchQuery}"
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onSearchQueryChange('')}
+                          style={{
+                            background: '#EFF6FF',
+                            color: '#2563EB',
+                            border: '1px solid #BFDBFE',
+                            borderRadius: '8px',
+                            padding: '6px 16px',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          คลิกดูคิวที่รอคัดกรองทั้งหมด ({waitingCount} คิว)
+                        </button>
                       </div>
                     )}
                   </div>
