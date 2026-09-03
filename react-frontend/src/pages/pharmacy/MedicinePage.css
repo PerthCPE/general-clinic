@@ -225,6 +225,7 @@ body.dark-mode .medicine-page-container .table-title {
   background-color: #F8FAFC;
   border-bottom: 2px solid #E2E8F0;
   white-space: nowrap;
+  text-align: center;
 }
 
 body.dark-mode .medicine-page-container .stock-table th {
@@ -239,6 +240,7 @@ body.dark-mode .medicine-page-container .stock-table th {
   border-bottom: 1px solid #F1F5F9;
   color: #1E293B;
   vertical-align: middle;
+  text-align: center;
 }
 
 body.dark-mode .medicine-page-container .stock-table td {
