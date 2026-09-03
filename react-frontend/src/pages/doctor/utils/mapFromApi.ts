@@ -66,7 +66,28 @@ function mapVitals(screening: BackendDoctorScreening): Patient['vitals'] {
     weight: screening.weight,
     height: screening.height,
     bmi: screening.bmi,
+
+    // 0 = พยาบาลไม่ได้กรอก ต่างจาก 0 ที่แปลว่า "ไม่ปวดเลย" ไม่ได้ในระดับ API
+    // จึงปล่อยเป็น undefined ให้หน้าจอแสดงว่ายังไม่มีข้อมูล ดีกว่าโชว์ 0/10 ลอยๆ
+    painScore: screening.pain_score > 0 ? screening.pain_score : undefined,
+    bloodSugar: screening.blood_sugar > 0 ? screening.blood_sugar : undefined,
   };
+}
+
+/** แปลงข้อความประวัติการสูบบุหรี่ / ดื่มสุรา ที่พยาบาลบันทึกเป็นข้อความอิสระ
+ *
+ *  หน้าจอแพทย์เก็บเป็นอ็อบเจกต์ { isUser, status } จึงต้องเดาจากคำที่พบ
+ *  ถ้าเจอคำปฏิเสธ ("ไม่", "ปฏิเสธ", "no", "non", "never") ถือว่าไม่ได้ใช้
+ *  ส่วนข้อความเต็มยังเก็บไว้ใน status ให้แพทย์อ่านคำเดิมของพยาบาลได้
+ */
+function toSubstanceFromText(
+  text: string | undefined
+): { isUser: boolean; status: string } | undefined {
+  const value = (text || '').trim();
+  if (value === '') return undefined;
+
+  const denies = /ไม่|ปฏิเสธ|เลิก|no|non|never|deny/i.test(value);
+  return { isUser: !denies, status: value };
 }
 
 function mapTriage(screening: BackendDoctorScreening): Patient['triage'] {
@@ -126,6 +147,20 @@ export function mapQueueItemToPatient(item: BackendDoctorQueueItem): Patient {
     if (screeningAllergies) {
       mapped.drugAllergies = screeningAllergies;
     }
+
+    // ประวัติที่จุดคัดกรองเพิ่งเริ่มเก็บให้ ทั้งหมดเว้นว่างได้
+    const foodAllergies = toList(screening.food_allergies);
+    if (foodAllergies) {
+      mapped.foodAllergies = foodAllergies;
+    }
+
+    const medications = toList(screening.current_medications);
+    if (medications) {
+      mapped.currentMedications = medications;
+    }
+
+    mapped.smokingHistory = toSubstanceFromText(screening.smoking_history);
+    mapped.alcoholHistory = toSubstanceFromText(screening.alcohol_history);
   } else {
     mapped.screeningCompleted = false;
   }
@@ -213,6 +248,22 @@ export function applyExaminationDetail(base: Patient, detail: BackendExamination
   const merged: Patient = { ...base };
 
   merged.vn = detail.vn || merged.vn;
+  // ใบสั่งยาที่เคยบันทึกไว้ ให้แสดงกลับตอนเปิดเคสเดิมมาแก้ต่อ
+  // ถ้ายังไม่เคยบันทึกยาเลย จะไม่เขียนทับรายการที่แพทย์เพิ่งพิมพ์ค้างไว้บนหน้าจอ
+  if (detail.prescriptions && detail.prescriptions.length > 0) {
+    merged.prescriptions = detail.prescriptions.map((item, index) => ({
+      id: `rx-${index + 1}`,
+      medicineName: item.medicineName || '',
+      dosage: item.dosage || '',
+      frequency: item.frequency || '',
+      duration: item.duration || '',
+      quantity: Number(item.quantity) || 0,
+      route: item.route || '',
+      timing: item.timing || '',
+      specialInstructions: item.specialInstructions || '',
+    }));
+  }
+
   merged.presentIllness = keep(detail.presentIllness, merged.presentIllness);
   merged.chiefComplaintDuration = keep(detail.chiefComplaintDuration, merged.chiefComplaintDuration);
   merged.assessmentNotes = keep(detail.assessmentNotes, merged.assessmentNotes);
@@ -306,6 +357,18 @@ export function buildExaminationRequest(
       code: item.code || '',
       name: item.name || '',
       localName: item.localName || '',
+    })),
+
+    // ใบสั่งยา backend จะเขียนลงตาราง dispensings ให้ห้องยาเห็น
+    prescriptions: (patient.prescriptions || []).map((item) => ({
+      medicineName: item.medicineName || '',
+      dosage: item.dosage || '',
+      frequency: item.frequency || '',
+      duration: item.duration || '',
+      quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
+      route: item.route || '',
+      timing: item.timing || '',
+      specialInstructions: item.specialInstructions || '',
     })),
 
     patientHistory: {

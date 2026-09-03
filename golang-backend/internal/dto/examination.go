@@ -96,10 +96,28 @@ type ExaminationDetail struct {
 	PrimaryDiagnosis   *DiagnosisItemDTO  `json:"primaryDiagnosis"`
 	SecondaryDiagnoses []DiagnosisItemDTO `json:"secondaryDiagnoses"`
 
+	// ใบสั่งยาที่บันทึกไว้ อ่านกลับจากตาราง dispensings
+	Prescriptions []PrescriptionItemDTO `json:"prescriptions"`
+
 	// ข้อมูลประกอบที่ดึงมาแสดงคู่กัน
 	Patient        PatientBrief       `json:"patient"`
 	Screening      *ScreeningBrief    `json:"screening"`
 	PatientHistory *PatientHistoryDTO `json:"patientHistory"`
+}
+
+// PrescriptionItemDTO - ยา 1 รายการในใบสั่งยาของแพทย์
+//
+// ชื่อฟิลด์ตรงกับ PrescriptionItem ใน react-frontend/src/pages/doctor/types.ts
+// medicineName ต้องตรงกับ medicines.name ในคลังยา ไม่งั้นห้องยาจะไม่เห็นรายการนี้
+type PrescriptionItemDTO struct {
+	MedicineName        string `json:"medicineName"`
+	Dosage              string `json:"dosage"`
+	Frequency           string `json:"frequency"`
+	Duration            string `json:"duration"`
+	Quantity            int    `json:"quantity"`
+	Route               string `json:"route"`
+	Timing              string `json:"timing"`
+	SpecialInstructions string `json:"specialInstructions"`
 }
 
 // SaveExaminationRequest - body ของ PUT /api/doctor/visits/:id/examination
@@ -122,6 +140,10 @@ type SaveExaminationRequest struct {
 	PrimaryDiagnosis   *DiagnosisItemDTO  `json:"primaryDiagnosis"`
 	SecondaryDiagnoses []DiagnosisItemDTO `json:"secondaryDiagnoses"`
 
+	// ใบสั่งยา บันทึกลงตาราง dispensings เพื่อส่งต่อให้ห้องยา
+	// ส่งมาทุกครั้งที่บันทึก (ทั้งร่างและเซ็นปิด) รายการเดิมของ visit นี้จะถูกแทนที่
+	Prescriptions []PrescriptionItemDTO `json:"prescriptions"`
+
 	// ส่งมาด้วยได้ ถ้าแพทย์แก้ประวัติติดตัวผู้ป่วยในหน้าเดียวกัน
 	PatientHistory *PatientHistoryDTO `json:"patientHistory"`
 }
@@ -133,4 +155,11 @@ type SaveExaminationResponse struct {
 	Status         string `json:"status"`
 	VisitStatus    string `json:"visit_status"`
 	DiagnosisCount int    `json:"diagnosis_count"`
+
+	// จำนวนยาที่ส่งต่อห้องยาได้จริง
+	PrescriptionCount int `json:"prescription_count"`
+
+	// ชื่อยาที่หาไม่เจอในตาราง medicines จึงส่งต่อห้องยาไม่ได้
+	// หน้าจอต้องเตือนแพทย์ ไม่งั้นจะเข้าใจว่าสั่งยาสำเร็จทั้งที่ห้องยาไม่เห็น
+	UnmatchedMedicines []string `json:"unmatched_medicines,omitempty"`
 }

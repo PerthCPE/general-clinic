@@ -269,8 +269,15 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setIsSaving(true);
     void examinationApi
       .save(visitId, buildExaminationRequest(updatedPatient, action))
-      .then(() => {
-        setSaveError(null);
+      .then((result) => {
+        // ยาที่จับคู่กับคลังของห้องยาไม่ได้ จะไม่ถูกส่งต่อไปห้องยา
+        // ต้องบอกแพทย์ตรงนี้ ไม่งั้นจะเข้าใจว่าสั่งยาสำเร็จทั้งใบ
+        const unmatched = result?.unmatched_medicines || [];
+        setSaveError(
+          unmatched.length > 0
+            ? `ยาต่อไปนี้ไม่มีในคลังของห้องยา จึงยังไม่ถูกส่งต่อ: ${unmatched.join(', ')} — กรุณาแจ้งห้องยาให้เพิ่มยาเข้าคลัง หรือเลือกยาชื่ออื่นที่มีอยู่`
+            : null
+        );
         // ดึงผลตรวจที่เพิ่งบันทึกกลับมาทับ เพื่อให้หน้าจอตรงกับฐานข้อมูลจริง
         return Promise.all([refresh(), hydrateExamination(visitId)]);
       })

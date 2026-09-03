@@ -132,7 +132,26 @@ func GetExamination(c *gin.Context) {
 		DoctorName:         visit.Doctor.FullName,
 		Patient:            toPatientBrief(visit.Patient),
 		SecondaryDiagnoses: []dto.DiagnosisItemDTO{},
+		Prescriptions:      []dto.PrescriptionItemDTO{},
 		Editable:           true,
+	}
+
+	// ใบสั่งยาที่บันทึกไว้ อ่านกลับจากตาราง dispensings
+	// วิธีใช้ยาถูกรวมเป็นข้อความเดียวตอนบันทึก จึงคืนมาในช่อง specialInstructions
+	// ช่องเดียว แพทย์แก้ต่อได้ปกติ แล้วระบบจะเขียนทับรายการเดิมตอนบันทึกครั้งถัดไป
+	var saved []models.Dispensing
+	if err := config.DB.Preload("Medicine").
+		Where("visit_id = ?", visit.ID).
+		Order("id asc").
+		Find(&saved).Error; err == nil {
+		for _, d := range saved {
+			detail.Prescriptions = append(detail.Prescriptions, dto.PrescriptionItemDTO{
+				MedicineName:        d.Medicine.Name,
+				Dosage:              d.Dosage,
+				Quantity:            d.Quantity,
+				SpecialInstructions: d.Instructions,
+			})
+		}
 	}
 
 	// บันทึกการตรวจของ visit นี้ (ถ้าเคยบันทึกไว้แล้ว)
@@ -210,6 +229,99 @@ func GetExamination(c *gin.Context) {
 //
 // action = "draft" บันทึกร่าง แก้ไขต่อได้
 // action = "sign"  เซ็นปิดการตรวจ ต้องมีการวินิจฉัยหลัก และปิดเคสส่งต่อห้องยา
+// ==============================================================================
+// ใบสั่งยา -> ตาราง dispensings (ส่งต่อห้องยา)
+// ==============================================================================
+// ห้องยาอ่านรายการยาของผู้ป่วยจากตาราง dispensings (ดู GetPharmacyQueues ใน
+// dispensing_controller.go) ก่อนหน้านี้ไม่มีใครเขียนลงตารางนี้เลย ยาที่แพทย์
+// กดสั่งจึงเป็นแค่ state บนหน้าจอ พอปิดเคสก็หายไป ห้องยาเห็นชื่อผู้ป่วย
+// แต่ไม่เห็นยาสักตัว
+//
+// การจับคู่ยา: dispensings ต้องการ medicine_id จริงจากตาราง medicines
+// แต่หน้าจอแพทย์เลือกยาจากรายการที่เขียนไว้ในไฟล์ ซึ่งมีแค่ชื่อ
+// จึงจับคู่ด้วยชื่อ (ไม่สนตัวพิมพ์ใหญ่เล็ก) ตัวไหนไม่เจอจะข้ามและคืนชื่อกลับไป
+// ให้หน้าจอเตือนแพทย์ ดีกว่าเงียบแล้วปล่อยให้เข้าใจว่าสั่งสำเร็จ
+//
+// จงใจ "ไม่" สร้างยาใหม่ลงตาราง medicines เอง เพราะเป็นคลังของห้องยา
+// การแอบเพิ่มยาที่ไม่มีสต็อกเข้าไปจะทำให้ตัวเลขคลังของเขาเพี้ยน
+
+// buildDispenseInstructions - รวมวิธีใช้ยาเป็นข้อความเดียวให้เภสัชอ่าน
+func buildDispenseInstructions(item dto.PrescriptionItemDTO) string {
+	parts := make([]string, 0, 4)
+	for _, v := range []string{item.Frequency, item.Duration, item.Route, item.Timing} {
+		if t := strings.TrimSpace(v); t != "" {
+			parts = append(parts, t)
+		}
+	}
+
+	text := strings.Join(parts, " · ")
+	if special := strings.TrimSpace(item.SpecialInstructions); special != "" {
+		if text != "" {
+			text += " — "
+		}
+		text += special
+	}
+	return text
+}
+
+// syncDispensings - เขียนใบสั่งยาของ visit หนึ่งครั้งลงตาราง dispensings
+//
+// ลบรายการเดิมของ visit นี้ทิ้งก่อนเสมอ เพราะแพทย์แก้ใบสั่งยาระหว่างร่างได้
+// ถ้าไม่ลบ ยาที่ถอดออกไปแล้วจะยังค้างอยู่และถูกจ่ายจริง
+//
+// คืน (จำนวนที่เขียนสำเร็จ, ชื่อยาที่จับคู่กับคลังไม่ได้)
+func syncDispensings(tx *gorm.DB, visitID uint, doctorProfileID uint,
+	items []dto.PrescriptionItemDTO) (int, []string, error) {
+
+	if err := tx.Where("visit_id = ?", visitID).Delete(&models.Dispensing{}).Error; err != nil {
+		return 0, nil, err
+	}
+
+	saved := 0
+	unmatched := make([]string, 0)
+
+	for _, item := range items {
+		name := strings.TrimSpace(item.MedicineName)
+		if name == "" {
+			continue
+		}
+
+		var med models.Medicine
+		err := tx.Where("LOWER(name) = LOWER(?)", name).First(&med).Error
+		if err != nil {
+			// ลองแบบหลวมขึ้น เผื่อชื่อในคลังมีวงเล็บหรือหน่วยต่อท้าย
+			err = tx.Where("LOWER(name) LIKE LOWER(?)", name+"%").First(&med).Error
+		}
+		if err != nil {
+			unmatched = append(unmatched, name)
+			continue
+		}
+
+		qty := item.Quantity
+		if qty <= 0 {
+			qty = 1
+		}
+
+		row := models.Dispensing{
+			VisitID:      visitID,
+			MedicineID:   med.ID,
+			Quantity:     qty,
+			Dosage:       strings.TrimSpace(item.Dosage),
+			Instructions: buildDispenseInstructions(item),
+		}
+		if doctorProfileID > 0 {
+			row.DoctorID = doctorProfileID
+		}
+
+		if err := tx.Create(&row).Error; err != nil {
+			return saved, unmatched, err
+		}
+		saved++
+	}
+
+	return saved, unmatched, nil
+}
+
 func SaveExamination(c *gin.Context) {
 	doctorID := doctorAuthUserID(c)
 	if doctorID == 0 {
@@ -230,6 +342,10 @@ func SaveExamination(c *gin.Context) {
 	}
 
 	signing := strings.EqualFold(strings.TrimSpace(req.Action), "sign")
+
+	// ผลของการส่งใบสั่งยาต่อห้องยา เติมค่าในทรานแซกชันด้านล่าง
+	prescriptionCount := 0
+	unmatchedMedicines := []string{}
 
 	var visit models.VisitRecord
 	if err := config.DB.First(&visit, uint(visitID)).Error; err != nil {
@@ -374,6 +490,23 @@ func SaveExamination(c *gin.Context) {
 			}
 		}
 
+		// ใบสั่งยา -> ตาราง dispensings ให้ห้องยาเห็น
+		// เขียนทุกครั้งที่บันทึก ไม่ใช่เฉพาะตอนเซ็นปิด เพราะแพทย์ต้องเห็น
+		// ใบสั่งยาเดิมตอนเปิดร่างกลับมาแก้ต่อ ส่วนห้องยาจะยังไม่เห็นผู้ป่วยรายนี้
+		// จนกว่าคิวจะเปลี่ยนเป็น "รอรับยา" ตอนเซ็นปิดอยู่ดี
+		var doctorProfile models.Doctor
+		doctorProfileID := uint(0)
+		if err := tx.Where("user_id = ?", doctorID).First(&doctorProfile).Error; err == nil {
+			doctorProfileID = doctorProfile.ID
+		}
+
+		count, unmatched, err := syncDispensings(tx, visit.ID, doctorProfileID, req.Prescriptions)
+		if err != nil {
+			return err
+		}
+		prescriptionCount = count
+		unmatchedMedicines = unmatched
+
 		// เซ็นปิดการตรวจ = ปิดเคสและส่งคิวต่อไปห้องยา
 		if signing {
 			q, ok, err := applyVisitStatusTx(tx, &visit, models.VisitStatusCompleted,
@@ -430,6 +563,9 @@ func SaveExamination(c *gin.Context) {
 		Status:         exam.Status,
 		VisitStatus:    visitStatus,
 		DiagnosisCount: diagCount,
+
+		PrescriptionCount:  prescriptionCount,
+		UnmatchedMedicines: unmatchedMedicines,
 	})
 }
 

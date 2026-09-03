@@ -371,6 +371,15 @@ export interface BackendDoctorScreening {
   heart_rate: number;
   respiratory_rate: number;
   spo2: number;
+
+  // คอลัมน์ที่จุดคัดกรองเพิ่งเพิ่มให้ ค่าเป็น 0 หรือสตริงว่างได้ถ้าพยาบาลไม่ได้กรอก
+  pain_score: number;
+  blood_sugar: number;
+  food_allergies: string;
+  current_medications: string;
+  smoking_history: string;
+  alcohol_history: string;
+
   screened_by_name: string;
   screened_at: string;
 }
@@ -577,9 +586,28 @@ export interface BackendExaminationDetail {
   primaryDiagnosis: BackendDiagnosisItem | null;
   secondaryDiagnoses: BackendDiagnosisItem[] | null;
 
+  // ใบสั่งยาที่บันทึกไว้ อ่านกลับจากตาราง dispensings
+  prescriptions: BackendPrescriptionItem[] | null;
+
   patient: BackendDoctorPatient;
   screening: BackendDoctorScreening | null;
   patientHistory: BackendPatientHistory | null;
+}
+
+/** ยา 1 รายการในใบสั่งยา ตรงกับ PrescriptionItemDTO ฝั่ง backend
+ *
+ *  medicineName ต้องตรงกับชื่อในตาราง medicines ของห้องยา ไม่งั้น backend
+ *  จะจับคู่ไม่ได้ และคืนชื่อกลับมาใน unmatched_medicines
+ */
+export interface BackendPrescriptionItem {
+  medicineName: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  quantity: number;
+  route: string;
+  timing: string;
+  specialInstructions: string;
 }
 
 export interface SaveExaminationPayload {
@@ -599,6 +627,9 @@ export interface SaveExaminationPayload {
   primaryDiagnosis: BackendDiagnosisItem | null;
   secondaryDiagnoses: BackendDiagnosisItem[];
 
+  // ใบสั่งยา ส่งไปบันทึกลงตาราง dispensings ให้ห้องยาเห็น
+  prescriptions: BackendPrescriptionItem[];
+
   patientHistory: BackendPatientHistory | null;
 }
 
@@ -608,6 +639,12 @@ export interface SaveExaminationResult {
   status: string;
   visit_status: string;
   diagnosis_count: number;
+
+  // จำนวนยาที่ส่งต่อห้องยาได้จริง
+  prescription_count?: number;
+
+  // ชื่อยาที่ไม่มีในคลังของห้องยา จึงส่งต่อไม่ได้ ต้องเตือนแพทย์
+  unmatched_medicines?: string[];
 }
 
 export interface BackendPastVisit {
