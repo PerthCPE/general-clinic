@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import './MedicinePage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
@@ -119,9 +119,51 @@ export default function MedicinePage() {
     };
   }, [fetchMedicines, subscribe]);
 
-  // Extract unique categories
-  const categories = Array.from(new Set(medicines.map(m => m.category).filter(Boolean)));
-  
+  // Custom Categories state with localStorage persistence
+  const [customCategories, setCustomCategories] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('clinic_custom_categories');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const allAvailableCategories: string[] = useMemo<string[]>(() => {
+    const fromMeds = medicines.map(m => m.category).filter(Boolean);
+    const defaults = [
+      'ยารักษาโรคทั่วไป',
+      'ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย',
+      'ยาลดไข้ บรรเทาปวด',
+      'ยาแก้แพ้ ลดน้ำมูก',
+      'ยาลดกรด เคลือบกระเพาะ',
+      'ยาแก้อักเสบ กล้ามเนื้อ',
+      'ยาวิตามินและอาหารเสริม'
+    ];
+    return Array.from(new Set([...fromMeds, ...customCategories, ...defaults]));
+  }, [medicines, customCategories]);
+
+  const handleAddNewCategory = (newCat: string) => {
+    const trimmed = newCat.trim();
+    if (!trimmed) return;
+    setCustomCategories(prev => {
+      if (prev.includes(trimmed)) return prev;
+      const updated = [...prev, trimmed];
+      try {
+        localStorage.setItem('clinic_custom_categories', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+  };
+
+  // State for toggling add category input in Add Modal
+  const [isAddingNewCatInAddModal, setIsAddingNewCatInAddModal] = useState(false);
+  const [newCatInputInAddModal, setNewCatInputInAddModal] = useState('');
+
+  // State for toggling add category input in Edit Detail Modal
+  const [isAddingNewCatInEditModal, setIsAddingNewCatInEditModal] = useState(false);
+  const [newCatInputInEditModal, setNewCatInputInEditModal] = useState('');
+
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
@@ -597,7 +639,7 @@ export default function MedicinePage() {
               }}
             >
               <option value="all">ทั้งหมดทุกชนิด</option>
-              {categories.map((cat) => (
+              {allAvailableCategories.map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
             </select>
@@ -849,8 +891,13 @@ export default function MedicinePage() {
               )}
 
               {isReduceInvalid && (
-                <p className="error-text">
-                  ⚠ ไม่สามารถลดจำนวนเกินกว่าสต็อกที่มีอยู่ ({selectedMedicine.stock} เม็ด) ได้
+                <p className="error-text" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                  ไม่สามารถลดจำนวนเกินกว่าสต็อกที่มีอยู่ ({selectedMedicine.stock} เม็ด) ได้
                 </p>
               )}
             </div>
@@ -876,8 +923,14 @@ export default function MedicinePage() {
             <div className="med-detail-header">
               <div className="med-detail-title-box" style={{ width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                  <span className="med-detail-badge" style={{ background: isEditingDetailMed ? '#FEF3C7' : undefined, color: isEditingDetailMed ? '#92400E' : undefined }}>
-                    {isEditingDetailMed ? '✏️ โหมดแก้ไขข้อมูลตัวยาและสรรพคุณ' : 'รายละเอียดตัวยาและสรรพคุณ'}
+                  <span className="med-detail-badge" style={{ background: isEditingDetailMed ? '#FEF3C7' : undefined, color: isEditingDetailMed ? '#92400E' : undefined, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    {isEditingDetailMed && (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      </svg>
+                    )}
+                    {isEditingDetailMed ? 'โหมดแก้ไขข้อมูลตัวยาและสรรพคุณ' : 'รายละเอียดตัวยาและสรรพคุณ'}
                   </span>
                   {!isEditingDetailMed && (
                     <button
@@ -898,7 +951,11 @@ export default function MedicinePage() {
                       }}
                       title="คลิกเพื่อแก้ไขข้อมูลยาและบันทึกลงฐานข้อมูลทันที"
                     >
-                      ✏️ แก้ไขข้อมูลยา
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      </svg>
+                      แก้ไขข้อมูลยา
                     </button>
                   )}
                 </div>
@@ -973,7 +1030,14 @@ export default function MedicinePage() {
                     </div>
 
                     <div className="med-info-box warning-box">
-                      <h4 className="info-box-title">⚠️ ข้อควรระวังและผลข้างเคียง</h4>
+                      <h4 className="info-box-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                          <line x1="12" y1="9" x2="12" y2="13"></line>
+                          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        ข้อควรระวังและผลข้างเคียง
+                      </h4>
                       <p className="info-box-desc">{detailModalMed.precautions}</p>
                     </div>
 
@@ -1006,14 +1070,85 @@ export default function MedicinePage() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   <div>
-                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>หมวดยา</label>
-                    <input 
-                      type="text" 
-                      value={detailEditForm.category} 
-                      onChange={(e) => setDetailEditForm(prev => ({ ...prev, category: e.target.value }))}
-                      placeholder="เช่น ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย, ยาลดไข้ บรรเทาปวด..."
-                      style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13.5px', boxSizing: 'border-box' }}
-                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>ชนิด / หมวดหมู่ยา</label>
+                      {!isAddingNewCatInEditModal ? (
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingNewCatInEditModal(true)}
+                          style={{
+                            background: 'none', border: 'none', color: '#2563EB',
+                            fontSize: '12.5px', fontWeight: '700', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: '4px', padding: 0
+                          }}
+                        >
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                          </svg>
+                          เพิ่มหมวดหมู่ใหม่
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingNewCatInEditModal(false)}
+                          style={{
+                            background: 'none', border: 'none', color: '#64748B',
+                            fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', padding: 0
+                          }}
+                        >
+                          เลือกจากหมวดหมู่เดิม
+                        </button>
+                      )}
+                    </div>
+
+                    {!isAddingNewCatInEditModal ? (
+                      <select 
+                        value={detailEditForm.category} 
+                        onChange={(e) => {
+                          if (e.target.value === '__add_new__') {
+                            setIsAddingNewCatInEditModal(true);
+                          } else {
+                            setDetailEditForm(prev => ({ ...prev, category: e.target.value }));
+                          }
+                        }}
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13.5px', background: '#FFFFFF', boxSizing: 'border-box' }}
+                      >
+                        {allAvailableCategories.map((cat, idx) => (
+                          <option key={idx} value={cat}>{cat}</option>
+                        ))}
+                        <option value="__add_new__">+ เพิ่มหมวดหมู่ใหม่...</option>
+                      </select>
+                    ) : (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <input 
+                          type="text" 
+                          value={newCatInputInEditModal} 
+                          onChange={(e) => setNewCatInputInEditModal(e.target.value)}
+                          placeholder="พิมพ์ชื่อหมวดหมู่ยาใหม่ เช่น ยาเพิ่มพลัง..."
+                          autoFocus
+                          style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #2563EB', borderRadius: '8px', fontSize: '13.5px', boxSizing: 'border-box' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (newCatInputInEditModal.trim()) {
+                              handleAddNewCategory(newCatInputInEditModal.trim());
+                              setDetailEditForm(prev => ({ ...prev, category: newCatInputInEditModal.trim() }));
+                              setNewCatInputInEditModal('');
+                              setIsAddingNewCatInEditModal(false);
+                            }
+                          }}
+                          style={{
+                            padding: '0 16px', background: '#2563EB', color: '#FFFFFF',
+                            border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          ตกลง
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
@@ -1040,7 +1175,14 @@ export default function MedicinePage() {
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626', marginBottom: '3px', display: 'block' }}>⚠️ ข้อควรระวังและผลข้างเคียง</label>
+                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                      </svg>
+                      ข้อควรระวังและผลข้างเคียง
+                    </label>
                     <textarea 
                       rows={2}
                       value={detailEditForm.precautions} 
@@ -1106,7 +1248,11 @@ export default function MedicinePage() {
                       gap: '6px'
                     }}
                   >
-                    ✏️ แก้ไขข้อมูลยานี้
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    แก้ไขข้อมูลยานี้
                   </button>
                   <button className="primary-btn-close" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>
                     ปิดหน้าต่าง
@@ -1147,7 +1293,12 @@ export default function MedicinePage() {
                       boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)'
                     }}
                   >
-                    {isSavingDetailMed ? 'กำลังบันทึกลง DB...' : '💾 บันทึกลงฐานข้อมูลทันที'}
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                      <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                      <polyline points="7 3 7 8 15 8"></polyline>
+                    </svg>
+                    {isSavingDetailMed ? 'กำลังบันทึกลง DB...' : 'บันทึกลงฐานข้อมูลทันที'}
                   </button>
                 </>
               )}
@@ -1199,13 +1350,92 @@ export default function MedicinePage() {
                   />
                 </div>
                 <div className="input-group">
-                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ชนิด / หมวดหมู่ยา</label>
-                  <input
-                    type="text"
-                    placeholder="เช่น ยาลดไข้ บรรเทาปวด"
-                    value={addCategory}
-                    onChange={(e) => setAddCategory(e.target.value)}
-                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: '600' }}>ชนิด / หมวดหมู่ยา</label>
+                    {!isAddingNewCatInAddModal ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingNewCatInAddModal(true)}
+                        style={{
+                          background: 'none', border: 'none', color: '#2563EB',
+                          fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                          display: 'inline-flex', alignItems: 'center', gap: '3px', padding: 0
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <line x1="12" y1="5" x2="12" y2="19"></line>
+                          <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        เพิ่มหมวดหมู่ใหม่
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsAddingNewCatInAddModal(false)}
+                        style={{
+                          background: 'none', border: 'none', color: '#64748B',
+                          fontSize: '12px', fontWeight: '600', cursor: 'pointer', padding: 0
+                        }}
+                      >
+                        เลือกจากหมวดหมู่เดิม
+                      </button>
+                    )}
+                  </div>
+
+                  {!isAddingNewCatInAddModal ? (
+                    <select
+                      value={addCategory}
+                      onChange={(e) => {
+                        if (e.target.value === '__add_new__') {
+                          setIsAddingNewCatInAddModal(true);
+                        } else {
+                          setAddCategory(e.target.value);
+                        }
+                      }}
+                      style={{
+                        width: '100%', padding: '9px 12px', borderRadius: '8px',
+                        border: '1.5px solid #CBD5E1', fontSize: '13.5px',
+                        background: '#FFFFFF', appearance: 'auto'
+                      }}
+                    >
+                      {allAvailableCategories.map((cat, idx) => (
+                        <option key={idx} value={cat}>{cat}</option>
+                      ))}
+                      <option value="__add_new__">+ เพิ่มหมวดหมู่ใหม่...</option>
+                    </select>
+                  ) : (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <input
+                        type="text"
+                        placeholder="เช่น ยาเพิ่มพลัง..."
+                        value={newCatInputInAddModal}
+                        onChange={(e) => setNewCatInputInAddModal(e.target.value)}
+                        autoFocus
+                        style={{
+                          flex: 1, padding: '8px 12px', borderRadius: '8px',
+                          border: '1.5px solid #2563EB', fontSize: '13.5px'
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (newCatInputInAddModal.trim()) {
+                            handleAddNewCategory(newCatInputInAddModal.trim());
+                            setAddCategory(newCatInputInAddModal.trim());
+                            setNewCatInputInAddModal('');
+                            setIsAddingNewCatInAddModal(false);
+                          }
+                        }}
+                        style={{
+                          padding: '0 14px', background: '#2563EB', color: '#FFFFFF',
+                          border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        ตกลง
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
