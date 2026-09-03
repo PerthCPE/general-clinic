@@ -554,18 +554,18 @@ export default function PatientHistoryPage() {
 
           {isPatientListExpanded && (
             <>
-              <div className="table-wrapper">
-                <table className="patient-table">
+              <div className="table-wrapper" style={{ overflowX: 'hidden', width: '100%' }}>
+                <table className="patient-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'center', width: '100px' }}>ID (HN)</th>
-                      <th style={{ textAlign: 'left', paddingLeft: '20px' }}>ชื่อผู้ป่วย</th>
-                      <th style={{ textAlign: 'center', width: '80px' }}>อายุ</th>
-                      <th style={{ textAlign: 'center', width: '90px' }}>กรุ๊ปเลือด</th>
-                      <th style={{ textAlign: 'center', width: '190px' }}>สิทธิการรักษา</th>
-                      <th style={{ textAlign: 'center', width: '150px' }}>จำนวนเข้ารักษา</th>
-                      <th style={{ textAlign: 'center' }}>โรคประจำตัว</th>
-                      <th style={{ textAlign: 'center', width: '160px' }}>การจัดการ</th>
+                      <th style={{ textAlign: 'center', width: '11%', padding: '12px 6px' }}>ID (HN)</th>
+                      <th style={{ textAlign: 'left', width: '20%', padding: '12px 14px' }}>ชื่อผู้ป่วย</th>
+                      <th style={{ textAlign: 'center', width: '8%', padding: '12px 4px' }}>อายุ</th>
+                      <th style={{ textAlign: 'center', width: '8%', padding: '12px 4px' }}>กรุ๊ปเลือด</th>
+                      <th style={{ textAlign: 'center', width: '18%', padding: '12px 6px' }}>สิทธิการรักษา</th>
+                      <th style={{ textAlign: 'center', width: '13%', padding: '12px 6px' }}>จำนวนเข้ารักษา</th>
+                      <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>โรคประจำตัว</th>
+                      <th style={{ textAlign: 'center', width: '12%', padding: '12px 6px' }}>การจัดการ</th>
                     </tr>
                   </thead>
                   <tbody>

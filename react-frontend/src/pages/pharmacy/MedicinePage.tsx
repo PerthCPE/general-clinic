@@ -1267,17 +1267,17 @@ export default function MedicinePage() {
 
         {isStockTableExpanded && (
           <>
-            <div className="table-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
-              <table className="stock-table" style={{ width: '100%', tableLayout: 'auto' }}>
+            <div className="table-wrapper" style={{ overflowX: 'hidden', width: '100%' }}>
+              <table className="stock-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'center', width: '85px', padding: '10px 6px' }}>รหัสยา</th>
-                    <th style={{ textAlign: 'center', padding: '10px 8px' }}>ชื่อยา</th>
-                    <th style={{ textAlign: 'center', width: '135px', padding: '10px 6px' }}>ชนิด / หมวดหมู่ยา</th>
-                    <th style={{ textAlign: 'center', width: '85px', padding: '10px 6px' }}>คงเหลือในคลัง</th>
-                    <th style={{ textAlign: 'center', width: '90px', padding: '10px 4px' }}>สถานะคลังยา</th>
-                    <th style={{ textAlign: 'center', width: '75px', padding: '10px 6px' }}>จ่ายวันนี้</th>
-                    <th style={{ textAlign: 'center', width: '190px', padding: '10px 6px' }}>การจัดการ</th>
+                    <th style={{ textAlign: 'center', width: '12%', padding: '12px 6px' }}>รหัสยา</th>
+                    <th style={{ textAlign: 'center', width: '23%', padding: '12px 8px' }}>ชื่อยา</th>
+                    <th style={{ textAlign: 'center', width: '18%', padding: '12px 6px' }}>ชนิด / หมวดหมู่ยา</th>
+                    <th style={{ textAlign: 'center', width: '11%', padding: '12px 6px' }}>คงเหลือในคลัง</th>
+                    <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>สถานะคลังยา</th>
+                    <th style={{ textAlign: 'center', width: '9%', padding: '12px 6px' }}>จ่ายวันนี้</th>
+                    <th style={{ textAlign: 'center', width: '16%', padding: '12px 6px' }}>การจัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
