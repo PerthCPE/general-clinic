@@ -1272,7 +1272,7 @@ export default function MedicinePage() {
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'center', width: '85px', padding: '10px 6px' }}>รหัสยา</th>
-                    <th style={{ textAlign: 'left', padding: '10px 8px 10px 14px' }}>ชื่อยา</th>
+                    <th style={{ textAlign: 'center', padding: '10px 8px' }}>ชื่อยา</th>
                     <th style={{ textAlign: 'center', width: '135px', padding: '10px 6px' }}>ชนิด / หมวดหมู่ยา</th>
                     <th style={{ textAlign: 'center', width: '85px', padding: '10px 6px' }}>คงเหลือในคลัง</th>
                     <th style={{ textAlign: 'center', width: '90px', padding: '10px 4px' }}>สถานะคลังยา</th>
@@ -1311,11 +1311,11 @@ export default function MedicinePage() {
                         <td style={{ padding: '10px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <CopyableText value={med.id} color="#2563EB" />
                         </td>
-                        <td className="med-name-cell" style={{ textAlign: 'left', padding: '10px 8px 10px 14px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '2px' }}>
+                        <td className="med-name-cell" style={{ textAlign: 'center', padding: '10px 8px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
                             <div 
                               onClick={() => { setDetailModalMed(med); setIsEditingDetailMed(false); }}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px', whiteSpace: 'nowrap', cursor: 'pointer' }}
                               title="คลิกเพื่อดูรายละเอียดตัวยาและสรรพคุณ"
                             >
                               <CopyableText value={med.name} mono={false} color="#0F172A" />
@@ -1329,11 +1329,13 @@ export default function MedicinePage() {
                                 fontSize: '11px',
                                 color: '#2563EB',
                                 background: '#EFF6FF',
-                                padding: '1px 6px',
+                                padding: '1px 8px',
                                 borderRadius: '4px',
                                 border: '1px solid #DBEAFE',
                                 fontWeight: '500',
-                                display: 'inline-block',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
                                 whiteSpace: 'nowrap'
                               }}
                               title="คลิกเพื่อดูรายละเอียดและสรรพคุณยา"
