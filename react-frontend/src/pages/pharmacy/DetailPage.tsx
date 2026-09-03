@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import './DetailPage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
+import CopyableText from '../../components/Common/CopyableText';
+import { Check } from 'lucide-react';
 
 interface ToastState {
   message: string;
@@ -86,12 +88,13 @@ export default function DetailPage({
         if (pRes.ok) {
           const pData = await pRes.json();
           if (pData.status === 'success' && Array.isArray(pData.queues)) {
-            const mappedQueues = pData.queues.map((pq: any) => {
+            const mappedQueues: PatientConfig[] = pData.queues.map((pq: any) => {
               const cleanHN = (pq.hn || pq.patient?.hn || '').replace(/[-]/g, '');
               let rawMeds = pq.medications || [];
               if (typeof rawMeds === 'string') {
                 try { rawMeds = JSON.parse(rawMeds); } catch { rawMeds = []; }
               }
+              const isDispensed = pq.status === 'dispensed';
               return {
                 id: String(pq.id),
                 visitId: pq.visit_id || 1,
@@ -108,20 +111,37 @@ export default function DetailPage({
                 allergies: pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา'],
                 chronicDiseases: pq.chronic_diseases || 'ไม่มี',
                 vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-                visitStatus: 'รอรับยา / ชำระเงิน',
+                visitStatus: isDispensed ? 'จ่ายยาแล้ว / ส่งการเงินแล้ว' : 'รอรับยา / ชำระเงิน',
+                status: (isDispensed ? 'dispensed' : 'pending') as 'pending' | 'dispensed',
                 visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
                 visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
                 doctorAdvice: pq.doctor_advice || 'พักผ่อนให้เพียงพอ ทานยาตามแพทย์สั่ง',
-                medications: rawMeds
+                medications: rawMeds.map((m: any) => ({
+                  medId: m.medId || m.medicine_code || 'MED-001',
+                  name: m.name || m.medicine_name || 'ยาตามแพทย์สั่ง',
+                  dosage: m.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
+                  instructions: m.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
+                  stock: m.stock || m.stock_quantity || 100,
+                  stockStatus: (m.stock || m.stock_quantity || 100) > 10 ? ('in-stock' as const) : ('low-stock' as const),
+                  quantity: m.quantity && m.quantity > 0 ? m.quantity : 10,
+                  price: m.price && m.price > 0 ? m.price : (m.unit_price || 15),
+                  unit_price: m.unit_price && m.unit_price > 0 ? m.unit_price : (m.price || 15),
+                  properties: m.properties || 'บรรเทาอาการตามแพทย์สั่ง'
+                }))
               };
             });
+
+            // จัดเรียง: ผู้ป่วยที่รอจัดยาอยู่บนสุด (pending) และ Log ผู้ป่วยที่ส่งไปการเงินแล้ว (dispensed) อยู่ถัดลงมา
+            mappedQueues.sort((a, b) => Number(a.status === 'dispensed') - Number(b.status === 'dispensed'));
+
             setQueueList(mappedQueues);
             setLocalPatientId(prev => {
               if (mappedQueues.length > 0) {
-                if (!prev || !mappedQueues.find((q: any) => q.id === prev)) {
-                  return mappedQueues[0].id;
+                if (prev && mappedQueues.find(q => q.id === prev)) {
+                  return prev;
                 }
-                return prev;
+                const firstPending = mappedQueues.find(q => q.status !== 'dispensed');
+                return firstPending ? firstPending.id : mappedQueues[0].id;
               }
               return '';
             });
@@ -360,9 +380,52 @@ export default function DetailPage({
     }
 
     triggerToast(`ยืนยันการจ่ายยาเรียบร้อย! ส่งข้อมูลใบสั่งยาของ ${pName} ไปยังระบบการเงินแล้ว`, 'success');
-    setQueueList(prev => prev.filter(p => p.id !== activePatient.id));
-    setLocalPatientId('');
-    if (onSelectPatientId) onSelectPatientId('');
+    
+    // อัปเดตสถานะในคิวเป็น 'dispensed' เพื่อคง Log ประวัติที่ส่งไปก่อนหน้านั้นเหมือนระบบหมอ
+    setQueueList(prev => {
+      const updated = prev.map(p => {
+        if (p.id === activePatient.id) {
+          return {
+            ...p,
+            status: 'dispensed' as const,
+            visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
+            dispensedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+          };
+        }
+        return p;
+      });
+      return [...updated].sort((a, b) => Number(a.status === 'dispensed') - Number(b.status === 'dispensed'));
+    });
+
+    // สลับไปยังผู้ป่วยคนถัดไปที่ยังรอจัดยา
+    const nextPending = queueList.find(p => p.id !== activePatient.id && p.status !== 'dispensed');
+    if (nextPending) {
+      setLocalPatientId(nextPending.id);
+      if (onSelectPatientId) onSelectPatientId(nextPending.id);
+    }
+  };
+
+  // ฟังก์ชันแก้ไขจำนวนยาที่สั่งจ่ายในหน้ารายละเอียดการจ่ายยา
+  const handleUpdateMedQty = (index: number, newQty: number) => {
+    if (!activePatient) return;
+    const safeQty = Math.max(1, Math.min(999, newQty));
+    
+    setQueueList(prev => prev.map(p => {
+      if (p.id === activePatient.id) {
+        const updatedMeds = [...(p.medications || [])];
+        if (updatedMeds[index]) {
+          updatedMeds[index] = {
+            ...updatedMeds[index],
+            quantity: safeQty
+          };
+        }
+        return {
+          ...p,
+          medications: updatedMeds
+        };
+      }
+      return p;
+    }));
   };
 
 
@@ -425,9 +488,11 @@ export default function DetailPage({
             </div>
           </div>
           <div style={{ fontSize: '32px', fontWeight: '800', color: '#2563EB', lineHeight: '38px' }}>
-            {Math.max(1, queueList.length - 1)}
+            {queueList.filter(p => p.status !== 'dispensed').length}
           </div>
-          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>รอจัดยา 1 • ซักถามคำแนะนำ 1</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
+            รอจัดยา {queueList.filter(p => p.status !== 'dispensed').length} คิว
+          </div>
         </div>
 
         <div 
@@ -447,9 +512,11 @@ export default function DetailPage({
             </div>
           </div>
           <div style={{ fontSize: '32px', fontWeight: '800', color: '#0D9488', lineHeight: '38px' }}>
-            1
+            {queueList.filter(p => p.status === 'dispensed').length}
           </div>
-          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>ส่งต่อไปแคชเชียร์ 1 • รอชำระ 1</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
+            ส่งต่อไปแคชเชียร์ {queueList.filter(p => p.status === 'dispensed').length} คน
+          </div>
         </div>
 
         <div 
@@ -468,8 +535,10 @@ export default function DetailPage({
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             </div>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: '800', color: '#16A34A', lineHeight: '38px' }}>0</div>
-          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>เสร็จสิ้น 0 • รับยาเรียบร้อย 0</div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#16A34A', lineHeight: '38px' }}>
+            {queueList.filter(p => p.status === 'completed').length}
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>เสร็จสิ้น • รับยาเรียบร้อย</div>
         </div>
       </div>
 
@@ -544,15 +613,21 @@ export default function DetailPage({
                 <thead>
                   <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '100px', textAlign: 'center' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '110px' }}>HN</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '120px' }}>HN</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '160px' }}>เลขบัตรประชาชน</th>
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '180px' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '220px' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '150px' }}>การดำเนินการ</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '230px' }}>สถานะ / สิทธิการรักษา</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '160px' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
                   {queueList
+                    .filter(p => {
+                      if (statFilter === 'pending') return p.status !== 'dispensed';
+                      if (statFilter === 'dispensed') return p.status === 'dispensed';
+                      if (statFilter === 'completed') return p.status === 'completed';
+                      return true;
+                    })
                     .filter(p => 
                       patientIdInput === '' ||
                       p.id.toLowerCase().includes(patientIdInput.toLowerCase()) || 
@@ -560,65 +635,115 @@ export default function DetailPage({
                       p.nationalId.includes(patientIdInput) ||
                       p.name.toLowerCase().includes(patientIdInput.toLowerCase())
                     )
-                    .map((p, index) => (
-                    <tr 
-                      key={p.id + '_' + index}
-                      className={localPatientId === p.id ? 'active-row' : ''}
-                      style={{ borderBottom: '1px solid #F1F5F9', whiteSpace: 'nowrap', height: '56px' }}
-                    >
-                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
-                        <span style={{ 
-                          color: '#2563EB', 
-                          fontWeight: '700', 
-                          fontSize: '15px',
-                          whiteSpace: 'nowrap', 
-                          display: 'inline-block'
-                        }}>
-                          {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                        <span style={{ fontSize: '14.5px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
-                          {p.hn.replace(/[-]/g, '')}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                        <div className="patient-table-name" style={{ fontWeight: '700', color: '#0F172A', fontSize: '14px', whiteSpace: 'nowrap' }}>{p.name}</div>
-                      </td>
-                      <td className="patient-table-sub" style={{ padding: '14px 16px', fontFamily: 'monospace', fontSize: '13.5px', color: '#475569', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>{p.nationalId}</td>
-                      <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
-                        <span style={{ 
-                          background: p.treatmentRights.includes('30') ? '#FEF9C3' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
-                          color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
-                          border: `1px solid ${p.treatmentRights.includes('30') ? '#FDE68A' : p.treatmentRights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
-                          padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
-                          whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center',
-                          width: '175px', textAlign: 'center', boxSizing: 'border-box'
-                        }}>
-                          {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                        <button 
-                          onClick={() => {
-                            setLocalPatientId(p.id);
-                            if (onSelectPatientId) onSelectPatientId(p.id);
-                          }}
+                    .map((p, index) => {
+                      const isDispensed = p.status === 'dispensed';
+                      return (
+                        <tr 
+                          key={p.id + '_' + index}
+                          className={localPatientId === p.id ? 'active-row' : ''}
                           style={{ 
-                            padding: '8px 20px', 
-                            background: localPatientId === p.id ? '#10B981' : '#2563EB', 
-                            color: 'white', border: 'none', borderRadius: '10px', 
-                            cursor: 'pointer', fontWeight: '700', fontSize: '14px',
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                            whiteSpace: 'nowrap', minWidth: '100px',
-                            boxShadow: localPatientId === p.id ? '0 2px 6px rgba(16, 185, 129, 0.25)' : '0 2px 6px rgba(37, 99, 235, 0.25)'
+                            borderBottom: '1px solid #F1F5F9', 
+                            whiteSpace: 'nowrap', 
+                            height: '56px',
+                            background: isDispensed ? '#F8FAFC' : undefined
                           }}
                         >
-                          {localPatientId === p.id ? 'เลือกอยู่' : 'เข้าคิว'}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
+                            <span style={{ 
+                              color: isDispensed ? '#64748B' : '#2563EB', 
+                              fontWeight: '700', 
+                              fontSize: '15px',
+                              fontFamily: 'monospace'
+                            }}>
+                              {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
+                            </span>
+                          </td>
+                          <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                            <CopyableText value={p.hn.replace(/[-]/g, '')} />
+                          </td>
+                          <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                            {p.nationalId && p.nationalId !== '-' ? (
+                              <CopyableText value={p.nationalId} color="#475569" />
+                            ) : (
+                              <span style={{ color: '#94A3B8' }}>-</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '14px' }}>{p.name}</span>
+                              {p.doctorAdvice && (
+                                <span style={{ fontSize: '12px', color: '#64748B', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {p.doctorAdvice}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ 
+                                background: isDispensed ? '#DCFCE7' : '#DBEAFE',
+                                color: isDispensed ? '#15803D' : '#1E40AF',
+                                border: `1px solid ${isDispensed ? '#86EFAC' : '#93C5FD'}`,
+                                padding: '4px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {isDispensed ? '✓ จ่ายยาแล้ว' : 'รอจัดยา'}
+                              </span>
+                              <span style={{ 
+                                background: p.treatmentRights.includes('30') ? '#FEF9C3' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
+                                color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
+                                border: `1px solid ${p.treatmentRights.includes('30') ? '#FDE68A' : p.treatmentRights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
+                                padding: '4px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: '600',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                            {isDispensed ? (
+                              <button 
+                                onClick={() => {
+                                  setLocalPatientId(p.id);
+                                  if (onSelectPatientId) onSelectPatientId(p.id);
+                                }}
+                                style={{ 
+                                  padding: '7px 16px', 
+                                  background: localPatientId === p.id ? '#0D9488' : '#F1F5F9', 
+                                  color: localPatientId === p.id ? '#FFFFFF' : '#0F766E', 
+                                  border: '1px solid #CBD5E1', borderRadius: '10px', 
+                                  cursor: 'pointer', fontWeight: '700', fontSize: '13px',
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title="คลิกเพื่อดูประวัติใบสั่งยาที่ส่งไปการเงินแล้ว"
+                              >
+                                <Check size={14} strokeWidth={2.5} />
+                                ส่งการเงินแล้ว
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => {
+                                  setLocalPatientId(p.id);
+                                  if (onSelectPatientId) onSelectPatientId(p.id);
+                                }}
+                                style={{ 
+                                  padding: '8px 20px', 
+                                  background: localPatientId === p.id ? '#10B981' : '#2563EB', 
+                                  color: 'white', border: 'none', borderRadius: '10px', 
+                                  cursor: 'pointer', fontWeight: '700', fontSize: '14px',
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                                  whiteSpace: 'nowrap', minWidth: '100px',
+                                  boxShadow: localPatientId === p.id ? '0 2px 6px rgba(16, 185, 129, 0.25)' : '0 2px 6px rgba(37, 99, 235, 0.25)'
+                                }}
+                              >
+                                {localPatientId === p.id ? 'เลือกอยู่' : 'จัดยา'}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -635,15 +760,25 @@ export default function DetailPage({
             <div className="patient-info-container">
               <div className="patient-title-row">
                 <h3 className="patient-name">{activePatient.name}</h3>
-                <div className="patient-badges">
+                <div className="patient-badges" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                   <span className="badge ticket-badge">{activePatient.ticket}</span>
-                  <span className="badge hn-badge">HN: {activePatient.hn.replace(/[-]/g, '')}</span>
+                  <span className="badge hn-badge" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                    <CopyableText label="HN" value={activePatient.hn.replace(/[-]/g, '')} color="#FFFFFF" />
+                  </span>
+                  {activePatient.status === 'dispensed' && (
+                    <span style={{ background: '#DCFCE7', color: '#15803D', border: '1px solid #86EFAC', padding: '3px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '700' }}>
+                      ✓ จ่ายยาแล้ว
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="patient-details" style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '20px', alignItems: 'center', fontSize: '0.95rem', color: '#CBD5E1' }}>
                 <span>เพศ {activePatient.gender}</span>
                 <span>อายุ {activePatient.age} ปี</span>
-                <span>เบอร์โทร: {activePatient.phone}</span>
+                <span>เบอร์โทร: {activePatient.phone || '-'}</span>
+                {activePatient.nationalId && (
+                  <span>เลขบัตร: <CopyableText value={activePatient.nationalId} color="#E2E8F0" /></span>
+                )}
               </div>
             </div>
           </div>
@@ -726,79 +861,113 @@ export default function DetailPage({
 
                 {/* Medication + Stock Combined List Table */}
                 <div className="med-table-container" style={{ border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
-                  <h4 className="column-title" style={{ marginBottom: '16px', fontSize: '15px', fontWeight: '700', color: '#0F172A', borderBottom: '1px solid #E2E8F0', paddingBottom: '10px' }}>
-                    รายการยาที่สั่งจ่าย ({activePatient.medications.length} รายการ)
-                  </h4>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #E2E8F0', paddingBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                    <h4 className="column-title" style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#0F172A' }}>
+                      รายการยาที่สั่งจ่าย ({activePatient.medications.length} รายการ)
+                    </h4>
+                    <span style={{ fontSize: '13px', color: '#64748B' }}>
+                      * สามารถปรับแก้จำนวนยาที่จ่ายได้ในตารางนี้ ระบบจะคำนวณและส่งต่อให้การเงินโดยอัตโนมัติ
+                    </span>
+                  </div>
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                       <thead>
                         <tr style={{ color: '#0F172A', background: '#F1F5F9', borderBottom: '2px solid #CBD5E1', height: '44px' }}>
-                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>รหัสยา</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '120px' }}>รหัสยา</th>
                           <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ชื่อรายการยา & สรรพคุณ</th>
                           <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ขนาด / วิธีรับประทาน</th>
-                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>ราคา</th>
-                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>สถานะคลังยา</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '170px' }}>จำนวน</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '110px' }}>ราคา</th>
+                          <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '130px' }}>สถานะคลังยา</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {activePatient.medications.map((med, index) => (
-                          <tr key={index} style={{ borderBottom: '1px solid #F1F5F9' }}>
-                            <td style={{ padding: '12px', textAlign: 'center' }}>
-                              <span style={{ 
-                                color: '#2563EB', 
-                                fontWeight: '700', 
-                                fontFamily: 'monospace', 
-                                fontSize: '14.5px',
-                                letterSpacing: '0.3px',
-                                display: 'inline-block'
-                              }}>
-                                {med.medId}
-                              </span>
-                            </td>
-                            <td style={{ padding: '12px' }}>
-                              <div 
-                                className="patient-table-name" 
-                                style={{ color: '#2563EB', fontWeight: 'bold', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                                onClick={() => setSelectedMedInfo({ name: med.name, medId: med.medId, properties: med.properties })}
-                                title="คลิกเพื่อดูรายละเอียดสรรพคุณ"
-                              >
-                                {med.name}
-                              </div>
-                              <div>
+                        {activePatient.medications.map((med, index) => {
+                          const unitPrice = (med as any).unit_price || med.price || 15;
+                          const qty = med.quantity || 10;
+                          return (
+                            <tr key={index} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                              <td style={{ padding: '12px', textAlign: 'center' }}>
+                                <CopyableText value={med.medId} color="#2563EB" />
+                              </td>
+                              <td style={{ padding: '12px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  <CopyableText value={med.name} mono={false} color="#2563EB" />
+                                  <span 
+                                    style={{ 
+                                      fontSize: '12.5px', color: '#0284C7', fontWeight: '600', 
+                                      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' 
+                                    }}
+                                    onClick={() => setSelectedMedInfo({ name: med.name, medId: med.medId, properties: med.properties })}
+                                  >
+                                    (คลิกดูสรรพคุณ)
+                                  </span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px' }}>
+                                <div style={{ fontWeight: '600', color: '#1E293B' }}>{med.dosage}</div>
+                                <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>คำแนะนำ: {med.instructions}</div>
+                              </td>
+                              <td style={{ padding: '12px', textAlign: 'center' }}>
+                                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: '#F8FAFC', padding: '4px 8px', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
+                                  <button 
+                                    type="button" 
+                                    onClick={() => handleUpdateMedQty(index, Math.max(1, qty - 1))}
+                                    style={{
+                                      width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #CBD5E1',
+                                      background: '#FFFFFF', cursor: 'pointer', fontWeight: '800', fontSize: '15px',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569'
+                                    }}
+                                    title="ลดจำนวน"
+                                  >-</button>
+                                  <input 
+                                    type="number" 
+                                    min="1"
+                                    max={med.stock || 999}
+                                    value={qty}
+                                    onChange={(e) => handleUpdateMedQty(index, Math.max(1, parseInt(e.target.value) || 1))}
+                                    style={{
+                                      width: '52px', height: '28px', textAlign: 'center', fontWeight: '800',
+                                      borderRadius: '6px', border: '1.5px solid #2563EB', fontSize: '14px',
+                                      color: '#0F172A', background: '#FFFFFF'
+                                    }}
+                                  />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => handleUpdateMedQty(index, qty + 1)}
+                                    style={{
+                                      width: '26px', height: '26px', borderRadius: '6px', border: '1px solid #CBD5E1',
+                                      background: '#FFFFFF', cursor: 'pointer', fontWeight: '800', fontSize: '15px',
+                                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569'
+                                    }}
+                                    title="เพิ่มจำนวน"
+                                  >+</button>
+                                  <span style={{ fontSize: '12.5px', color: '#64748B', fontWeight: '600', marginLeft: '2px' }}>เม็ด</span>
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px', textAlign: 'center', fontWeight: '700', fontSize: '14.5px', color: '#0F172A' }}>
+                                ฿ {(unitPrice * qty).toLocaleString()}
+                                <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 'normal' }}>
+                                  (@ ฿{unitPrice})
+                                </div>
+                              </td>
+                              <td style={{ padding: '12px', textAlign: 'center' }}>
                                 <span 
                                   style={{ 
-                                    fontSize: '13px', color: '#0284C7', fontWeight: '600', 
-                                    cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '3px' 
+                                    background: med.stockStatus === 'out-stock' ? '#FEE2E2' : '#DCFCE7', 
+                                    color: med.stockStatus === 'out-stock' ? '#DC2626' : '#15803D', 
+                                    border: `1px solid ${med.stockStatus === 'out-stock' ? '#FCA5A5' : '#86EFAC'}`,
+                                    padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
+                                    display: 'inline-flex', justifyContent: 'center', alignItems: 'center', minWidth: '110px',
+                                    textAlign: 'center', whiteSpace: 'nowrap'
                                   }}
-                                  onClick={() => setSelectedMedInfo({ name: med.name, medId: med.medId, properties: med.properties })}
                                 >
-                                  คลิกเพื่อดูรายละเอียดสรรพคุณ
+                                  {med.stockStatus === 'out-stock' ? 'หมดคลัง (0)' : `มีในคลัง (${med.stock})`}
                                 </span>
-                              </div>
-                            </td>
-                            <td style={{ padding: '12px' }}>
-                              <div style={{ fontWeight: '600', color: '#1E293B' }}>{med.dosage}</div>
-                              <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>คำแนะนำ: {med.instructions}</div>
-                            </td>
-                            <td style={{ padding: '12px', textAlign: 'center', fontWeight: '700', fontSize: '14.5px', color: '#0F172A' }}>
-                              ฿ {med.price.toLocaleString()}
-                            </td>
-                            <td style={{ padding: '12px', textAlign: 'center' }}>
-                              <span 
-                                style={{ 
-                                  background: med.stockStatus === 'out-stock' ? '#FEE2E2' : '#DCFCE7', 
-                                  color: med.stockStatus === 'out-stock' ? '#DC2626' : '#15803D', 
-                                  border: `1px solid ${med.stockStatus === 'out-stock' ? '#FCA5A5' : '#86EFAC'}`,
-                                  padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
-                                  display: 'inline-flex', justifyContent: 'center', alignItems: 'center', minWidth: '110px',
-                                  textAlign: 'center', whiteSpace: 'nowrap'
-                                }}
-                              >
-                                {med.stockStatus === 'out-stock' ? 'หมดคลัง (0)' : `มีในคลัง (${med.stock})`}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -806,18 +975,29 @@ export default function DetailPage({
 
                 {/* Action Button: Confirm & Send to Billing */}
                 <div className="send-billing-action-bar" style={{ marginTop: '4px' }}>
-                  <button className="confirm-send-billing-btn" onClick={handleSendToBilling}>
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                      <polyline points="22 4 12 14.01 9 11.01"/>
-                    </svg>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: '1.3' }}>
-                      <span style={{ fontSize: '1rem', fontWeight: '800' }}>ยืนยันการจ่ายยา & ส่งข้อมูลไปการเงิน</span>
-                      <span style={{ fontSize: '0.85rem', fontWeight: '500', opacity: 0.95 }}>
-                        (Confirm & Send to Billing)
-                      </span>
+                  {activePatient.status === 'dispensed' ? (
+                    <div style={{
+                      padding: '16px 24px', background: '#DCFCE7', border: '1.5px solid #86EFAC',
+                      borderRadius: '12px', color: '#15803D', fontWeight: '700', fontSize: '15px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
+                    }}>
+                      <Check size={20} strokeWidth={2.5} />
+                      ใบสั่งยานี้ส่งต่อไปยังห้องการเงินเรียบร้อยแล้ว (รอผู้ป่วยชำระเงินที่ห้องการเงิน)
                     </div>
-                  </button>
+                  ) : (
+                    <button className="confirm-send-billing-btn" onClick={handleSendToBilling}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                      </svg>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', lineHeight: '1.3' }}>
+                        <span style={{ fontSize: '1rem', fontWeight: '800' }}>ยืนยันการจ่ายยา & ส่งข้อมูลไปการเงิน</span>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '500', opacity: 0.95 }}>
+                          (Confirm & Send to Billing)
+                        </span>
+                      </div>
+                    </button>
+                  )}
                 </div>
               </div>
             )}

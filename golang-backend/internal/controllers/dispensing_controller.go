@@ -1108,14 +1108,15 @@ func GetPharmacyQueues(c *gin.Context) {
 		ChronicDiseases string    `json:"chronic_diseases"`
 		DoctorAdvice    string    `json:"doctor_advice"`
 		Medications     []gin.H   `json:"medications"`
+		Status          string    `json:"status"`
 		CreatedAt       time.Time `json:"created_at"`
 	}
 
 	var results []PharmacyQueueItem
 
-	// 1. ดึงจากตารางคิวห้องยาเฉพาะ models.MedicineQueue เรียงล่าสุดขึ้นบนสุด
+	// 1. ดึงจากตารางคิวห้องยาเฉพาะ models.MedicineQueue เรียงล่าสุดขึ้นบนสุด (รวม Log ที่ส่งไปก่อนหน้านั้นด้วย)
 	var medQueues []models.MedicineQueue
-	config.DB.Where("status = ?", "pending").Order("id desc, created_at desc").Find(&medQueues)
+	config.DB.Where("status IN ('pending', 'dispensed')").Order("id desc, created_at desc").Limit(30).Find(&medQueues)
 	for _, mq := range medQueues {
 		var medList []gin.H
 		if mq.Medications != "" {
@@ -1163,6 +1164,7 @@ func GetPharmacyQueues(c *gin.Context) {
 			ChronicDiseases: chronic,
 			DoctorAdvice:    mq.DoctorAdvice,
 			Medications:     medList,
+			Status:          mq.Status,
 			CreatedAt:       mq.CreatedAt,
 		})
 	}
@@ -1170,8 +1172,9 @@ func GetPharmacyQueues(c *gin.Context) {
 	// 2. ดึงจากคิวตรวจแพทย์ models.Queue เรียงล่าสุดขึ้นบนสุด (เฉพาะคิวที่ยังไม่ได้อยู่ใน medQueues)
 	var queues []models.Queue
 	config.DB.Preload("Patient").
-		Where("status IN ?", []string{"รอรับยา", "pharmacy_waiting", "Pending Pharmacy"}).
+		Where("status IN ?", []string{"รอรับยา", "pharmacy_waiting", "Pending Pharmacy", "รอชำระเงิน", "เสร็จสิ้น"}).
 		Order("id desc").
+		Limit(20).
 		Find(&queues)
 
 	for _, q := range queues {
@@ -1237,6 +1240,11 @@ func GetPharmacyQueues(c *gin.Context) {
 			hn = fmt.Sprintf("HN-%d", q.PatientID)
 		}
 
+		qStatus := "pending"
+		if q.Status == "รอชำระเงิน" || q.Status == "เสร็จสิ้น" {
+			qStatus = "dispensed"
+		}
+
 		results = append(results, PharmacyQueueItem{
 			ID:              fmt.Sprintf("%d", q.ID),
 			VisitID:         visitID,
@@ -1251,6 +1259,7 @@ func GetPharmacyQueues(c *gin.Context) {
 			ChronicDiseases: q.Patient.ChronicDiseases,
 			DoctorAdvice:    q.Note,
 			Medications:     medList,
+			Status:          qStatus,
 			CreatedAt:       q.CreatedAt,
 		})
 	}

@@ -21,6 +21,8 @@ export interface PatientConfig {
   chronicDiseases: string;
   vitals: string;
   visitStatus: string;
+  status?: 'pending' | 'dispensed' | 'completed';
+  dispensedAt?: string;
   visitDate: string;
   visitTime: string;
   doctorAdvice: string;

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import './MedicinePage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
+import CopyableText from '../../components/Common/CopyableText';
 
 interface Medicine {
   id: string;
@@ -602,23 +603,19 @@ export default function MedicinePage() {
                     filteredMedicines.map((med) => (
                       <tr key={med.id}>
                         <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <span style={{ 
-                            color: '#2563EB', 
-                            fontWeight: '700', 
-                            fontFamily: 'monospace', 
-                            fontSize: '14.5px',
-                            letterSpacing: '0.3px',
-                            display: 'inline-block'
-                          }}>
-                            {med.id}
-                          </span>
+                          <CopyableText value={med.id} color="#2563EB" />
                         </td>
-                        <td 
-                          className="med-name-cell clickable-med-name"
-                          onClick={() => setDetailModalMed(med)}
-                        >
-                          <span className="med-name-link">{med.name}</span>
-                          <span className="med-hint-tag">คลิกเพื่อดูรายละเอียดสรรพคุณ </span>
+                        <td className="med-name-cell">
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <CopyableText value={med.name} mono={false} color="#0F172A" />
+                            <span 
+                              className="med-hint-tag" 
+                              onClick={() => setDetailModalMed(med)}
+                              style={{ cursor: 'pointer', margin: 0 }}
+                            >
+                              (คลิกดูสรรพคุณ)
+                            </span>
+                          </div>
                         </td>
                         <td style={{ padding: '14px 16px' }}>
                           <span style={{ 
@@ -766,8 +763,14 @@ export default function MedicinePage() {
             <div className="med-detail-header">
               <div className="med-detail-title-box">
                 <span className="med-detail-badge">รายละเอียดตัวยาและสรรพคุณ</span>
-                <h2 className="med-detail-name">{detailModalMed.name}</h2>
-                <span className="med-detail-generic">ชื่อสามัญทางยา: {detailModalMed.genericName} (รหัส: {detailModalMed.id})</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <h2 className="med-detail-name" style={{ margin: 0 }}>{detailModalMed.name}</h2>
+                  <CopyableText value={detailModalMed.name} mono={false} showIcon={true} />
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+                  <span className="med-detail-generic">ชื่อสามัญทางยา: {detailModalMed.genericName}</span>
+                  <CopyableText label="รหัสยา" value={detailModalMed.id} color="#2563EB" />
+                </div>
               </div>
               <button className="close-btn" onClick={() => setDetailModalMed(null)}>✕</button>
             </div>
