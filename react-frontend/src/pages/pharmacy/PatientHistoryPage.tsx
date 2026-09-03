@@ -548,11 +548,11 @@ export default function PatientHistoryPage() {
                   <thead>
                     <tr>
                       <th style={{ textAlign: 'center', width: '100px' }}>ID (HN)</th>
-                      <th style={{ textAlign: 'center' }}>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
+                      <th style={{ textAlign: 'center' }}>ชื่อผู้ป่วย</th>
                       <th style={{ textAlign: 'center', width: '80px' }}>อายุ</th>
                       <th style={{ textAlign: 'center', width: '90px' }}>กรุ๊ปเลือด</th>
                       <th style={{ textAlign: 'center', width: '190px' }}>สิทธิการรักษา</th>
-                      <th style={{ textAlign: 'center', width: '130px' }}>จำนวนเข้ารักษา</th>
+                      <th style={{ textAlign: 'center', width: '150px' }}>จำนวนเข้ารักษา</th>
                       <th style={{ textAlign: 'center' }}>โรคประจำตัว</th>
                       <th style={{ textAlign: 'center', width: '160px' }}>การจัดการ</th>
                     </tr>
@@ -570,7 +570,7 @@ export default function PatientHistoryPage() {
                             onClick={() => handleSelectPatient(patient)}
                             style={{ textAlign: 'center', padding: '12px 14px' }}
                           >
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                               <span className="history-name-link" style={{ fontWeight: '700', color: '#0F172A', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -578,8 +578,8 @@ export default function PatientHistoryPage() {
                                 </svg>
                                 {patient.name}
                               </span>
-                              <span className="history-hint-tag" style={{ fontSize: '11.5px', color: '#2563EB', background: '#EFF6FF', padding: '2px 8px', borderRadius: '4px', border: '1px solid #DBEAFE', cursor: 'pointer' }}>
-                                คลิกดูประวัติการรักษา & แพ้ยา 
+                              <span className="history-hint-tag" style={{ fontSize: '11.5px', color: '#2563EB', background: '#EFF6FF', padding: '2px 8px', borderRadius: '4px', border: '1px solid #DBEAFE', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                                (คลิกดูประวัติ)
                               </span>
                             </div>
                           </td>
@@ -597,8 +597,8 @@ export default function PatientHistoryPage() {
                               {rights}
                             </span>
                           </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <span className="visit-count-badge">
+                          <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <span className="visit-count-badge" style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: '700', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
                               เข้ารักษา {patient.visitCount || 1} ครั้ง
                             </span>
                           </td>

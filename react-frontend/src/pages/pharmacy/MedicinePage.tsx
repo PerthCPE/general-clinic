@@ -316,6 +316,213 @@ function ModernCategoryDropdown({
   );
 }
 
+// Modern Dropdown to select/search medicine to edit by Code or Name
+function MedicineSelectorDropdown({
+  medicines,
+  currentMed,
+  onSelect
+}: {
+  medicines: Medicine[];
+  currentMed: Medicine;
+  onSelect: (med: Medicine) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return medicines;
+    return medicines.filter(m =>
+      (m.id && m.id.toLowerCase().includes(q)) ||
+      (m.medicine_code && m.medicine_code.toLowerCase().includes(q)) ||
+      (m.name && m.name.toLowerCase().includes(q)) ||
+      (m.genericName && m.genericName.toLowerCase().includes(q))
+    );
+  }, [medicines, search]);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', marginBottom: '14px' }}>
+      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        เลือกหรือค้นหายาที่ต้องการแก้ไข (ตามรหัสยา / ชื่อยา)
+      </label>
+
+      {/* Selector Trigger Button */}
+      <div
+        onClick={() => setIsOpen(prev => !prev)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '9px 14px',
+          background: '#F8FAFC',
+          border: '1.5px solid #2563EB',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          boxShadow: isOpen ? '0 0 0 3px rgba(37, 99, 235, 0.15)' : 'none',
+          transition: 'all 0.15s ease'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+          <span style={{ 
+            background: '#2563EB', color: '#FFFFFF', fontSize: '11.5px', fontWeight: '800', 
+            padding: '2px 8px', borderRadius: '6px', fontFamily: 'monospace', letterSpacing: '0.5px' 
+          }}>
+            {currentMed.medicine_code || currentMed.id}
+          </span>
+          <span style={{ fontSize: '14px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {currentMed.name}
+          </span>
+          {currentMed.category && (
+            <span style={{ fontSize: '12px', color: '#64748B' }}>
+              ({currentMed.category.replace(/\s*\([^)]*\)/g, '').trim()})
+            </span>
+          )}
+        </div>
+
+        <svg 
+          width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.5" 
+          strokeLinecap="round" strokeLinejoin="round"
+          style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease', flexShrink: 0 }}
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
+
+      {/* Downward Dropdown Menu */}
+      {isOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            right: 0,
+            background: '#FFFFFF',
+            borderRadius: '10px',
+            border: '1.5px solid #CBD5E1',
+            boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.18), 0 4px 10px -2px rgba(15, 23, 42, 0.08)',
+            zIndex: 99999,
+            overflow: 'hidden'
+          }}
+        >
+          {/* Search Box */}
+          <div style={{ padding: '8px 10px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0' }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2.5" style={{ position: 'absolute', left: '10px' }}>
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                type="text"
+                placeholder="พิมพ์ค้นหารหัสยา (เช่น MED-001) หรือชื่อยา..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+                style={{
+                  width: '100%', padding: '7px 10px 7px 32px', borderRadius: '6px',
+                  border: '1.5px solid #CBD5E1', fontSize: '13px', outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setSearch(''); }}
+                  style={{ position: 'absolute', right: '8px', background: 'none', border: 'none', color: '#94A3B8', cursor: 'pointer', fontSize: '14px' }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Medicines List */}
+          <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
+                ไม่พบรายการยาที่ตรงกับ "{search}"
+              </div>
+            ) : (
+              filtered.map((med) => {
+                const isSelected = med.id === currentMed.id;
+                return (
+                  <div
+                    key={med.id}
+                    onClick={() => {
+                      onSelect(med);
+                      setIsOpen(false);
+                      setSearch('');
+                    }}
+                    style={{
+                      padding: '9px 14px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: isSelected ? '#EFF6FF' : '#FFFFFF',
+                      borderBottom: '1px solid #F1F5F9',
+                      transition: 'background 0.15s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = '#F8FAFC';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = '#FFFFFF';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        background: isSelected ? '#1D4ED8' : '#F1F5F9',
+                        color: isSelected ? '#FFFFFF' : '#334155',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontFamily: 'monospace'
+                      }}>
+                        {med.medicine_code || med.id}
+                      </span>
+                      <span style={{ fontSize: '13.5px', fontWeight: isSelected ? '700' : '600', color: isSelected ? '#1D4ED8' : '#0F172A' }}>
+                        {med.name}
+                      </span>
+                      {med.category && (
+                        <span style={{ fontSize: '12px', color: '#64748B' }}>
+                          • {med.category.replace(/\s*\([^)]*\)/g, '').trim()}
+                        </span>
+                      )}
+                    </div>
+
+                    {isSelected && (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1D4ED8" strokeWidth="2.5">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MedicinePage() {
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const { isConnected, subscribe } = useWebSocket();
@@ -1310,6 +1517,11 @@ export default function MedicinePage() {
                   </>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
+                    <MedicineSelectorDropdown
+                      medicines={medicines}
+                      currentMed={detailModalMed}
+                      onSelect={(med) => handleOpenEditDetailMedDirect(med)}
+                    />
                     <div>
                       <label style={{ fontSize: '13.5px', fontWeight: '700', color: '#1E293B', display: 'block', marginBottom: '4px' }}>ชื่อยา * (Trade Name)</label>
                       <input 
