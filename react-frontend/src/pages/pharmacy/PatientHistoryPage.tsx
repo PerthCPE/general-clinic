@@ -437,6 +437,17 @@ export default function PatientHistoryPage() {
     return matchSearch && matchRisk;
   });
 
+  const ITEMS_PER_PAGE = 10;
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, timeRange, urgencyFilter, riskFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPatients.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredPatients.length);
+  const paginatedPatients = filteredPatients.slice(startIndex, endIndex);
+
   return (
     <div className="patient-history-container">
       <div className="list-view-container">
@@ -558,7 +569,7 @@ export default function PatientHistoryPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredPatients.map((patient) => {
+                    {paginatedPatients.map((patient) => {
                       const rights = patient.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
                       return (
                         <tr key={patient.id}>
@@ -615,7 +626,7 @@ export default function PatientHistoryPage() {
                                 type="button"
                                 onClick={(e) => handleOpenEditPatient(patient, e)}
                                 style={{
-                                  padding: '6px 11px', borderRadius: '8px',
+                                   padding: '6px 11px', borderRadius: '8px',
                                   background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE',
                                   fontSize: '12.5px', fontWeight: '700', cursor: 'pointer',
                                   display: 'inline-flex', alignItems: 'center', gap: '4px',
@@ -659,29 +670,56 @@ export default function PatientHistoryPage() {
                 </table>
               </div>
 
-              {/* Pagination Bar matching Image 4 */}
+              {/* Pagination Bar */}
               <div className="table-pagination-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 24px', borderTop: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '12px' }}>
-                <span className="pagination-info" style={{ fontSize: '13.5px', fontWeight: '500' }}>
-                  แสดง 1 ถึง {filteredPatients.length} จาก {patients.length} รายการ
+                <span className="pagination-info" style={{ fontSize: '13.5px', fontWeight: '500', color: '#475569' }}>
+                  แสดง {filteredPatients.length === 0 ? 0 : startIndex + 1} ถึง {endIndex} จาก {filteredPatients.length} รายการ
                 </span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <button 
-                    disabled={currentPage === 1}
+                    disabled={safeCurrentPage <= 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                     className="pagination-btn"
-                    style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13.5px', cursor: 'not-allowed' }}
+                    style={{
+                      padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13.5px',
+                      background: safeCurrentPage <= 1 ? '#F1F5F9' : '#FFFFFF',
+                      color: safeCurrentPage <= 1 ? '#94A3B8' : '#334155',
+                      cursor: safeCurrentPage <= 1 ? 'not-allowed' : 'pointer',
+                      fontWeight: '600', transition: 'all 0.15s ease'
+                    }}
                   >
                     ย้อนกลับ
                   </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                    <button 
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`pagination-btn ${safeCurrentPage === pageNum ? 'active' : ''}`}
+                      style={{
+                        padding: '6px 12px', minWidth: '34px', borderRadius: '8px',
+                        border: safeCurrentPage === pageNum ? 'none' : '1px solid #CBD5E1',
+                        background: safeCurrentPage === pageNum ? '#2563EB' : '#FFFFFF',
+                        color: safeCurrentPage === pageNum ? '#FFFFFF' : '#334155',
+                        fontWeight: '700', fontSize: '13.5px', cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+
                   <button 
-                    className="pagination-btn active"
-                    style={{ padding: '6px 14px', borderRadius: '8px', border: 'none', background: '#2563EB', color: '#FFFFFF', fontWeight: '700', fontSize: '13.5px', cursor: 'pointer' }}
-                  >
-                    1
-                  </button>
-                  <button 
-                    disabled
+                    disabled={safeCurrentPage >= totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                     className="pagination-btn"
-                    style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13.5px', cursor: 'not-allowed' }}
+                    style={{
+                      padding: '6px 14px', borderRadius: '8px', border: '1px solid #CBD5E1', fontSize: '13.5px',
+                      background: safeCurrentPage >= totalPages ? '#F1F5F9' : '#FFFFFF',
+                      color: safeCurrentPage >= totalPages ? '#94A3B8' : '#334155',
+                      cursor: safeCurrentPage >= totalPages ? 'not-allowed' : 'pointer',
+                      fontWeight: '600', transition: 'all 0.15s ease'
+                    }}
                   >
                     ถัดไป
                   </button>

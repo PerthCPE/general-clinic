@@ -989,6 +989,19 @@ export default function MedicinePage() {
 
     return matchSearch && matchCategory && matchStatus;
   });
+
+  const ITEMS_PER_PAGE = 10;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, categoryFilter, stockStatusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredMedicines.length / ITEMS_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredMedicines.length);
+  const paginatedMedicines = filteredMedicines.slice(startIndex, endIndex);
   
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -1293,7 +1306,7 @@ export default function MedicinePage() {
                       </td>
                     </tr>
                   ) : (
-                    filteredMedicines.map((med) => (
+                    paginatedMedicines.map((med) => (
                       <tr key={med.id}>
                         <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <CopyableText value={med.id} color="#2563EB" />
@@ -1408,12 +1421,34 @@ export default function MedicinePage() {
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0, color: '#2563EB' }}>
                   <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                 </svg>
-                แสดง 1 - {filteredMedicines.length} จากทั้งหมด <strong>{medicines.length}</strong> รายการ
+                แสดง {filteredMedicines.length === 0 ? 0 : startIndex + 1} - {endIndex} จากทั้งหมด <strong>{filteredMedicines.length}</strong> รายการ
               </span>
               <div className="pagination-buttons">
-                <button className="page-arrow" disabled title="หน้าก่อนหน้า">‹</button>
-                <button className="page-num active">1</button>
-                <button className="page-arrow" disabled title="หน้าถัดไป">›</button>
+                <button 
+                  className="page-arrow" 
+                  disabled={safeCurrentPage <= 1} 
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  title="หน้าก่อนหน้า"
+                >
+                  ‹
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                  <button 
+                    key={pageNum}
+                    className={`page-num ${safeCurrentPage === pageNum ? 'active' : ''}`}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+                <button 
+                  className="page-arrow" 
+                  disabled={safeCurrentPage >= totalPages} 
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  title="หน้าถัดไป"
+                >
+                  ›
+                </button>
               </div>
             </div>
           </>
