@@ -957,3 +957,44 @@ body.dark-mode .billing-invoice-container .banner-rights-select {
 body.dark-mode .billing-invoice-container .banner-rights-select option {
   background: #1E293B;
 }
+
+/* ===== Print Media Styles & Receipt Preview Animation ===== */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+  .receipt-preview-dialog,
+  .receipt-preview-dialog * {
+    visibility: visible !important;
+  }
+  .receipt-preview-dialog {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+  .receipt-preview-dialog > div:first-child {
+    display: none !important; /* Hide modal top control bar during print */
+  }
+  .receipt-preview-dialog > div:last-child {
+    padding: 0 !important;
+    background: transparent !important;
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

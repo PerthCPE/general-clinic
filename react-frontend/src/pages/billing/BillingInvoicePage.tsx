@@ -22,9 +22,25 @@ export default function BillingInvoicePage({
   onNavigateToDashboard
 }: BillingInvoicePageProps) {
   const { subscribe } = useWebSocket();
-  const [queueList, setQueueList] = useState<PatientConfig[]>([]);
+  const [queueList, setQueueList] = useState<PatientConfig[]>(() => {
+    try {
+      const cached = localStorage.getItem('billing_active_patient_data');
+      if (cached) {
+        const p = JSON.parse(cached);
+        if (p && p.id) return [p];
+      }
+    } catch {}
+    return [];
+  });
   const receiptRef = useRef<HTMLDivElement>(null);
+  const printableReceiptRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [showReceiptPreview, setShowReceiptPreview] = useState(false);
+  const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
+  const [receiptSent, setReceiptSent] = useState<string | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('qr');
+  const [cashReceived, setCashReceived] = useState<string>('');
 
   // PromptPay Phone / National ID (สามารถแก้ไขเบอร์พร้อมเพย์ได้)
   const [promptPayNumber, setPromptPayNumber] = useState<string>(() => {
@@ -171,9 +187,17 @@ export default function BillingInvoicePage({
           });
           setQueueList(prev => {
             if (mapped.length === 0) return prev;
-            const existingIds = new Set(mapped.map((m: any) => m.id));
-            const keepPrev = prev.filter(p => !existingIds.has(p.id) && p.visitStatus === 'รอชำระเงิน');
-            return [...mapped, ...keepPrev];
+            const prevMap = new Map(prev.map((p: any) => [p.id, p]));
+            const merged = mapped.map((m: any) => {
+              const old = prevMap.get(m.id);
+              if (old && (!m.medications || m.medications.length === 0) && old.medications && old.medications.length > 0) {
+                return { ...m, medications: old.medications, doctorAdvice: old.doctorAdvice || m.doctorAdvice };
+              }
+              return m;
+            });
+            const existingIds = new Set(merged.map((m: any) => m.id));
+            const keepPrev = prev.filter((p: any) => !existingIds.has(p.id) && p.visitStatus === 'รอชำระเงิน');
+            return [...merged, ...keepPrev];
           });
           setLoading(false);
           return;
@@ -188,12 +212,12 @@ export default function BillingInvoicePage({
   useEffect(() => {
     fetchQueues();
 
-    // Smart Background Polling ทุกๆ 2.5 วินาที เพื่อดึงคิวใบแจ้งหนี้ล่าสุดอย่างต่อเนื่อง
+    // Smart Background Polling ทุกๆ 4 วินาที เพื่อดึงคิวใบแจ้งหนี้ล่าสุด
     const pollInterval = setInterval(() => {
-      if (!document.hidden) {
+      if (!document.hidden && !showQrModal) {
         fetchQueues();
       }
-    }, 2500);
+    }, 4000);
 
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
       if (data) {
@@ -243,7 +267,7 @@ export default function BillingInvoicePage({
       unsubBill();
       unsubQueue();
     };
-  }, [subscribe, masterMedicines.length]);
+  }, [subscribe, masterMedicines.length, showQrModal]);
 
   const currentSelectedId = selectedPatientId || localStorage.getItem('billing_active_patient') || '';
   const activePatient: PatientConfig | undefined = 
@@ -251,9 +275,12 @@ export default function BillingInvoicePage({
     queueList[0];
   const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
 
-  // ดึงรายการยาและราคาจริงจากฐานข้อมูล สำหรับคนไข้ที่เลือกอยู่
+  // ดึงรายการยาและราคาจริงจากฐานข้อมูล สำหรับคนไข้ที่เลือกอยู่ (ถ้ายังไม่มีในแคช)
   useEffect(() => {
     if (activePatient) {
+      if (activePatient.medications && activePatient.medications.length > 0) {
+        return;
+      }
       const fetchMeds = async () => {
         try {
           if (activePatient.visitId) {
@@ -334,12 +361,6 @@ export default function BillingInvoicePage({
     }
   }, [activePatient?.id, activePatient?.visitId, activePatient?.hn, masterMedicines.length]);
 
-  const [showQrModal, setShowQrModal] = useState(false);
-  const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
-  const [receiptSent, setReceiptSent] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('qr');
-  const [cashReceived, setCashReceived] = useState<string>('');
-
   const patientType = activePatient?.patientType || 'ผู้ป่วยนอก (OPD)';
   const allergiesList = Array.isArray(activePatient?.allergies) 
     ? activePatient.allergies 
@@ -418,19 +439,30 @@ export default function BillingInvoicePage({
     }
   };
 
-  // พิมพ์และบันทึกใบเสร็จเป็น PDF ด้วย html2pdf.js
+  // เปิดดูหน้าตัวอย่างใบเสร็จ (Preview) ก่อนพิมพ์หรือบันทึกไฟล์
   const handlePrintReceipt = () => {
-    if (!receiptRef.current) return;
+    setShowReceiptPreview(true);
+  };
+
+  // บันทึกเป็นไฟล์ PDF จากหน้าพรีวิวด้วย html2pdf.js
+  const handleDownloadPdf = () => {
+    const targetEl = printableReceiptRef.current || receiptRef.current;
+    if (!targetEl) return;
     const opt = {
       margin: 10,
       filename: `Receipt-${activePatient?.hn || 'HN'}-${Date.now()}.pdf`,
       image: { type: 'jpeg' as const, quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
       jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
     };
-    html2pdf().set(opt).from(receiptRef.current).save();
-    setReceiptSent('🖨 ดาวน์โหลดและพิมพ์ใบเสร็จรับเงิน PDF เรียบร้อยแล้ว');
+    html2pdf().set(opt).from(targetEl).save();
+    setReceiptSent('ดาวน์โหลดใบเสร็จรับเงิน PDF สำเร็จแล้ว');
     setTimeout(() => setReceiptSent(null), 3000);
+  };
+
+  // สั่งพิมพ์ผ่านเครื่องพิมพ์ (Print Dialog)
+  const handleBrowserPrint = () => {
+    window.print();
   };
 
   const handleSendDigitalReceipt = () => {
@@ -513,8 +545,13 @@ export default function BillingInvoicePage({
                 if (onSelectPatientId) onSelectPatientId(p.id);
                 localStorage.setItem('billing_active_patient', p.id);
               }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
-              👤 {p.id} ({p.name})
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+              <span>{p.id} ({p.name})</span>
             </button>
           ))}
         </div>
@@ -554,9 +591,15 @@ export default function BillingInvoicePage({
               background: isPaymentConfirmed ? 'rgba(52, 211, 153, 0.25)' : 'rgba(239, 68, 68, 0.25)', 
               color: isPaymentConfirmed ? '#6EE7B7' : '#FCA5A5',
               border: `1.5px solid ${isPaymentConfirmed ? '#34D399' : '#F87171'}`, 
-              padding: '5px 14px', borderRadius: '16px', fontSize: '13.5px', fontWeight: 'bold' 
+              padding: '5px 14px', borderRadius: '16px', fontSize: '13.5px', fontWeight: 'bold',
+              display: 'inline-flex', alignItems: 'center', gap: '6px'
             }}>
-              {isPaymentConfirmed ? '✓ ชำระเงินแล้ว' : 'ยังไม่ชำระเงิน'}
+              {isPaymentConfirmed ? (
+                <>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  ชำระเงินแล้ว
+                </>
+              ) : 'ยังไม่ชำระเงิน'}
             </span>
           </div>
         </div>
@@ -665,7 +708,22 @@ export default function BillingInvoicePage({
                   ผู้ป่วย: <strong>{activePatient.name}</strong> (HN: {activePatient.hn}) • สิทธิ: {currentRights}
                 </p>
               </div>
-              <button className="modal-close-icon" onClick={() => setShowQrModal(false)}>✕</button>
+              <button 
+                type="button"
+                className="modal-close-icon" 
+                onClick={() => setShowQrModal(false)}
+                style={{
+                  width: '32px', height: '32px', borderRadius: '8px',
+                  border: '1px solid #CBD5E1', background: '#FFFFFF',
+                  color: '#64748B', display: 'inline-flex', alignItems: 'center',
+                  justifyContent: 'center', cursor: 'pointer'
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
             </div>
 
             {receiptSent && (
@@ -677,16 +735,31 @@ export default function BillingInvoicePage({
             {/* Payment Method Selector Tabs */}
             <div className="payment-method-toggle">
               <button
+                type="button"
                 className={`toggle-tab-btn ${paymentMethod === 'qr' ? 'active-qr' : ''}`}
                 onClick={() => setPaymentMethod('qr')}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
               >
-                📱 สแกน QR Code (PromptPay)
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                สแกน QR Code (PromptPay)
               </button>
               <button
+                type="button"
                 className={`toggle-tab-btn ${paymentMethod === 'cash' ? 'active-cash' : ''}`}
                 onClick={() => setPaymentMethod('cash')}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
               >
-                💵 ชำระด้วยเงินสด (Cash)
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                  <circle cx="12" cy="12" r="2"></circle>
+                  <path d="M6 12h.01M18 12h.01"></path>
+                </svg>
+                ชำระด้วยเงินสด (Cash)
               </button>
             </div>
 
@@ -724,6 +797,7 @@ export default function BillingInvoicePage({
                               className="edit-phone-input"
                             />
                             <button
+                              type="button"
                               onClick={() => {
                                 handleSavePromptPay(promptPayNumber);
                                 setIsEditingPromptPay(false);
@@ -740,25 +814,41 @@ export default function BillingInvoicePage({
                               type="button"
                               onClick={() => setIsEditingPromptPay(true)}
                               className="btn-edit-phone-link"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                             >
-                              ✎ แก้ไขเบอร์
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                              </svg>
+                              แก้ไขเบอร์
                             </button>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    <div className="timeout-alert">
-                      <span>⏰ กรุณาชำระเงินให้เสร็จสิ้นภายใน 5 นาที</span>
+                    <div className="timeout-alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                      </svg>
+                      <span>กรุณาชำระเงินให้เสร็จสิ้นภายใน 5 นาที</span>
                     </div>
 
                     {!isPaymentConfirmed ? (
-                      <button className="confirm-qr-btn" onClick={handleConfirmPayment}>
-                        ✓ ยืนยันการรับชำระเงินผ่าน QR Code
+                      <button 
+                        type="button" 
+                        className="confirm-qr-btn" 
+                        onClick={handleConfirmPayment}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        ยืนยันการรับชำระเงินผ่าน QR Code
                       </button>
                     ) : (
-                      <div className="confirmed-badge">
-                        ✓ ยืนยันการรับชำระเงินเรียบร้อยแล้ว
+                      <div className="confirmed-badge" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        ยืนยันการรับชำระเงินเรียบร้อยแล้ว
                       </div>
                     )}
                   </div>
@@ -797,15 +887,19 @@ export default function BillingInvoicePage({
 
                     {!isPaymentConfirmed ? (
                       <button 
+                        type="button"
                         className="confirm-qr-btn cash-confirm-btn" 
                         disabled={cashNumber < grandTotal}
                         onClick={handleConfirmPayment}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       >
-                        ✓ ยืนยันการรับเงินสด {cashNumber >= grandTotal && `(ทอน ฿${changeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })})`}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        ยืนยันการรับเงินสด {cashNumber >= grandTotal && `(ทอน ฿${changeAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })})`}
                       </button>
                     ) : (
-                      <div className="confirmed-badge">
-                        ✓ ยืนยันการรับเงินสดเรียบร้อยแล้ว
+                      <div className="confirmed-badge" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        ยืนยันการรับเงินสดเรียบร้อยแล้ว
                       </div>
                     )}
                   </div>
@@ -874,29 +968,63 @@ export default function BillingInvoicePage({
                     </div>
 
                     <div className="receipt-btns">
-                      <button className="receipt-btn print-btn" onClick={handlePrintReceipt}>
-                        🖨 ดาวน์โหลด / พิมพ์ใบเสร็จ (PDF)
+                      <button 
+                        type="button"
+                        className="receipt-btn print-btn" 
+                        onClick={handlePrintReceipt}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                          <rect x="6" y="14" width="12" height="8"></rect>
+                        </svg>
+                        ดาวน์โหลด / พิมพ์ใบเสร็จ (PDF)
                       </button>
-                      <button className="receipt-btn digital-btn" onClick={handleSendDigitalReceipt}>
-                        📨 ส่งใบเสร็จดิจิทัล (SMS/Email)
+                      <button 
+                        type="button"
+                        className="receipt-btn digital-btn" 
+                        onClick={handleSendDigitalReceipt}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                          <polyline points="22,6 12,13 2,6"></polyline>
+                        </svg>
+                        ส่งใบเสร็จดิจิทัล (SMS/Email)
                       </button>
                       {onNavigateToDashboard && (
                         <button 
+                          type="button"
                           className="receipt-btn" 
-                          style={{ background: '#1D4ED8', color: 'white', border: 'none', fontWeight: '700', padding: '12px', borderRadius: '8px', cursor: 'pointer', marginTop: '4px' }}
+                          style={{ background: '#1D4ED8', color: 'white', border: 'none', fontWeight: '700', padding: '12px', borderRadius: '8px', cursor: 'pointer', marginTop: '4px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
                           onClick={() => {
                             setShowQrModal(false);
                             onNavigateToDashboard();
                           }}
                         >
-                          📊 ไปยังหน้า Dashboard (ประวัติการเงิน)
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                            <line x1="9" y1="21" x2="9" y2="9"></line>
+                          </svg>
+                          ไปยังหน้า Dashboard (ประวัติการเงิน)
                         </button>
                       )}
                     </div>
                   </div>
                 ) : (
                   <div className="checkout-summary-box">
-                    <h3 className="summary-box-title">📋 สรุปรายการบิล</h3>
+                    <h3 className="summary-box-title" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                      </svg>
+                      สรุปรายการบิล
+                    </h3>
                     <div className="summary-list">
                       <div className="summary-item">
                         <span>ค่าตรวจแพทย์</span>
@@ -921,11 +1049,357 @@ export default function BillingInvoicePage({
                       </div>
                     </div>
 
-                    <div className="summary-note">
-                      💡 เมื่อตรวจสอบยอดเงินเรียบร้อยแล้ว ให้กดปุ่ม <strong>"ยืนยันการรับชำระเงิน"</strong> เพื่อบันทึกประวัติการเงิน
+                    <div className="summary-note" style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '2px' }}>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                      <span>เมื่อตรวจสอบยอดเงินเรียบร้อยแล้ว ให้กดปุ่ม <strong>"ยืนยันการรับชำระเงิน"</strong> เพื่อบันทึกประวัติการเงิน</span>
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Receipt Preview & Print Modal */}
+      {showReceiptPreview && activePatient && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setShowReceiptPreview(false)}
+          style={{
+            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(15, 23, 42, 0.75)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 99999, padding: '20px', overflowY: 'auto'
+          }}
+        >
+          <div 
+            className="receipt-preview-dialog" 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF', borderRadius: '16px',
+              maxWidth: '780px', width: '100%', maxHeight: '92vh',
+              display: 'flex', flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Modal Top Control Bar */}
+            <div style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '16px 24px', borderBottom: '1px solid #E2E8F0',
+              background: '#F8FAFC'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '8px',
+                  background: '#EFF6FF', color: '#2563EB',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                  </svg>
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0F172A' }}>
+                    ตัวอย่างใบเสร็จรับเงิน (Receipt Preview)
+                  </h3>
+                  <span style={{ fontSize: '12.5px', color: '#64748B' }}>
+                    ตรวจสอบความถูกต้องก่อนสั่งพิมพ์หรือบันทึกไฟล์ PDF
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={handleBrowserPrint}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 16px', borderRadius: '8px',
+                    background: '#FFFFFF', color: '#0F172A',
+                    border: '1.5px solid #CBD5E1', fontSize: '13.5px',
+                    fontWeight: '700', cursor: 'pointer', transition: 'all 0.15s ease'
+                  }}
+                  title="สั่งพิมพ์ออกเครื่องพิมพ์"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                  </svg>
+                  สั่งพิมพ์ (Print)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 18px', borderRadius: '8px',
+                    background: '#2563EB', color: '#FFFFFF',
+                    border: 'none', fontSize: '13.5px',
+                    fontWeight: '700', cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="บันทึกเอกสารเป็นไฟล์ PDF"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  บันทึกเป็น PDF (Save PDF)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowReceiptPreview(false)}
+                  style={{
+                    width: '34px', height: '34px', borderRadius: '8px',
+                    border: '1px solid #CBD5E1', background: '#FFFFFF',
+                    color: '#64748B', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', cursor: 'pointer'
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Printable Paper Sheet */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', background: '#F1F5F9' }}>
+              <div 
+                ref={printableReceiptRef}
+                style={{
+                  background: '#FFFFFF',
+                  borderRadius: '12px',
+                  padding: '36px 42px',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                  maxWidth: '680px',
+                  margin: '0 auto',
+                  fontFamily: "'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                  color: '#0F172A',
+                  position: 'relative'
+                }}
+              >
+                {/* Clinic Official Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0F172A', paddingBottom: '18px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                    <div style={{
+                      width: '52px', height: '52px', borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%)',
+                      color: '#FFFFFF', display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', boxShadow: '0 4px 10px rgba(37,99,235,0.3)'
+                    }}>
+                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2v20M2 12h20"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#0F172A', letterSpacing: '0.2px' }}>
+                        คลินิกเวชกรรมทั่วไป
+                      </h1>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#2563EB', marginTop: '2px' }}>
+                        GENERAL MEDICAL CLINIC
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '3px', lineHeight: '1.4' }}>
+                        ใบอนุญาตเลขที่ 1020300456 • 123/45 ถ.สาธารณสุข แขวงคลินิก เขตสุขภาพ กรุงเทพฯ 10400<br/>
+                        โทรศัพท์: 02-123-4567 • www.generalclinic.co.th
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{
+                      display: 'inline-block', padding: '4px 12px', borderRadius: '6px',
+                      background: '#EFF6FF', color: '#1E40AF', fontWeight: '800',
+                      fontSize: '13.5px', letterSpacing: '0.5px', border: '1px solid #BFDBFE'
+                    }}>
+                      ใบเสร็จรับเงิน / ต้นฉบับ
+                    </div>
+                    <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748B', marginTop: '3px' }}>
+                      RECEIPT / ORIGINAL
+                    </div>
+                    <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#0F172A', marginTop: '6px', fontFamily: 'monospace' }}>
+                      เลขที่: {activePatient?.visitId ? `REC-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(activePatient.visitId).padStart(4, '0')}` : 'REC-20260904-0001'}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                      วันที่: {new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Patient Information Box */}
+                <div style={{
+                  background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px',
+                  padding: '14px 18px', marginBottom: '20px', display: 'grid',
+                  gridTemplateColumns: '1.2fr 1fr', gap: '10px 24px', fontSize: '13px'
+                }}>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>ชื่อ-นามสกุล ผู้ป่วย: </span>
+                    <strong style={{ color: '#0F172A', fontSize: '13.5px' }}>{activePatient.name}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>แพทย์ผู้ตรวจ: </span>
+                    <strong style={{ color: '#0F172A' }}>นพ. สมเกียรติ มั่นคง (ว.45892)</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>เลขประจำตัว (HN): </span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1E40AF' }}>{activePatient.hn}</span>
+                    {activePatient.nationalId && (
+                      <span style={{ color: '#64748B', marginLeft: '10px' }}>
+                        (เลขบัตร: {activePatient.nationalId})
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>สิทธิการรักษา: </span>
+                    <strong style={{ color: '#0F172A' }}>{currentRights}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>ช่องทางชำระเงิน: </span>
+                    <strong style={{ color: paymentMethod === 'qr' ? '#7C3AED' : '#059669' }}>
+                      {paymentMethod === 'qr' ? 'PromptPay QR Code (โอนเงิน)' : 'เงินสด (Cash)'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>สถานะการชำระ: </span>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '3px',
+                      background: '#DCFCE7', color: '#15803D', padding: '2px 8px',
+                      borderRadius: '999px', fontWeight: '700', fontSize: '11.5px'
+                    }}>
+                      ✓ ชำระเงินเรียบร้อยแล้ว (PAID)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Items & Medication Table */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#F1F5F9', borderTop: '1px solid #CBD5E1', borderBottom: '1.5px solid #94A3B8' }}>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', width: '38px', color: '#334155', fontWeight: '700' }}>ลำดับ</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', color: '#334155', fontWeight: '700' }}>รายการการรักษาและยา</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', width: '65px', color: '#334155', fontWeight: '700' }}>จำนวน</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', width: '90px', color: '#334155', fontWeight: '700' }}>ราคา/หน่วย</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', width: '100px', color: '#334155', fontWeight: '700' }}>รวมเงิน (บาท)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                      <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748B' }}>1</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <div style={{ fontWeight: '600', color: '#0F172A' }}>ค่าตรวจวินิจฉัยและรักษาโดยแพทย์ (Medical Consultation)</div>
+                        <div style={{ fontSize: '11.5px', color: '#64748B' }}>ตรวจประเมินร่างกายและให้คำปรึกษาทางการแพทย์</div>
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>1</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace' }}>500.00</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '600' }}>500.00</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                      <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748B' }}>2</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <div style={{ fontWeight: '600', color: '#0F172A' }}>ค่าบริการทางการแพทย์และคลินิก (Clinic Service Fee)</div>
+                        <div style={{ fontSize: '11.5px', color: '#64748B' }}>ค่าบริการพยาบาล คัดกรองและวัดสัญญาณชีพ</div>
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>1</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace' }}>300.00</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '600' }}>300.00</td>
+                    </tr>
+                    {medicationsList.map((med: any, idx: number) => {
+                      const qty = Number(med.quantity) || 1;
+                      const uPrice = Number(med.price || med.unit_price) || 0;
+                      const lineTotal = qty * uPrice;
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748B' }}>{idx + 3}</td>
+                          <td style={{ padding: '8px 10px' }}>
+                            <div style={{ fontWeight: '600', color: '#0F172A' }}>{med.name}</div>
+                            {med.dosage && (
+                              <div style={{ fontSize: '11.5px', color: '#64748B' }}>
+                                วิธีใช้: {med.dosage} {med.instructions ? `• ${med.instructions}` : ''}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', fontFamily: 'monospace' }}>{qty}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{uPrice.toFixed(2)}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '600' }}>{lineTotal.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                {/* Subtotal & Grand Total Section */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderTop: '1.5px solid #CBD5E1', paddingTop: '14px', marginBottom: '24px' }}>
+                  {/* Paid Stamp Watermark */}
+                  <div style={{
+                    border: '2px solid #16A34A', borderRadius: '8px',
+                    padding: '8px 16px', color: '#16A34A', display: 'inline-flex',
+                    flexDirection: 'column', alignItems: 'center', transform: 'rotate(-3deg)'
+                  }}>
+                    <span style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '1px' }}>ชำระเงินแล้ว / PAID</span>
+                    <span style={{ fontSize: '11px', fontWeight: '600' }}>
+                      {new Date().toLocaleDateString('th-TH')} • {paymentMethod === 'qr' ? 'PromptPay' : 'Cash'}
+                    </span>
+                  </div>
+
+                  {/* Financial calculation */}
+                  <div style={{ width: '260px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '4px' }}>
+                      <span>รวมเป็นเงิน (Subtotal):</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>฿ {(medTotal + medicalServiceFee).toFixed(2)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '8px' }}>
+                      <span>ภาษีมูลค่าเพิ่ม (VAT 7%):</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>฿ {vatTax.toFixed(2)}</span>
+                    </div>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      borderTop: '2px solid #0F172A', paddingTop: '8px', fontSize: '15px',
+                      fontWeight: '800', color: '#0F172A'
+                    }}>
+                      <span>ยอดชำระสุทธิ (Net Total):</span>
+                      <span style={{ fontFamily: 'monospace', fontSize: '18px', color: '#1E40AF' }}>฿ {grandTotal.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Advice & Signatures Footer */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '24px',
+                  borderTop: '1px dashed #CBD5E1', paddingTop: '16px', fontSize: '12px'
+                }}>
+                  <div>
+                    <strong style={{ color: '#0F172A', display: 'block', marginBottom: '4px' }}>คำแนะนำจากแพทย์และการใช้ยา:</strong>
+                    <p style={{ margin: 0, color: '#475569', lineHeight: '1.5' }}>
+                      {activePatient.doctorAdvice || 'รับประทานยาตามที่ระบุบนฉลากอย่างเคร่งครัด หากมีอาการผิดปกติหรือแพ้ยาให้หยุดยาและติดต่อคลินิกทันที'}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ height: '36px', borderBottom: '1px solid #94A3B8', marginBottom: '6px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+                      <span style={{ fontStyle: 'italic', fontFamily: 'serif', color: '#1E40AF', fontSize: '16px' }}>นภาพร สดใส</span>
+                    </div>
+                    <div style={{ fontWeight: '700', color: '#0F172A' }}>( ภญ. นภาพร สดใส )</div>
+                    <div style={{ color: '#64748B', fontSize: '11px' }}>เภสัชกรผู้จ่ายยา / ผู้รับเงิน</div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '11.5px', color: '#94A3B8' }}>
+                  *** เอกสารฉบับนี้พิมพ์จากระบบสารสนเทศคลินิกเวชกรรม ขอขอบพระคุณที่ไว้วางใจใช้บริการ ***
+                </div>
               </div>
             </div>
           </div>

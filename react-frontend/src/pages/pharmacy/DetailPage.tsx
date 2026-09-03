@@ -112,12 +112,23 @@ export default function DetailPage({
         const token = localStorage.getItem('token');
         const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-        // 1. ดึงจาก /api/pharmacy/queues โดยตรง (คิวผู้ป่วยที่แพทย์ตรวจเสร็จแล้ว)
-        let pRes = await fetch('/api/pharmacy/queues', { headers });
-        if (!pRes.ok) {
-          pRes = await fetch('/api/system/pharmacy/queues');
+        // 1. ดึงทั้งคิวห้องยา และประวัติการเงิน (Billing History) แบบ Parallel เพื่อประสิทธิภาพสูงสุด
+        const [pRes, bRes] = await Promise.all([
+          fetch('/api/pharmacy/queues', { headers }).then(r => r.ok ? r : fetch('/api/system/pharmacy/queues')).catch(() => null),
+          fetch('/api/billing/history', { headers }).then(r => r.ok ? r : fetch('/api/system/billing/history')).catch(() => null)
+        ]);
+
+        let completedHistories: any[] = [];
+        if (bRes && bRes.ok) {
+          try {
+            const bData = await bRes.json();
+            if (bData.status === 'success' && Array.isArray(bData.histories)) {
+              completedHistories = bData.histories;
+            }
+          } catch {}
         }
-        if (pRes.ok) {
+
+        if (pRes && pRes.ok) {
           const pData = await pRes.json();
           if (pData.status === 'success' && Array.isArray(pData.queues)) {
             const mappedQueues: PatientConfig[] = pData.queues.map((pq: any) => {
@@ -126,7 +137,15 @@ export default function DetailPage({
               if (typeof rawMeds === 'string') {
                 try { rawMeds = JSON.parse(rawMeds); } catch { rawMeds = []; }
               }
-              const isDispensed = pq.status === 'dispensed';
+
+              // ตรวจสอบว่าผู้ป่วยชำระเงินเสร็จสิ้นแล้วหรือไม่ (จาก billing history หรือ status ตรงๆ)
+              const isPaid = completedHistories.some((bh: any) => {
+                const bhHN = (bh.hn || '').replace(/[-]/g, '');
+                return (bhHN && bhHN === cleanHN) || (bh.visit_id && pq.visit_id && bh.visit_id === pq.visit_id);
+              });
+              const isCompleted = pq.status === 'completed' || pq.status === 'เสร็จสิ้น' || isPaid;
+              const isDispensed = isCompleted || pq.status === 'dispensed';
+
               return {
                 id: String(pq.id),
                 visitId: pq.visit_id || 1,
@@ -143,8 +162,8 @@ export default function DetailPage({
                 allergies: pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา'],
                 chronicDiseases: pq.chronic_diseases || 'ไม่มี',
                 vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-                visitStatus: isDispensed ? 'จ่ายยาแล้ว / ส่งการเงินแล้ว' : 'รอรับยา / ชำระเงิน',
-                status: (isDispensed ? 'dispensed' : 'pending') as 'pending' | 'dispensed',
+                visitStatus: isCompleted ? 'เสร็จสิ้นกระบวนการ / รับยาเรียบร้อย' : (isDispensed ? 'จ่ายยาแล้ว / ส่งการเงินแล้ว' : 'รอรับยา / ชำระเงิน'),
+                status: (isCompleted ? 'completed' : (isDispensed ? 'dispensed' : 'pending')) as 'pending' | 'dispensed' | 'completed',
                 visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
                 visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
                 doctorAdvice: pq.doctor_advice || 'พักผ่อนให้เพียงพอ ทานยาตามแพทย์สั่ง',
@@ -163,13 +182,59 @@ export default function DetailPage({
               };
             });
 
+            // นำประวัติคนไข้ที่ชำระเงินเสร็จสิ้นแล้วจาก Billing History มาเติม (Merge) เพื่อให้ตัวเลขเสร็จสิ้นถูกต้องเสมอ
+            completedHistories.forEach((bh: any) => {
+              const bhHN = (bh.hn || '').replace(/[-]/g, '');
+              const already = mappedQueues.some(q => q.hn.replace(/[-]/g, '') === bhHN || (bh.visit_id && q.visitId === bh.visit_id));
+              if (!already) {
+                let parsedMeds: any[] = [];
+                if (bh.medications) {
+                  try { parsedMeds = typeof bh.medications === 'string' ? JSON.parse(bh.medications) : bh.medications; } catch {}
+                }
+                mappedQueues.push({
+                  id: `BH-${bh.id || bh.receipt_number}`,
+                  visitId: bh.visit_id || 1,
+                  hn: bhHN || 'HN0001',
+                  nationalId: bh.national_id || '',
+                  queueNumber: bh.receipt_number || 'Q0000',
+                  ticket: 'A-00',
+                  name: bh.patient_name || 'ผู้ป่วย',
+                  shortName: bh.patient_name || 'ผู้ป่วย',
+                  gender: 'ชาย',
+                  age: 35,
+                  treatmentRights: 'ชำระเงินแล้ว',
+                  patientType: 'ผู้ป่วยนอก (OPD)',
+                  allergies: ['ไม่มีประวัติแพ้ยา'],
+                  chronicDiseases: 'ไม่มี',
+                  vitals: 'ความดันปกติ',
+                  visitStatus: 'เสร็จสิ้นกระบวนการ / รับยาเรียบร้อย',
+                  status: 'completed' as any,
+                  visitDate: new Date(bh.created_at || Date.now()).toLocaleDateString('th-TH'),
+                  visitTime: new Date(bh.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+                  doctorAdvice: bh.doctor_advice || 'รับประทานยาตามคำแนะนำของแพทย์',
+                  medications: parsedMeds.map((m: any) => ({
+                    medId: m.medId || m.medicine_code || 'MED-001',
+                    name: m.name || m.medicine_name || 'ยาตามแพทย์สั่ง',
+                    dosage: m.dosage || 'ตามคำสั่งแพทย์',
+                    instructions: m.instructions || 'รับประทานตามคำแนะนำ',
+                    stock: 100,
+                    stockStatus: 'in-stock',
+                    quantity: m.quantity || 1,
+                    price: m.price || m.unit_price || 0,
+                    unit_price: m.unit_price || m.price || 0,
+                    properties: m.properties || ''
+                  }))
+                });
+              }
+            });
+
             // นำประวัติคนไข้ที่ส่งการเงินแล้วจาก localStorage มาผสาน (Merge) เพื่อให้คิวยังคงค้างแสดงอยู่เสมอ
             const storedDispensed = getStoredDispensedPatients();
             storedDispensed.forEach(storedP => {
               const cleanStoredHN = (storedP.hn || '').replace(/[-]/g, '');
               const existingIdx = mappedQueues.findIndex(q => q.id === storedP.id || (q.hn.replace(/[-]/g, '') === cleanStoredHN && q.queueNumber === storedP.queueNumber));
               if (existingIdx >= 0) {
-                if (storedP.status === 'dispensed') {
+                if (storedP.status === 'dispensed' && mappedQueues[existingIdx].status !== 'completed') {
                   mappedQueues[existingIdx] = {
                     ...mappedQueues[existingIdx],
                     status: 'dispensed',
@@ -182,8 +247,11 @@ export default function DetailPage({
               }
             });
 
-            // จัดเรียง: ผู้ป่วยที่รอจัดยาอยู่บนสุด (pending) และ Log ผู้ป่วยที่ส่งไปการเงินแล้ว (dispensed) อยู่ถัดลงมา
-            mappedQueues.sort((a, b) => Number(a.status === 'dispensed') - Number(b.status === 'dispensed'));
+            // จัดเรียง: ผู้ป่วยที่รอจัดยาอยู่บนสุด (pending) -> จ่ายยาแล้ว (dispensed) -> เสร็จสิ้นกระบวนการ (completed)
+            mappedQueues.sort((a, b) => {
+              const score = (p: PatientConfig) => (p.status === 'pending' ? 0 : (p.status === 'dispensed' ? 1 : 2));
+              return score(a) - score(b);
+            });
 
             setQueueList(mappedQueues);
             setLocalPatientId(prev => {
@@ -191,7 +259,7 @@ export default function DetailPage({
                 if (prev && mappedQueues.find(q => q.id === prev)) {
                   return prev;
                 }
-                const firstPending = mappedQueues.find(q => q.status !== 'dispensed');
+                const firstPending = mappedQueues.find(q => q.status === 'pending');
                 return firstPending ? firstPending.id : mappedQueues[0].id;
               }
               return '';
@@ -199,9 +267,6 @@ export default function DetailPage({
             return;
           }
         }
-
-        setQueueList([]);
-        setLocalPatientId('');
       } catch (err) {
         console.error('Failed to fetch queues:', err);
       }
@@ -209,12 +274,12 @@ export default function DetailPage({
 
     fetchQueues();
 
-    // Smart Background Polling ทุกๆ 2.5 วินาที เพื่อดึงคิวล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket)
+    // Smart Background Polling ทุกๆ 3 วินาที เพื่อดึงคิวล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket)
     const pollInterval = setInterval(() => {
       if (!document.hidden) {
         fetchQueues();
       }
-    }, 2500);
+    }, 3000);
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
       if (data && data.action === 'db_reset') {
@@ -224,12 +289,21 @@ export default function DetailPage({
       }
     });
 
+    const unsubPay = subscribe('PAYMENT_CONFIRMED', () => {
+      fetchQueues();
+      triggerToast('ผู้ป่วยชำระเงินและเสร็จสิ้นกระบวนการเรียบร้อยแล้ว', 'success');
+    });
+
+    const unsubBillHist = subscribe('BILLING_HISTORY_CREATED', () => {
+      fetchQueues();
+    });
+
     const unsubExam = subscribe('EXAMINATION_SAVED', (data: any) => {
       fetchQueues();
       triggerToast('แพทย์บันทึกการตรวจและส่งข้อมูลมายังห้องยาแล้ว', 'doctor');
     });
 
-    const unsubVisit = subscribe('VISIT_UPDATED', (data: any) => {
+    const unsubVisit = subscribe('VISIT_UPDATED', () => {
       fetchQueues();
     });
 
@@ -241,7 +315,7 @@ export default function DetailPage({
       }
     });
 
-    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', (data: any) => {
+    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', () => {
       fetchQueues();
       triggerToast('ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์', 'doctor');
     });
@@ -249,6 +323,8 @@ export default function DetailPage({
     return () => {
       clearInterval(pollInterval);
       unsubQueue();
+      unsubPay();
+      unsubBillHist();
       unsubExam();
       unsubVisit();
       unsubCreated();
@@ -709,7 +785,7 @@ export default function DetailPage({
                 <tbody>
                   {queueList
                     .filter(p => {
-                      if (statFilter === 'pending') return p.status !== 'dispensed';
+                      if (statFilter === 'pending') return p.status !== 'dispensed' && p.status !== 'completed';
                       if (statFilter === 'dispensed') return p.status === 'dispensed';
                       if (statFilter === 'completed') return p.status === 'completed';
                       return true;
@@ -722,7 +798,8 @@ export default function DetailPage({
                       p.name.toLowerCase().includes(patientIdInput.toLowerCase())
                     )
                     .map((p, index) => {
-                      const isDispensed = p.status === 'dispensed';
+                      const isCompleted = p.status === 'completed';
+                      const isDispensed = p.status === 'dispensed' || isCompleted;
                       return (
                         <tr 
                           key={p.id + '_' + index}
@@ -731,12 +808,12 @@ export default function DetailPage({
                             borderBottom: '1px solid #F1F5F9', 
                             whiteSpace: 'nowrap', 
                             height: '56px',
-                            background: isDispensed ? '#F8FAFC' : undefined
+                            background: isCompleted ? '#F0FDF4' : (isDispensed ? '#F8FAFC' : undefined)
                           }}
                         >
                           <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
                             <span style={{ 
-                              color: isDispensed ? '#64748B' : '#2563EB', 
+                              color: isCompleted ? '#16A34A' : (isDispensed ? '#64748B' : '#2563EB'), 
                               fontWeight: '700', 
                               fontSize: '15px',
                               fontFamily: 'monospace'
@@ -773,18 +850,18 @@ export default function DetailPage({
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              width: '105px',
-                              height: '28px',
+                              minWidth: '105px',
+                              padding: '4px 10px',
                               boxSizing: 'border-box',
                               borderRadius: '9999px',
-                              fontSize: '12.5px',
+                              fontSize: '12px',
                               fontWeight: '700',
-                              background: isDispensed ? '#DCFCE7' : '#DBEAFE',
-                              color: isDispensed ? '#15803D' : '#1E40AF',
-                              border: `1.5px solid ${isDispensed ? '#86EFAC' : '#93C5FD'}`,
+                              background: isCompleted ? '#DCFCE7' : (isDispensed ? '#F0FDF4' : '#DBEAFE'),
+                              color: isCompleted ? '#166534' : (isDispensed ? '#15803D' : '#1E40AF'),
+                              border: `1.5px solid ${isCompleted ? '#34D399' : (isDispensed ? '#86EFAC' : '#93C5FD')}`,
                               whiteSpace: 'nowrap'
                             }}>
-                              {isDispensed ? '✓ จ่ายยาแล้ว' : 'รอจัดยา'}
+                              {isCompleted ? '✓ เสร็จสิ้น/รับยา' : (isDispensed ? '✓ จ่ายยาแล้ว' : 'รอจัดยา')}
                             </span>
                           </td>
                           <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>

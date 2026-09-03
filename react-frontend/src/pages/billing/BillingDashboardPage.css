@@ -128,15 +128,17 @@ body.dark-mode .billing-dashboard-container .dashboard-title {
 .billing-dashboard-container .metric-card {
   background: #FFFFFF;
   border-radius: 14px;
-  padding: 22px 24px;
+  padding: 18px 20px;
   border: 1px solid #E2E8F0;
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  box-sizing: border-box;
+  min-height: 118px;
 }
 
 .billing-dashboard-container .metric-card::before {
@@ -300,6 +302,18 @@ body.dark-mode .billing-dashboard-container .purple-badge {
 }
 
 /* ===== Table Section ===== */
+.billing-dashboard-container .table-card {
+  padding: 24px 20px !important;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.billing-dashboard-container .table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
 .billing-dashboard-container .table-title {
   font-size: 1.1rem;
   font-weight: 500;
@@ -314,16 +328,17 @@ body.dark-mode .billing-dashboard-container .table-title {
 .billing-dashboard-container .payment-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .billing-dashboard-container .payment-table th {
-  padding: 14px 16px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: #334155;
+  padding: 12px 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0F172A;
   background: var(--bg-color, #F8FAFC);
   border-bottom: 2px solid var(--border-color, #E2E8F0);
-  text-align: left;
+  white-space: nowrap;
 }
 
 body.dark-mode .billing-dashboard-container .payment-table th {
@@ -332,12 +347,11 @@ body.dark-mode .billing-dashboard-container .payment-table th {
   border-bottom: 2px solid #334155;
 }
 
-
-
 .billing-dashboard-container .payment-table td {
-  padding: 16px;
+  padding: 10px 8px;
   border-bottom: 1px solid #F1F5F9;
-  font-size: 0.9rem;
+  font-size: 13.5px;
+  vertical-align: middle;
 }
 
 body.dark-mode .billing-dashboard-container .payment-table td {
@@ -888,4 +902,95 @@ body.dark-mode .billing-dashboard-container .badge-qr {
 body.dark-mode .billing-dashboard-container .badge-cash {
   background: #334155;
   color: #E2E8F0;
+}
+
+/* ===== Modern Pagination Bar ===== */
+.billing-dashboard-container .pagination-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background-color: #FFFFFF;
+  border-top: 1px solid #E2E8F0;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+body.dark-mode .billing-dashboard-container .pagination-bar {
+  background-color: #1E293B;
+  border-top-color: #334155;
+}
+
+.billing-dashboard-container .pagination-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: #475569;
+  font-weight: 500;
+  background-color: #F1F5F9;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #E2E8F0;
+}
+
+body.dark-mode .billing-dashboard-container .pagination-info {
+  background-color: #0F172A;
+  color: #94A3B8;
+  border-color: #334155;
+}
+
+.billing-dashboard-container .pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.billing-dashboard-container .page-arrow,
+.billing-dashboard-container .page-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #CBD5E1;
+  background-color: #FFFFFF;
+  color: #334155;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.billing-dashboard-container .page-arrow:hover:not(:disabled),
+.billing-dashboard-container .page-num:hover:not(.active) {
+  background-color: #F1F5F9;
+  border-color: #94A3B8;
+}
+
+.billing-dashboard-container .page-num.active {
+  background-color: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+}
+
+.billing-dashboard-container .page-arrow:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+body.dark-mode .billing-dashboard-container .page-arrow,
+body.dark-mode .billing-dashboard-container .page-num {
+  background-color: #0F172A;
+  border-color: #334155;
+  color: #E2E8F0;
+}
+
+body.dark-mode .billing-dashboard-container .page-num.active {
+  background-color: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
 }

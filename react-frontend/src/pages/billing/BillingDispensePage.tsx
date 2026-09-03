@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import './BillingDispensePage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
+import CopyableText from '../../components/Common/CopyableText';
 
 interface ToastState {
   message: string;
@@ -59,6 +60,17 @@ export default function BillingDispensePage({
       (p.shortName || '').toLowerCase().includes(q)
     );
   });
+
+  // Pagination for queue table
+  const [currentQueuePage, setCurrentQueuePage] = useState(1);
+  const queuePageSize = 10;
+  const totalQueuePages = Math.ceil(filteredQueue.length / queuePageSize) || 1;
+  const paginatedQueue = useMemo(() => {
+    const start = (currentQueuePage - 1) * queuePageSize;
+    return filteredQueue.slice(start, start + queuePageSize);
+  }, [filteredQueue, currentQueuePage, queuePageSize]);
+
+
 
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isToastFading, setIsToastFading] = useState(false);
@@ -496,6 +508,7 @@ export default function BillingDispensePage({
       onSelectPatientId(activePatient.id);
     }
     localStorage.setItem('billing_active_patient', activePatient.id);
+    localStorage.setItem('billing_active_patient_data', JSON.stringify(activePatient));
     if (onNavigateToBilling) {
       onNavigateToBilling();
     }
@@ -646,116 +659,83 @@ export default function BillingDispensePage({
             </div>
 
             {/* Patients Table */}
-            <div style={{ overflowX: 'auto', marginTop: '16px' }}>
-              <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+            <div style={{ overflowX: 'hidden', width: '100%', marginTop: '16px' }}>
+              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
                 <thead>
-                  <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>HN</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'left' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center' }}>การดำเนินการ</th>
+                  <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '44px', whiteSpace: 'nowrap' }}>
+                    <th style={{ padding: '12px 6px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '12%' }}>ลำดับคิว</th>
+                    <th style={{ padding: '12px 6px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '14%' }}>HN</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '13.5px', textAlign: 'left', width: '24%' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '12px 6px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '16%' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 6px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '18%' }}>สิทธิการรักษา</th>
+                    <th style={{ padding: '12px 16px 12px 6px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '16%' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredQueue.length > 0 ? (
-                    filteredQueue.map((p, index) => (
+                    paginatedQueue.map((p, index) => (
                       <tr 
                         key={p.id + '_' + index}
                         className={localPatientId === p.id ? 'active-row' : ''}
                         style={{ borderBottom: '1px solid #F1F5F9', whiteSpace: 'nowrap' }}
                       >
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        <td style={{ padding: '10px 6px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <span style={{ 
                             color: '#2563EB', 
                             fontWeight: '700', 
-                            fontSize: '15px',
+                            fontSize: '14px',
                             whiteSpace: 'nowrap', 
                             display: 'inline-block'
                           }}>
-                            {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
+                            {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String((currentQueuePage - 1) * queuePageSize + index + 1).padStart(4, '0')}`}
                           </span>
                         </td>
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                          <span
-                            onClick={(e) => handleCopyHn(p.hn, e)}
-                            title={copiedHn === p.hn.replace(/[-]/g, '') ? 'คัดลอกแล้ว!' : 'คลิกเพื่อคัดลอก HN'}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '5px',
-                              cursor: 'pointer',
-                              position: 'relative',
-                              userSelect: 'none'
-                            }}
-                          >
-                            <span style={{ fontSize: '14.5px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
-                              {p.hn.replace(/[-]/g, '')}
-                            </span>
-                            {copiedHn === p.hn.replace(/[-]/g, '') ? (
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            ) : (
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                              </svg>
-                            )}
-                            {copiedHn === p.hn.replace(/[-]/g, '') && (
-                              <span style={{
-                                position: 'absolute',
-                                top: '-24px',
-                                left: '50%',
-                                transform: 'translateX(-50%)',
-                                backgroundColor: '#0F172A',
-                                color: '#FFFFFF',
-                                fontSize: '10px',
-                                fontWeight: 'bold',
-                                padding: '2px 6px',
-                                borderRadius: '4px',
-                                whiteSpace: 'nowrap',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                                zIndex: 50
-                              }}>
-                                คัดลอกแล้ว!
-                              </span>
-                            )}
-                          </span>
+                        <td style={{ padding: '10px 6px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                          <CopyableText value={p.hn.replace(/[-]/g, '')} color="#2563EB" />
                         </td>
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'left' }}>
-                          <div className="patient-table-name" style={{ fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>{p.name}</div>
+                        <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', textAlign: 'left' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                              <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                            {p.name}
+                          </div>
                         </td>
-                        <td className="patient-table-sub" style={{ padding: '12px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center', color: '#64748B' }}>
+                        <td className="patient-table-sub" style={{ padding: '10px 6px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center', color: '#64748B' }}>
                           {p.nationalId || '-'}
                         </td>
-                        <td style={{ padding: '12px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                        <td style={{ padding: '10px 6px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                           <span style={{ 
                             background: '#F3E8FF',
                             color: '#7E22CE',
                             border: '1px solid #E9D5FF',
-                            padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
+                            padding: '4px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700',
                             whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center'
                           }}>
                             {(p.treatmentRights || '').includes('30') ? 'บัตรทอง (สปสช.)' : (p.treatmentRights || 'บัตรทอง (สปสช.)')}
                           </span>
                         </td>
 
-                        <td style={{ padding: '12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '10px 16px 10px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <button 
+                            type="button"
                             onClick={() => handleSelectPatient(p.id)}
                             style={{ 
-                              padding: '8px 22px', 
+                              padding: '6px 16px', 
                               background: localPatientId === p.id ? '#10B981' : '#2563EB', 
-                              color: 'white', border: 'none', borderRadius: '10px', 
-                              cursor: 'pointer', fontWeight: '700', fontSize: '14px',
-                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                              whiteSpace: 'nowrap', minWidth: '95px',
-                              boxShadow: localPatientId === p.id ? '0 2px 6px rgba(16, 185, 129, 0.25)' : '0 2px 6px rgba(37, 99, 235, 0.25)'
+                              color: 'white', border: 'none', borderRadius: '7px', 
+                              cursor: 'pointer', fontWeight: '700', fontSize: '12.5px',
+                              display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
+                              whiteSpace: 'nowrap',
+                              boxShadow: localPatientId === p.id ? '0 2px 4px rgba(16, 185, 129, 0.25)' : '0 2px 4px rgba(37, 99, 235, 0.25)'
                             }}
+                            title="เลือกคนไข้นี้เพื่อคิดเงินและออกบิล"
                           >
-                            {localPatientId === p.id ? 'เลือกอยู่' : 'เลือกคนไข้'}
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
+                            </svg>
+                            {localPatientId === p.id ? 'เลือกอยู่' : 'เลือกคิว'}
                           </button>
                         </td>
                       </tr>
@@ -769,6 +749,51 @@ export default function BillingDispensePage({
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Queue Pagination Bar */}
+            <div className="pagination-bar" style={{ borderRadius: '0 0 12px 12px', marginTop: '4px' }}>
+              <span className="pagination-info">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="3" y1="9" x2="21" y2="9"/>
+                  <line x1="9" y1="21" x2="9" y2="9"/>
+                </svg>
+                {filteredQueue.length > 0 
+                  ? `แสดง ${(currentQueuePage - 1) * queuePageSize + 1} ถึง ${Math.min(currentQueuePage * queuePageSize, filteredQueue.length)} จาก ${filteredQueue.length} รายการ`
+                  : 'ไม่มีข้อมูลแสดงผล'
+                }
+              </span>
+              {totalQueuePages > 1 && (
+                <div className="pagination-buttons">
+                  <button 
+                    type="button"
+                    className="page-arrow" 
+                    disabled={currentQueuePage === 1}
+                    onClick={() => setCurrentQueuePage(p => Math.max(1, p - 1))}
+                  >
+                    ‹ ย้อนกลับ
+                  </button>
+                  {Array.from({ length: totalQueuePages }, (_, i) => i + 1).map((pageNum) => (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      className={`page-num ${currentQueuePage === pageNum ? 'active' : ''}`}
+                      onClick={() => setCurrentQueuePage(pageNum)}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                  <button 
+                    type="button"
+                    className="page-arrow" 
+                    disabled={currentQueuePage === totalQueuePages}
+                    onClick={() => setCurrentQueuePage(p => Math.min(totalQueuePages, p + 1))}
+                  >
+                    ถัดไป ›
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
