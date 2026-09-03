@@ -491,6 +491,26 @@ export default function MedicinePage() {
     setIsEditingDetailMed(true);
   };
 
+  const handleOpenEditDetailMedDirect = (med: Medicine) => {
+    const cleanPrice = typeof med.unit_price === 'number' 
+      ? med.unit_price 
+      : (parseFloat(String(med.price).replace(/[^0-9.]/g, '')) || 0);
+
+    setDetailModalMed(med);
+    setDetailEditForm({
+      name: med.name,
+      genericName: med.genericName,
+      category: med.category || 'ยารักษาโรคทั่วไป',
+      properties: med.properties || '',
+      dosage: med.dosage || '',
+      precautions: med.precautions || 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
+      manufacturer: med.manufacturer || 'บริษัท เภสัชกรรม จำกัด',
+      unitPrice: cleanPrice,
+      stock: med.stock
+    });
+    setIsEditingDetailMed(true);
+  };
+
   const handleSaveDetailMedEdit = async () => {
     if (!detailModalMed) return;
     setIsSavingDetailMed(true);
@@ -962,7 +982,7 @@ export default function MedicinePage() {
               สถานะคลังยา & สรุปการจ่ายยาประจำวัน
             </h3>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={(e) => {
@@ -974,8 +994,7 @@ export default function MedicinePage() {
                 background: '#16A34A', color: '#FFFFFF', border: 'none',
                 fontSize: '13px', fontWeight: '700', cursor: 'pointer',
                 display: 'inline-flex', alignItems: 'center', gap: '6px',
-                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)', transition: 'all 0.2s ease',
-                marginRight: '6px'
+                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)', transition: 'all 0.2s ease'
               }}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -983,6 +1002,31 @@ export default function MedicinePage() {
                 <line x1="5" y1="12" x2="19" y2="12"></line>
               </svg>
               เพิ่มรายการยาใหม่
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (filteredMedicines.length > 0) {
+                  handleOpenEditDetailMedDirect(filteredMedicines[0]);
+                } else if (medicines.length > 0) {
+                  handleOpenEditDetailMedDirect(medicines[0]);
+                }
+              }}
+              style={{
+                padding: '6px 14px', borderRadius: '8px',
+                background: '#EFF6FF', color: '#2563EB', border: '1.5px solid #BFDBFE',
+                fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.1)', transition: 'all 0.2s ease'
+              }}
+              title="แก้ไขข้อมูลยา"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+              แก้ไขข้อมูลยา
             </button>
             {showSuccessBadge && (
               <span className="success-badge" style={{ background: '#DCFCE7', color: '#166534', fontWeight: 'bold', padding: '4px 12px', borderRadius: '16px', fontSize: '13px' }}>
@@ -1007,13 +1051,13 @@ export default function MedicinePage() {
               <table className="stock-table">
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'center' }}>รหัสยา</th>
-                    <th>ชื่อยา</th>
-                    <th>ชนิด / หมวดหมู่ยา</th>
-                    <th style={{ textAlign: 'center' }}>คงเหลือในคลัง</th>
-                    <th style={{ textAlign: 'center' }}>สถานะคลังยา</th>
-                    <th style={{ textAlign: 'center' }}>จ่ายวันนี้</th>
-                    <th style={{ textAlign: 'right' }}>การจัดการ</th>
+                    <th style={{ textAlign: 'center', width: '100px' }}>รหัสยา</th>
+                    <th style={{ textAlign: 'left', paddingLeft: '16px' }}>ชื่อยา</th>
+                    <th style={{ textAlign: 'center', width: '180px' }}>ชนิด / หมวดหมู่ยา</th>
+                    <th style={{ textAlign: 'center', width: '110px' }}>คงเหลือในคลัง</th>
+                    <th style={{ textAlign: 'center', width: '120px' }}>สถานะคลังยา</th>
+                    <th style={{ textAlign: 'center', width: '90px' }}>จ่ายวันนี้</th>
+                    <th style={{ textAlign: 'center', width: '220px' }}>การจัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1047,7 +1091,7 @@ export default function MedicinePage() {
                         <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <CopyableText value={med.id} color="#2563EB" />
                         </td>
-                        <td className="med-name-cell">
+                        <td className="med-name-cell" style={{ paddingLeft: '16px' }}>
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                             <CopyableText value={med.name} mono={false} color="#0F172A" />
                             <span 
@@ -1059,18 +1103,20 @@ export default function MedicinePage() {
                             </span>
                           </div>
                         </td>
-                        <td style={{ padding: '14px 16px' }}>
-                          <span style={{ 
-                            fontSize: '13px', 
-                            padding: '4px 10px', 
-                            borderRadius: '6px', 
-                            background: 'var(--bg-card, #F1F5F9)', 
-                            color: 'var(--text-primary, #334155)',
-                            fontWeight: '500',
-                            display: 'inline-block'
-                          }}>
-                            {med.category ? med.category.replace(/\s*\([^)]*\)/g, '').trim() : 'ยารักษาโรคทั่วไป'}
-                          </span>
+                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', justifyContent: 'center' }}>
+                            <span style={{ 
+                              fontSize: '13px', 
+                              padding: '4px 10px', 
+                              borderRadius: '6px', 
+                              background: 'var(--bg-card, #F1F5F9)', 
+                              color: 'var(--text-primary, #334155)',
+                              fontWeight: '500',
+                              display: 'inline-block'
+                            }}>
+                              {med.category ? med.category.replace(/\s*\([^)]*\)/g, '').trim() : 'ยารักษาโรคทั่วไป'}
+                            </span>
+                          </div>
                         </td>
                         <td className="stock-num-cell" style={{ textAlign: 'center' }}>{med.stock} เม็ด</td>
                         <td style={{ textAlign: 'center' }}>
@@ -1079,8 +1125,26 @@ export default function MedicinePage() {
                           </span>
                         </td>
                         <td className="dispensed-cell" style={{ textAlign: 'center' }}>{med.dispensedToday} เม็ด</td>
-                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditDetailMedDirect(med)}
+                              style={{
+                                padding: '6px 11px', borderRadius: '8px',
+                                background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE',
+                                fontSize: '12.5px', fontWeight: '700', cursor: 'pointer',
+                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                transition: 'all 0.15s ease'
+                              }}
+                              title="แก้ไขข้อมูลยาตัวนี้"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                              </svg>
+                              แก้ไขยา
+                            </button>
                             <button
                               className="update-stock-btn"
                               onClick={() => handleUpdateClick(med)}
@@ -1091,9 +1155,9 @@ export default function MedicinePage() {
                               type="button"
                               onClick={() => setDeleteConfirmMed(med)}
                               style={{
-                                padding: '6px 12px', borderRadius: '8px',
+                                padding: '6px 10px', borderRadius: '8px',
                                 background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5',
-                                fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                                fontSize: '12.5px', fontWeight: '600', cursor: 'pointer',
                                 transition: 'all 0.2s ease'
                               }}
                               title="ลบรายการยานี้ออกจากคลัง"
