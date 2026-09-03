@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import './MedicinePage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
@@ -19,6 +19,301 @@ interface Medicine {
   stock_quantity: number;
   status: 'In Stock' | 'Low Stock' | 'Out of Stock';
   dispensedToday: number;
+}
+
+// Custom Modern Category Dropdown that ALWAYS opens downwards with modern UI and high-contrast typography
+function ModernCategoryDropdown({
+  value,
+  onChange,
+  categories,
+  onAddNewCategory,
+  placeholder = 'เลือกชนิด / หมวดหมู่ยา'
+}: {
+  value: string;
+  onChange: (cat: string) => void;
+  categories: string[];
+  onAddNewCategory: (newCat: string) => void;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setIsAddingNew(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const handleSelect = (cat: string) => {
+    onChange(cat);
+    setIsOpen(false);
+    setIsAddingNew(false);
+  };
+
+  const handleConfirmAddNew = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newCatName.trim();
+    if (trimmed) {
+      onAddNewCategory(trimmed);
+      onChange(trimmed);
+      setNewCatName('');
+      setIsAddingNew(false);
+      setIsOpen(false);
+    }
+  };
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%', userSelect: 'none' }}>
+      {/* Modern Trigger Button */}
+      <div
+        onClick={() => {
+          setIsOpen(!isOpen);
+          setIsAddingNew(false);
+        }}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '9px 14px',
+          background: '#FFFFFF',
+          border: isOpen ? '1.5px solid #2563EB' : '1.5px solid #CBD5E1',
+          boxShadow: isOpen ? '0 0 0 3px rgba(37, 99, 235, 0.12)' : 'none',
+          borderRadius: '9px',
+          cursor: 'pointer',
+          transition: 'all 0.15s ease',
+          fontSize: '13.5px',
+          color: value ? '#0F172A' : '#64748B',
+          fontWeight: value ? '600' : '400',
+          boxSizing: 'border-box'
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+            <line x1="7" y1="7" x2="7.01" y2="7"></line>
+          </svg>
+          <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+            {value || placeholder}
+          </span>
+        </div>
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#475569"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease',
+            flexShrink: 0,
+            marginLeft: '8px'
+          }}
+        >
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
+
+      {/* Downward Dropdown Menu - Always drops below */}
+      {isOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: 0,
+            right: 0,
+            background: '#FFFFFF',
+            borderRadius: '10px',
+            border: '1.5px solid #CBD5E1',
+            boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15, 23, 42, 0.08)',
+            zIndex: 9999,
+            overflow: 'hidden'
+          }}
+        >
+          {/* Header of Dropdown with clear font */}
+          <div
+            style={{
+              padding: '8px 14px',
+              background: '#F1F5F9',
+              borderBottom: '1px solid #E2E8F0',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}
+          >
+            <span style={{ fontSize: '11.5px', fontWeight: '800', color: '#1E293B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              หมวดหมู่ยาในระบบ (คลิกเลือก)
+            </span>
+            {!isAddingNew && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsAddingNew(true);
+                }}
+                style={{
+                  background: '#EFF6FF',
+                  border: '1px solid #BFDBFE',
+                  color: '#2563EB',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '3px 8px',
+                  borderRadius: '6px',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                + เพิ่มหมวดใหม่
+              </button>
+            )}
+          </div>
+
+          {/* Add New Category Inline Form */}
+          {isAddingNew && (
+            <div style={{ padding: '10px 12px', background: '#EFF6FF', borderBottom: '1px solid #BFDBFE' }}>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#1D4ED8', marginBottom: '6px' }}>
+                พิมพ์ชื่อหมวดหมู่ยาใหม่:
+              </div>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  type="text"
+                  placeholder="เช่น ยาเพิ่มพลัง..."
+                  value={newCatName}
+                  onChange={(e) => setNewCatName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleConfirmAddNew();
+                    }
+                  }}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    padding: '7px 10px',
+                    borderRadius: '6px',
+                    border: '1.5px solid #2563EB',
+                    fontSize: '13px',
+                    background: '#FFFFFF',
+                    color: '#0F172A',
+                    fontWeight: '600',
+                    outline: 'none'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleConfirmAddNew()}
+                  style={{
+                    padding: '0 14px',
+                    background: '#2563EB',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: '700',
+                    fontSize: '12.5px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  บันทึก
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAddingNew(false)}
+                  style={{
+                    padding: '0 8px',
+                    background: '#E2E8F0',
+                    color: '#475569',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Category List Items - Scrollable */}
+          <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+            {categories.map((cat: string, idx: number) => {
+              const isSelected = cat === value;
+              return (
+                <div
+                  key={idx}
+                  onClick={() => handleSelect(cat)}
+                  style={{
+                    padding: '10px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    background: isSelected ? '#EFF6FF' : '#FFFFFF',
+                    color: isSelected ? '#1D4ED8' : '#0F172A',
+                    fontWeight: isSelected ? '700' : '600',
+                    fontSize: '13.5px',
+                    borderBottom: '1px solid #F1F5F9',
+                    transition: 'all 0.12s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.background = '#F8FAFC';
+                      e.currentTarget.style.color = '#2563EB';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) {
+                      e.currentTarget.style.background = '#FFFFFF';
+                      e.currentTarget.style.color = '#0F172A';
+                    }
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span
+                      style={{
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        background: isSelected ? '#2563EB' : '#94A3B8',
+                        flexShrink: 0
+                      }}
+                    />
+                    <span>{cat}</span>
+                  </div>
+                  {isSelected && (
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function MedicinePage() {
@@ -155,14 +450,6 @@ export default function MedicinePage() {
       return updated;
     });
   };
-
-  // State for toggling add category input in Add Modal
-  const [isAddingNewCatInAddModal, setIsAddingNewCatInAddModal] = useState(false);
-  const [newCatInputInAddModal, setNewCatInputInAddModal] = useState('');
-
-  // State for toggling add category input in Edit Detail Modal
-  const [isAddingNewCatInEditModal, setIsAddingNewCatInEditModal] = useState(false);
-  const [newCatInputInEditModal, setNewCatInputInEditModal] = useState('');
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -920,9 +1207,9 @@ export default function MedicinePage() {
       {detailModalMed && (
         <div className="modal-overlay" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>
           <div className="med-detail-modal-card card" style={{ maxWidth: '680px', width: '92%' }} onClick={(e) => e.stopPropagation()}>
-            <div className="med-detail-header">
-              <div className="med-detail-title-box" style={{ width: '100%' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <div className="med-detail-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #E2E8F0', paddingBottom: '16px', marginBottom: '18px' }}>
+              <div className="med-detail-title-box" style={{ flex: 1, minWidth: 0, paddingRight: '20px' }}>
+                <div style={{ marginBottom: '8px' }}>
                   <span className="med-detail-badge" style={{ background: isEditingDetailMed ? '#FEF3C7' : undefined, color: isEditingDetailMed ? '#92400E' : undefined, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                     {isEditingDetailMed && (
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -932,32 +1219,6 @@ export default function MedicinePage() {
                     )}
                     {isEditingDetailMed ? 'โหมดแก้ไขข้อมูลตัวยาและสรรพคุณ' : 'รายละเอียดตัวยาและสรรพคุณ'}
                   </span>
-                  {!isEditingDetailMed && (
-                    <button
-                      onClick={handleOpenEditDetailMed}
-                      style={{
-                        padding: '6px 14px',
-                        background: '#EFF6FF',
-                        color: '#2563EB',
-                        border: '1.5px solid #BFDBFE',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontWeight: '700',
-                        fontSize: '13px',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.15s ease'
-                      }}
-                      title="คลิกเพื่อแก้ไขข้อมูลยาและบันทึกลงฐานข้อมูลทันที"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                      </svg>
-                      แก้ไขข้อมูลยา
-                    </button>
-                  )}
                 </div>
 
                 {!isEditingDetailMed ? (
@@ -966,48 +1227,84 @@ export default function MedicinePage() {
                       <h2 className="med-detail-name" style={{ margin: 0 }}>{detailModalMed.name}</h2>
                       <CopyableText value={detailModalMed.name} mono={false} showIcon={true} />
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
-                      <span className="med-detail-generic">ชื่อสามัญทางยา: {detailModalMed.genericName}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '6px' }}>
+                      <span className="med-detail-generic">ชื่อสามัญทางยา: <strong style={{ color: '#1E293B' }}>{detailModalMed.genericName}</strong></span>
                       <CopyableText label="รหัสยา" value={detailModalMed.id} color="#2563EB" />
                     </div>
                   </>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '6px' }}>
                     <div>
-                      <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>ชื่อยา (Name) *</label>
+                      <label style={{ fontSize: '13.5px', fontWeight: '700', color: '#1E293B', display: 'block', marginBottom: '4px' }}>ชื่อยา * (Trade Name)</label>
                       <input 
                         type="text" 
                         value={detailEditForm.name} 
                         onChange={(e) => setDetailEditForm(prev => ({ ...prev, name: e.target.value }))}
                         placeholder="เช่น Amoxicillin 500mg"
-                        style={{ width: '100%', padding: '8px 12px', fontSize: '15px', fontWeight: 'bold', border: '1.5px solid #2563EB', borderRadius: '8px', boxSizing: 'border-box' }}
+                        style={{ width: '100%', padding: '9px 12px', fontSize: '15px', fontWeight: 'bold', border: '1.5px solid #2563EB', borderRadius: '8px', boxSizing: 'border-box' }}
                       />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                       <div>
-                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>ชื่อสามัญทางยา (Generic Name)</label>
+                        <label style={{ fontSize: '12.5px', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>ชื่อสามัญทางยา (Generic Name)</label>
                         <input 
                           type="text" 
                           value={detailEditForm.genericName} 
                           onChange={(e) => setDetailEditForm(prev => ({ ...prev, genericName: e.target.value }))}
                           placeholder="เช่น Amoxicillin Trihydrate"
-                          style={{ width: '100%', padding: '7px 10px', fontSize: '13px', border: '1.5px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box' }}
+                          style={{ width: '100%', padding: '8px 12px', fontSize: '13px', border: '1.5px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box' }}
                         />
                       </div>
                       <div>
-                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>รหัสยา (Medicine Code)</label>
+                        <label style={{ fontSize: '12.5px', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '4px' }}>รหัสยา (Medicine Code)</label>
                         <input 
                           type="text" 
                           value={detailModalMed.medicine_code || detailModalMed.id} 
                           disabled
-                          style={{ width: '100%', padding: '7px 10px', fontSize: '13px', background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '6px', color: '#64748B', boxSizing: 'border-box' }}
+                          style={{ width: '100%', padding: '8px 12px', fontSize: '13px', background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '6px', color: '#64748B', boxSizing: 'border-box' }}
                         />
                       </div>
                     </div>
                   </div>
                 )}
               </div>
-              <button className="close-btn" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>✕</button>
+
+              {/* Right Action container with clean gap between edit and close button */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
+                {!isEditingDetailMed && (
+                  <button
+                    onClick={handleOpenEditDetailMed}
+                    style={{
+                      padding: '7px 16px',
+                      background: '#EFF6FF',
+                      color: '#2563EB',
+                      border: '1.5px solid #BFDBFE',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      transition: 'all 0.15s ease'
+                    }}
+                    title="คลิกเพื่อแก้ไขข้อมูลยาและบันทึกลงฐานข้อมูลทันที"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                    แก้ไขข้อมูลยา
+                  </button>
+                )}
+                <button 
+                  className="close-btn" 
+                  onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}
+                  title="ปิดหน้าต่าง"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             <div className="med-detail-body">
@@ -1068,114 +1365,45 @@ export default function MedicinePage() {
                   </div>
                 </>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* Modern Downward Dropdown */}
                   <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>ชนิด / หมวดหมู่ยา</label>
-                      {!isAddingNewCatInEditModal ? (
-                        <button
-                          type="button"
-                          onClick={() => setIsAddingNewCatInEditModal(true)}
-                          style={{
-                            background: 'none', border: 'none', color: '#2563EB',
-                            fontSize: '12.5px', fontWeight: '700', cursor: 'pointer',
-                            display: 'inline-flex', alignItems: 'center', gap: '4px', padding: 0
-                          }}
-                        >
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                          </svg>
-                          เพิ่มหมวดหมู่ใหม่
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setIsAddingNewCatInEditModal(false)}
-                          style={{
-                            background: 'none', border: 'none', color: '#64748B',
-                            fontSize: '12.5px', fontWeight: '600', cursor: 'pointer', padding: 0
-                          }}
-                        >
-                          เลือกจากหมวดหมู่เดิม
-                        </button>
-                      )}
-                    </div>
-
-                    {!isAddingNewCatInEditModal ? (
-                      <select 
-                        value={detailEditForm.category} 
-                        onChange={(e) => {
-                          if (e.target.value === '__add_new__') {
-                            setIsAddingNewCatInEditModal(true);
-                          } else {
-                            setDetailEditForm(prev => ({ ...prev, category: e.target.value }));
-                          }
-                        }}
-                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13.5px', background: '#FFFFFF', boxSizing: 'border-box' }}
-                      >
-                        {allAvailableCategories.map((cat, idx) => (
-                          <option key={idx} value={cat}>{cat}</option>
-                        ))}
-                        <option value="__add_new__">+ เพิ่มหมวดหมู่ใหม่...</option>
-                      </select>
-                    ) : (
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <input 
-                          type="text" 
-                          value={newCatInputInEditModal} 
-                          onChange={(e) => setNewCatInputInEditModal(e.target.value)}
-                          placeholder="พิมพ์ชื่อหมวดหมู่ยาใหม่ เช่น ยาเพิ่มพลัง..."
-                          autoFocus
-                          style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #2563EB', borderRadius: '8px', fontSize: '13.5px', boxSizing: 'border-box' }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (newCatInputInEditModal.trim()) {
-                              handleAddNewCategory(newCatInputInEditModal.trim());
-                              setDetailEditForm(prev => ({ ...prev, category: newCatInputInEditModal.trim() }));
-                              setNewCatInputInEditModal('');
-                              setIsAddingNewCatInEditModal(false);
-                            }
-                          }}
-                          style={{
-                            padding: '0 16px', background: '#2563EB', color: '#FFFFFF',
-                            border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          ตกลง
-                        </button>
-                      </div>
-                    )}
+                    <label style={{ fontSize: '13.5px', fontWeight: '700', color: '#1E293B', marginBottom: '6px', display: 'block' }}>
+                      ชนิด / หมวดหมู่ยา
+                    </label>
+                    <ModernCategoryDropdown
+                      value={detailEditForm.category}
+                      onChange={(cat) => setDetailEditForm(prev => ({ ...prev, category: cat }))}
+                      categories={allAvailableCategories}
+                      onAddNewCategory={handleAddNewCategory}
+                    />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                     <div>
-                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>สรรพคุณและข้อบ่งใช้</label>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>สรรพคุณและข้อบ่งใช้</label>
                       <textarea 
                         rows={3}
                         value={detailEditForm.properties} 
                         onChange={(e) => setDetailEditForm(prev => ({ ...prev, properties: e.target.value }))}
                         placeholder="ระบุสรรพคุณและอาการที่ใช้รักษา..."
-                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>ขนาดและวิธีรับประทาน</label>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>ขนาดและวิธีรับประทาน</label>
                       <textarea 
                         rows={3}
                         value={detailEditForm.dosage} 
                         onChange={(e) => setDetailEditForm(prev => ({ ...prev, dosage: e.target.value }))}
                         placeholder="เช่น ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร..."
-                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626', marginBottom: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                         <line x1="12" y1="9" x2="12" y2="13"></line>
@@ -1188,40 +1416,40 @@ export default function MedicinePage() {
                       value={detailEditForm.precautions} 
                       onChange={(e) => setDetailEditForm(prev => ({ ...prev, precautions: e.target.value }))}
                       placeholder="เช่น ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว..."
-                      style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #FCA5A5', borderRadius: '8px', fontSize: '13px', background: '#FEF2F2', boxSizing: 'border-box', resize: 'vertical' }}
+                      style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #FCA5A5', borderRadius: '8px', fontSize: '13px', background: '#FEF2F2', boxSizing: 'border-box', resize: 'vertical' }}
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '14px' }}>
                     <div>
-                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>ผู้ผลิต / บริษัท</label>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>ผู้ผลิต / บริษัท</label>
                       <input 
                         type="text" 
                         value={detailEditForm.manufacturer} 
                         onChange={(e) => setDetailEditForm(prev => ({ ...prev, manufacturer: e.target.value }))}
                         placeholder="เช่น องค์การเภสัชกรรม (GPO)"
-                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }}
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }}
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>ราคาต่อหน่วย (฿)</label>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>ราคาต่อหน่วย (฿)</label>
                       <input 
                         type="number" 
                         step="0.5"
                         min="0"
                         value={detailEditForm.unitPrice} 
                         onChange={(e) => setDetailEditForm(prev => ({ ...prev, unitPrice: e.target.value === '' ? 0 : Number(e.target.value) }))}
-                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', boxSizing: 'border-box' }}
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', boxSizing: 'border-box' }}
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>สต็อกคงเหลือ (เม็ด)</label>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>สต็อกคงเหลือ (เม็ด)</label>
                       <input 
                         type="number" 
                         min="0"
                         value={detailEditForm.stock} 
                         onChange={(e) => setDetailEditForm(prev => ({ ...prev, stock: e.target.value === '' ? 0 : Number(e.target.value) }))}
-                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', boxSizing: 'border-box' }}
+                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', boxSizing: 'border-box' }}
                       />
                     </div>
                   </div>
@@ -1350,92 +1578,13 @@ export default function MedicinePage() {
                   />
                 </div>
                 <div className="input-group">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                    <label style={{ fontSize: '13px', fontWeight: '600' }}>ชนิด / หมวดหมู่ยา</label>
-                    {!isAddingNewCatInAddModal ? (
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingNewCatInAddModal(true)}
-                        style={{
-                          background: 'none', border: 'none', color: '#2563EB',
-                          fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                          display: 'inline-flex', alignItems: 'center', gap: '3px', padding: 0
-                        }}
-                      >
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <line x1="12" y1="5" x2="12" y2="19"></line>
-                          <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        เพิ่มหมวดหมู่ใหม่
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingNewCatInAddModal(false)}
-                        style={{
-                          background: 'none', border: 'none', color: '#64748B',
-                          fontSize: '12px', fontWeight: '600', cursor: 'pointer', padding: 0
-                        }}
-                      >
-                        เลือกจากหมวดหมู่เดิม
-                      </button>
-                    )}
-                  </div>
-
-                  {!isAddingNewCatInAddModal ? (
-                    <select
-                      value={addCategory}
-                      onChange={(e) => {
-                        if (e.target.value === '__add_new__') {
-                          setIsAddingNewCatInAddModal(true);
-                        } else {
-                          setAddCategory(e.target.value);
-                        }
-                      }}
-                      style={{
-                        width: '100%', padding: '9px 12px', borderRadius: '8px',
-                        border: '1.5px solid #CBD5E1', fontSize: '13.5px',
-                        background: '#FFFFFF', appearance: 'auto'
-                      }}
-                    >
-                      {allAvailableCategories.map((cat, idx) => (
-                        <option key={idx} value={cat}>{cat}</option>
-                      ))}
-                      <option value="__add_new__">+ เพิ่มหมวดหมู่ใหม่...</option>
-                    </select>
-                  ) : (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <input
-                        type="text"
-                        placeholder="เช่น ยาเพิ่มพลัง..."
-                        value={newCatInputInAddModal}
-                        onChange={(e) => setNewCatInputInAddModal(e.target.value)}
-                        autoFocus
-                        style={{
-                          flex: 1, padding: '8px 12px', borderRadius: '8px',
-                          border: '1.5px solid #2563EB', fontSize: '13.5px'
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (newCatInputInAddModal.trim()) {
-                            handleAddNewCategory(newCatInputInAddModal.trim());
-                            setAddCategory(newCatInputInAddModal.trim());
-                            setNewCatInputInAddModal('');
-                            setIsAddingNewCatInAddModal(false);
-                          }
-                        }}
-                        style={{
-                          padding: '0 14px', background: '#2563EB', color: '#FFFFFF',
-                          border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        ตกลง
-                      </button>
-                    </div>
-                  )}
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px', display: 'block' }}>ชนิด / หมวดหมู่ยา</label>
+                  <ModernCategoryDropdown
+                    value={addCategory}
+                    onChange={setAddCategory}
+                    categories={allAvailableCategories}
+                    onAddNewCategory={handleAddNewCategory}
+                  />
                 </div>
               </div>
 
