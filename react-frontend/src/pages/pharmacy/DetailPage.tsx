@@ -10,6 +10,38 @@ interface ToastState {
   type: 'success' | 'error' | 'doctor';
 }
 
+// Persistent Storage Key สำหรับจัดเก็บคิวที่ส่งไปการเงินแล้ว ให้ค้างแสดงในตารางเสมอ
+const DISPENSED_LOGS_STORAGE_KEY = 'pharmacy_dispensed_patients_log';
+
+const getStoredDispensedPatients = (): PatientConfig[] => {
+  try {
+    const raw = localStorage.getItem(DISPENSED_LOGS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistDispensedPatient = (patient: PatientConfig) => {
+  try {
+    const existing = getStoredDispensedPatients();
+    const cleanHN = (patient.hn || '').replace(/[-]/g, '');
+    const filtered = existing.filter(p => p.id !== patient.id && (p.hn || '').replace(/[-]/g, '') !== cleanHN);
+    const updated = [
+      {
+        ...patient,
+        status: 'dispensed' as const,
+        visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
+        dispensedAt: patient.dispensedAt || (new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.')
+      },
+      ...filtered
+    ].slice(0, 50);
+    localStorage.setItem(DISPENSED_LOGS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.error('Failed to persist dispensed patient:', err);
+  }
+};
+
 interface DetailPageProps {
   selectedPatientId?: string;
   onSelectPatientId?: (id: string) => void;
@@ -129,6 +161,25 @@ export default function DetailPage({
                   properties: m.properties || 'บรรเทาอาการตามแพทย์สั่ง'
                 }))
               };
+            });
+
+            // นำประวัติคนไข้ที่ส่งการเงินแล้วจาก localStorage มาผสาน (Merge) เพื่อให้คิวยังคงค้างแสดงอยู่เสมอ
+            const storedDispensed = getStoredDispensedPatients();
+            storedDispensed.forEach(storedP => {
+              const cleanStoredHN = (storedP.hn || '').replace(/[-]/g, '');
+              const existingIdx = mappedQueues.findIndex(q => q.id === storedP.id || (q.hn.replace(/[-]/g, '') === cleanStoredHN && q.queueNumber === storedP.queueNumber));
+              if (existingIdx >= 0) {
+                if (storedP.status === 'dispensed') {
+                  mappedQueues[existingIdx] = {
+                    ...mappedQueues[existingIdx],
+                    status: 'dispensed',
+                    visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
+                    dispensedAt: storedP.dispensedAt || mappedQueues[existingIdx].dispensedAt
+                  };
+                }
+              } else {
+                mappedQueues.push(storedP);
+              }
             });
 
             // จัดเรียง: ผู้ป่วยที่รอจัดยาอยู่บนสุด (pending) และ Log ผู้ป่วยที่ส่งไปการเงินแล้ว (dispensed) อยู่ถัดลงมา
@@ -381,27 +432,30 @@ export default function DetailPage({
 
     triggerToast(`ยืนยันการจ่ายยาเรียบร้อย! ส่งข้อมูลใบสั่งยาของ ${pName} ไปยังระบบการเงินแล้ว`, 'success');
     
-    // อัปเดตสถานะในคิวเป็น 'dispensed' เพื่อคง Log ประวัติที่ส่งไปก่อนหน้านั้นเหมือนระบบหมอ
+    const dispensedPatient: PatientConfig = {
+      ...activePatient,
+      status: 'dispensed' as const,
+      visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
+      dispensedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+    };
+
+    // บันทึกลง Storage ทันทีเพื่อคงค้างอยู่ในตารางเสมอ
+    persistDispensedPatient(dispensedPatient);
+
+    // อัปเดตสถานะในคิวทันที ไม่ลบคนไข้ออก
     setQueueList(prev => {
-      const updated = prev.map(p => {
-        if (p.id === activePatient.id) {
-          return {
-            ...p,
-            status: 'dispensed' as const,
-            visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
-            dispensedAt: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
-          };
-        }
-        return p;
-      });
+      const updated = prev.map(p => p.id === activePatient.id ? dispensedPatient : p);
       return [...updated].sort((a, b) => Number(a.status === 'dispensed') - Number(b.status === 'dispensed'));
     });
 
-    // สลับไปยังผู้ป่วยคนถัดไปที่ยังรอจัดยา
+    // สลับไปยังผู้ป่วยคนถัดไปที่ยังรอจัดยา (ถ้ามี)
     const nextPending = queueList.find(p => p.id !== activePatient.id && p.status !== 'dispensed');
     if (nextPending) {
       setLocalPatientId(nextPending.id);
       if (onSelectPatientId) onSelectPatientId(nextPending.id);
+    } else {
+      // ถ้าไม่มีคิวรออื่นแล้ว ให้ค้างอยู่ที่คนไข้คนนี้เพื่อให้เห็นชัดเจนว่าส่งต่อไปการเงินแล้ว
+      setLocalPatientId(activePatient.id);
     }
   };
 
@@ -566,14 +620,30 @@ export default function DetailPage({
           </div>
           
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-            {activePatient && (
-              <span style={{ 
-                background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', 
-                padding: '4px 12px', borderRadius: '16px', fontSize: '13px', border: '1px solid #93C5FD' 
-              }}>
-                ถึงคิวที่ {activePatient.queueNumber} ({activePatient.name})
-              </span>
-            )}
+            {(() => {
+              const firstPending = queueList.find(p => p.status !== 'dispensed');
+              if (firstPending) {
+                return (
+                  <span style={{ 
+                    background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', 
+                    padding: '4px 12px', borderRadius: '16px', fontSize: '13px', border: '1px solid #93C5FD' 
+                  }}>
+                    ถึงคิวที่ {firstPending.queueNumber} ({firstPending.name})
+                  </span>
+                );
+              }
+              if (queueList.length > 0) {
+                return (
+                  <span style={{ 
+                    background: '#DCFCE7', color: '#15803D', fontWeight: 'bold', 
+                    padding: '4px 12px', borderRadius: '16px', fontSize: '13px', border: '1px solid #86EFAC' 
+                  }}>
+                    ✓ ส่งข้อมูลไปการเงินครบแล้ว ({queueList.length} รายการ)
+                  </span>
+                );
+              }
+              return null;
+            })()}
             <span style={{ 
               background: '#F3E8FF', color: '#9333EA', fontWeight: 'bold', 
               padding: '4px 12px', borderRadius: '16px', fontSize: '13px' 
