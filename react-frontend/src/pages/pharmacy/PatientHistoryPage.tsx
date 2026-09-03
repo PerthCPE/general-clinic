@@ -136,6 +136,127 @@ export default function PatientHistoryPage() {
 
   const [copiedHn, setCopiedHn] = useState<string | null>(null);
 
+  // Edit Patient Modal State
+  const [editPatientModal, setEditPatientModal] = useState<Patient | null>(null);
+  const [editPatientForm, setEditPatientForm] = useState({
+    name: '',
+    age: 35,
+    bloodType: 'O+',
+    treatmentRights: 'สิทธิ 30 บาท (สปสช.)',
+    diseases: '',
+    allergies: 'ปฏิเสธการแพ้ยา',
+    phone: '',
+    visitCount: 1
+  });
+  const [isSavingPatient, setIsSavingPatient] = useState(false);
+
+  // Delete Patient Modal State
+  const [deleteConfirmPatient, setDeleteConfirmPatient] = useState<Patient | null>(null);
+  const [isDeletingPatient, setIsDeletingPatient] = useState(false);
+
+  const handleOpenEditPatient = (patient: Patient, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditPatientModal(patient);
+    setEditPatientForm({
+      name: patient.name,
+      age: patient.age || 35,
+      bloodType: patient.bloodType || 'O+',
+      treatmentRights: patient.treatmentRights || 'สิทธิ 30 บาท (สปสช.)',
+      diseases: Array.isArray(patient.diseases) ? patient.diseases.join(', ') : (patient.diseases || ''),
+      allergies: patient.allergies || 'ปฏิเสธการแพ้ยา',
+      phone: patient.phone || '',
+      visitCount: patient.visitCount || 1
+    });
+  };
+
+  const handleSavePatientEdit = async () => {
+    if (!editPatientModal) return;
+    setIsSavingPatient(true);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const payload = {
+        fullname: editPatientForm.name.trim(),
+        age: editPatientForm.age,
+        blood_type: editPatientForm.bloodType,
+        scheme_type: editPatientForm.treatmentRights,
+        chronic_diseases: editPatientForm.diseases.trim(),
+        allergies: editPatientForm.allergies.trim(),
+        phone_number: editPatientForm.phone.trim(),
+        visit_count: editPatientForm.visitCount
+      };
+
+      let res = await fetch(`/api/pharmacy/patient-medicines/${editPatientModal.hn}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        res = await fetch(`/api/system/patient-medicines/${editPatientModal.hn}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      setPatients(prev => prev.map(p => {
+        if (p.hn === editPatientModal.hn || p.id === editPatientModal.id) {
+          const rawD = editPatientForm.diseases.split(',').map(d => d.trim()).filter(Boolean);
+          return {
+            ...p,
+            name: editPatientForm.name.trim(),
+            age: editPatientForm.age,
+            bloodType: editPatientForm.bloodType,
+            treatmentRights: editPatientForm.treatmentRights,
+            diseases: rawD.length > 0 ? rawD : ['ไม่มี'],
+            allergies: editPatientForm.allergies.trim(),
+            phone: editPatientForm.phone.trim(),
+            visitCount: editPatientForm.visitCount
+          };
+        }
+        return p;
+      }));
+
+      setEditPatientModal(null);
+    } catch (err) {
+      console.error('Failed to update patient:', err);
+    } finally {
+      setIsSavingPatient(false);
+    }
+  };
+
+  const handleDeletePatient = async () => {
+    if (!deleteConfirmPatient) return;
+    setIsDeletingPatient(true);
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      let res = await fetch(`/api/pharmacy/patient-medicines/${deleteConfirmPatient.hn}`, {
+        method: 'DELETE',
+        headers
+      });
+      if (!res.ok) {
+        res = await fetch(`/api/system/patient-medicines/${deleteConfirmPatient.hn}`, {
+          method: 'DELETE'
+        });
+      }
+
+      setPatients(prev => prev.filter(p => p.hn !== deleteConfirmPatient.hn && p.id !== deleteConfirmPatient.id));
+      if (selectedPatientModal?.hn === deleteConfirmPatient.hn) {
+        setSelectedPatientModal(null);
+      }
+      setDeleteConfirmPatient(null);
+    } catch (err) {
+      console.error('Failed to delete patient:', err);
+    } finally {
+      setIsDeletingPatient(false);
+    }
+  };
+
   const handleCopyHn = (hn: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!hn) return;
@@ -426,13 +547,14 @@ export default function PatientHistoryPage() {
                 <table className="patient-table">
                   <thead>
                     <tr>
-                      <th>ID (HN)</th>
-                      <th>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
-                      <th>อายุ</th>
-                      <th>กรุ๊ปเลือด</th>
-                      <th style={{ textAlign: 'center' }}>สิทธิการรักษา</th>
-                      <th style={{ textAlign: 'center' }}>จำนวนเข้ารักษา</th>
-                      <th>โรคประจำตัว</th>
+                      <th style={{ textAlign: 'center', width: '100px' }}>ID (HN)</th>
+                      <th style={{ textAlign: 'center' }}>ชื่อผู้ป่วย (คลิกเพื่อดูประวัติ)</th>
+                      <th style={{ textAlign: 'center', width: '80px' }}>อายุ</th>
+                      <th style={{ textAlign: 'center', width: '90px' }}>กรุ๊ปเลือด</th>
+                      <th style={{ textAlign: 'center', width: '190px' }}>สิทธิการรักษา</th>
+                      <th style={{ textAlign: 'center', width: '130px' }}>จำนวนเข้ารักษา</th>
+                      <th style={{ textAlign: 'center' }}>โรคประจำตัว</th>
+                      <th style={{ textAlign: 'center', width: '160px' }}>การจัดการ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -440,24 +562,29 @@ export default function PatientHistoryPage() {
                       const rights = patient.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
                       return (
                         <tr key={patient.id}>
-                          <td className="hn-cell">
-                            <CopyableText value={patient.hn.replace(/[-]/g, '')} />
+                          <td className="hn-cell" style={{ textAlign: 'center' }}>
+                            <CopyableText value={patient.hn.replace(/[-]/g, '')} color="#2563EB" />
                           </td>
                           <td 
                             className="patient-name-cell clickable-patient-history"
                             onClick={() => handleSelectPatient(patient)}
+                            style={{ textAlign: 'center', padding: '12px 14px' }}
                           >
-                            <span className="history-name-link">
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '6px', marginTop: '-2px' }}>
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                <circle cx="12" cy="7" r="4"/>
-                              </svg>
-                              {patient.name}
-                            </span>
-                            <span className="history-hint-tag">คลิกดูประวัติการรักษา & แพ้ยา </span>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
+                              <span className="history-name-link" style={{ fontWeight: '700', color: '#0F172A', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                  <circle cx="12" cy="7" r="4"/>
+                                </svg>
+                                {patient.name}
+                              </span>
+                              <span className="history-hint-tag" style={{ fontSize: '11.5px', color: '#2563EB', background: '#EFF6FF', padding: '2px 8px', borderRadius: '4px', border: '1px solid #DBEAFE', cursor: 'pointer' }}>
+                                คลิกดูประวัติการรักษา & แพ้ยา 
+                              </span>
+                            </div>
                           </td>
-                          <td>{patient.age} ปี</td>
-                          <td><span className="blood-badge">{patient.bloodType}</span></td>
+                          <td style={{ textAlign: 'center' }}>{patient.age} ปี</td>
+                          <td style={{ textAlign: 'center' }}><span className="blood-badge">{patient.bloodType}</span></td>
                           <td style={{ textAlign: 'center' }}>
                             <span style={{ 
                               background: rights.includes('30') ? '#FEF9C3' : rights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
@@ -475,11 +602,54 @@ export default function PatientHistoryPage() {
                               เข้ารักษา {patient.visitCount || 1} ครั้ง
                             </span>
                           </td>
-                          <td>
-                            <div className="disease-badges">
+                          <td style={{ textAlign: 'center' }}>
+                            <div className="disease-badges" style={{ justifyContent: 'center' }}>
                               {(patient.diseases || []).map((d, i) => (
                                 <span key={i} className="disease-tag">{d}</span>
                               ))}
+                            </div>
+                          </td>
+                          <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                              <button
+                                type="button"
+                                onClick={(e) => handleOpenEditPatient(patient, e)}
+                                style={{
+                                  padding: '6px 11px', borderRadius: '8px',
+                                  background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE',
+                                  fontSize: '12.5px', fontWeight: '700', cursor: 'pointer',
+                                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                  transition: 'all 0.15s ease'
+                                }}
+                                title="แก้ไขข้อมูลประวัติผู้ป่วยนี้"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                แก้ไข
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteConfirmPatient(patient);
+                                }}
+                                style={{
+                                  padding: '6px 10px', borderRadius: '8px',
+                                  background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5',
+                                  fontSize: '12.5px', fontWeight: '600', cursor: 'pointer',
+                                  display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                title="ลบข้อมูลประวัตินี้ออกจากระบบ"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <polyline points="3 6 5 6 21 6"></polyline>
+                                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                                ลบ
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -711,6 +881,216 @@ export default function PatientHistoryPage() {
                 style={{ padding: '8px 24px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#334155', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}
               >
                 ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Patient History Modal */}
+      {editPatientModal && (
+        <div className="modal-overlay" onClick={() => setEditPatientModal(null)}>
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: 'none', background: '#FFFFFF' }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                  แก้ไขข้อมูลประวัติผู้ป่วย (HN: {editPatientModal.hn.replace(/[-]/g, '')})
+                </h3>
+              </div>
+              <button 
+                onClick={() => setEditPatientModal(null)} 
+                style={{ background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '72vh', overflowY: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>ชื่อ - นามสกุล *</label>
+                  <input
+                    type="text"
+                    value={editPatientForm.name}
+                    onChange={(e) => setEditPatientForm(prev => ({ ...prev, name: e.target.value }))}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '13.5px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>อายุ (ปี)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="130"
+                    value={editPatientForm.age}
+                    onChange={(e) => setEditPatientForm(prev => ({ ...prev, age: Number(e.target.value) || 0 }))}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '13.5px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>กรุ๊ปเลือด</label>
+                  <select
+                    value={editPatientForm.bloodType}
+                    onChange={(e) => setEditPatientForm(prev => ({ ...prev, bloodType: e.target.value }))}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '13.5px', background: '#FFFFFF', boxSizing: 'border-box' }}
+                  >
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>สิทธิการรักษา</label>
+                  <select
+                    value={editPatientForm.treatmentRights}
+                    onChange={(e) => setEditPatientForm(prev => ({ ...prev, treatmentRights: e.target.value }))}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '13.5px', background: '#FFFFFF', boxSizing: 'border-box' }}
+                  >
+                    <option value="สิทธิ 30 บาท (สปสช.)">สิทธิ 30 บาท (สปสช.)</option>
+                    <option value="บัตรทอง (สปสช.)">บัตรทอง (สปสช.)</option>
+                    <option value="ประกันสังคม">ประกันสังคม</option>
+                    <option value="สิทธิ์ข้าราชการ">สิทธิ์ข้าราชการ</option>
+                    <option value="ประกันสุขภาพเอกชน">ประกันสุขภาพเอกชน</option>
+                    <option value="ชำระเงินเอง">ชำระเงินเอง</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>โรคประจำตัว (คั่นด้วยจุลภาค เช่น ความดันโลหิตสูง, เบาหวาน)</label>
+                <input
+                  type="text"
+                  value={editPatientForm.diseases}
+                  onChange={(e) => setEditPatientForm(prev => ({ ...prev, diseases: e.target.value }))}
+                  placeholder="เช่น ความดันโลหิตสูง, เบาหวาน (หากไม่มีพิมพ์ 'ไม่มี')"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '13.5px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                  ประวัติแพ้ยา
+                </label>
+                <input
+                  type="text"
+                  value={editPatientForm.allergies}
+                  onChange={(e) => setEditPatientForm(prev => ({ ...prev, allergies: e.target.value }))}
+                  placeholder="เช่น ปฏิเสธการแพ้ยา หรือ แพ้ยาเพนิซิลลิน"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #FCA5A5', background: '#FEF2F2', fontSize: '13.5px', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>เบอร์โทรศัพท์</label>
+                  <input
+                    type="text"
+                    value={editPatientForm.phone}
+                    onChange={(e) => setEditPatientForm(prev => ({ ...prev, phone: e.target.value }))}
+                    placeholder="เช่น 081-234-5678"
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '13.5px', boxSizing: 'border-box' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>จำนวนครั้งที่เข้ารักษา</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={editPatientForm.visitCount}
+                    onChange={(e) => setEditPatientForm(prev => ({ ...prev, visitCount: Number(e.target.value) || 1 }))}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '13.5px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div style={{ padding: '16px 24px', borderTop: '1px solid #F1F5F9', background: '#F8FAFC', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setEditPatientModal(null)}
+                style={{ padding: '8px 18px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontWeight: '600', fontSize: '13.5px', cursor: 'pointer' }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePatientEdit}
+                disabled={isSavingPatient || !editPatientForm.name.trim()}
+                style={{
+                  padding: '8px 22px', borderRadius: '8px', border: 'none',
+                  background: isSavingPatient ? '#94A3B8' : '#16A34A', color: '#FFFFFF',
+                  fontWeight: '700', fontSize: '13.5px', cursor: isSavingPatient ? 'not-allowed' : 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)'
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                  <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                {isSavingPatient ? 'กำลังบันทึก...' : 'บันทึกการแก้ไขทันที'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Patient Confirmation Modal */}
+      {deleteConfirmPatient && (
+        <div className="modal-overlay" onClick={() => setDeleteConfirmPatient(null)}>
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: 'none', background: '#FFFFFF', textAlign: 'center', padding: '24px' }}>
+            <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+              ยืนยันการลบประวัติผู้ป่วย?
+            </h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#64748B', lineHeight: '1.5' }}>
+              คุณต้องการลบประวัติของ <strong style={{ color: '#0F172A' }}>{deleteConfirmPatient.name}</strong> (HN: {deleteConfirmPatient.hn.replace(/[-]/g, '')}) ใช่หรือไม่? ข้อมูลนี้จะถูกนำออกจากระบบ
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmPatient(null)}
+                style={{ flex: 1, padding: '10px 16px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontWeight: '600', fontSize: '14px', cursor: 'pointer' }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleDeletePatient}
+                disabled={isDeletingPatient}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: '8px', border: 'none',
+                  background: isDeletingPatient ? '#94A3B8' : '#DC2626', color: '#FFFFFF',
+                  fontWeight: '700', fontSize: '14px', cursor: isDeletingPatient ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 2px 6px rgba(220, 38, 38, 0.3)'
+                }}
+              >
+                {isDeletingPatient ? 'กำลังลบ...' : 'ยืนยันลบประวัติ'}
               </button>
             </div>
           </div>

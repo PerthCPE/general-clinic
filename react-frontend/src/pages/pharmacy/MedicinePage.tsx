@@ -1052,7 +1052,7 @@ export default function MedicinePage() {
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'center', width: '100px' }}>รหัสยา</th>
-                    <th style={{ textAlign: 'left', paddingLeft: '16px' }}>ชื่อยา</th>
+                    <th style={{ textAlign: 'center' }}>ชื่อยา</th>
                     <th style={{ textAlign: 'center', width: '180px' }}>ชนิด / หมวดหมู่ยา</th>
                     <th style={{ textAlign: 'center', width: '110px' }}>คงเหลือในคลัง</th>
                     <th style={{ textAlign: 'center', width: '120px' }}>สถานะคลังยา</th>
@@ -1091,13 +1091,25 @@ export default function MedicinePage() {
                         <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <CopyableText value={med.id} color="#2563EB" />
                         </td>
-                        <td className="med-name-cell" style={{ paddingLeft: '16px' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <td className="med-name-cell" style={{ textAlign: 'center', padding: '12px 14px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
                             <CopyableText value={med.name} mono={false} color="#0F172A" />
                             <span 
                               className="med-hint-tag" 
                               onClick={() => setDetailModalMed(med)}
-                              style={{ cursor: 'pointer', margin: 0 }}
+                              style={{ 
+                                cursor: 'pointer', 
+                                margin: 0, 
+                                fontSize: '12px',
+                                color: '#2563EB',
+                                background: '#EFF6FF',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                border: '1px solid #DBEAFE',
+                                fontWeight: '500',
+                                display: 'inline-block'
+                              }}
+                              title="คลิกเพื่อดูรายละเอียดและสรรพคุณยา"
                             >
                               (คลิกดูสรรพคุณ)
                             </span>

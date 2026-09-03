@@ -749,6 +749,136 @@ func GetPatientMedicines(c *gin.Context) {
 	})
 }
 
+// PUT/POST /api/pharmacy/patient-medicines/:hn - แก้ไขข้อมูลประวัติผู้ป่วยและการรักษา
+func UpdatePatientMedicine(c *gin.Context) {
+	hn := c.Param("hn")
+	cleanHN := strings.TrimLeft(strings.TrimPrefix(strings.TrimPrefix(hn, "HN-"), "HN"), "0")
+	var hnVariants []string
+	if hn != "" {
+		hnVariants = append(hnVariants, hn)
+	}
+	if cleanHN != "" {
+		hnVariants = append(hnVariants, "HN"+cleanHN, "HN-"+cleanHN, fmt.Sprintf("HN%04s", cleanHN), fmt.Sprintf("HN-%04s", cleanHN), cleanHN)
+	}
+
+	var req struct {
+		FullName        string `json:"fullname"`
+		Age             int    `json:"age"`
+		BloodType       string `json:"blood_type"`
+		SchemeType      string `json:"scheme_type"`
+		ChronicDiseases string `json:"chronic_diseases"`
+		Allergies       string `json:"allergies"`
+		PhoneNumber     string `json:"phone_number"`
+		VisitCount      int    `json:"visit_count"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request data"})
+		return
+	}
+
+	// 1. อัปเดตในตาราง Patient
+	var patient models.Patient
+	if err := config.DB.Where("hn IN ?", hnVariants).First(&patient).Error; err == nil {
+		updates := map[string]interface{}{}
+		if req.FullName != "" {
+			updates["full_name"] = req.FullName
+		}
+		if req.SchemeType != "" {
+			updates["scheme_type"] = req.SchemeType
+		}
+		if req.ChronicDiseases != "" {
+			updates["chronic_diseases"] = req.ChronicDiseases
+		}
+		if req.Allergies != "" {
+			updates["allergies"] = req.Allergies
+		}
+		if req.PhoneNumber != "" {
+			updates["phone_number"] = req.PhoneNumber
+		}
+		if len(updates) > 0 {
+			config.DB.Model(&patient).Updates(updates)
+		}
+	}
+
+	// 2. อัปเดตในตาราง PatientMedicine
+	var patMed models.PatientMedicine
+	if err := config.DB.Where("hn IN ?", hnVariants).First(&patMed).Error; err == nil {
+		updates := map[string]interface{}{}
+		if req.FullName != "" {
+			updates["full_name"] = req.FullName
+		}
+		if req.Age > 0 {
+			updates["age"] = req.Age
+		}
+		if req.BloodType != "" {
+			updates["blood_type"] = req.BloodType
+		}
+		if req.SchemeType != "" {
+			updates["scheme_type"] = req.SchemeType
+		}
+		if req.ChronicDiseases != "" {
+			updates["chronic_diseases"] = req.ChronicDiseases
+		}
+		if req.Allergies != "" {
+			updates["allergies"] = req.Allergies
+		}
+		if req.PhoneNumber != "" {
+			updates["phone_number"] = req.PhoneNumber
+		}
+		if req.VisitCount > 0 {
+			updates["visit_count"] = req.VisitCount
+		}
+		config.DB.Model(&patMed).Updates(updates)
+	} else {
+		newPatMed := models.PatientMedicine{
+			HN:              hn,
+			FullName:        req.FullName,
+			Age:             req.Age,
+			BloodType:       req.BloodType,
+			SchemeType:      req.SchemeType,
+			ChronicDiseases: req.ChronicDiseases,
+			Allergies:       req.Allergies,
+			PhoneNumber:     req.PhoneNumber,
+			VisitCount:      req.VisitCount,
+		}
+		config.DB.Create(&newPatMed)
+	}
+
+	ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", gin.H{"hn": hn, "action": "updated"})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Patient medicine history updated successfully",
+	})
+}
+
+// DELETE /api/pharmacy/patient-medicines/:hn - ลบประวัติผู้ป่วย
+func DeletePatientMedicine(c *gin.Context) {
+	hn := c.Param("hn")
+	cleanHN := strings.TrimLeft(strings.TrimPrefix(strings.TrimPrefix(hn, "HN-"), "HN"), "0")
+	var hnVariants []string
+	if hn != "" {
+		hnVariants = append(hnVariants, hn)
+	}
+	if cleanHN != "" {
+		hnVariants = append(hnVariants, "HN"+cleanHN, "HN-"+cleanHN, fmt.Sprintf("HN%04s", cleanHN), fmt.Sprintf("HN-%04s", cleanHN), cleanHN)
+	}
+
+	// ลบจาก PatientMedicine
+	config.DB.Where("hn IN ?", hnVariants).Delete(&models.PatientMedicine{})
+
+	// ลบจาก Patient
+	config.DB.Where("hn IN ?", hnVariants).Delete(&models.Patient{})
+
+	ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", gin.H{"hn": hn, "action": "deleted"})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":  "success",
+		"message": "Patient history deleted successfully",
+	})
+}
+
 // GET /api/pharmacy/patient-medicines/:hn - ดึงประวัติการรับยาของป่วยรายบุคคลตาม HN พร้อมผลตรวจและสัญญาณชีพจริง
 func GetPatientMedicineDetail(c *gin.Context) {
 	hn := c.Param("hn")

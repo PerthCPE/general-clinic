@@ -102,6 +102,9 @@ func SetUpRoutes(r *gin.Engine) {
 		pharmacyRoutes.POST("/dispense", controllers.ConfirmDispenseAndBill)
 		pharmacyRoutes.GET("/patient-medicines", controllers.GetPatientMedicines)
 		pharmacyRoutes.GET("/patient-medicines/:hn", controllers.GetPatientMedicineDetail)
+		pharmacyRoutes.PUT("/patient-medicines/:hn", controllers.UpdatePatientMedicine)
+		pharmacyRoutes.POST("/patient-medicines/:hn", controllers.UpdatePatientMedicine)
+		pharmacyRoutes.DELETE("/patient-medicines/:hn", controllers.DeletePatientMedicine)
 	}
 
 	// ===== ระบบย่อยที่ 2: การเงิน (Billing / QRPayment) -Bun =====
@@ -132,6 +135,9 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.DELETE("/medicines/:id", controllers.DeleteMedicine)
 		systemRoutes.GET("/patient-medicines", controllers.GetPatientMedicines)
 		systemRoutes.GET("/patient-medicines/:hn", controllers.GetPatientMedicineDetail)
+		systemRoutes.PUT("/patient-medicines/:hn", controllers.UpdatePatientMedicine)
+		systemRoutes.POST("/patient-medicines/:hn", controllers.UpdatePatientMedicine)
+		systemRoutes.DELETE("/patient-medicines/:hn", controllers.DeletePatientMedicine)
 		systemRoutes.POST("/dispense", controllers.ConfirmDispenseAndBill)
 		systemRoutes.GET("/queue/list", controllers.GetQueueList)
 		systemRoutes.GET("/billing/list", controllers.GetAllBillings)
