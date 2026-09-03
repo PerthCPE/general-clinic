@@ -1267,17 +1267,17 @@ export default function MedicinePage() {
 
         {isStockTableExpanded && (
           <>
-            <div className="table-wrapper">
-              <table className="stock-table">
+            <div className="table-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
+              <table className="stock-table" style={{ width: '100%', tableLayout: 'auto' }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'center', width: '100px' }}>รหัสยา</th>
-                    <th style={{ textAlign: 'left', paddingLeft: '20px' }}>ชื่อยา</th>
-                    <th style={{ textAlign: 'center', width: '180px' }}>ชนิด / หมวดหมู่ยา</th>
-                    <th style={{ textAlign: 'center', width: '110px' }}>คงเหลือในคลัง</th>
-                    <th style={{ textAlign: 'center', width: '120px' }}>สถานะคลังยา</th>
-                    <th style={{ textAlign: 'center', width: '90px' }}>จ่ายวันนี้</th>
-                    <th style={{ textAlign: 'center', width: '220px' }}>การจัดการ</th>
+                    <th style={{ textAlign: 'center', width: '85px', padding: '10px 6px' }}>รหัสยา</th>
+                    <th style={{ textAlign: 'left', padding: '10px 8px 10px 14px' }}>ชื่อยา</th>
+                    <th style={{ textAlign: 'center', width: '135px', padding: '10px 6px' }}>ชนิด / หมวดหมู่ยา</th>
+                    <th style={{ textAlign: 'center', width: '85px', padding: '10px 6px' }}>คงเหลือในคลัง</th>
+                    <th style={{ textAlign: 'center', width: '90px', padding: '10px 4px' }}>สถานะคลังยา</th>
+                    <th style={{ textAlign: 'center', width: '75px', padding: '10px 6px' }}>จ่ายวันนี้</th>
+                    <th style={{ textAlign: 'center', width: '190px', padding: '10px 6px' }}>การจัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1308,21 +1308,17 @@ export default function MedicinePage() {
                   ) : (
                     paginatedMedicines.map((med) => (
                       <tr key={med.id}>
-                        <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <td style={{ padding: '10px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <CopyableText value={med.id} color="#2563EB" />
                         </td>
-                        <td className="med-name-cell" style={{ textAlign: 'left', padding: '12px 14px 12px 20px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '3px' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-                              <span 
-                                className="med-name-text"
-                                onClick={() => { setDetailModalMed(med); setIsEditingDetailMed(false); }}
-                                style={{ cursor: 'pointer', fontWeight: '700', color: '#0F172A' }}
-                                title="คลิกเพื่อดูรายละเอียดตัวยาและสรรพคุณ"
-                              >
-                                {med.name}
-                              </span>
-                              <CopyableText value={med.name} mono={false} showIcon={true} />
+                        <td className="med-name-cell" style={{ textAlign: 'left', padding: '10px 8px 10px 14px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '2px' }}>
+                            <div 
+                              onClick={() => { setDetailModalMed(med); setIsEditingDetailMed(false); }}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', whiteSpace: 'nowrap', cursor: 'pointer' }}
+                              title="คลิกเพื่อดูรายละเอียดตัวยาและสรรพคุณ"
+                            >
+                              <CopyableText value={med.name} mono={false} color="#0F172A" />
                             </div>
                             <span 
                               className="med-hint-tag" 
@@ -1346,43 +1342,44 @@ export default function MedicinePage() {
                             </span>
                           </div>
                         </td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                        <td style={{ padding: '10px 6px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', justifyContent: 'center' }}>
                             <span style={{ 
-                              fontSize: '13px', 
-                              padding: '4px 10px', 
+                              fontSize: '12px', 
+                              padding: '3px 8px', 
                               borderRadius: '6px', 
                               background: 'var(--bg-card, #F1F5F9)', 
                               color: 'var(--text-primary, #334155)',
                               fontWeight: '500',
-                              display: 'inline-block'
+                              display: 'inline-block',
+                              whiteSpace: 'nowrap'
                             }}>
                               {med.category ? med.category.replace(/\s*\([^)]*\)/g, '').trim() : 'ยารักษาโรคทั่วไป'}
                             </span>
                           </div>
                         </td>
-                        <td className="stock-num-cell" style={{ textAlign: 'center' }}>{med.stock} เม็ด</td>
-                        <td style={{ textAlign: 'center' }}>
-                          <span className={`status-badge ${getStatusClass(med.status)}`} style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', minWidth: '90px', textAlign: 'center' }}>
+                        <td className="stock-num-cell" style={{ textAlign: 'center', padding: '10px 6px', whiteSpace: 'nowrap', fontSize: '13.5px' }}>{med.stock} เม็ด</td>
+                        <td style={{ textAlign: 'center', padding: '10px 4px' }}>
+                          <span className={`status-badge ${getStatusClass(med.status)}`} style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', minWidth: '76px', padding: '3px 8px', fontSize: '11.5px', textAlign: 'center' }}>
                             {renderStatusText(med.status)}
                           </span>
                         </td>
-                        <td className="dispensed-cell" style={{ textAlign: 'center' }}>{med.dispensedToday} เม็ด</td>
-                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                        <td className="dispensed-cell" style={{ textAlign: 'center', padding: '10px 6px', whiteSpace: 'nowrap', fontSize: '13.5px' }}>{med.dispensedToday} เม็ด</td>
+                        <td style={{ textAlign: 'center', padding: '10px 6px', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
                             <button
                               type="button"
                               onClick={() => handleOpenEditDetailMedDirect(med)}
                               style={{
-                                padding: '6px 11px', borderRadius: '8px',
+                                padding: '5px 8px', borderRadius: '6px',
                                 background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE',
-                                fontSize: '12.5px', fontWeight: '700', cursor: 'pointer',
-                                display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                transition: 'all 0.15s ease'
+                                fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+                                display: 'inline-flex', alignItems: 'center', gap: '3px',
+                                whiteSpace: 'nowrap', transition: 'all 0.15s ease'
                               }}
                               title="แก้ไขข้อมูลยาตัวนี้"
                             >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                               </svg>
@@ -1391,6 +1388,7 @@ export default function MedicinePage() {
                             <button
                               className="update-stock-btn"
                               onClick={() => handleUpdateClick(med)}
+                              style={{ padding: '5px 8px', fontSize: '12px', whiteSpace: 'nowrap' }}
                             >
                               ปรับสต็อก
                             </button>
@@ -1398,10 +1396,10 @@ export default function MedicinePage() {
                               type="button"
                               onClick={() => setDeleteConfirmMed(med)}
                               style={{
-                                padding: '6px 10px', borderRadius: '8px',
+                                padding: '5px 8px', borderRadius: '6px',
                                 background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5',
-                                fontSize: '12.5px', fontWeight: '600', cursor: 'pointer',
-                                transition: 'all 0.2s ease'
+                                fontSize: '12px', fontWeight: '600', cursor: 'pointer',
+                                whiteSpace: 'nowrap', transition: 'all 0.2s ease'
                               }}
                               title="ลบรายการยานี้ออกจากคลัง"
                             >
