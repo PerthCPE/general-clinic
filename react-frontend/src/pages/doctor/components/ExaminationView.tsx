@@ -371,7 +371,9 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
   // Nursing Physical Assessment State
   const [nurseGenAppearance, setNurseGenAppearance] = useState(patient.nursingAssessment?.generalAppearance || 'Good consciousness, non-toxic appearance');
-  const [nurseConsciousness, setNurseConsciousness] = useState(patient.nursingAssessment?.consciousness || 'Alert (E4V5M6)');
+  // ระดับความรู้สึกตัวยังไม่มีคอลัมน์ในตาราง screenings จุดคัดกรองจึงยังส่งมาไม่ได้
+  // เว้นว่างไว้แทนการเดาว่า "Alert" เพราะเป็นค่าที่ใช้แยกเคสฉุกเฉิน เดาผิดแล้วอันตราย
+  const [nurseConsciousness, setNurseConsciousness] = useState(patient.nursingAssessment?.consciousness || '');
   const [nurseMobility, setNurseMobility] = useState(patient.nursingAssessment?.mobility || 'Ambulatory');
   const [nurseRespiratory, setNurseRespiratory] = useState(patient.nursingAssessment?.respiratoryCondition || 'Normal breathing, room air');
   const [nurseBleeding, setNurseBleeding] = useState(patient.nursingAssessment?.bleeding || 'No active bleeding');
@@ -385,8 +387,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   const [spo2, setSpo2] = useState(patient.vitals?.spo2 || 98);
   const [weight, setWeight] = useState(patient.vitals?.weight || 68);
   const [height, setHeight] = useState(patient.vitals?.height || 170);
-  const [painScore, setPainScore] = useState(patient.vitals?.painScore || 0);
-  const [bloodSugar, setBloodSugar] = useState(patient.vitals?.bloodSugar || 100);
+  // ปล่อยเป็น undefined เมื่อจุดคัดกรองไม่ได้กรอก จะได้แสดงว่า "ไม่มีข้อมูล"
+  // แทนการเดาค่าให้ ค่าสัญญาณชีพที่ระบบแต่งขึ้นเองอันตรายกว่าช่องว่าง
+  const [painScore, setPainScore] = useState<number | undefined>(patient.vitals?.painScore);
+  const [bloodSugar, setBloodSugar] = useState<number | undefined>(patient.vitals?.bloodSugar);
 
   // Auto calculated BMI
   const bmi = React.useMemo(() => {
@@ -796,8 +800,8 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         weight: Number(weight),
         height: Number(height),
         bmi,
-        painScore: Number(painScore),
-        bloodSugar: Number(bloodSugar)
+        painScore: painScore !== undefined ? Number(painScore) : undefined,
+        bloodSugar: bloodSugar !== undefined ? Number(bloodSugar) : undefined
       },
       physicalExam: {
         generalAppearance,
@@ -1498,7 +1502,9 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'ระดับความเจ็บปวด' : 'Pain Score (0-10)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {painScore !== undefined ? `${painScore}/10` : '4/10'}
+                    {painScore !== undefined
+                      ? `${painScore}/10`
+                      : <span className="text-slate-400 font-normal">- ไม่ได้ประเมิน -</span>}
                   </div>
                 </div>
 
@@ -1507,7 +1513,9 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'ระดับน้ำตาลในเลือด' : 'Blood Sugar (mg/dL)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {bloodSugar ? `${bloodSugar} mg/dL` : '105 mg/dL'}
+                    {bloodSugar !== undefined
+                      ? `${bloodSugar} mg/dL`
+                      : <span className="text-slate-400 font-normal">- ไม่ได้ตรวจ -</span>}
                   </div>
                 </div>
               </div>
