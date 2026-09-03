@@ -160,17 +160,33 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     if (!isDoctor) return;
 
-    const events = ['QUEUE_CREATED', 'QUEUE_UPDATED', 'VITALS_RECORDED', 'VISIT_UPDATED'];
+    const events = [
+      'QUEUE_CREATED',
+      'QUEUE_UPDATED',
+      'VITALS_RECORDED',
+      'VISIT_UPDATED',
+      'VISIT_CREATED',
+      'PATIENT_REGISTERED',
+      'SCREENING_RECORDED',
+      'STATUS_CHANGED',
+      'QUEUE_CALLED'
+    ];
     const unsubscribers = events.map((eventType) => subscribe(eventType, scheduleRefresh));
+
+    // Polling fallback ทุก 4 วินาที เพื่อให้แน่ใจว่าคิวล่าสุดและสถิติอัปเดตเสมอ
+    const pollInterval = setInterval(() => {
+      void refresh();
+    }, 4000);
 
     return () => {
       unsubscribers.forEach((unsubscribe) => unsubscribe());
+      clearInterval(pollInterval);
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
         refreshTimerRef.current = null;
       }
     };
-  }, [isDoctor, subscribe, scheduleRefresh]);
+  }, [isDoctor, subscribe, scheduleRefresh, refresh]);
 
   /**
    * ดึงผลการตรวจที่เคยบันทึกไว้ เมื่อแพทย์เปิดเคสใดเคสหนึ่ง

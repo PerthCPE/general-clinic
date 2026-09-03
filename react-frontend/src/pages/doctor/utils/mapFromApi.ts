@@ -1,4 +1,4 @@
-import type { DiagnosisItem, PastVisitRecord, Patient, QueueStatus } from '../types';
+import type { DiagnosisItem, PastVisitRecord, Patient, PrescriptionItem, QueueStatus } from '../types';
 import type {
   BackendDoctorQueueItem,
   BackendDoctorScreening,
@@ -250,17 +250,21 @@ export function applyExaminationDetail(base: Patient, detail: BackendExamination
   merged.vn = detail.vn || merged.vn;
   // ใบสั่งยาที่เคยบันทึกไว้ ให้แสดงกลับตอนเปิดเคสเดิมมาแก้ต่อ
   // ถ้ายังไม่เคยบันทึกยาเลย จะไม่เขียนทับรายการที่แพทย์เพิ่งพิมพ์ค้างไว้บนหน้าจอ
+  //
+  // ตาราง dispensings เก็บวิธีใช้ยารวมเป็นข้อความเดียวในช่อง instructions
+  // (ตอนบันทึกรวม route + timing + specialInstructions เข้าด้วยกัน)
+  // อ่านกลับจึงคืนลง specialInstructions ช่องเดียว แพทย์แก้ต่อได้ตามปกติ
   if (detail.prescriptions && detail.prescriptions.length > 0) {
     merged.prescriptions = detail.prescriptions.map((item, index) => ({
-      id: `rx-${index + 1}`,
+      id: item.id || `rx-${index + 1}`,
       medicineName: item.medicineName || '',
       dosage: item.dosage || '',
       frequency: item.frequency || '',
       duration: item.duration || '',
       quantity: Number(item.quantity) || 0,
-      route: item.route || '',
-      timing: item.timing || '',
-      specialInstructions: item.specialInstructions || '',
+      route: '',
+      timing: '',
+      specialInstructions: item.instructions || '',
     }));
   }
 
@@ -359,18 +363,6 @@ export function buildExaminationRequest(
       localName: item.localName || '',
     })),
 
-    // ใบสั่งยา backend จะเขียนลงตาราง dispensings ให้ห้องยาเห็น
-    prescriptions: (patient.prescriptions || []).map((item) => ({
-      medicineName: item.medicineName || '',
-      dosage: item.dosage || '',
-      frequency: item.frequency || '',
-      duration: item.duration || '',
-      quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
-      route: item.route || '',
-      timing: item.timing || '',
-      specialInstructions: item.specialInstructions || '',
-    })),
-
     patientHistory: {
       pastMedicalHistory: patient.pastMedicalHistory || '',
       pastSurgery: patient.pastSurgery || '',
@@ -395,6 +387,18 @@ export function buildExaminationRequest(
         : null,
       currentMedications: patient.currentMedications || [],
     },
+    prescriptions: (patient.prescriptions || []).map((p: PrescriptionItem) => ({
+      id: p.id,
+      medicineName: p.medicineName,
+      dosage: p.dosage,
+      frequency: p.frequency,
+      duration: p.duration,
+      quantity: Number(p.quantity) || 1,
+      instructions: [p.route, p.timing, p.specialInstructions].filter(Boolean).join(' - ') || 'รับประทานตามแพทย์สั่ง',
+      status: 'Active'
+    })),
+    allergies: Array.isArray(patient.drugAllergies) ? patient.drugAllergies.join(', ') : '',
+    chronicDiseases: Array.isArray(patient.chronicDiseases) ? patient.chronicDiseases.join(', ') : '',
   };
 }
 

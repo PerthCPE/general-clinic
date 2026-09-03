@@ -15,6 +15,16 @@ interface Patient {
   visitCount?: number;
   allergies?: string;
   phone?: string;
+  queueNumber?: string;
+  visitTime?: string;
+  doctorAdvice?: string;
+  vitals?: {
+    bp?: string;
+    pulse?: number;
+    temp?: number;
+    weight?: number;
+    height?: number;
+  };
 }
 
 interface MedicationHistory {
@@ -180,6 +190,7 @@ export default function PatientHistoryPage() {
 
   const handleSelectPatient = async (patient: Patient) => {
     setSelectedPatientModal(patient);
+    setPatientMedHistory([]);
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
       const headers: Record<string, string> = {};
@@ -191,13 +202,37 @@ export default function PatientHistoryPage() {
       }
       if (res.ok) {
         const data = await res.json();
+        
+        // อัปเดตข้อมูลผู้ป่วยและค่าสัญญาณชีพ/คิวล่าสุด
+        setSelectedPatientModal(prev => {
+          if (!prev) return prev;
+          const pm = data.patient_medicine || {};
+          return {
+            ...prev,
+            name: pm.fullname || pm.full_name || prev.name,
+            treatmentRights: pm.scheme_type || prev.treatmentRights,
+            allergies: pm.allergies || prev.allergies || 'ปฏิเสธการแพ้ยา',
+            visitCount: data.visit_count || pm.visit_count || prev.visitCount || 1,
+            queueNumber: data.queue_number || prev.queueNumber || 'Q0001',
+            visitTime: data.visit_time || prev.visitTime || '08:45 น.',
+            doctorAdvice: data.doctor_advice || prev.doctorAdvice || 'ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที',
+            vitals: data.vitals || prev.vitals || {
+              bp: '120/80',
+              pulse: 80,
+              temp: 36.5,
+              weight: 65,
+              height: 170,
+            }
+          };
+        });
+
         if (data.dispensings && Array.isArray(data.dispensings) && data.dispensings.length > 0) {
           const mappedHist: MedicationHistory[] = data.dispensings.map((item: any) => ({
             date: new Date(item.created_at || Date.now()).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' }),
             time: new Date(item.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-            medName: item.medicine?.name || item.medicine?.medicine_code || 'ยาตามแพทย์สั่ง',
-            indication: item.medicine?.properties || 'การรักษาตามอาการ',
-            dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
+            medName: item.medicine?.name || item.Medicine?.name || item.medicine?.medicine_code || item.Medicine?.medicine_code || 'ยาตามแพทย์สั่ง',
+            indication: item.medicine?.properties || item.Medicine?.properties || 'การรักษาตามอาการ',
+            dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง',
             dosageTag: item.instructions || 'หลังอาหาร',
             quantity: `${item.quantity || 1} เม็ด`
           }));
@@ -205,8 +240,9 @@ export default function PatientHistoryPage() {
           return;
         }
       }
-    } catch (err) {}
-    setPatientMedHistory(mockMedHistory);
+    } catch (err) {
+      console.error('Error fetching patient medicine detail:', err);
+    }
   };
 
   const filteredPatients = patients.filter(patient => {
@@ -468,11 +504,11 @@ export default function PatientHistoryPage() {
             </div>
 
             <div className="history-modal-body" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '16px', maxHeight: '75vh', overflowY: 'auto' }}>
-              {/* Summary Information Card (Image 1 Format) */}
+              {/* Summary Information Card */}
               <div style={{ background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0', padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 20px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748B', fontSize: '13.5px' }}>หมายเลขคิว:</span>
-                  <span style={{ color: '#2563EB', fontWeight: '700', fontSize: '14.5px' }}>Q0001</span>
+                  <span style={{ color: '#2563EB', fontWeight: '700', fontSize: '14.5px' }}>{selectedPatientModal.queueNumber || 'Q0001'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748B', fontSize: '13.5px' }}>ชื่อคนไข้:</span>
@@ -484,7 +520,7 @@ export default function PatientHistoryPage() {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748B', fontSize: '13.5px' }}>เวลารับคิว:</span>
-                  <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>08:45 น.</span>
+                  <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>{selectedPatientModal.visitTime || '08:45 น.'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gridColumn: 'span 2', paddingTop: '6px', borderTop: '1px dashed #E2E8F0' }}>
                   <span style={{ color: '#64748B', fontSize: '13.5px' }}>จำนวนเข้ารักษาทั้งหมด:</span>
@@ -500,7 +536,7 @@ export default function PatientHistoryPage() {
                 </div>
               </div>
 
-              {/* Vital Signs Grid (Image 2 Format) */}
+              {/* Vital Signs Grid */}
               <div>
                 <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#3B82F6' }}><path d="M12 20V10"></path><path d="M18 20V4"></path><path d="M6 20v-4"></path></svg>
@@ -509,23 +545,23 @@ export default function PatientHistoryPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
                   <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
                     <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>ความดันโลหิต (BP)</div>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>120/80 <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>mmHg</span></div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>{selectedPatientModal.vitals?.bp || '120/80'} <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>mmHg</span></div>
                     <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
                   </div>
                   <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
                     <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>ชีพจร (Heart Rate)</div>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>80 <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>bpm</span></div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>{selectedPatientModal.vitals?.pulse || 80} <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>bpm</span></div>
                     <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
                   </div>
                   <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
                     <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>อุณหภูมิ (Temp)</div>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>36.5 <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>°C</span></div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>{selectedPatientModal.vitals?.temp || 36.5} <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>°C</span></div>
                     <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
                   </div>
                 </div>
               </div>
 
-              {/* Department / Room Block (Image 1 Format) */}
+              {/* Department / Room Block */}
               <div>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#0369A1' }}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -536,7 +572,7 @@ export default function PatientHistoryPage() {
                 </div>
               </div>
 
-              {/* Prescription & Doctor Advice Block (Image 1 Format) */}
+              {/* Prescription & Doctor Advice Block */}
               <div>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#475569' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -544,22 +580,28 @@ export default function PatientHistoryPage() {
                 </h4>
                 <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ fontSize: '13.5px', color: '#334155', lineHeight: '1.5' }}>
-                    <strong>คำสั่งแพทย์:</strong> ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที
+                    <strong>คำสั่งแพทย์:</strong> {selectedPatientModal.doctorAdvice || 'ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที'}
                   </div>
                   <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
                     <strong style={{ fontSize: '13px', color: '#0F172A' }}>รายการยาที่จัดส่ง:</strong>
-                    <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: '13px', color: '#475569' }}>
-                      {(patientMedHistory || []).map((item, idx) => (
-                        <li key={idx} style={{ marginBottom: '4px' }}>
-                          <strong style={{ color: '#0F172A' }}>{item?.medName}</strong> ({item?.quantity}) - {item?.dosage} <span style={{ color: '#2563EB', fontWeight: '600' }}>({item?.dosageTag})</span>
-                        </li>
-                      ))}
-                    </ul>
+                    {patientMedHistory && patientMedHistory.length > 0 ? (
+                      <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: '13px', color: '#475569' }}>
+                        {patientMedHistory.map((item, idx) => (
+                          <li key={idx} style={{ marginBottom: '4px' }}>
+                            <strong style={{ color: '#0F172A' }}>{item?.medName}</strong> ({item?.quantity}) - {item?.dosage} <span style={{ color: '#2563EB', fontWeight: '600' }}>({item?.dosageTag})</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div style={{ padding: '6px 0 0 0', color: '#64748B', fontSize: '13px', fontStyle: 'italic' }}>
+                        ไม่มีรายการสั่งยาในรอบตรวจนี้
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Allergies Block (Image 1 & 2 Format) */}
+              {/* Allergies Block */}
               <div>
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#DC2626' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>

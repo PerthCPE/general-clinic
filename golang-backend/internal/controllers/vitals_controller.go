@@ -149,11 +149,45 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		}
 	}
 
-	// 6. สร้าง VisitRecord
+	// 6. กำหนดชื่อแผนก/ห้องตรวจ
+	roomNumber := 1
+	shortDocName := ""
+	docID := assignedDoctorID
+	if doctor.ID > 0 {
+		docID = doctor.ID
+	}
+	if docID == 4 || docID == 1 || strings.Contains(doctor.FullName, "สุดา") {
+		roomNumber = 1
+		shortDocName = "พญ.สุดา"
+	} else if docID == 5 || docID == 2 || strings.Contains(doctor.FullName, "วิชัย") {
+		roomNumber = 2
+		shortDocName = "นพ.วิชัย"
+	} else if docID == 6 || docID == 3 || strings.Contains(doctor.FullName, "เกศรา") {
+		roomNumber = 3
+		shortDocName = "พญ.เกศรา"
+	} else if docID > 0 {
+		roomNumber = int((docID-1)%3) + 1
+		parts := strings.Split(doctor.FullName, " ")
+		if len(parts) > 0 {
+			shortDocName = parts[0]
+		}
+	}
+
+	deptName := fmt.Sprintf("ห้องตรวจ %d", roomNumber)
+	if shortDocName != "" {
+		deptName = fmt.Sprintf("ห้องตรวจ %d (%s)", roomNumber, shortDocName)
+	} else if doctor.FullName != "" {
+		deptName = fmt.Sprintf("ห้องตรวจ %d (%s)", roomNumber, doctor.FullName)
+	}
+
+	// 7. สร้าง VisitRecord
 	newVisitRecord := models.VisitRecord{
-		PatientID: patient.ID,
-		DoctorID:  assignedDoctorID,
-		VisitDate: time.Now(),
+		PatientID:  patient.ID,
+		DoctorID:   assignedDoctorID,
+		VisitDate:  time.Now(),
+		Status:     models.VisitStatusWaiting,
+		Department: deptName,
+		VisitType:  "walk-in",
 	}
 
 	if err := config.DB.Create(&newVisitRecord).Error; err != nil {
@@ -161,7 +195,14 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		return
 	}
 
-	// 7. สร้าง Screening Record
+	// ออกเลข VN ทันที
+	if newVisitRecord.VN == "" {
+		vn := fmt.Sprintf("69%02d%04d", time.Now().Year()%100, (newVisitRecord.ID*7)%9000+1000)
+		config.DB.Model(&models.VisitRecord{}).Where("id = ?", newVisitRecord.ID).Update("vn", vn)
+		newVisitRecord.VN = vn
+	}
+
+	// 8. สร้าง Screening Record
 	cc := strings.TrimSpace(req.ChiefComplaint)
 	if cc == "" {
 		cc = "ตรวจสุขภาพและคัดกรองทั่วไป"
@@ -202,49 +243,32 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		return
 	}
 
-	// 8. อัปเดตสถานะคิวคนไข้เป็น "รอพบแพทย์" เฉพาะคิวนี้คิวเดียวเท่านั้น (Single Queue Update)
-	// กำหนดเลขห้องตรวจ strictly เป็น 1, 2 หรือ 3 เท่านั้น
-	roomNumber := 1
-	docID := assignedDoctorID
-	if doctor.ID > 0 {
-		docID = doctor.ID
-	}
-	if docID == 4 || docID == 1 {
-		roomNumber = 1
-	} else if docID == 5 || docID == 2 {
-		roomNumber = 2
-	} else if docID == 6 || docID == 3 {
-		roomNumber = 3
-	} else if docID > 0 {
-		roomNumber = int((docID-1)%3) + 1
-	}
-
-	deptName := fmt.Sprintf("ห้องตรวจ %d", roomNumber)
-	if doctor.ID > 0 && doctor.FullName != "" {
-		deptName = fmt.Sprintf("ห้องตรวจ %d (%s)", roomNumber, doctor.FullName)
-	}
+	// 9. อัปเดตสถานะคิวคนไข้เป็น "รอพบแพทย์"
 	noteText := fmt.Sprintf("คัดกรองแล้ว: %s (BP: %d/%d, T: %.1f°C, HR: %d)", triageLevel, req.SystolicBP, req.DiastolicBP, temp, req.HeartRate)
+	vID := newVisitRecord.ID
 
 	if targetQueue.ID > 0 {
-		// อัปเดตเฉพาะคิวนี้เท่านั้น คิวอื่นๆ ของผู้ป่วยคนเดียวกันจะไม่ถูกกระทบ!
+		targetQueue.VisitID = &vID
+		targetQueue.AssignedDoctorID = &assignedDoctorID
 		targetQueue.Status = "รอพบแพทย์"
 		targetQueue.Department = deptName
 		targetQueue.Note = noteText
 		config.DB.Save(&targetQueue)
 		ws.BroadcastEvent("QUEUE_UPDATED", targetQueue)
 	} else {
-		// ถ้าไม่มีคิวเดิม ให้สร้างคิวใหม่สำหรับรายการนี้
 		cleanQ := strings.TrimSpace(req.QueueNumber)
 		if cleanQ == "" {
 			cleanQ = fmt.Sprintf("Q%04X", patient.ID)
 		}
 		newQ := models.Queue{
-			PatientID:       patient.ID,
-			CreatedByUserID: nurseID,
-			QueueNumber:     cleanQ,
-			Status:          "รอพบแพทย์",
-			Department:      deptName,
-			Note:            noteText,
+			PatientID:        patient.ID,
+			VisitID:          &vID,
+			AssignedDoctorID: &assignedDoctorID,
+			CreatedByUserID:  nurseID,
+			QueueNumber:      cleanQ,
+			Status:           "รอพบแพทย์",
+			Department:       deptName,
+			Note:             noteText,
 		}
 		config.DB.Create(&newQ)
 		ws.BroadcastEvent("QUEUE_CREATED", newQ)

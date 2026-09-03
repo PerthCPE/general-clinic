@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -45,10 +46,16 @@ type visitCase struct {
 	Allergies       string
 	ChronicDiseases string
 
-	ChiefComplaint string
-	MedicalHistory string
-	NurseNotes     string
-	TriageLevel    string // เว้นว่างได้ backend จะประเมินจากสัญญาณชีพให้เอง
+	ChiefComplaint     string
+	MedicalHistory     string
+	NurseNotes         string
+	TriageLevel        string // เว้นว่างได้ backend จะประเมินจากสัญญาณชีพให้เอง
+	PainScore          int
+	BloodSugar         float64
+	FoodAllergies      string
+	CurrentMedications string
+	SmokingHistory     string
+	AlcoholHistory     string
 
 	Weight          float64
 	Height          float64
@@ -62,7 +69,7 @@ type visitCase struct {
 
 var cases = []visitCase{
 	{
-		FullName:        "นายทดสอบ ระบบหนึ่ง",
+		FullName:        "นายสมศักดิ์ ภักดีชน",
 		Gender:          "ชาย",
 		BirthDate:       "1992-03-18",
 		Phone:           "081-700-0001",
@@ -72,19 +79,25 @@ var cases = []visitCase{
 		Allergies:       "ปฏิเสธการแพ้ยา",
 		ChronicDiseases: "ไม่มีโรคประจำตัว",
 
-		ChiefComplaint: "ไข้ต่ำๆ ไอมีเสมหะ เจ็บคอ มา 3 วัน",
-		MedicalHistory: "ไม่มีโรคประจำตัว ไม่เคยผ่าตัด",
-		NurseNotes:     "รู้สึกตัวดี เดินได้เอง ไม่มีภาวะขาดน้ำ",
-		TriageLevel:    "ปกติ (Normal)",
+		ChiefComplaint:     "ไข้ต่ำๆ ไอมีเสมหะ เจ็บคอ มา 3 วัน",
+		MedicalHistory:     "ไม่มีโรคประจำตัว ไม่เคยผ่าตัด",
+		NurseNotes:         "รู้สึกตัวดี เดินได้เอง ไม่มีภาวะขาดน้ำ",
+		TriageLevel:        "ปกติ (Normal)",
+		PainScore:          1,
+		BloodSugar:         98.0,
+		FoodAllergies:      "ปฏิเสธการแพ้อาหาร",
+		CurrentMedications: "ไม่มี",
+		SmokingHistory:     "ไม่สูบ",
+		AlcoholHistory:     "ไม่ดื่ม",
 
 		Weight: 68.5, Height: 172, Temperature: 37.8,
 		SystolicBP: 124, DiastolicBP: 78,
 		HeartRate: 88, RespiratoryRate: 20, SpO2: 98,
 	},
 	{
-		FullName:        "นางสาวทดสอบ ระบบสอง",
+		FullName:        "นางสาวนภาลัย สว่างแดน",
 		Gender:          "หญิง",
-		BirthDate:       "1988-11-02",
+		BirthDate:       "1996-11-02",
 		Phone:           "081-700-0002",
 		Address:         "45/7 ซอยมิตรภาพ 12 ตำบลในเมือง อำเภอเมือง นครราชสีมา",
 		Emergency:       "นายวิรัตน์ (สามี) 089-700-0002",
@@ -92,17 +105,23 @@ var cases = []visitCase{
 		Allergies:       "แพ้ยา Penicillin (ผื่นลมพิษ)",
 		ChronicDiseases: "ไมเกรน",
 
-		ChiefComplaint: "ปวดท้องบิดเป็นพักๆ บริเวณท้องน้อยขวา มา 1 วัน",
-		MedicalHistory: "เคยผ่าตัดไส้ติ่งเมื่อ 10 ปีก่อน",
-		NurseNotes:     "สีหน้าเจ็บปวด กดเจ็บท้องน้อยขวา ยังไม่มีไข้",
-		TriageLevel:    "เร่งด่วน (Urgent)",
+		ChiefComplaint:     "ปวดศีรษะข้างเดียว คลื่นไส้ ตาพร่ามัว มา 6 ชั่วโมง",
+		MedicalHistory:     "ไมเกรน มีประวัติแพ้ยา Penicillin",
+		NurseNotes:         "นอนพักห้องสังเกตอาการ อาการปวดศีรษะปานกลาง",
+		TriageLevel:        "กึ่งฉุกเฉิน (Semi-Urgent)",
+		PainScore:          6,
+		BloodSugar:         102.0,
+		FoodAllergies:      "ปฏิเสธการแพ้อาหาร",
+		CurrentMedications: "Paracetamol 500mg, Cafergot",
+		SmokingHistory:     "ไม่สูบ",
+		AlcoholHistory:     "ดื่มเข้าสังคม",
 
-		Weight: 54.2, Height: 158, Temperature: 37.1,
-		SystolicBP: 132, DiastolicBP: 84,
-		HeartRate: 96, RespiratoryRate: 22, SpO2: 99,
+		Weight: 54.2, Height: 158, Temperature: 36.8,
+		SystolicBP: 130, DiastolicBP: 82,
+		HeartRate: 84, RespiratoryRate: 18, SpO2: 99,
 	},
 	{
-		FullName:        "นายทดสอบ ระบบสาม",
+		FullName:        "นายประยุทธ จันทร์สว่าง",
 		Gender:          "ชาย",
 		BirthDate:       "1971-07-25",
 		Phone:           "081-700-0003",
@@ -112,39 +131,142 @@ var cases = []visitCase{
 		Allergies:       "ปฏิเสธการแพ้ยา",
 		ChronicDiseases: "ความดันโลหิตสูง ไขมันในเลือดสูง",
 
-		ChiefComplaint: "แน่นหน้าอก เหนื่อยหอบ ร้าวไปแขนซ้าย เริ่มมา 2 ชั่วโมง",
-		MedicalHistory: "ความดันโลหิตสูง กินยา Amlodipine สูบบุหรี่วันละครึ่งซอง",
-		NurseNotes:     "ให้ออกซิเจน 3 LPM แล้ว ทำ EKG รอแพทย์อ่านผลด่วน",
-		TriageLevel:    "ฉุกเฉิน (Emergency)",
+		ChiefComplaint:     "แน่นหน้าอก เหนื่อยหอบ ร้าวไปแขนซ้าย เริ่มมา 2 ชั่วโมง",
+		MedicalHistory:     "ความดันโลหิตสูง กินยา Amlodipine สูบบุหรี่วันละครึ่งซอง",
+		NurseNotes:         "ให้ออกซิเจน 3 LPM แล้ว ทำ EKG รอแพทย์อ่านผลด่วน",
+		TriageLevel:        "ฉุกเฉินเร่งด่วน (Level 2)",
+		PainScore:          8,
+		BloodSugar:         165.0,
+		FoodAllergies:      "อาหารทะเล (กุ้ง, ปู)",
+		CurrentMedications: "Amlodipine 5mg 1x1, Simvastatin 20mg 1xhs",
+		SmokingHistory:     "สูบบุหรี่ 10 มวน/วัน (5 ปี)",
+		AlcoholHistory:     "ดื่มแอลกอฮอล์ 2-3 ครั้ง/สัปดาห์",
 
 		Weight: 82, Height: 170, Temperature: 36.9,
 		SystolicBP: 158, DiastolicBP: 96,
 		HeartRate: 112, RespiratoryRate: 26, SpO2: 94,
 	},
+	{
+		FullName:        "ด.ช.ธนกร กาญจนา",
+		Gender:          "ชาย",
+		BirthDate:       "2018-05-14",
+		Phone:           "081-700-0004",
+		Address:         "23/1 ซอยสุรนารี 5 ตำบลในเมือง อำเภอเมือง นครราชสีมา",
+		Emergency:       "นางกาญจนา (มารดา) 089-700-0004",
+		SchemeType:      "บัตรทอง (สปสช.)",
+		Allergies:       "ปฏิเสธการแพ้ยา",
+		ChronicDiseases: "ไม่มีโรคประจำตัว",
+
+		ChiefComplaint:     "มีไข้สูง 38.9°C ไอ มีน้ำมูก ซึม ทานอาหารได้น้อย มา 1 วัน",
+		MedicalHistory:     "คลอดครบกำหนด วัคซีนครบตามเกณฑ์",
+		NurseNotes:         "เช็ดตัวลดไข้ทันที ส่งพบกุมารแพทย์ห้องตรวจ 3 ด่วน",
+		TriageLevel:        "เร่งด่วน (Urgent)",
+		PainScore:          3,
+		BloodSugar:         90.0,
+		FoodAllergies:      "ปฏิเสธการแพ้อาหาร",
+		CurrentMedications: "Tempra syrup",
+		SmokingHistory:     "ไม่สูบ (เด็ก)",
+		AlcoholHistory:     "ไม่ดื่ม (เด็ก)",
+
+		Weight: 22.5, Height: 120, Temperature: 38.9,
+		SystolicBP: 100, DiastolicBP: 65,
+		HeartRate: 118, RespiratoryRate: 24, SpO2: 97,
+	},
+	{
+		FullName:        "นางประภาศรี มีสุข",
+		Gender:          "หญิง",
+		BirthDate:       "1978-09-12",
+		Phone:           "081-700-0005",
+		Address:         "99/12 หมู่ 7 ตำบลหัวทะเล อำเภอเมือง นครราชสีมา",
+		Emergency:       "นายสมพร (สามี) 089-700-0005",
+		SchemeType:      "ประกันสุขภาพเอกชน",
+		Allergies:       "แพ้ยา Sulfa",
+		ChronicDiseases: "โรคกระเพาะอาหาร",
+
+		ChiefComplaint:     "ปวดท้องบิดเกร็งบริเวณลิ้นปี่ คลื่นไส้อาเจียน 2 ครั้ง",
+		MedicalHistory:     "โรคกระเพาะอาหาร ทานอาหารไม่ตรงเวลา",
+		NurseNotes:         "กดเจ็บบริเวณ Epigastrium ไม่มี Rebound tenderness",
+		TriageLevel:        "กึ่งฉุกเฉิน (Semi-Urgent)",
+		PainScore:          5,
+		BloodSugar:         105.0,
+		FoodAllergies:      "ปฏิเสธการแพ้อาหาร",
+		CurrentMedications: "Omeprazole 20mg",
+		SmokingHistory:     "ไม่สูบ",
+		AlcoholHistory:     "ไม่ดื่ม",
+
+		Weight: 58.0, Height: 162, Temperature: 37.0,
+		SystolicBP: 128, DiastolicBP: 80,
+		HeartRate: 88, RespiratoryRate: 20, SpO2: 98,
+	},
+	{
+		FullName:        "นายอนุสรณ์ อุดมศักดิ์",
+		Gender:          "ชาย",
+		BirthDate:       "1985-02-20",
+		Phone:           "081-700-0006",
+		Address:         "14/8 ถนนราชดำเนิน ตำบลในเมือง อำเภอเมือง นครราชสีมา",
+		Emergency:       "นางสาวกัญจนา (ภรรยา) 089-700-0006",
+		SchemeType:      "ชำระเงินเอง",
+		Allergies:       "ปฏิเสธการแพ้ยา",
+		ChronicDiseases: "ไม่มีโรคประจำตัว",
+
+		ChiefComplaint:     "มีดบาดแขนขวา แผลฉีกขาดยาวประมาณ 3 ซม. เลือดซึม",
+		MedicalHistory:     "ฉีดวัคซีนบาดทะยักครบเมื่อ 2 ปีก่อน",
+		NurseNotes:         "กดห้ามเลือดแล้ว ส่งเข้าห้องหัตถการเพื่อทำแผลและเย็บแผล",
+		TriageLevel:        "ไม่เร่งด่วน (Non-Urgent)",
+		PainScore:          4,
+		BloodSugar:         96.0,
+		FoodAllergies:      "ปฏิเสธการแพ้อาหาร",
+		CurrentMedications: "ไม่มี",
+		SmokingHistory:     "สูบบุหรี่ 5 มวน/วัน",
+		AlcoholHistory:     "ดื่มเข้าสังคม",
+
+		Weight: 74.0, Height: 175, Temperature: 36.6,
+		SystolicBP: 122, DiastolicBP: 76,
+		HeartRate: 82, RespiratoryRate: 18, SpO2: 99,
+	},
+}
+
+type QueueTargetSpec struct {
+	Status     string
+	Department string
+	Note       string
+}
+
+var queueSpecs = []QueueTargetSpec{
+	{Status: "รอคัดกรอง", Department: "จุดคัดกรอง", Note: "รอซักประวัติและวัดสัญญาณชีพ"},
+	{Status: "รอพบแพทย์", Department: "ห้องตรวจ 1 (พญ.สุดา)", Note: "คัดกรองแล้ว: ปกติ (Normal) (BP: 120/80)"},
+	{Status: "รอพบแพทย์", Department: "ห้องตรวจ 2 (นพ.วิชัย)", Note: "คัดกรองแล้ว: เร่งด่วน (Urgent) (BP: 135/85)"},
+	{Status: "รอพบแพทย์", Department: "ห้องตรวจ 3 (พญ.เกศรา)", Note: "คัดกรองแล้ว: กุมารเวชกรรม (T: 38.5°C)"},
+	{Status: "กำลังตรวจ", Department: "ห้องตรวจ 1 (พญ.สุดา)", Note: "แพทย์กำลังซักประวัติและตรวจร่างกาย"},
+	{Status: "กำลังตรวจ", Department: "ห้องตรวจ 2 (นพ.วิชัย)", Note: "แพทย์กำลังตรวจรักษาและประเมินอาการ"},
+	{Status: "กำลังตรวจ", Department: "ห้องตรวจ 3 (พญ.เกศรา)", Note: "กุมารแพทย์กำลังตรวจรักษา"},
+	{Status: "รอทำหัตถการ", Department: "ห้องหัตถการ (ทำแผล/ฉีดยา)", Note: "ส่งทำแผล ล้างแผล และฉีดยาตามคำสั่งแพทย์"},
+	{Status: "รอชำระเงิน", Department: "ห้องการเงิน (แคชเชียร์)", Note: "ตรวจเสร็จสิ้น รอชำระค่าบริการทางการแพทย์"},
+	{Status: "รอรับยา", Department: "ห้องจ่ายยาและเภสัชกรรม", Note: "ชำระเงินแล้ว รอจัดยาและรับคำแนะนำการใช้ยา"},
+	{Status: "เสร็จสิ้น", Department: "ห้องจ่ายยาและเภสัชกรรม", Note: "รับยาและเสร็จสิ้นขั้นตอนการรักษา"},
 }
 
 var client = &http.Client{Timeout: 30 * time.Second}
 
-func main() {
-	defaultURL := "http://127.0.0.1:" + envOr("PORT", "8081")
+type doctorInfo struct {
+	ID       uint   `json:"id"`
+	Username string `json:"username"`
+	FullName string `json:"fullname"`
+}
 
-	baseURL := flag.String("url", defaultURL, "ที่อยู่ของ backend")
-	doctorUser := flag.String("doctor", "doctor1", "username ของแพทย์ที่จะรับคิว")
+func main() {
+	defaultURL := "http://127.0.0.1:" + envOr("PORT", "8080")
+
+	baseURL := flag.String("url", defaultURL, "ที่อยู่ของ backend (ค่าเริ่มต้น http://127.0.0.1:8080)")
+	mode := flag.String("mode", "balanced", "โหมดการทำงาน: 'balanced' (กระจายคิวทุกสถานะให้สมดุล), 'continuous' (ยิงต่อเนื่อง), 'queue' (ยิงตรงเข้า Master Queue), 'registration' (ยิงเข้าลงทะเบียนอย่างเดียว)")
+	count := flag.Int("n", 6, "จำนวนรายการที่ต้องการสร้าง")
+	regInterval := flag.Duration("reg-interval", 5*time.Minute, "ระยะเวลาหน่วงการลงทะเบียนคนไข้ใหม่ในโหมด continuous (เช่น 5m, 10m)")
+	queueInterval := flag.Duration("queue-interval", 15*time.Second, "ระยะเวลาหน่วงการยิง Master Queue ในโหมด continuous (เช่น 15s, 30s)")
 	password := flag.String("password", "password", "รหัสผ่านของ user ที่ใช้เดิน flow")
-	count := flag.Int("n", len(cases), "จำนวนผู้ป่วยที่ต้องการสร้าง")
 	flag.Parse()
 
 	url := strings.TrimRight(*baseURL, "/")
-
-	n := *count
-	if n < 1 {
-		n = 1
-	}
-	if n > len(cases) {
-		n = len(cases)
-	}
-
-	log.Printf("เชื่อมต่อ %s", url)
+	log.Printf("เชื่อมต่อระบบ Backend ที่: %s", url)
 
 	// --- เตรียม token ของแต่ละ role ---
 	registrarToken, err := login(url, "registrar1", *password)
@@ -156,52 +278,184 @@ func main() {
 		log.Fatalf("login nurse1 ไม่สำเร็จ: %v", err)
 	}
 
-	doctorID, doctorName, err := findDoctor(url, nurseToken, *doctorUser)
-	if err != nil {
-		log.Fatalf("หาแพทย์ไม่เจอ: %v", err)
+	allDoctors, err := getAllDoctors(url, nurseToken)
+	if err != nil || len(allDoctors) == 0 {
+		log.Fatalf("ดึงรายชื่อแพทย์ไม่สำเร็จ: %v", err)
 	}
-	log.Printf("ส่งต่อให้แพทย์: %s (user_id %d)", doctorName, doctorID)
-	log.Println(strings.Repeat("-", 62))
 
-	created := 0
-	for i := 0; i < n; i++ {
-		c := cases[i]
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
-		// เลขบัตรอิงเวลาปัจจุบัน กันชนกับที่เคยลงทะเบียนไว้
+	switch *mode {
+	case "balanced":
+		runBalancedSeed(url, registrarToken, nurseToken, allDoctors, *count)
+	case "queue":
+		runDirectQueueSeed(url, registrarToken, nurseToken, allDoctors, *count, rng)
+	case "registration":
+		runRegistrationOnlySeed(url, registrarToken, *count)
+	case "continuous":
+		runContinuousLoop(url, registrarToken, nurseToken, allDoctors, *regInterval, *queueInterval, rng)
+	default:
+		runBalancedSeed(url, registrarToken, nurseToken, allDoctors, *count)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 1. โหมด Balanced: กระจายคิวทุกสถานะให้เห็นภาพการทำงานครบทุกจุดบริการ
+// ---------------------------------------------------------------------------
+func runBalancedSeed(url, registrarToken, nurseToken string, allDoctors []doctorInfo, count int) {
+	log.Println(strings.Repeat("=", 80))
+	log.Println("กำลังจำลองข้อมูลแบบสมดุล (Balanced Mode): กระจายทุกสถานะและห้องตรวจ...")
+	log.Println(strings.Repeat("-", 80))
+
+	selectedSpecs := []QueueTargetSpec{
+		{Status: "รอคัดกรอง", Department: "จุดคัดกรอง", Note: "รอซักประวัติและวัดสัญญาณชีพ"},
+		{Status: "รอพบแพทย์", Department: "ห้องตรวจ 1 (พญ.สุดา)", Note: "คัดกรองแล้ว: ปกติ (Normal)"},
+		{Status: "รอพบแพทย์", Department: "ห้องตรวจ 2 (นพ.วิชัย)", Note: "คัดกรองแล้ว: เร่งด่วน (Urgent)"},
+		{Status: "กำลังตรวจ", Department: "ห้องตรวจ 3 (พญ.เกศรา)", Note: "กุมารแพทย์กำลังตรวจรักษา"},
+		{Status: "รอทำหัตถการ", Department: "ห้องหัตถการ (ทำแผล/ฉีดยา)", Note: "ส่งทำแผลและฉีดยาตามคำสั่งแพทย์"},
+		{Status: "รอชำระเงิน", Department: "ห้องการเงิน (แคชเชียร์)", Note: "ตรวจเสร็จสิ้น รอชำระค่าบริการ"},
+		{Status: "รอรับยา", Department: "ห้องจ่ายยาและเภสัชกรรม", Note: "ชำระเงินแล้ว รอจัดยา"},
+	}
+
+	if count > len(selectedSpecs) {
+		count = len(selectedSpecs)
+	}
+
+	for i := 0; i < count; i++ {
+		c := cases[i%len(cases)]
+		spec := selectedSpecs[i]
 		nationalID := fmt.Sprintf("1%012d", (time.Now().UnixNano()/1000)%1000000000000+int64(i))
 
-		// ---------- ขั้นที่ 1: เจ้าหน้าที่เวชระเบียนลงทะเบียนผู้ป่วย ----------
+		// 1. ลงทะเบียนผู้ป่วย
 		patientID, hn, err := registerPatient(url, registrarToken, c, nationalID)
 		if err != nil {
 			log.Printf("[%d] ลงทะเบียน %s ไม่สำเร็จ: %v", i+1, c.FullName, err)
 			continue
 		}
 
-		// ---------- ขั้นที่ 2: ออกบัตรคิว ----------
-		queueNo, err := createQueue(url, registrarToken, patientID)
+		// 2. ออกบัตรคิว
+		queueID, queueNo, err := createQueue(url, registrarToken, patientID, spec.Department, spec.Note)
 		if err != nil {
 			log.Printf("[%d] ออกคิวให้ %s ไม่สำเร็จ: %v", i+1, c.FullName, err)
 			continue
 		}
 
-		// ---------- ขั้นที่ 3: พยาบาลคัดกรองและส่งต่อแพทย์ ----------
-		triage, err := recordVitals(url, nurseToken, c, patientID, queueNo, doctorID)
-		if err != nil {
-			log.Printf("[%d] คัดกรอง %s ไม่สำเร็จ: %v", i+1, c.FullName, err)
-			continue
+		// 3. ถ้าเป็นสถานะที่ผ่านการคัดกรองแล้ว ให้บันทึก Vitals ด้วย
+		if spec.Status != "รอคัดกรอง" {
+			targetDoc := allDoctors[i%len(allDoctors)]
+			_ = recordVitals(url, nurseToken, c, patientID, queueNo, targetDoc.ID)
+			_ = updateQueueStatus(url, registrarToken, queueID, spec.Status, spec.Department, spec.Note)
 		}
 
-		created++
-		log.Printf("[%d] %s  %-24s  %-8s  %s", i+1, queueNo, c.FullName, hn, triage)
+		log.Printf("[%d] คิว: %-6s | HN: %-7s | ผู้ป่วย: %-22s | แผนก: %-26s | สถานะ: %s",
+			i+1, queueNo, hn, c.FullName, spec.Department, spec.Status)
 	}
 
-	log.Println(strings.Repeat("-", 62))
-	log.Printf("เสร็จ %d ราย — คิวอยู่ที่สถานะ \"รอพบแพทย์\" แล้ว", created)
-	log.Printf("เปิดหน้าเว็บ login เป็น %s แล้วกดรีเฟรชหน้าคิวผู้ป่วยได้เลย", *doctorUser)
+	// สร้างคนไข้ที่ "ยังไม่ได้เข้าคิว" 1 ราย สำหรับหน้าจอลงทะเบียน (/registration)
+	unqCase := cases[count%len(cases)]
+	unqNationalID := fmt.Sprintf("1%012d", (time.Now().UnixNano()/1000)%1000000000000+999)
+	_, unqHN, err := registerPatient(url, registrarToken, unqCase, unqNationalID)
+	if err == nil {
+		log.Println(strings.Repeat("-", 80))
+		log.Printf("[+] ลงทะเบียนผู้ป่วยใหม่ (ยังไม่เข้าคิว): %s (HN: %s) -> แสดงในหน้า /registration", unqCase.FullName, unqHN)
+	}
+
+	log.Println(strings.Repeat("=", 80))
+	log.Printf("สำเร็จ! ระบบมีข้อมูลคิวครบทุกสถานะใน /queue และผู้ป่วยรอส่งคิวใน /registration พร้อมทดสอบ")
 }
 
 // ---------------------------------------------------------------------------
-// ขั้นตอนแต่ละขั้น
+// 2. โหมด Continuous Loop: ยิงคนไข้ลงทะเบียนตามช่วงเวลา และยิงคิวต่อเนื่อง
+// ---------------------------------------------------------------------------
+func runContinuousLoop(url, registrarToken, nurseToken string, allDoctors []doctorInfo, regInterval, queueInterval time.Duration, rng *rand.Rand) {
+	log.Println(strings.Repeat("=", 80))
+	log.Printf("เริ่มต้นโหมด Continuous Simulator:")
+	log.Printf("   - ยิงผู้ป่วยใหม่เข้าหน้าระบบลงทะเบียน (/registration) ทุกๆ: %v", regInterval)
+	log.Printf("   - ยิงคิวจำลองตรงเข้า Master Queue (/queue) ทุกๆ: %v", queueInterval)
+	log.Println(strings.Repeat("=", 80))
+
+	regTicker := time.NewTicker(regInterval)
+	queueTicker := time.NewTicker(queueInterval)
+	defer regTicker.Stop()
+	defer queueTicker.Stop()
+
+	// ยิงตั้งต้น 1 รายการทันที
+	fireOneQueue(url, registrarToken, nurseToken, allDoctors, rng)
+
+	seq := 1
+	for {
+		select {
+		case <-regTicker.C:
+			// สุ่มยิงคนไข้เข้าหน้าระบบลงทะเบียน (ยังไม่เข้าคิว)
+			c := cases[rng.Intn(len(cases))]
+			nationalID := fmt.Sprintf("1%012d", (time.Now().UnixNano()/1000)%1000000000000+int64(seq))
+			_, hn, err := registerPatient(url, registrarToken, c, nationalID)
+			if err == nil {
+				log.Printf("[REG] ผู้ป่วยใหม่ลงทะเบียนเข้าสู่ระบบ: %s (HN: %s) | เวลารอ: %v", c.FullName, hn, regInterval)
+			}
+			seq++
+
+		case <-queueTicker.C:
+			// ยิงคิวตรงเข้าสู่ Master Queue พร้อมสุ่มสถานะและห้องตรวจ
+			fireOneQueue(url, registrarToken, nurseToken, allDoctors, rng)
+		}
+	}
+}
+
+func fireOneQueue(url, registrarToken, nurseToken string, allDoctors []doctorInfo, rng *rand.Rand) {
+	c := cases[rng.Intn(len(cases))]
+	spec := queueSpecs[rng.Intn(len(queueSpecs))]
+	nationalID := fmt.Sprintf("1%012d", (time.Now().UnixNano()/1000)%1000000000000+int64(rng.Intn(9000)+1000))
+
+	patientID, hn, err := registerPatient(url, registrarToken, c, nationalID)
+	if err != nil {
+		return
+	}
+
+	queueID, queueNo, err := createQueue(url, registrarToken, patientID, spec.Department, spec.Note)
+	if err != nil {
+		return
+	}
+
+	if spec.Status != "รอคัดกรอง" {
+		targetDoc := allDoctors[rng.Intn(len(allDoctors))]
+		_ = recordVitals(url, nurseToken, c, patientID, queueNo, targetDoc.ID)
+		_ = updateQueueStatus(url, registrarToken, queueID, spec.Status, spec.Department, spec.Note)
+	}
+
+	log.Printf("[QUEUE] คิว: %-6s | HN: %-7s | ผู้ป่วย: %-22s | แผนก: %-26s | สถานะ: %s",
+		queueNo, hn, c.FullName, spec.Department, spec.Status)
+}
+
+// ---------------------------------------------------------------------------
+// 3. โหมด Direct Queue Seed: ยิงคิวตรงเข้า Master Queue แบบสุ่ม
+// ---------------------------------------------------------------------------
+func runDirectQueueSeed(url, registrarToken, nurseToken string, allDoctors []doctorInfo, count int, rng *rand.Rand) {
+	log.Printf("กำลังยิงคิวจำลองตรงเข้า Master Queue จำนวน %d คิว...", count)
+	for i := 0; i < count; i++ {
+		fireOneQueue(url, registrarToken, nurseToken, allDoctors, rng)
+		time.Sleep(1 * time.Second)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 4. โหมด Registration Only: ยิงผู้ป่วยเข้าหน้าระบบลงทะเบียน (ยังไม่เข้าคิว)
+// ---------------------------------------------------------------------------
+func runRegistrationOnlySeed(url, registrarToken string, count int) {
+	log.Printf("กำลังลงทะเบียนผู้ป่วยใหม่ (ยังไม่เข้าคิว) จำนวน %d ราย...", count)
+	for i := 0; i < count; i++ {
+		c := cases[i%len(cases)]
+		nationalID := fmt.Sprintf("1%012d", (time.Now().UnixNano()/1000)%1000000000000+int64(i))
+		_, hn, err := registerPatient(url, registrarToken, c, nationalID)
+		if err == nil {
+			log.Printf("[%d] ลงทะเบียนผู้ป่วย: %s (HN: %s) -> แสดงในตาราง /registration", i+1, c.FullName, hn)
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// ตัวช่วยเรียก API แต่ละ endpoint
 // ---------------------------------------------------------------------------
 
 func login(baseURL, username, password string) (string, error) {
@@ -219,23 +473,12 @@ func login(baseURL, username, password string) (string, error) {
 	return res.Token, nil
 }
 
-// findDoctor - หา user_id ของแพทย์จาก username ผ่าน GET /api/doctors
-func findDoctor(baseURL, token, username string) (uint, string, error) {
-	var doctors []struct {
-		ID       uint   `json:"id"`
-		Username string `json:"username"`
-		FullName string `json:"fullname"`
-	}
+func getAllDoctors(baseURL, token string) ([]doctorInfo, error) {
+	var doctors []doctorInfo
 	if err := call(baseURL, "GET", "/api/doctors", token, nil, &doctors); err != nil {
-		return 0, "", err
+		return nil, err
 	}
-
-	for _, d := range doctors {
-		if strings.EqualFold(d.Username, username) {
-			return d.ID, d.FullName, nil
-		}
-	}
-	return 0, "", fmt.Errorf("ไม่พบแพทย์ username '%s' (มีทั้งหมด %d คน)", username, len(doctors))
+	return doctors, nil
 }
 
 func registerPatient(baseURL, token string, c visitCase, nationalID string) (uint, string, error) {
@@ -267,61 +510,70 @@ func registerPatient(baseURL, token string, c visitCase, nationalID string) (uin
 	return res.Patient.ID, res.Patient.HN, nil
 }
 
-func createQueue(baseURL, token string, patientID uint) (string, error) {
+func createQueue(baseURL, token string, patientID uint, department, note string) (uint, string, error) {
+	if department == "" {
+		department = "จุดคัดกรอง"
+	}
+	if note == "" {
+		note = "ข้อมูลทดสอบระบบ"
+	}
+
 	body := map[string]any{
 		"patient_id": patientID,
-		"department": "แผนกคัดกรอง",
-		"note":       "ข้อมูลทดสอบระบบ (seed-visit-flow)",
+		"department": department,
+		"note":       note,
 	}
 
 	var res struct {
 		Queue struct {
+			ID          uint   `json:"id"`
 			QueueNumber string `json:"queue_number"`
 		} `json:"queue"`
 	}
 	if err := call(baseURL, "POST", "/api/queue/create", token, body, &res); err != nil {
-		return "", err
+		return 0, "", err
 	}
-	return res.Queue.QueueNumber, nil
+	return res.Queue.ID, res.Queue.QueueNumber, nil
 }
 
-func recordVitals(baseURL, token string, c visitCase, patientID uint, queueNo string, doctorID uint) (string, error) {
+func updateQueueStatus(baseURL, token string, queueID uint, status, department, note string) error {
 	body := map[string]any{
-		"patient_id":         patientID,
-		"queue_number":       queueNo,
-		"chief_complaint":    c.ChiefComplaint,
-		"weight":             c.Weight,
-		"height":             c.Height,
-		"temperature":        c.Temperature,
-		"systolic_bp":        c.SystolicBP,
-		"diastolic_bp":       c.DiastolicBP,
-		"heart_rate":         c.HeartRate,
-		"respiratory_rate":   c.RespiratoryRate,
-		"spo2":               c.SpO2,
-		"allergies":          c.Allergies,
-		"medical_history":    c.MedicalHistory,
-		"nurse_notes":        c.NurseNotes,
-		"assigned_doctor_id": doctorID,
-		"triage_level":       c.TriageLevel,
+		"status":     status,
+		"department": department,
+		"note":       note,
 	}
-
-	var res struct {
-		TriageLevel string `json:"triage_level"`
-	}
-	if err := call(baseURL, "POST", "/api/nurse/vitals", token, body, &res); err != nil {
-		return "", err
-	}
-	return res.TriageLevel, nil
+	return call(baseURL, "PUT", fmt.Sprintf("/api/queue/%d/status", queueID), token, body, nil)
 }
 
-// ---------------------------------------------------------------------------
-// ตัวช่วยเรียก API
-// ---------------------------------------------------------------------------
+func recordVitals(baseURL, token string, c visitCase, patientID uint, queueNo string, doctorID uint) error {
+	body := map[string]any{
+		"patient_id":          patientID,
+		"queue_number":        queueNo,
+		"chief_complaint":     c.ChiefComplaint,
+		"weight":              c.Weight,
+		"height":              c.Height,
+		"temperature":         c.Temperature,
+		"systolic_bp":         c.SystolicBP,
+		"diastolic_bp":        c.DiastolicBP,
+		"heart_rate":          c.HeartRate,
+		"respiratory_rate":    c.RespiratoryRate,
+		"spo2":                c.SpO2,
+		"allergies":           c.Allergies,
+		"food_allergies":      c.FoodAllergies,
+		"medical_history":     c.MedicalHistory,
+		"current_medications": c.CurrentMedications,
+		"smoking_history":     c.SmokingHistory,
+		"alcohol_history":     c.AlcoholHistory,
+		"pain_score":          c.PainScore,
+		"blood_sugar":         c.BloodSugar,
+		"nurse_notes":         c.NurseNotes,
+		"assigned_doctor_id":  doctorID,
+		"triage_level":        c.TriageLevel,
+	}
 
-// call - ยิง request หนึ่งครั้ง แล้วแกะ JSON ใส่ out
-//
-// ถ้า backend ตอบไม่ใช่ 2xx จะดึงข้อความในฟิลด์ error ออกมาเป็นข้อความผิดพลาด
-// (controller ของโปรเจกต์นี้ตอบ {"error": "..."} เป็นภาษาไทยอยู่แล้ว)
+	return call(baseURL, "POST", "/api/nurse/vitals", token, body, nil)
+}
+
 func call(baseURL, method, path, token string, body any, out any) error {
 	var reader io.Reader
 	if body != nil {

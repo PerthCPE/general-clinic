@@ -494,42 +494,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
         )}
       </div>
 
-      {/* Actions Group (Reset DB + Notifications + Profile) */}
+      {/* Actions Group (Notifications + Profile) */}
       <div className="actions-group">
-        <button 
-          className="reset-db-btn"
-          onClick={async () => {
-            if (!window.confirm('คุณต้องการรีเซ็ตระบบและคืนค่าข้อมูลคิวทดสอบใหม่สำหรับ Re-testing ใช่หรือไม่?')) {
-              return;
-            }
-            try {
-              const token = localStorage.getItem('token');
-              await fetch('/api/system/reset-db', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                }
-              });
-              alert('✓ รีเซ็ตระบบและคืนค่าคิวทดสอบสำเร็จ! ทุกหน้าจอได้รับการอัปเดตแบบ Real-time เรียบร้อยแล้ว');
-            } catch {
-              alert('✓ ส่งคำสั่งรีเซ็ตระบบเรียบร้อยแล้ว');
-            }
-          }}
-          title="รีเซ็ตข้อมูลคิวและระบบทดสอบ (Reset Database for Re-testing)"
-          style={{ 
-            display: 'inline-flex', alignItems: 'center', gap: '6px', 
-            padding: '6px 12px', borderRadius: '8px', 
-            background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', 
-            color: '#1D4ED8', border: '1px solid #93C5FD', 
-            fontWeight: '700', fontSize: '13px', cursor: 'pointer',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)', transition: 'all 0.2s ease',
-            marginRight: '8px'
-          }}
-        >
-          <span>🔄</span>
-          <span>รีเซ็ตระบบทดสอบ</span>
-        </button>
 
         {/* Notification Icon & Dropdown Panel */}
         <div className="notice-container" ref={noticeRef}>
@@ -759,9 +725,40 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 </span>
               </button>
 
-              {/* 3. ออกจากระบบ (Text align center, no emoji) */}
+              {/* 3. ล้างข้อมูลทดสอบในระบบ */}
               <button
-                className="dropdown-menu-item dropdown-item-3 dropdown-logout-btn"
+                className="dropdown-menu-item dropdown-item-reset"
+                onClick={async () => {
+                  setIsDropdownOpen(false);
+                  if (!window.confirm('คุณต้องการล้างข้อมูลทดสอบ (ผู้ป่วย คิว และการคัดกรอง) ทั้งหมดในระบบของคุณใช่หรือไม่?')) {
+                    return;
+                  }
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch('/api/system/reset-db', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                      }
+                    });
+                    if (res.ok) {
+                      window.location.reload();
+                    }
+                  } catch (err) {
+                    console.error('Reset system error:', err);
+                  }
+                }}
+              >
+                <span>ล้างข้อมูลทดสอบในระบบ</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#2563EB' }}>
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>
+                </svg>
+              </button>
+
+              {/* 4. ออกจากระบบ (Text align center, no emoji) */}
+              <button
+                className="dropdown-menu-item dropdown-item-4 dropdown-logout-btn"
                 onClick={() => {
                   logout();
                   setIsDropdownOpen(false);

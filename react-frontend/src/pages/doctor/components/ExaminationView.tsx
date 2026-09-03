@@ -607,15 +607,75 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     };
   }, []);
 
+  const [medicinesList, setMedicinesList] = useState<any[]>(MEDICINE_DATABASE);
+
+  useEffect(() => {
+    // Fetch live medicines database from backend
+    const fetchMeds = async () => {
+      try {
+        const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        let res = await fetch('/api/pharmacy/medicines', { headers });
+        if (!res.ok) {
+          res = await fetch('/api/system/medicines');
+        }
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'success' && Array.isArray(data.medicines) && data.medicines.length > 0) {
+            const mapped = data.medicines.map((m: any) => {
+              const isLiquid = (m.name || '').toLowerCase().includes('syrup') || (m.name || '').toLowerCase().includes('liquid') || (m.name || '').toLowerCase().includes('sol');
+              const isCap = (m.name || '').toLowerCase().includes('cap');
+              const defaultDosageStr = isLiquid ? '10 มล.' : (isCap ? '1 แคปซูล' : '1 เม็ด');
+              const defaultFreqStr = (m.properties || '').includes('ความดัน') || (m.properties || '').includes('เบาหวาน') || (m.name || '').includes('Amlodipine') || (m.name || '').includes('Omeprazole') ? 'วันละ 1 ครั้ง' : 'วันละ 3 ครั้ง';
+              const defaultTimingStr = (m.name || '').includes('Omeprazole') ? 'ก่อนอาหาร' : ((m.properties || '').includes('ลดไข้') || (m.name || '').includes('Paracetamol') ? 'เมื่อมีอาการ' : 'หลังอาหาร');
+              const defaultDurationStr = (m.properties || '').includes('ความดัน') || (m.properties || '').includes('เบาหวาน') ? '30 วัน' : '5 วัน';
+              const defaultQtyNum = (m.properties || '').includes('ความดัน') || (m.properties || '').includes('เบาหวาน') ? 30 : 10;
+
+              return {
+                id: m.id,
+                code: m.medicine_code,
+                name: m.name,
+                genericName: m.generic_name,
+                category: m.category,
+                properties: m.properties,
+                price: m.unit_price || m.price,
+                stock: m.stock_quantity || m.stock,
+                defaultDosage: { th: defaultDosageStr, en: defaultDosageStr },
+                defaultFreq: { th: defaultFreqStr, en: defaultFreqStr },
+                defaultDuration: { th: defaultDurationStr, en: defaultDurationStr },
+                defaultQty: defaultQtyNum,
+                defaultRoute: { th: 'รับประทาน', en: 'Oral' },
+                defaultTiming: { th: defaultTimingStr, en: defaultTimingStr },
+                defaultInstructions: {
+                  th: m.properties || 'รับประทานยาตามแพทย์สั่งอย่างเคร่งครัด',
+                  en: m.generic_name ? `Generic: ${m.generic_name}` : 'Take as directed by physician.'
+                }
+              };
+            });
+            setMedicinesList(mapped);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch medicines for doctor prescription:', err);
+      }
+    };
+    fetchMeds();
+  }, []);
+
   const filteredMedicines = React.useMemo(() => {
     if (!medSearch.trim()) {
-      return MEDICINE_DATABASE;
+      return medicinesList;
     }
     const q = medSearch.trim().toLowerCase();
-    return MEDICINE_DATABASE.filter(m =>
-      m.name.toLowerCase().includes(q) || m.category.toLowerCase().includes(q)
+    return medicinesList.filter(m =>
+      (m.name || '').toLowerCase().includes(q) ||
+      (m.code || '').toLowerCase().includes(q) ||
+      (m.genericName || '').toLowerCase().includes(q) ||
+      (m.category || '').toLowerCase().includes(q)
     );
-  }, [medSearch]);
+  }, [medSearch, medicinesList]);
 
   const [newMedName, setNewMedName] = useState('');
   const [newMedDosage, setNewMedDosage] = useState('');
@@ -994,43 +1054,46 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       setNewMedInstructions('');
       return;
     }
-    const found = MEDICINE_DATABASE.find(
-      m => m.name.toLowerCase() === nameVal.trim().toLowerCase()
+    const found = medicinesList.find(
+      m => (m.name || '').toLowerCase() === nameVal.trim().toLowerCase() ||
+           (m.code && m.code.toLowerCase() === nameVal.trim().toLowerCase())
     );
     if (found) {
       const isTh = language === 'th';
       if (found.defaultDosage) {
         setNewMedDosage(typeof found.defaultDosage === 'object' ? (isTh ? found.defaultDosage.th : found.defaultDosage.en) : found.defaultDosage);
       } else {
-        setNewMedDosage('');
+        setNewMedDosage('1 เม็ด');
       }
       if (found.defaultFreq) {
         setNewMedFreq(typeof found.defaultFreq === 'object' ? (isTh ? found.defaultFreq.th : found.defaultFreq.en) : found.defaultFreq);
       } else {
-        setNewMedFreq('');
+        setNewMedFreq('วันละ 3 ครั้ง');
       }
       if (found.defaultDuration) {
         setNewMedDuration(typeof found.defaultDuration === 'object' ? (isTh ? found.defaultDuration.th : found.defaultDuration.en) : found.defaultDuration);
       } else {
-        setNewMedDuration('');
+        setNewMedDuration('5 วัน');
       }
       if (found.defaultQty !== undefined) {
         setNewMedQty(found.defaultQty);
       } else {
-        setNewMedQty('');
+        setNewMedQty(10);
       }
       if (found.defaultRoute) {
         setNewMedRoute(typeof found.defaultRoute === 'object' ? (isTh ? found.defaultRoute.th : found.defaultRoute.en) : found.defaultRoute);
       } else {
-        setNewMedRoute('');
+        setNewMedRoute(isTh ? 'รับประทาน' : 'Oral');
       }
       if (found.defaultTiming) {
         setNewMedTiming(typeof found.defaultTiming === 'object' ? (isTh ? found.defaultTiming.th : found.defaultTiming.en) : found.defaultTiming);
       } else {
-        setNewMedTiming('');
+        setNewMedTiming(isTh ? 'หลังอาหาร' : 'After Meal');
       }
       if (found.defaultInstructions) {
         setNewMedInstructions(typeof found.defaultInstructions === 'object' ? (isTh ? found.defaultInstructions.th : found.defaultInstructions.en) : found.defaultInstructions);
+      } else if (found.properties) {
+        setNewMedInstructions(found.properties);
       } else {
         setNewMedInstructions('');
       }
@@ -2296,10 +2359,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
                       {filteredMedicines.length > 0 ? (
                         filteredMedicines.map((med, idx) => {
-                          const isSelected = newMedName.toLowerCase() === med.name.toLowerCase();
+                          const isSelected = newMedName.toLowerCase() === (med.name || '').toLowerCase();
                           return (
                             <button
-                              key={idx}
+                              key={med.code || med.id || idx}
                               type="button"
                               onClick={() => {
                                 handleSelectMedicine(med.name);
@@ -2310,15 +2373,21 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                               }`}
                             >
                               <div>
-                                <div className="text-xs sm:text-sm font-semibold group-hover:text-blue-700 flex items-center gap-1.5">
+                                <div className="text-xs sm:text-sm font-semibold group-hover:text-blue-700 flex items-center gap-1.5 flex-wrap">
+                                  {med.code && (
+                                    <span className="font-mono text-[10.5px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-md border border-slate-200">
+                                      {med.code}
+                                    </span>
+                                  )}
                                   <span>{med.name}</span>
                                   {isSelected && <Check className="w-3.5 h-3.5 text-blue-600" />}
                                 </div>
-                                <div className="text-[11px] text-slate-500 group-hover:text-blue-600">
-                                  {med.category}
+                                <div className="text-[11px] text-slate-500 group-hover:text-blue-600 flex items-center gap-2 mt-0.5">
+                                  {med.genericName && <span>{med.genericName}</span>}
+                                  {med.category && <span className="text-slate-400">• {med.category}</span>}
                                 </div>
                               </div>
-                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors">
+                              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700 transition-colors shrink-0 ml-2">
                                 {language === 'th' ? 'เลือกยา' : 'Select'}
                               </span>
                             </button>

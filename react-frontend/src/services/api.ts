@@ -594,20 +594,22 @@ export interface BackendExaminationDetail {
   patientHistory: BackendPatientHistory | null;
 }
 
-/** ยา 1 รายการในใบสั่งยา ตรงกับ PrescriptionItemDTO ฝั่ง backend
- *
- *  medicineName ต้องตรงกับชื่อในตาราง medicines ของห้องยา ไม่งั้น backend
- *  จะจับคู่ไม่ได้ และคืนชื่อกลับมาใน unmatched_medicines
- */
 export interface BackendPrescriptionItem {
+  id?: string;
+  medicineId?: number;
+  medicineCode?: string;
   medicineName: string;
+  genericName?: string;
+  category?: string;
   dosage: string;
-  frequency: string;
-  duration: string;
+  frequency?: string;
+  duration?: string;
   quantity: number;
-  route: string;
-  timing: string;
-  specialInstructions: string;
+  unitPrice?: number;
+  totalPrice?: number;
+  instructions?: string;
+  notes?: string;
+  status?: string;
 }
 
 export interface SaveExaminationPayload {
@@ -627,10 +629,10 @@ export interface SaveExaminationPayload {
   primaryDiagnosis: BackendDiagnosisItem | null;
   secondaryDiagnoses: BackendDiagnosisItem[];
 
-  // ใบสั่งยา ส่งไปบันทึกลงตาราง dispensings ให้ห้องยาเห็น
-  prescriptions: BackendPrescriptionItem[];
-
   patientHistory: BackendPatientHistory | null;
+  prescriptions?: BackendPrescriptionItem[];
+  allergies?: string;
+  chronicDiseases?: string;
 }
 
 export interface SaveExaminationResult {

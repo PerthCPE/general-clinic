@@ -105,19 +105,23 @@ type ExaminationDetail struct {
 	PatientHistory *PatientHistoryDTO `json:"patientHistory"`
 }
 
-// PrescriptionItemDTO - ยา 1 รายการในใบสั่งยาของแพทย์
-//
-// ชื่อฟิลด์ตรงกับ PrescriptionItem ใน react-frontend/src/pages/doctor/types.ts
-// medicineName ต้องตรงกับ medicines.name ในคลังยา ไม่งั้นห้องยาจะไม่เห็นรายการนี้
+// PrescriptionItemDTO - รายการสั่งยาที่แพทย์สั่ง
 type PrescriptionItemDTO struct {
-	MedicineName        string `json:"medicineName"`
-	Dosage              string `json:"dosage"`
-	Frequency           string `json:"frequency"`
-	Duration            string `json:"duration"`
-	Quantity            int    `json:"quantity"`
-	Route               string `json:"route"`
-	Timing              string `json:"timing"`
-	SpecialInstructions string `json:"specialInstructions"`
+	ID           string  `json:"id"`
+	MedicineID   uint    `json:"medicineId"`
+	MedicineCode string  `json:"medicineCode"`
+	MedicineName string  `json:"medicineName"`
+	GenericName  string  `json:"genericName"`
+	Category     string  `json:"category"`
+	Dosage       string  `json:"dosage"`
+	Frequency    string  `json:"frequency"`
+	Duration     string  `json:"duration"`
+	Quantity     int     `json:"quantity"`
+	UnitPrice    float64 `json:"unitPrice"`
+	TotalPrice   float64 `json:"totalPrice"`
+	Instructions string  `json:"instructions"`
+	Notes        string  `json:"notes"`
+	Status       string  `json:"status"`
 }
 
 // SaveExaminationRequest - body ของ PUT /api/doctor/visits/:id/examination
@@ -140,12 +144,11 @@ type SaveExaminationRequest struct {
 	PrimaryDiagnosis   *DiagnosisItemDTO  `json:"primaryDiagnosis"`
 	SecondaryDiagnoses []DiagnosisItemDTO `json:"secondaryDiagnoses"`
 
-	// ใบสั่งยา บันทึกลงตาราง dispensings เพื่อส่งต่อให้ห้องยา
-	// ส่งมาทุกครั้งที่บันทึก (ทั้งร่างและเซ็นปิด) รายการเดิมของ visit นี้จะถูกแทนที่
-	Prescriptions []PrescriptionItemDTO `json:"prescriptions"`
-
 	// ส่งมาด้วยได้ ถ้าแพทย์แก้ประวัติติดตัวผู้ป่วยในหน้าเดียวกัน
-	PatientHistory *PatientHistoryDTO `json:"patientHistory"`
+	PatientHistory  *PatientHistoryDTO    `json:"patientHistory"`
+	Prescriptions   []PrescriptionItemDTO `json:"prescriptions"`
+	Allergies       string                `json:"allergies"`
+	ChronicDiseases string                `json:"chronicDiseases"`
 }
 
 // SaveExaminationResponse - ผลลัพธ์หลังบันทึก

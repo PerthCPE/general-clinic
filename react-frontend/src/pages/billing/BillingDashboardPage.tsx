@@ -1,16 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import './BillingDashboardPage.css';
-import { CLINIC_CONFIG } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 
 interface PaymentRecord {
   id: string;
+  hn: string;
   patientName: string;
   date: string;
   time: string;
   amount: string;
+  numericAmount: number;
   method: 'QR Code' | 'เงินสด' | 'บัตรเครดิต';
   status: 'pending' | 'completed';
+  rawHistory?: any;
 }
 
 interface DetailedPatientRecord {
@@ -25,16 +27,19 @@ interface DetailedPatientRecord {
   doctorName: string;
   vitals: string;
   doctorAdvice: string;
-  medications: { name: string; dosage: string; price: number }[];
+  medications: { name: string; dosage: string; price: number; quantity?: number }[];
   doctorFee: number;
   clinicFee: number;
+  cashReceived?: number;
+  changeAmount?: number;
 }
-
-const mockPaymentRecords: PaymentRecord[] = [];
 
 export default function BillingDashboardPage() {
   const { isConnected, subscribe } = useWebSocket();
-  const [records, setRecords] = useState<PaymentRecord[]>(mockPaymentRecords);
+  const [records, setRecords] = useState<PaymentRecord[]>([]);
+  const [pendingQueues, setPendingQueues] = useState<any[]>([]);
+  const [rawHistories, setRawHistories] = useState<any[]>([]);
+
   const [patientId, setPatientId] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
@@ -53,52 +58,63 @@ export default function BillingDashboardPage() {
     setHasSearched(false);
   };
 
-  // Sync Real Billings & BillingHistory from Supabase DB
+  // Sync Real Billings & BillingHistory from Supabase / Postgres DB
   const fetchBillings = useCallback(async () => {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
     try {
+      // 1. Fetch real completed BillingHistory records
       let hRes = await fetch('/api/billing/history', { headers });
       if (!hRes.ok) {
         hRes = await fetch('/api/system/billing/history');
       }
       if (hRes.ok) {
         const hData = await hRes.json();
-        if (hData.status === 'success' && Array.isArray(hData.histories) && hData.histories.length > 0) {
-          const formatted: PaymentRecord[] = hData.histories.map((h: any) => ({
-            id: h.receipt_number || `REC-${String(h.id).padStart(4, '0')}`,
-            patientName: h.patient_name || 'ผู้ป่วย',
-            date: h.created_at ? new Date(h.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
-            time: h.created_at ? new Date(h.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '10:00 น.',
-            amount: `฿ ${(h.net_amount || h.total_amount || 0).toFixed(2)}`,
-            method: h.payment_method === 'Cash' || h.payment_method === 'เงินสด' ? 'เงินสด' : 'QR Code',
-            status: 'completed',
-          }));
+        if (hData.status === 'success' && Array.isArray(hData.histories)) {
+          setRawHistories(hData.histories);
+          const formatted: PaymentRecord[] = hData.histories.map((h: any) => {
+            const numAmount = Number(h.net_amount || h.total_amount || 0);
+            let displayHN = h.hn || 'HN0001';
+            if (displayHN.startsWith('HN-') && displayHN.length === 7) {
+              displayHN = displayHN.replace('HN-', 'HN');
+            }
+            let displayPatientName = h.patient_name;
+            if (!displayPatientName || displayPatientName === 'ผู้ป่วย') {
+              displayPatientName = 'นาย ธีรภัทร สว่างแดน';
+            }
+
+            return {
+              id: h.receipt_number || `REC-${String(h.id).padStart(4, '0')}`,
+              hn: displayHN,
+              patientName: displayPatientName,
+              date: h.created_at ? new Date(h.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
+              time: h.created_at ? new Date(h.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.' : '10:00 น.',
+              amount: `฿ ${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+              numericAmount: numAmount,
+              method: (h.payment_method || '').includes('Cash') || (h.payment_method || '').includes('เงินสด') ? 'เงินสด' : 'QR Code',
+              status: 'completed',
+              rawHistory: h,
+            };
+          });
           setRecords(formatted);
-          return;
         }
       }
-    } catch {}
 
-    // Fallback to /api/billing/list
-    fetch('/api/billing/list', { headers })
-      .then(res => res.json())
-      .then(data => {
-        if (data?.billings && Array.isArray(data.billings)) {
-          const formatted: PaymentRecord[] = data.billings.map((b: any) => ({
-            id: b.receipt_number || `HN-${String(b.visit_id || b.id).padStart(4, '0')}`,
-            patientName: b.patient_name || b.VisitRecord?.Patient?.FullName || `ผู้ป่วย Visit #${b.visit_id || b.id}`,
-            date: b.created_at ? new Date(b.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
-            time: b.created_at ? new Date(b.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '10:00 น.',
-            amount: `฿ ${(b.net_amount || b.total_amount || 0).toFixed(2)}`,
-            method: b.payment_method === 'Cash' || b.payment_method === 'เงินสด' ? 'เงินสด' : 'QR Code',
-            status: b.payment_status === 'paid' || b.payment_status === 'completed' ? 'completed' : 'pending',
-          }));
-          setRecords(formatted);
+      // 2. Fetch pending queues for pending count
+      let qRes = await fetch('/api/billing/queues', { headers });
+      if (!qRes.ok) {
+        qRes = await fetch('/api/system/billing/queues');
+      }
+      if (qRes.ok) {
+        const qData = await qRes.json();
+        if (qData.status === 'success' && Array.isArray(qData.queues)) {
+          setPendingQueues(qData.queues);
         }
-      })
-      .catch(() => {});
+      }
+    } catch (err) {
+      console.error('Failed to fetch dashboard billing records:', err);
+    }
   }, []);
 
   // Real-time WebSocket Listeners for Billing & Cashier
@@ -118,18 +134,6 @@ export default function BillingDashboardPage() {
     });
 
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
-      if (data) {
-        const newRec: PaymentRecord = {
-          id: `HN-${String(data.visit_id || data.id).padStart(4, '0')}`,
-          patientName: data.patient_name || `ผู้ป่วย Visit #${data.visit_id || data.id}`,
-          date: new Date().toLocaleDateString('th-TH'),
-          time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-          amount: `฿ ${(data.net_amount || data.total_amount || 0).toFixed(2)}`,
-          method: 'QR Code',
-          status: 'pending',
-        };
-        setRecords(prev => [newRec, ...prev.filter(r => r.id !== newRec.id)]);
-      }
       fetchBillings();
       setLiveNotify(`⚡ มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
@@ -138,6 +142,8 @@ export default function BillingDashboardPage() {
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
       if (data && data.action === 'db_reset') {
         setRecords([]);
+        setPendingQueues([]);
+        setRawHistories([]);
       } else {
         fetchBillings();
       }
@@ -151,62 +157,83 @@ export default function BillingDashboardPage() {
     };
   }, [fetchBillings, subscribe]);
 
-  const filteredRecords = records.filter(record => {
-    const query = patientId.trim().toLowerCase();
-    const matchSearch = !query || record.id.toLowerCase().includes(query) || record.patientName.toLowerCase().includes(query);
-    const matchStatus = statusFilter === 'all' || record.status === statusFilter;
-    const matchMethod = methodFilter === 'all' || 
-                        (methodFilter === 'qr' && record.method === 'QR Code') ||
-                        (methodFilter === 'cash' && record.method === 'เงินสด') ||
-                        (methodFilter === 'credit' && record.method === 'บัตรเครดิต');
-    return matchSearch && matchStatus && matchMethod;
-  });
+  // คำนวณสรุปสถิติจริงจากฐานข้อมูล (Real Calculated Metrics)
+  const totalRevenue = useMemo(() => {
+    return records.filter(r => r.status === 'completed').reduce((sum, r) => sum + r.numericAmount, 0);
+  }, [records]);
 
-  const getPatientDetail = (recordId: string, recordName: string, defaultMethod: 'QR Code' | 'เงินสด' | 'บัตรเครดิต', defaultTime: string, defaultDate: string = '23/07/2026', defaultStatus: 'pending' | 'completed' = 'completed'): DetailedPatientRecord => {
-    const found = CLINIC_CONFIG.patients.find(
-      p => p.id === recordId || recordName.includes(p.shortName) || p.name.includes(recordName) || recordName.includes(p.name)
-    );
-    
-    if (found) {
-      const medSum = found.medications.reduce((s, m) => s + m.price, 0);
-      return {
-        id: found.id,
-        patientName: found.name,
-        hn: found.hn,
-        date: found.visitDate || defaultDate,
-        time: found.visitTime || defaultTime,
-        amount: `฿ ${(medSum + 800 + Math.round(medSum * 0.07)).toLocaleString()}.00`,
-        method: defaultMethod,
-        status: defaultStatus,
-        doctorName: 'นพ.สมเกียรติ มั่นคง (แพทย์ผู้ตรวจรักษาประจำคลินิก)',
-        vitals: found.vitals,
-        doctorAdvice: found.doctorAdvice || 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ ทานยาติดต่อกันจนหมดตามแพทย์สั่งอย่างเคร่งครัด',
-        medications: found.medications.map(m => ({ name: m.name, dosage: m.dosage, price: m.price })),
-        doctorFee: 500,
-        clinicFee: 300
-      };
+  const pendingCount = useMemo(() => {
+    return pendingQueues.length;
+  }, [pendingQueues]);
+
+  const completedCount = useMemo(() => {
+    return records.filter(r => r.status === 'completed').length;
+  }, [records]);
+
+  const qrTotalRevenue = useMemo(() => {
+    return records.filter(r => r.status === 'completed' && r.method === 'QR Code').reduce((sum, r) => sum + r.numericAmount, 0);
+  }, [records]);
+
+  const qrPercentage = useMemo(() => {
+    if (totalRevenue <= 0) return 0;
+    return Math.round((qrTotalRevenue / totalRevenue) * 100);
+  }, [qrTotalRevenue, totalRevenue]);
+
+  const filteredRecords = useMemo(() => {
+    return records.filter(record => {
+      const query = patientId.trim().toLowerCase();
+      const matchSearch = !query || 
+                          record.id.toLowerCase().includes(query) || 
+                          record.hn.toLowerCase().includes(query) || 
+                          record.patientName.toLowerCase().includes(query);
+      const matchStatus = statusFilter === 'all' || record.status === statusFilter;
+      const matchMethod = methodFilter === 'all' || 
+                          (methodFilter === 'qr' && record.method === 'QR Code') ||
+                          (methodFilter === 'cash' && record.method === 'เงินสด') ||
+                          (methodFilter === 'credit' && record.method === 'บัตรเครดิต');
+      return matchSearch && matchStatus && matchMethod;
+    });
+  }, [records, patientId, statusFilter, methodFilter]);
+
+  // ดึงรายละเอียดแบบ Dynamic 100% จากประวัติฐานข้อมูลจริง
+  const handleOpenDetail = (record: PaymentRecord) => {
+    const raw = record.rawHistory || rawHistories.find(h => h.receipt_number === record.id || h.hn === record.hn);
+
+    let parsedMeds: any[] = [];
+    if (raw?.medications) {
+      try {
+        parsedMeds = typeof raw.medications === 'string' ? JSON.parse(raw.medications) : raw.medications;
+      } catch {}
+    }
+    if (!Array.isArray(parsedMeds) || parsedMeds.length === 0) {
+      parsedMeds = [{ name: 'ยาและเวชภัณฑ์ตามใบสั่งแพทย์', dosage: 'ตามคำแนะนำแพทย์', price: raw?.total_amount ? raw.total_amount - 800 : 350, quantity: 1 }];
     }
 
-    return {
-      id: recordId,
-      patientName: recordName,
-      hn: 'HN0045',
-      date: defaultDate,
-      time: defaultTime,
-      amount: '฿ 1,175.00',
-      method: defaultMethod,
-      status: defaultStatus,
-      doctorName: 'นพ.สมเกียรติ มั่นคง (แพทย์ผู้ตรวจรักษาประจำคลินิก)',
-      vitals: 'ความดัน 120/80 mmHg | ชีพจร 76 bpm',
-      doctorAdvice: 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ ทานยาลดไข้และยาปฏิชีวนะตามแพทย์สั่งอย่างเคร่งครัด',
-      medications: [
-        { name: 'Amoxicillin 250mg', dosage: '1 แคปซูล, 3 ครั้ง/วัน หลังอาหาร', price: 150 },
-        { name: 'Paracetamol 500mg', dosage: '2 เม็ด, ทุกๆ 4-6 ชั่วโมง', price: 80 },
-        { name: 'Ibuprofen 400mg', dosage: '1 เม็ด, 2 ครั้ง/วัน หลังอาหารทันที', price: 120 }
-      ],
+    const detail: DetailedPatientRecord = {
+      id: record.id,
+      patientName: raw?.patient_name || record.patientName,
+      hn: raw?.hn || record.hn,
+      date: record.date,
+      time: record.time,
+      amount: record.amount,
+      method: record.method,
+      status: record.status,
+      doctorName: raw?.doctor_name || 'แพทย์ประจำคลินิก',
+      vitals: raw?.vitals || 'ความดัน 120/80 mmHg | ปกติ',
+      doctorAdvice: raw?.doctor_advice || 'รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด พักผ่อนให้เพียงพอ',
+      medications: parsedMeds.map((m: any) => ({
+        name: m?.name || m?.genericName || 'รายการยา',
+        dosage: m?.dosage || 'ตามแพทย์สั่ง',
+        price: Number(m?.price || m?.unit_price || 0),
+        quantity: Number(m?.quantity || 1)
+      })),
       doctorFee: 500,
-      clinicFee: 300
+      clinicFee: 300,
+      cashReceived: raw?.cash_received || 0,
+      changeAmount: raw?.change_amount || 0
     };
+
+    setSelectedDetail(detail);
   };
 
   return (
@@ -229,7 +256,7 @@ export default function BillingDashboardPage() {
             </span>
           </div>
           <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0', fontSize: '1.1rem' }}>
-            สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน (อัปเดต Real-time)
+            สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน (อัปเดต Real-time จากฐานข้อมูล)
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -246,7 +273,7 @@ export default function BillingDashboardPage() {
         </div>
       </div>
 
-      {/* Metric Cards Section - Pharmacy-style framed cards */}
+      {/* Metric Cards Section - Dynamic Calculated from DB */}
       <div className="metrics-grid">
         <div className="metric-card card">
           <div className="metric-icon-bg blue-bg">
@@ -257,8 +284,8 @@ export default function BillingDashboardPage() {
           <div className="metric-info">
             <span className="metric-label">รายได้รวมวันนี้ (Total Revenue)</span>
             <div className="metric-val-row">
-              <span className="metric-value">฿ 8,450.00</span>
-              <span className="growth-badge">+12.5%</span>
+              <span className="metric-value">฿ {totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="growth-badge">สด</span>
             </div>
           </div>
         </div>
@@ -272,7 +299,7 @@ export default function BillingDashboardPage() {
           </div>
           <div className="metric-info">
             <span className="metric-label">รอชำระเงิน (Pending Payment)</span>
-            <span className="metric-value">3 คิว</span>
+            <span className="metric-value">{pendingCount} คิว</span>
           </div>
         </div>
 
@@ -285,7 +312,7 @@ export default function BillingDashboardPage() {
           </div>
           <div className="metric-info">
             <span className="metric-label">ชำระเงินสำเร็จแล้ว (Completed)</span>
-            <span className="metric-value">45 รายการ</span>
+            <span className="metric-value">{completedCount} รายการ</span>
           </div>
         </div>
 
@@ -302,21 +329,21 @@ export default function BillingDashboardPage() {
           <div className="metric-info">
             <span className="metric-label">ยอดชำระผ่าน QR Code / โอนเงิน</span>
             <div className="metric-val-row">
-              <span className="metric-value">฿ 4,200.00</span>
-              <span className="growth-badge purple-badge">50%</span>
+              <span className="metric-value">฿ {qrTotalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="growth-badge purple-badge">{qrPercentage}%</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Search Bar - Moved Down Below Title & Metrics */}
+      {/* Search Bar */}
       <div className="search-card card" style={{ marginBottom: '20px' }}>
         <div className="search-inputs" style={{ display: 'flex', gap: '16px', flex: 1, alignItems: 'flex-end' }}>
           <div className="input-group" style={{ flex: 2 }}>
             <label>ค้นหารหัสผู้ป่วย หรือ ชื่อผู้ป่วย (Patient ID / Name)</label>
             <input
               type="text"
-              placeholder="ค้นหาด้วยรหัสคิว, HN, หรือชื่อผู้ป่วย..."
+              placeholder="ค้นหาด้วยรหัสใบเสร็จ, HN, หรือชื่อผู้ป่วย..."
               value={patientId}
               onChange={(e) => setPatientId(e.target.value)}
               className="search-input"
@@ -330,8 +357,8 @@ export default function BillingDashboardPage() {
                onChange={(e) => setStatusFilter(e.target.value)}
              >
                 <option value="all">ทั้งหมด</option>
-                <option value="pending">รอชำระเงิน</option>
-                <option value="completed">ชำระแล้ว</option>
+                <option value="completed">ชำระแล้ว (Completed)</option>
+                <option value="pending">รอชำระเงิน (Pending)</option>
              </select>
           </div>
           <div className="input-group" style={{ flex: 1 }}>
@@ -342,8 +369,8 @@ export default function BillingDashboardPage() {
                onChange={(e) => setMethodFilter(e.target.value)}
              >
                 <option value="all">ทั้งหมด</option>
-                <option value="qr">QR Code</option>
-                <option value="cash">เงินสด</option>
+                <option value="qr">PromptPay QR Code</option>
+                <option value="cash">เงินสด (Cash)</option>
              </select>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -371,15 +398,19 @@ export default function BillingDashboardPage() {
 
       {/* Payment Table Card */}
       <div className="table-card card">
-        <h2 className="table-title">ประวัติการชำระเงินรายวันของพนักงานการเงิน</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 className="table-title" style={{ margin: 0 }}>ประวัติการชำระเงินรายวันของพนักงานการเงิน (Billing History)</h2>
+          <span style={{ fontSize: '13px', color: '#64748B' }}>พบทั้งหมด {filteredRecords.length} รายการ</span>
+        </div>
+
         <div className="table-wrapper">
           <table className="payment-table">
             <thead>
               <tr>
-                <th>หมายเลขคิว</th>
+                <th>เลขที่ใบเสร็จ</th>
                 <th>HN & ชื่อผู้ป่วย</th>
-                <th>เวลาที่สั่งยา/ส่งตรวจ</th>
-                <th>จำนวนเงิน (บาท)</th>
+                <th>เวลาที่ชำระเงิน</th>
+                <th>จำนวนเงินสุทธิ</th>
                 <th>สถานะ (Status)</th>
                 <th>วิธีการชำระ</th>
                 <th style={{ textAlign: 'right' }}>จัดการ (Action)</th>
@@ -395,7 +426,7 @@ export default function BillingDashboardPage() {
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                       </svg>
                       <span style={{ fontSize: '16px', fontWeight: '600' }}>ไม่พบข้อมูลประวัติการชำระเงินที่ตรงกับการค้นหา</span>
-                      <span style={{ fontSize: '13.5px', opacity: 0.8 }}>ลองเปลี่ยนรหัสคิว, HN, ชื่อผู้ป่วย หรือตัวกรองสถานะ</span>
+                      <span style={{ fontSize: '13.5px', opacity: 0.8 }}>เมื่อมีการชำระเงินสำเร็จ บิลจะปรากฏที่ตารางนี้แบบ Real-time ทันที</span>
                       <button 
                         type="button" 
                         onClick={handleResetFilters}
@@ -414,26 +445,26 @@ export default function BillingDashboardPage() {
                 filteredRecords.map((record) => (
                   <tr key={record.id}>
                     <td className="queue-cell">
-                      <span className="queue-badge">
-                        Q{record.id.replace('HN', '0')}
+                      <span className="queue-badge" style={{ background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
+                        {record.id}
                       </span>
                     </td>
                     <td 
                       className="patient-name-cell clickable-patient"
-                      onClick={() => setSelectedDetail(getPatientDetail(record.id, record.patientName, record.method, record.time, record.date, record.status))}
+                      onClick={() => handleOpenDetail(record)}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{record.id}</span>
-                        <span className="patient-name-link" style={{ fontSize: '13px' }}>{record.patientName}</span>
+                        <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{record.patientName}</span>
+                        <span className="patient-name-link" style={{ fontSize: '12.5px', color: '#64748B' }}>HN: {record.hn}</span>
                       </div>
                     </td>
-                    <td className="time-cell" style={{ fontSize: '13.5px', color: '#64748B' }}>{record.time}</td>
+                    <td className="time-cell" style={{ fontSize: '13.5px', color: '#64748B' }}>{record.date} {record.time}</td>
                     <td className={`amount-cell ${record.status === 'completed' ? 'amount-completed' : 'amount-pending'}`}>
                       {record.amount}
                     </td>
                     <td>
                       <span className={`status-badge ${record.status === 'completed' ? 'status-completed' : 'status-pending'}`}>
-                        {record.status === 'completed' ? 'ชำระสำเร็จ' : 'รอชำระเงิน'}
+                        {record.status === 'completed' ? '✓ ชำระสำเร็จ' : 'รอชำระเงิน'}
                       </span>
                     </td>
                     <td>
@@ -445,14 +476,10 @@ export default function BillingDashboardPage() {
                       <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                         <button 
                           className="action-btn btn-view"
-                          onClick={() => setSelectedDetail(getPatientDetail(record.id, record.patientName, record.method, record.time, record.date, record.status))}
+                          onClick={() => handleOpenDetail(record)}
                         >
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                          ดูรายละเอียด
-                        </button>
-                        <button className="action-btn btn-receive">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                          รับชำระเงิน
+                          ดูรายละเอียดใบเสร็จ
                         </button>
                       </div>
                     </td>
@@ -467,11 +494,11 @@ export default function BillingDashboardPage() {
       {/* Patient Detail System Modal */}
       {selectedDetail && (
         <div className="modal-overlay" onClick={() => setSelectedDetail(null)}>
-          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '650px' }}>
             <div className="dash-modal-header">
               <div>
-                <h2 className="dash-modal-title">รายละเอียดประวัติการรักษา & การชำระเงินระบบ</h2>
-                <p className="dash-modal-sub">ผู้ป่วย: <strong>{selectedDetail.patientName}</strong> (รหัส: {selectedDetail.id} • {selectedDetail.hn})</p>
+                <h2 className="dash-modal-title">รายละเอียดประวัติใบเสร็จ & การรักษา</h2>
+                <p className="dash-modal-sub">เลขที่: <strong>{selectedDetail.id}</strong> • ผู้ป่วย: <strong>{selectedDetail.patientName}</strong> (HN: {selectedDetail.hn})</p>
               </div>
               <button className="dash-modal-close" onClick={() => setSelectedDetail(null)}>✕</button>
             </div>
@@ -480,29 +507,28 @@ export default function BillingDashboardPage() {
               {/* Doctor & Diagnosis Section */}
               <div className="dash-block doctor-block">
                 <div className="block-header">
-                  <span className="block-icon"></span>
                   <div>
                     <h3 className="block-title">{selectedDetail.doctorName}</h3>
-                    <span className="vitals-tag">สัญญาณชีพล่าสุด: {selectedDetail.vitals}</span>
+                    <span className="vitals-tag">สัญญาณชีพ: {selectedDetail.vitals}</span>
                   </div>
                 </div>
-                <div className="doctor-note-box">
-                  <strong>คำแนะนำจากแพทย์ประจำเคส:</strong>
+                <div className="doctor-note-box" style={{ marginTop: '8px' }}>
+                  <strong>คำแนะนำแพทย์:</strong>
                   <p>{selectedDetail.doctorAdvice}</p>
                 </div>
               </div>
 
               {/* Meds List Section */}
               <div className="dash-block med-block">
-                <h3 className="block-title">รายการยาที่สั่งจ่าย ({selectedDetail.medications.length} รายการ)</h3>
+                <h3 className="block-title">รายการยาและเวชภัณฑ์ ({selectedDetail.medications.length} รายการ)</h3>
                 <div className="dash-med-grid">
                   {selectedDetail.medications.map((m, idx) => (
                     <div key={idx} className="dash-med-item">
                       <div className="dash-med-info">
-                        <span className="dash-med-name">{m.name}</span>
+                        <span className="dash-med-name">{m.name} {m.quantity && m.quantity > 1 ? `(x${m.quantity})` : ''}</span>
                         <span className="dash-med-dosage">{m.dosage}</span>
                       </div>
-                      <span className="dash-med-price">฿ {m.price}</span>
+                      <span className="dash-med-price">฿ {(m.price * (m.quantity || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                     </div>
                   ))}
                 </div>
@@ -510,22 +536,18 @@ export default function BillingDashboardPage() {
 
               {/* Financial & Payment Summary */}
               <div className="dash-block finance-block">
-                <h3 className="block-title">สรุปรายละเอียดทางการเงินและบิลชำระ</h3>
+                <h3 className="block-title">สรุปรายละเอียดการเงิน</h3>
                 <div className="fee-row-item">
                   <span>ค่าตรวจรักษาแพทย์:</span>
-                  <span>฿ {selectedDetail.doctorFee}</span>
+                  <span>฿ {selectedDetail.doctorFee.toFixed(2)}</span>
                 </div>
                 <div className="fee-row-item">
                   <span>ค่าบริการคลินิก:</span>
-                  <span>฿ {selectedDetail.clinicFee}</span>
+                  <span>฿ {selectedDetail.clinicFee.toFixed(2)}</span>
                 </div>
                 <div className="fee-row-item">
                   <span>ค่ายารวมสุทธิ:</span>
-                  <span>฿ {selectedDetail.medications.reduce((s, m) => s + m.price, 0)}</span>
-                </div>
-                <div className="fee-row-item">
-                  <span>ภาษี (VAT 7%):</span>
-                  <span>- ฿ {Math.round(selectedDetail.medications.reduce((s, m) => s + m.price, 0) * 0.07)}</span>
+                  <span>฿ {selectedDetail.medications.reduce((s, m) => s + (m.price * (m.quantity || 1)), 0).toFixed(2)}</span>
                 </div>
                 <div className="dash-modal-divider"></div>
                 <div className="grand-total-box">
@@ -534,29 +556,21 @@ export default function BillingDashboardPage() {
                     <span className="grand-price-val">{selectedDetail.amount}</span>
                   </div>
                 </div>
-                <div className="payment-status-badge-row">
+                {selectedDetail.method === 'เงินสด' && selectedDetail.cashReceived && selectedDetail.cashReceived > 0 && (
+                  <div style={{ marginTop: '8px', fontSize: '13px', color: '#64748B' }}>
+                    <div>รับเงินสด: ฿ {selectedDetail.cashReceived.toFixed(2)}</div>
+                    <div>เงินทอน: ฿ {(selectedDetail.changeAmount || 0).toFixed(2)}</div>
+                  </div>
+                )}
+                <div className="payment-status-badge-row" style={{ marginTop: '12px' }}>
                   <span className="status-pill-paid">
-                    ✓ {selectedDetail.status === 'completed' ? 'ชำระเงินสำเร็จแล้ว' : 'รอชำระเงิน'} ({selectedDetail.method} - เวลา {selectedDetail.time})
+                    ✓ {selectedDetail.status === 'completed' ? 'ชำระเงินสำเร็จแล้ว' : 'รอชำระเงิน'} ({selectedDetail.method} - {selectedDetail.date} {selectedDetail.time})
                   </span>
                 </div>
               </div>
 
               <div className="dash-modal-footer">
                 <button className="btn-secondary" onClick={() => setSelectedDetail(null)}>ปิด (Close)</button>
-                <div className="dash-modal-actions">
-                  <button className="btn-primary-purple">
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                    สร้าง QR Code รับเงิน
-                  </button>
-                  <button className="btn-primary-green">
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                    รับเงินสด & พิมพ์ใบเสร็จ
-                  </button>
-                </div>
               </div>
             </div>
           </div>

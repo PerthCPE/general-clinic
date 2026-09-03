@@ -43,7 +43,7 @@ export default function BillingDispensePage({
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
 
   // Current active patient object
-  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0] || CLINIC_CONFIG.patients.find(p => p.id === localPatientId) || CLINIC_CONFIG.patients[0];
+  const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0];
   const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
 
   const filteredQueue = queueList.filter(p => {
@@ -63,6 +63,89 @@ export default function BillingDispensePage({
   const [toast, setToast] = useState<ToastState | null>(null);
   const [isToastFading, setIsToastFading] = useState(false);
 
+  const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchMasterMeds = async () => {
+      try {
+        let res = await fetch('/api/pharmacy/medicines');
+        if (!res.ok) res = await fetch('/api/system/medicines');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'success' && Array.isArray(data.medicines)) {
+            setMasterMedicines(data.medicines);
+          }
+        }
+      } catch {}
+    };
+    fetchMasterMeds();
+  }, []);
+
+  const parseDispensedMed = (item: any, dbMeds: any[] = masterMedicines) => {
+    const m = item.medicine || item.Medicine || item;
+    let name = m.name || item.name || item.med_name || '';
+    let code = m.medicine_code || m.code || m.medId || (item.medicine_id ? `MED-${item.medicine_id}` : '');
+    let genericName = m.generic_name || m.genericName || '';
+    let category = m.category || 'ยาสามัญ';
+    let properties = m.properties || 'ยาตามแพทย์สั่งจ่าย';
+    let unitPrice = Number(m.unit_price ?? m.price ?? item.unit_price ?? item.price ?? 0);
+    const qty = Number(item.quantity ?? item.qty ?? m.quantity ?? 1);
+    const dosage = item.dosage || m.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
+    const instructions = item.instructions || m.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น';
+
+    if (dbMeds.length > 0) {
+      const cLower = (code || '').toLowerCase().trim();
+      const nLower = (name || '').toLowerCase().trim();
+      for (const dbM of dbMeds) {
+        const dbCode = (dbM.medicine_code || '').toLowerCase().trim();
+        const dbName = (dbM.name || '').toLowerCase().trim();
+        const dbGen = (dbM.generic_name || '').toLowerCase().trim();
+
+        let isMatch = false;
+        if (dbCode && cLower && (dbCode === cLower || cLower.includes(dbCode))) isMatch = true;
+        if (!isMatch && dbName && nLower && (nLower.includes(dbName) || dbName.includes(nLower))) isMatch = true;
+        if (!isMatch && dbGen && nLower && nLower.includes(dbGen)) isMatch = true;
+
+        if (!isMatch && dbName && nLower) {
+          const firstWord = dbName.split(' ')[0];
+          if (firstWord && firstWord.length >= 3 && nLower.includes(firstWord)) {
+            isMatch = true;
+          }
+        }
+
+        if (isMatch) {
+          if (!name || name === 'ยาบรรเทาอาการ' || name === 'ยาตามแพทย์สั่ง') name = dbM.name;
+          if (!code) code = dbM.medicine_code;
+          if (!genericName) genericName = dbM.generic_name;
+          if (!category || category === 'ยาสามัญ') category = dbM.category;
+          if (!properties || properties === 'ยาตามแพทย์สั่งจ่าย') properties = dbM.properties;
+          if (dbM.unit_price > 0) {
+            unitPrice = Number(dbM.unit_price);
+          }
+          break;
+        }
+      }
+    }
+
+    if (!name || name === 'ยาบรรเทาอาการ') name = 'ยาตามแพทย์สั่งจ่าย';
+    if (unitPrice <= 0) unitPrice = 10;
+
+    return {
+      medId: code,
+      name,
+      genericName,
+      category,
+      properties,
+      dosage,
+      instructions,
+      price: unitPrice,
+      unit_price: unitPrice,
+      quantity: qty,
+      stock: m.stock_quantity || 100,
+      stockStatus: (m.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
+    };
+  };
+
   // Real-time Queue & Billing Listener (คิวการเงินเฉพาะ ไม่ปนกับคิวหมอ)
   useEffect(() => {
     const fetchInitialQueue = async () => {
@@ -76,12 +159,15 @@ export default function BillingDispensePage({
         }
         if (bRes.ok) {
           const bData = await bRes.json();
-          if (bData.status === 'success' && Array.isArray(bData.queues) && bData.queues.length > 0) {
+          if (bData.status === 'success' && Array.isArray(bData.queues)) {
             const mapped = bData.queues.map((bq: any) => {
-              let parsedMeds = [];
+              let parsedMeds: any[] = [];
               if (bq.medications) {
                 try {
-                  parsedMeds = typeof bq.medications === 'string' ? JSON.parse(bq.medications) : bq.medications;
+                  const rawMeds = typeof bq.medications === 'string' ? JSON.parse(bq.medications) : bq.medications;
+                  if (Array.isArray(rawMeds)) {
+                    parsedMeds = rawMeds.map((m: any) => parseDispensedMed(m, masterMedicines));
+                  }
                 } catch {}
               }
               return {
@@ -113,16 +199,19 @@ export default function BillingDispensePage({
                 if (!prev || !mapped.find((q: any) => q.id === prev)) {
                   return mapped[0].id;
                 }
+                return prev;
               }
-              return prev;
+              return '';
             });
-          } else {
-            setQueueList(CLINIC_CONFIG.patients);
-            setLocalPatientId(prev => prev || CLINIC_CONFIG.patients[0]?.id);
+            return;
           }
         }
+        setQueueList([]);
+        setLocalPatientId('');
       } catch (err) {
         console.error('Failed to fetch initial billing queue:', err);
+        setQueueList([]);
+        setLocalPatientId('');
       }
     };
     
@@ -184,36 +273,52 @@ export default function BillingDispensePage({
 
   // Real-time Query Medications from DB for Active Billing Patient
   useEffect(() => {
-    if (activePatient && activePatient.visitId) {
+    if (activePatient) {
       const fetchMeds = async () => {
         try {
-          let res = await fetch(`/api/pharmacy/dispensing/${activePatient.visitId}`);
-          if (!res.ok) {
-            res = await fetch(`/api/system/dispensing/${activePatient.visitId}`);
+          if (activePatient.visitId) {
+            let res = await fetch(`/api/pharmacy/dispensing/${activePatient.visitId}`);
+            if (!res.ok) {
+              res = await fetch(`/api/system/dispensing/${activePatient.visitId}`);
+            }
+            if (res.ok) {
+              const data = await res.json();
+              if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
+                const fetchedMeds = data.dispensing.map((item: any) => parseDispensedMed(item, masterMedicines));
+                
+                setQueueList(prev => prev.map(q => {
+                  if (q.id === activePatient.id) {
+                    return { ...q, medications: fetchedMeds };
+                  }
+                  return q;
+                }));
+                return;
+              }
+            }
           }
-          if (res.ok) {
-            const data = await res.json();
-            if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
-              const fetchedMeds = data.dispensing.map((item: any) => ({
-                medId: item.Medicine?.code || `MED-${item.medicine_id}`,
-                name: item.Medicine?.name || 'ยาบรรเทาอาการ',
-                genericName: item.Medicine?.generic_name || '',
-                category: item.Medicine?.category || 'ยาสามัญ',
-                properties: item.Medicine?.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
-                dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
-                instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
-                price: item.Medicine?.unit_price || 50,
-                quantity: item.quantity || 1,
-                stock: item.Medicine?.stock_quantity || 100,
-                stockStatus: (item.Medicine?.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
-              }));
-              
-              setQueueList(prev => prev.map(q => {
-                if (q.id === activePatient.id) {
-                  return { ...q, medications: fetchedMeds };
-                }
-                return q;
-              }));
+
+          // Fallback: ดึงจาก patient-medicines ตาม HN
+          if (activePatient.hn) {
+            let hnRes = await fetch(`/api/pharmacy/patient-medicines/${encodeURIComponent(activePatient.hn)}`);
+            if (!hnRes.ok) {
+              hnRes = await fetch(`/api/system/patient-medicines/${encodeURIComponent(activePatient.hn)}`);
+            }
+            if (hnRes.ok) {
+              const hnData = await hnRes.json();
+              if (hnData.status === 'success' && Array.isArray(hnData.dispensings) && hnData.dispensings.length > 0) {
+                const fetchedMeds = hnData.dispensings.map((item: any) => parseDispensedMed(item, masterMedicines));
+
+                setQueueList(prev => prev.map(q => {
+                  if (q.id === activePatient.id) {
+                    return { 
+                      ...q, 
+                      medications: fetchedMeds,
+                      doctorAdvice: hnData.doctor_advice || q.doctorAdvice
+                    };
+                  }
+                  return q;
+                }));
+              }
             }
           }
         } catch (err) {
@@ -222,7 +327,7 @@ export default function BillingDispensePage({
       };
       fetchMeds();
     }
-  }, [activePatient?.id, activePatient?.visitId]);
+  }, [activePatient?.id, activePatient?.visitId, activePatient?.hn]);
 
   const triggerToast = (message: string, type: 'success' | 'error' | 'doctor') => {
     setIsToastFading(false);
@@ -246,10 +351,11 @@ export default function BillingDispensePage({
       return () => clearTimeout(timer2);
     }, 3500);
     return () => clearTimeout(timer1);
-  }, []);
+  }, [toast]);
 
   const handleSelectPatient = (id: string) => {
     setLocalPatientId(id);
+    localStorage.setItem('billing_active_patient', id);
     if (onSelectPatientId) {
       onSelectPatientId(id);
     }
@@ -270,6 +376,7 @@ export default function BillingDispensePage({
     if (onSelectPatientId) {
       onSelectPatientId(activePatient.id);
     }
+    localStorage.setItem('billing_active_patient', activePatient.id);
     if (onNavigateToBilling) {
       onNavigateToBilling();
     }
@@ -470,7 +577,7 @@ export default function BillingDispensePage({
                             padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
                             whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center'
                           }}>
-                            {p.treatmentRights.includes('30') ? 'บัตรทอง (สปสช.)' : p.treatmentRights}
+                            {(p.treatmentRights || '').includes('30') ? 'บัตรทอง (สปสช.)' : (p.treatmentRights || 'บัตรทอง (สปสช.)')}
                           </span>
                         </td>
 
@@ -576,7 +683,9 @@ export default function BillingDispensePage({
                     <div className="item-title">{med.name}</div>
                     <div className="item-sub">{med.dosage}</div>
                   </div>
-                  <div className="item-price">฿ {(Number(med.price) || 0).toLocaleString()}</div>
+                  <div className="item-price">
+                    ฿ {(((Number(med.price || (med as any).unit_price) || 0) * (Number((med as any).quantity) || 1))).toLocaleString()}
+                  </div>
                 </div>
               ))}
             </div>

@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -137,8 +139,7 @@ func GetExamination(c *gin.Context) {
 	}
 
 	// ใบสั่งยาที่บันทึกไว้ อ่านกลับจากตาราง dispensings
-	// วิธีใช้ยาถูกรวมเป็นข้อความเดียวตอนบันทึก จึงคืนมาในช่อง specialInstructions
-	// ช่องเดียว แพทย์แก้ต่อได้ปกติ แล้วระบบจะเขียนทับรายการเดิมตอนบันทึกครั้งถัดไป
+	// เพื่อให้แพทย์เปิดเคสเดิมกลับมาแล้วยังเห็นยาที่สั่งไว้ ไม่ต้องพิมพ์ใหม่
 	var saved []models.Dispensing
 	if err := config.DB.Preload("Medicine").
 		Where("visit_id = ?", visit.ID).
@@ -146,10 +147,13 @@ func GetExamination(c *gin.Context) {
 		Find(&saved).Error; err == nil {
 		for _, d := range saved {
 			detail.Prescriptions = append(detail.Prescriptions, dto.PrescriptionItemDTO{
-				MedicineName:        d.Medicine.Name,
-				Dosage:              d.Dosage,
-				Quantity:            d.Quantity,
-				SpecialInstructions: d.Instructions,
+				MedicineID:   d.MedicineID,
+				MedicineCode: d.Medicine.MedicineCode,
+				MedicineName: d.Medicine.Name,
+				Dosage:       d.Dosage,
+				Quantity:     d.Quantity,
+				UnitPrice:    d.Medicine.UnitPrice,
+				Instructions: d.Instructions,
 			})
 		}
 	}
@@ -229,99 +233,6 @@ func GetExamination(c *gin.Context) {
 //
 // action = "draft" บันทึกร่าง แก้ไขต่อได้
 // action = "sign"  เซ็นปิดการตรวจ ต้องมีการวินิจฉัยหลัก และปิดเคสส่งต่อห้องยา
-// ==============================================================================
-// ใบสั่งยา -> ตาราง dispensings (ส่งต่อห้องยา)
-// ==============================================================================
-// ห้องยาอ่านรายการยาของผู้ป่วยจากตาราง dispensings (ดู GetPharmacyQueues ใน
-// dispensing_controller.go) ก่อนหน้านี้ไม่มีใครเขียนลงตารางนี้เลย ยาที่แพทย์
-// กดสั่งจึงเป็นแค่ state บนหน้าจอ พอปิดเคสก็หายไป ห้องยาเห็นชื่อผู้ป่วย
-// แต่ไม่เห็นยาสักตัว
-//
-// การจับคู่ยา: dispensings ต้องการ medicine_id จริงจากตาราง medicines
-// แต่หน้าจอแพทย์เลือกยาจากรายการที่เขียนไว้ในไฟล์ ซึ่งมีแค่ชื่อ
-// จึงจับคู่ด้วยชื่อ (ไม่สนตัวพิมพ์ใหญ่เล็ก) ตัวไหนไม่เจอจะข้ามและคืนชื่อกลับไป
-// ให้หน้าจอเตือนแพทย์ ดีกว่าเงียบแล้วปล่อยให้เข้าใจว่าสั่งสำเร็จ
-//
-// จงใจ "ไม่" สร้างยาใหม่ลงตาราง medicines เอง เพราะเป็นคลังของห้องยา
-// การแอบเพิ่มยาที่ไม่มีสต็อกเข้าไปจะทำให้ตัวเลขคลังของเขาเพี้ยน
-
-// buildDispenseInstructions - รวมวิธีใช้ยาเป็นข้อความเดียวให้เภสัชอ่าน
-func buildDispenseInstructions(item dto.PrescriptionItemDTO) string {
-	parts := make([]string, 0, 4)
-	for _, v := range []string{item.Frequency, item.Duration, item.Route, item.Timing} {
-		if t := strings.TrimSpace(v); t != "" {
-			parts = append(parts, t)
-		}
-	}
-
-	text := strings.Join(parts, " · ")
-	if special := strings.TrimSpace(item.SpecialInstructions); special != "" {
-		if text != "" {
-			text += " — "
-		}
-		text += special
-	}
-	return text
-}
-
-// syncDispensings - เขียนใบสั่งยาของ visit หนึ่งครั้งลงตาราง dispensings
-//
-// ลบรายการเดิมของ visit นี้ทิ้งก่อนเสมอ เพราะแพทย์แก้ใบสั่งยาระหว่างร่างได้
-// ถ้าไม่ลบ ยาที่ถอดออกไปแล้วจะยังค้างอยู่และถูกจ่ายจริง
-//
-// คืน (จำนวนที่เขียนสำเร็จ, ชื่อยาที่จับคู่กับคลังไม่ได้)
-func syncDispensings(tx *gorm.DB, visitID uint, doctorProfileID uint,
-	items []dto.PrescriptionItemDTO) (int, []string, error) {
-
-	if err := tx.Where("visit_id = ?", visitID).Delete(&models.Dispensing{}).Error; err != nil {
-		return 0, nil, err
-	}
-
-	saved := 0
-	unmatched := make([]string, 0)
-
-	for _, item := range items {
-		name := strings.TrimSpace(item.MedicineName)
-		if name == "" {
-			continue
-		}
-
-		var med models.Medicine
-		err := tx.Where("LOWER(name) = LOWER(?)", name).First(&med).Error
-		if err != nil {
-			// ลองแบบหลวมขึ้น เผื่อชื่อในคลังมีวงเล็บหรือหน่วยต่อท้าย
-			err = tx.Where("LOWER(name) LIKE LOWER(?)", name+"%").First(&med).Error
-		}
-		if err != nil {
-			unmatched = append(unmatched, name)
-			continue
-		}
-
-		qty := item.Quantity
-		if qty <= 0 {
-			qty = 1
-		}
-
-		row := models.Dispensing{
-			VisitID:      visitID,
-			MedicineID:   med.ID,
-			Quantity:     qty,
-			Dosage:       strings.TrimSpace(item.Dosage),
-			Instructions: buildDispenseInstructions(item),
-		}
-		if doctorProfileID > 0 {
-			row.DoctorID = doctorProfileID
-		}
-
-		if err := tx.Create(&row).Error; err != nil {
-			return saved, unmatched, err
-		}
-		saved++
-	}
-
-	return saved, unmatched, nil
-}
-
 func SaveExamination(c *gin.Context) {
 	doctorID := doctorAuthUserID(c)
 	if doctorID == 0 {
@@ -490,23 +401,6 @@ func SaveExamination(c *gin.Context) {
 			}
 		}
 
-		// ใบสั่งยา -> ตาราง dispensings ให้ห้องยาเห็น
-		// เขียนทุกครั้งที่บันทึก ไม่ใช่เฉพาะตอนเซ็นปิด เพราะแพทย์ต้องเห็น
-		// ใบสั่งยาเดิมตอนเปิดร่างกลับมาแก้ต่อ ส่วนห้องยาจะยังไม่เห็นผู้ป่วยรายนี้
-		// จนกว่าคิวจะเปลี่ยนเป็น "รอรับยา" ตอนเซ็นปิดอยู่ดี
-		var doctorProfile models.Doctor
-		doctorProfileID := uint(0)
-		if err := tx.Where("user_id = ?", doctorID).First(&doctorProfile).Error; err == nil {
-			doctorProfileID = doctorProfile.ID
-		}
-
-		count, unmatched, err := syncDispensings(tx, visit.ID, doctorProfileID, req.Prescriptions)
-		if err != nil {
-			return err
-		}
-		prescriptionCount = count
-		unmatchedMedicines = unmatched
-
 		// เซ็นปิดการตรวจ = ปิดเคสและส่งคิวต่อไปห้องยา
 		if signing {
 			q, ok, err := applyVisitStatusTx(tx, &visit, models.VisitStatusCompleted,
@@ -545,7 +439,183 @@ func SaveExamination(c *gin.Context) {
 		"status":   exam.Status,
 	})
 	if signing {
+		var pat models.Patient
+		config.DB.First(&pat, visit.PatientID)
+		age := 35
+		if pat.BirthDate.Year() > 1900 {
+			age = time.Now().Year() - pat.BirthDate.Year()
+		}
+
+		// อัปเดตประวัติการแพ้ยาและโรคประจำตัวลงตาราง patients หากแพทย์ระบุ
+		if strings.TrimSpace(req.Allergies) != "" && req.Allergies != "ไม่มีประวัติแพ้ยา" {
+			pat.Allergies = req.Allergies
+			config.DB.Model(&models.Patient{}).Where("id = ?", pat.ID).Update("allergies", req.Allergies)
+		}
+		if strings.TrimSpace(req.ChronicDiseases) != "" && req.ChronicDiseases != "ไม่มี" {
+			pat.ChronicDiseases = req.ChronicDiseases
+			config.DB.Model(&models.Patient{}).Where("id = ?", pat.ID).Update("chronic_diseases", req.ChronicDiseases)
+		}
+
+		// บันทึกรายการสั่งยาที่แพทย์สั่งลงตาราง dispensings
+		config.DB.Where("visit_id = ?", visit.ID).Delete(&models.Dispensing{})
+		var medList []gin.H
+
+		for _, p := range req.Prescriptions {
+			// ค้นหายาและราคาต่อหน่วยจริงจากตาราง medicines
+			med := FindMedicineByNameOrCode(p.MedicineCode, p.MedicineName)
+			if med.ID == 0 && p.MedicineID > 0 {
+				config.DB.First(&med, p.MedicineID)
+			}
+
+			// ยาที่หาไม่เจอในคลัง ต้องข้าม ห้ามเดา
+			//
+			// โค้ดเดิมตรงนี้ใส่ medID = 1 เมื่อหาไม่เจอ ซึ่งแปลว่าผู้ป่วยจะได้รับ
+			// "ยาแถวแรกของตาราง medicines" แทนยาที่แพทย์สั่งจริง โดยไม่มีใครรู้
+			// เป็นความผิดพลาดที่ถึงตัวผู้ป่วยโดยตรง จึงเปลี่ยนเป็นข้ามรายการนั้น
+			// แล้วส่งชื่อกลับไปเตือนแพทย์ผ่าน unmatched_medicines
+			medID := med.ID
+			if medID == 0 {
+				unmatchedMedicines = append(unmatchedMedicines, p.MedicineName)
+				continue
+			}
+			unitPrice := med.UnitPrice
+			if unitPrice <= 0 && p.UnitPrice > 0 {
+				unitPrice = p.UnitPrice
+			}
+			if unitPrice <= 0 {
+				unitPrice = 10.0
+			}
+			qty := p.Quantity
+			if qty <= 0 {
+				qty = 1
+			}
+
+			disp := models.Dispensing{
+				VisitID:      visit.ID,
+				MedicineID:   medID,
+				DoctorID:     doctorID,
+				Quantity:     qty,
+				Dosage:       p.Dosage,
+				Instructions: p.Instructions,
+			}
+			config.DB.Create(&disp)
+			prescriptionCount++
+
+			medName := p.MedicineName
+			if medName == "" && med.Name != "" {
+				medName = med.Name
+			}
+			genName := p.GenericName
+			if genName == "" && med.GenericName != "" {
+				genName = med.GenericName
+			}
+			cat := p.Category
+			if cat == "" && med.Category != "" {
+				cat = med.Category
+			}
+			if cat == "" {
+				cat = "ยาสามัญ"
+			}
+			props := med.Properties
+			if props == "" {
+				props = "บรรเทาอาการตามแพทย์สั่ง"
+			}
+
+			medList = append(medList, gin.H{
+				"medId":        p.MedicineCode,
+				"name":         medName,
+				"genericName":  genName,
+				"category":     cat,
+				"properties":   props,
+				"dosage":       p.Dosage,
+				"instructions": p.Instructions,
+				"price":        unitPrice,
+				"quantity":     qty,
+				"stock":        med.StockQuantity,
+				"stockStatus":  "พร้อมจ่าย",
+			})
+		}
+
+		medsJSON, _ := json.Marshal(medList)
+
+		// สรุปคำแนะนำและคำวินิจฉัยของแพทย์
+		adviceParts := []string{}
+		if req.PrimaryDiagnosis != nil && req.PrimaryDiagnosis.Name != "" {
+			adviceParts = append(adviceParts, fmt.Sprintf("คำวินิจฉัยหลัก: %s (%s)", req.PrimaryDiagnosis.Name, req.PrimaryDiagnosis.Code))
+		}
+		if req.Counseling.MedicationAdvice != "" {
+			adviceParts = append(adviceParts, fmt.Sprintf("คำแนะนำการใช้ยา: %s", req.Counseling.MedicationAdvice))
+		}
+		if req.TreatmentPlan != "" {
+			adviceParts = append(adviceParts, fmt.Sprintf("แผนการรักษา: %s", req.TreatmentPlan))
+		}
+		if len(adviceParts) == 0 {
+			adviceParts = append(adviceParts, "พักผ่อนให้เพียงพอ และทานยาตามแพทย์สั่งอย่างเคร่งครัด")
+		}
+		fullAdvice := strings.Join(adviceParts, " | ")
+
+		var existingMQ models.MedicineQueue
+		mQueueNo := ""
+		if hasQueue && updatedQueue.QueueNumber != "" {
+			mQueueNo = updatedQueue.QueueNumber
+		} else {
+			var mqCount int64
+			config.DB.Model(&models.MedicineQueue{}).Count(&mqCount)
+			mQueueNo = fmt.Sprintf("M-%03d", mqCount+1)
+		}
+
+		if err := config.DB.Where("visit_id = ?", visit.ID).First(&existingMQ).Error; err != nil {
+			medQ := models.MedicineQueue{
+				QueueNumber:  mQueueNo,
+				HN:           pat.HN,
+				PatientName:  pat.FullName,
+				NationalID:   pat.NationalID,
+				Gender:       pat.Gender,
+				Age:          age,
+				SchemeType:   pat.SchemeType,
+				VisitID:      visit.ID,
+				DoctorAdvice: fullAdvice,
+				Status:       "pending",
+				Medications:  string(medsJSON),
+			}
+			config.DB.Create(&medQ)
+		} else {
+			existingMQ.Medications = string(medsJSON)
+			existingMQ.DoctorAdvice = fullAdvice
+			existingMQ.Status = "pending"
+			config.DB.Save(&existingMQ)
+		}
+
+		// ซิงค์ตาราง patient_medicines สำหรับห้องยา
+		var patMed models.PatientMedicine
+		if err := config.DB.Where("hn = ?", pat.HN).First(&patMed).Error; err != nil {
+			patMed = models.PatientMedicine{
+				HN:              pat.HN,
+				NationalID:      pat.NationalID,
+				FullName:        pat.FullName,
+				Gender:          pat.Gender,
+				Age:             age,
+				SchemeType:      pat.SchemeType,
+				Allergies:       pat.Allergies,
+				ChronicDiseases: pat.ChronicDiseases,
+				PhoneNumber:     pat.PhoneNumber,
+			}
+			config.DB.Create(&patMed)
+		} else {
+			patMed.Allergies = pat.Allergies
+			patMed.ChronicDiseases = pat.ChronicDiseases
+			config.DB.Save(&patMed)
+		}
+
 		ws.BroadcastEvent("VISIT_UPDATED", visit)
+		ws.BroadcastEvent("MEDICINE_QUEUE_CREATED", gin.H{
+			"visit_id":      visit.ID,
+			"hn":            pat.HN,
+			"patient_name":  pat.FullName,
+			"queue_number":  mQueueNo,
+			"doctor_advice": fullAdvice,
+			"medications":   medList,
+		})
 		if hasQueue {
 			config.DB.Preload("Patient").First(&updatedQueue, updatedQueue.ID)
 			ws.BroadcastEvent("QUEUE_UPDATED", updatedQueue)
