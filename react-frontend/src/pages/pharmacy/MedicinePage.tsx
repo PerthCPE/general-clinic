@@ -1259,7 +1259,7 @@ export default function MedicinePage() {
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'center', width: '100px' }}>รหัสยา</th>
-                    <th style={{ textAlign: 'center' }}>ชื่อยา</th>
+                    <th style={{ textAlign: 'left', paddingLeft: '20px' }}>ชื่อยา</th>
                     <th style={{ textAlign: 'center', width: '180px' }}>ชนิด / หมวดหมู่ยา</th>
                     <th style={{ textAlign: 'center', width: '110px' }}>คงเหลือในคลัง</th>
                     <th style={{ textAlign: 'center', width: '120px' }}>สถานะคลังยา</th>
@@ -1298,23 +1298,34 @@ export default function MedicinePage() {
                         <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <CopyableText value={med.id} color="#2563EB" />
                         </td>
-                        <td className="med-name-cell" style={{ textAlign: 'center', padding: '12px 14px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                            <CopyableText value={med.name} mono={false} color="#0F172A" />
+                        <td className="med-name-cell" style={{ textAlign: 'left', padding: '12px 14px 12px 20px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '3px' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                              <span 
+                                className="med-name-text"
+                                onClick={() => { setDetailModalMed(med); setIsEditingDetailMed(false); }}
+                                style={{ cursor: 'pointer', fontWeight: '700', color: '#0F172A' }}
+                                title="คลิกเพื่อดูรายละเอียดตัวยาและสรรพคุณ"
+                              >
+                                {med.name}
+                              </span>
+                              <CopyableText value={med.name} mono={false} showIcon={true} />
+                            </div>
                             <span 
                               className="med-hint-tag" 
-                              onClick={() => setDetailModalMed(med)}
+                              onClick={() => { setDetailModalMed(med); setIsEditingDetailMed(false); }}
                               style={{ 
                                 cursor: 'pointer', 
                                 margin: 0, 
-                                fontSize: '12px',
+                                fontSize: '11px',
                                 color: '#2563EB',
                                 background: '#EFF6FF',
-                                padding: '2px 8px',
+                                padding: '1px 6px',
                                 borderRadius: '4px',
                                 border: '1px solid #DBEAFE',
                                 fontWeight: '500',
-                                display: 'inline-block'
+                                display: 'inline-block',
+                                whiteSpace: 'nowrap'
                               }}
                               title="คลิกเพื่อดูรายละเอียดและสรรพคุณยา"
                             >

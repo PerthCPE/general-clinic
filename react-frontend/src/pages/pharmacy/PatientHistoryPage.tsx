@@ -548,7 +548,7 @@ export default function PatientHistoryPage() {
                   <thead>
                     <tr>
                       <th style={{ textAlign: 'center', width: '100px' }}>ID (HN)</th>
-                      <th style={{ textAlign: 'center' }}>ชื่อผู้ป่วย</th>
+                      <th style={{ textAlign: 'left', paddingLeft: '20px' }}>ชื่อผู้ป่วย</th>
                       <th style={{ textAlign: 'center', width: '80px' }}>อายุ</th>
                       <th style={{ textAlign: 'center', width: '90px' }}>กรุ๊ปเลือด</th>
                       <th style={{ textAlign: 'center', width: '190px' }}>สิทธิการรักษา</th>
@@ -568,17 +568,17 @@ export default function PatientHistoryPage() {
                           <td 
                             className="patient-name-cell clickable-patient-history"
                             onClick={() => handleSelectPatient(patient)}
-                            style={{ textAlign: 'center', padding: '12px 14px' }}
+                            style={{ textAlign: 'left', padding: '12px 14px 12px 20px' }}
                           >
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
-                              <span className="history-name-link" style={{ fontWeight: '700', color: '#0F172A', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '3px' }}>
+                              <span className="history-name-link" style={{ fontWeight: '700', color: '#0F172A', display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                                   <circle cx="12" cy="7" r="4"/>
                                 </svg>
                                 {patient.name}
                               </span>
-                              <span className="history-hint-tag" style={{ fontSize: '11.5px', color: '#2563EB', background: '#EFF6FF', padding: '2px 8px', borderRadius: '4px', border: '1px solid #DBEAFE', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                              <span className="history-hint-tag" style={{ fontSize: '11px', color: '#2563EB', background: '#EFF6FF', padding: '1px 6px', borderRadius: '4px', border: '1px solid #DBEAFE', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '500' }}>
                                 (คลิกดูประวัติ)
                               </span>
                             </div>
