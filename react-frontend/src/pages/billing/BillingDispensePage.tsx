@@ -286,6 +286,13 @@ export default function BillingDispensePage({
     
     fetchInitialQueue();
 
+    // Smart Background Polling ทุกๆ 2.5 วินาที เพื่อดึงคิวการเงินล่าสุดอย่างต่อเนื่อง
+    const pollInterval = setInterval(() => {
+      if (!document.hidden) {
+        fetchInitialQueue();
+      }
+    }, 2500);
+
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
       if (data) {
         const pName = data.patient_name || 'ผู้ป่วย';
@@ -348,6 +355,7 @@ export default function BillingDispensePage({
     });
 
     return () => {
+      clearInterval(pollInterval);
       unsubBill();
       unsubExam();
       unsubMedQ();

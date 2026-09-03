@@ -30,7 +30,14 @@ export default function MedicinePage() {
   const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all');
   
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
+  const [successBadgeText, setSuccessBadgeText] = useState('✓ อัปเดตคลังยาเรียบร้อยแล้ว');
   const [isStockTableExpanded, setIsStockTableExpanded] = useState(true);
+
+  const triggerSuccessBadge = (msg: string) => {
+    setSuccessBadgeText(msg);
+    setShowSuccessBadge(true);
+    setTimeout(() => setShowSuccessBadge(false), 3500);
+  };
 
   // Sync with Backend API
   const fetchMedicines = useCallback(() => {
@@ -119,6 +126,112 @@ export default function MedicinePage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMedicine, setSelectedMedicine] = useState<Medicine | null>(null);
   const [detailModalMed, setDetailModalMed] = useState<Medicine | null>(null);
+
+  // Edit Detail Modal state
+  const [isEditingDetailMed, setIsEditingDetailMed] = useState(false);
+  const [detailEditForm, setDetailEditForm] = useState({
+    name: '',
+    genericName: '',
+    category: '',
+    properties: '',
+    dosage: '',
+    precautions: '',
+    manufacturer: '',
+    unitPrice: 0,
+    stock: 0
+  });
+  const [isSavingDetailMed, setIsSavingDetailMed] = useState(false);
+
+  const handleOpenEditDetailMed = () => {
+    if (!detailModalMed) return;
+    const cleanPrice = typeof detailModalMed.unit_price === 'number' 
+      ? detailModalMed.unit_price 
+      : (parseFloat(String(detailModalMed.price).replace(/[^0-9.]/g, '')) || 0);
+
+    setDetailEditForm({
+      name: detailModalMed.name,
+      genericName: detailModalMed.genericName,
+      category: detailModalMed.category,
+      properties: detailModalMed.properties,
+      dosage: detailModalMed.dosage,
+      precautions: detailModalMed.precautions || 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
+      manufacturer: detailModalMed.manufacturer,
+      unitPrice: cleanPrice,
+      stock: detailModalMed.stock
+    });
+    setIsEditingDetailMed(true);
+  };
+
+  const handleSaveDetailMedEdit = async () => {
+    if (!detailModalMed) return;
+    setIsSavingDetailMed(true);
+
+    const payload = {
+      name: detailEditForm.name.trim(),
+      generic_name: detailEditForm.genericName.trim(),
+      category: detailEditForm.category.trim(),
+      properties: detailEditForm.properties.trim(),
+      dosage: detailEditForm.dosage.trim(),
+      manufacturer: detailEditForm.manufacturer.trim(),
+      unit_price: Number(detailEditForm.unitPrice),
+      stock_quantity: Number(detailEditForm.stock)
+    };
+
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const targetId = detailModalMed.medicine_code || detailModalMed.id;
+      let res = await fetch(`/api/pharmacy/medicines/${encodeURIComponent(targetId)}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        res = await fetch(`/api/system/medicines/${encodeURIComponent(targetId)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (res.ok) {
+        const newStock = Number(detailEditForm.stock);
+        let newStatus: 'In Stock' | 'Low Stock' | 'Out of Stock' = 'In Stock';
+        if (newStock === 0) newStatus = 'Out of Stock';
+        else if (newStock <= 20) newStatus = 'Low Stock';
+
+        const updatedItem: Medicine = {
+          ...detailModalMed,
+          name: detailEditForm.name.trim(),
+          genericName: detailEditForm.genericName.trim(),
+          category: detailEditForm.category.trim(),
+          properties: detailEditForm.properties.trim(),
+          dosage: detailEditForm.dosage.trim(),
+          precautions: detailEditForm.precautions.trim(),
+          manufacturer: detailEditForm.manufacturer.trim(),
+          price: `฿ ${Number(detailEditForm.unitPrice).toFixed(2)}`,
+          unit_price: Number(detailEditForm.unitPrice),
+          stock: newStock,
+          stock_quantity: newStock,
+          status: newStatus
+        };
+
+        setMedicines(prev => prev.map(m => (m.id === detailModalMed.id || m.medicine_code === detailModalMed.medicine_code) ? updatedItem : m));
+        setDetailModalMed(updatedItem);
+        setIsEditingDetailMed(false);
+        triggerSuccessBadge(`✓ บันทึกข้อมูลยา "${detailEditForm.name}" ลงฐานข้อมูลเรียบร้อยแล้ว`);
+      } else {
+        alert('ไม่สามารถบันทึกข้อมูลยาได้ กรุณาลองใหม่อีกครั้ง');
+      }
+    } catch (err) {
+      console.error('Failed to save medicine edit:', err);
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์');
+    } finally {
+      setIsSavingDetailMed(false);
+    }
+  };
 
   // Add Medicine Form state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -544,7 +657,7 @@ export default function MedicinePage() {
             </button>
             {showSuccessBadge && (
               <span className="success-badge" style={{ background: '#DCFCE7', color: '#166534', fontWeight: 'bold', padding: '4px 12px', borderRadius: '16px', fontSize: '13px' }}>
-                ✓ อัปเดตคลังยาเรียบร้อยแล้ว
+                {successBadgeText}
               </span>
             )}
             <span style={{ background: '#DBEAFE', color: '#1E40AF', fontWeight: 'bold', padding: '4px 12px', borderRadius: '16px', fontSize: '13px' }}>
@@ -756,78 +869,288 @@ export default function MedicinePage() {
         </div>
       )}
 
-      {/* Medicine Info Detail Modal */}
+      {/* Medicine Info Detail Modal (รองรับทั้งดูรายละเอียด และแก้ไขลง DB ทันที) */}
       {detailModalMed && (
-        <div className="modal-overlay" onClick={() => setDetailModalMed(null)}>
-          <div className="med-detail-modal-card card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>
+          <div className="med-detail-modal-card card" style={{ maxWidth: '680px', width: '92%' }} onClick={(e) => e.stopPropagation()}>
             <div className="med-detail-header">
-              <div className="med-detail-title-box">
-                <span className="med-detail-badge">รายละเอียดตัวยาและสรรพคุณ</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <h2 className="med-detail-name" style={{ margin: 0 }}>{detailModalMed.name}</h2>
-                  <CopyableText value={detailModalMed.name} mono={false} showIcon={true} />
+              <div className="med-detail-title-box" style={{ width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <span className="med-detail-badge" style={{ background: isEditingDetailMed ? '#FEF3C7' : undefined, color: isEditingDetailMed ? '#92400E' : undefined }}>
+                    {isEditingDetailMed ? '✏️ โหมดแก้ไขข้อมูลตัวยาและสรรพคุณ' : 'รายละเอียดตัวยาและสรรพคุณ'}
+                  </span>
+                  {!isEditingDetailMed && (
+                    <button
+                      onClick={handleOpenEditDetailMed}
+                      style={{
+                        padding: '6px 14px',
+                        background: '#EFF6FF',
+                        color: '#2563EB',
+                        border: '1.5px solid #BFDBFE',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: '700',
+                        fontSize: '13px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.15s ease'
+                      }}
+                      title="คลิกเพื่อแก้ไขข้อมูลยาและบันทึกลงฐานข้อมูลทันที"
+                    >
+                      ✏️ แก้ไขข้อมูลยา
+                    </button>
+                  )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
-                  <span className="med-detail-generic">ชื่อสามัญทางยา: {detailModalMed.genericName}</span>
-                  <CopyableText label="รหัสยา" value={detailModalMed.id} color="#2563EB" />
-                </div>
+
+                {!isEditingDetailMed ? (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <h2 className="med-detail-name" style={{ margin: 0 }}>{detailModalMed.name}</h2>
+                      <CopyableText value={detailModalMed.name} mono={false} showIcon={true} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '4px' }}>
+                      <span className="med-detail-generic">ชื่อสามัญทางยา: {detailModalMed.genericName}</span>
+                      <CopyableText label="รหัสยา" value={detailModalMed.id} color="#2563EB" />
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>ชื่อยา (Name) *</label>
+                      <input 
+                        type="text" 
+                        value={detailEditForm.name} 
+                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="เช่น Amoxicillin 500mg"
+                        style={{ width: '100%', padding: '8px 12px', fontSize: '15px', fontWeight: 'bold', border: '1.5px solid #2563EB', borderRadius: '8px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>ชื่อสามัญทางยา (Generic Name)</label>
+                        <input 
+                          type="text" 
+                          value={detailEditForm.genericName} 
+                          onChange={(e) => setDetailEditForm(prev => ({ ...prev, genericName: e.target.value }))}
+                          placeholder="เช่น Amoxicillin Trihydrate"
+                          style={{ width: '100%', padding: '7px 10px', fontSize: '13px', border: '1.5px solid #CBD5E1', borderRadius: '6px', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: '12px', fontWeight: '700', color: '#475569', display: 'block', marginBottom: '3px' }}>รหัสยา (Medicine Code)</label>
+                        <input 
+                          type="text" 
+                          value={detailModalMed.medicine_code || detailModalMed.id} 
+                          disabled
+                          style={{ width: '100%', padding: '7px 10px', fontSize: '13px', background: '#F1F5F9', border: '1px solid #CBD5E1', borderRadius: '6px', color: '#64748B', boxSizing: 'border-box' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <button className="close-btn" onClick={() => setDetailModalMed(null)}>✕</button>
+              <button className="close-btn" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>✕</button>
             </div>
 
             <div className="med-detail-body">
-              <div className="med-info-section category-section">
-                <span className="info-label">หมวดยา:</span>
-                <span className="info-value category-tag">{detailModalMed.category}</span>
-              </div>
+              {!isEditingDetailMed ? (
+                <>
+                  <div className="med-info-section category-section">
+                    <span className="info-label">หมวดยา:</span>
+                    <span className="info-value category-tag">{detailModalMed.category}</span>
+                  </div>
 
-              <div className="med-info-grid">
-                <div className="med-info-box">
-                  <h4 className="info-box-title">สรรพคุณและข้อบ่งใช้</h4>
-                  <p className="info-box-desc">{detailModalMed.properties}</p>
-                </div>
+                  <div className="med-info-grid">
+                    <div className="med-info-box">
+                      <h4 className="info-box-title">สรรพคุณและข้อบ่งใช้</h4>
+                      <p className="info-box-desc">{detailModalMed.properties}</p>
+                    </div>
 
-                <div className="med-info-box">
-                  <h4 className="info-box-title">ขนาดและวิธีรับประทาน</h4>
-                  <p className="info-box-desc">{detailModalMed.dosage}</p>
-                </div>
+                    <div className="med-info-box">
+                      <h4 className="info-box-title">ขนาดและวิธีรับประทาน</h4>
+                      <p className="info-box-desc">{detailModalMed.dosage}</p>
+                    </div>
 
-                <div className="med-info-box warning-box">
-                  <h4 className="info-box-title">⚠️ ข้อควรระวังและผลข้างเคียง</h4>
-                  <p className="info-box-desc">{detailModalMed.precautions}</p>
-                </div>
+                    <div className="med-info-box warning-box">
+                      <h4 className="info-box-title">⚠️ ข้อควรระวังและผลข้างเคียง</h4>
+                      <p className="info-box-desc">{detailModalMed.precautions}</p>
+                    </div>
 
-                <div className="med-info-box">
-                  <h4 className="info-box-title">ผู้ผลิตและราคาจำหน่าย</h4>
-                  <p className="info-box-desc">
-                    ผู้ผลิต: {detailModalMed.manufacturer}<br />
-                    ราคาจำหน่าย: <strong>{detailModalMed.price}</strong>
-                  </p>
-                </div>
-              </div>
+                    <div className="med-info-box">
+                      <h4 className="info-box-title">ผู้ผลิตและราคาจำหน่าย</h4>
+                      <p className="info-box-desc">
+                        ผู้ผลิต: {detailModalMed.manufacturer}<br />
+                        ราคาจำหน่าย: <strong>{detailModalMed.price}</strong>
+                      </p>
+                    </div>
+                  </div>
 
-              <div className="med-stock-summary-bar">
-                <div className="stock-stat-item">
-                  <span className="stat-label">คงเหลือในคลัง:</span>
-                  <span className="stat-val">{detailModalMed.stock} เม็ด</span>
+                  <div className="med-stock-summary-bar">
+                    <div className="stock-stat-item">
+                      <span className="stat-label">คงเหลือในคลัง:</span>
+                      <span className="stat-val">{detailModalMed.stock} เม็ด</span>
+                    </div>
+                    <div className="stock-stat-item">
+                      <span className="stat-label">จ่ายออกวันนี้:</span>
+                      <span className="stat-val">{detailModalMed.dispensedToday} เม็ด</span>
+                    </div>
+                    <div className="stock-stat-item">
+                      <span className="stat-label">สถานะสต็อก:</span>
+                      <span className={`status-badge ${getStatusClass(detailModalMed.status)}`}>
+                        {renderStatusText(detailModalMed.status)}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>หมวดยา</label>
+                    <input 
+                      type="text" 
+                      value={detailEditForm.category} 
+                      onChange={(e) => setDetailEditForm(prev => ({ ...prev, category: e.target.value }))}
+                      placeholder="เช่น ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย, ยาลดไข้ บรรเทาปวด..."
+                      style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13.5px', boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>สรรพคุณและข้อบ่งใช้</label>
+                      <textarea 
+                        rows={3}
+                        value={detailEditForm.properties} 
+                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, properties: e.target.value }))}
+                        placeholder="ระบุสรรพคุณและอาการที่ใช้รักษา..."
+                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>ขนาดและวิธีรับประทาน</label>
+                      <textarea 
+                        rows={3}
+                        value={detailEditForm.dosage} 
+                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, dosage: e.target.value }))}
+                        placeholder="เช่น ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร..."
+                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626', marginBottom: '3px', display: 'block' }}>⚠️ ข้อควรระวังและผลข้างเคียง</label>
+                    <textarea 
+                      rows={2}
+                      value={detailEditForm.precautions} 
+                      onChange={(e) => setDetailEditForm(prev => ({ ...prev, precautions: e.target.value }))}
+                      placeholder="เช่น ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว..."
+                      style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #FCA5A5', borderRadius: '8px', fontSize: '13px', background: '#FEF2F2', boxSizing: 'border-box', resize: 'vertical' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>ผู้ผลิต / บริษัท</label>
+                      <input 
+                        type="text" 
+                        value={detailEditForm.manufacturer} 
+                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, manufacturer: e.target.value }))}
+                        placeholder="เช่น องค์การเภสัชกรรม (GPO)"
+                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>ราคาต่อหน่วย (฿)</label>
+                      <input 
+                        type="number" 
+                        step="0.5"
+                        min="0"
+                        value={detailEditForm.unitPrice} 
+                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, unitPrice: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#334155', marginBottom: '3px', display: 'block' }}>สต็อกคงเหลือ (เม็ด)</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={detailEditForm.stock} 
+                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, stock: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="stock-stat-item">
-                  <span className="stat-label">จ่ายออกวันนี้:</span>
-                  <span className="stat-val">{detailModalMed.dispensedToday} เม็ด</span>
-                </div>
-                <div className="stock-stat-item">
-                  <span className="stat-label">สถานะสต็อก:</span>
-                  <span className={`status-badge ${getStatusClass(detailModalMed.status)}`}>
-                    {renderStatusText(detailModalMed.status)}
-                  </span>
-                </div>
-              </div>
+              )}
             </div>
 
-            <div className="med-detail-footer">
-              <button className="primary-btn-close" onClick={() => setDetailModalMed(null)}>
-                ปิดหน้าต่าง
-              </button>
+            <div className="med-detail-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              {!isEditingDetailMed ? (
+                <>
+                  <button 
+                    onClick={handleOpenEditDetailMed}
+                    style={{
+                      padding: '8px 18px',
+                      background: '#EFF6FF',
+                      color: '#2563EB',
+                      border: '1.5px solid #BFDBFE',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '700',
+                      fontSize: '13.5px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    ✏️ แก้ไขข้อมูลยานี้
+                  </button>
+                  <button className="primary-btn-close" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>
+                    ปิดหน้าต่าง
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => setIsEditingDetailMed(false)}
+                    style={{
+                      padding: '8px 18px',
+                      background: '#F1F5F9',
+                      color: '#475569',
+                      border: '1px solid #CBD5E1',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      fontSize: '13.5px'
+                    }}
+                  >
+                    ยกเลิก
+                  </button>
+                  <button 
+                    onClick={handleSaveDetailMedEdit}
+                    disabled={isSavingDetailMed || !detailEditForm.name.trim()}
+                    style={{
+                      padding: '8px 22px',
+                      background: isSavingDetailMed ? '#94A3B8' : '#16A34A',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: isSavingDetailMed ? 'not-allowed' : 'pointer',
+                      fontWeight: '700',
+                      fontSize: '13.5px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 6px rgba(22, 163, 74, 0.3)'
+                    }}
+                  >
+                    {isSavingDetailMed ? 'กำลังบันทึกลง DB...' : '💾 บันทึกลงฐานข้อมูลทันที'}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

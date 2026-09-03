@@ -204,12 +204,17 @@ export default function DetailPage({
         setLocalPatientId('');
       } catch (err) {
         console.error('Failed to fetch queues:', err);
-        setQueueList([]);
-        setLocalPatientId('');
       }
     };
 
     fetchQueues();
+
+    // Smart Background Polling ทุกๆ 2.5 วินาที เพื่อดึงคิวล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket)
+    const pollInterval = setInterval(() => {
+      if (!document.hidden) {
+        fetchQueues();
+      }
+    }, 2500);
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
       if (data && data.action === 'db_reset') {
@@ -242,6 +247,7 @@ export default function DetailPage({
     });
 
     return () => {
+      clearInterval(pollInterval);
       unsubQueue();
       unsubExam();
       unsubVisit();

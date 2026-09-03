@@ -188,6 +188,13 @@ export default function BillingInvoicePage({
   useEffect(() => {
     fetchQueues();
 
+    // Smart Background Polling ทุกๆ 2.5 วินาที เพื่อดึงคิวใบแจ้งหนี้ล่าสุดอย่างต่อเนื่อง
+    const pollInterval = setInterval(() => {
+      if (!document.hidden) {
+        fetchQueues();
+      }
+    }, 2500);
+
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
       if (data) {
         const pName = data.patient_name || 'ผู้ป่วย';
@@ -232,6 +239,7 @@ export default function BillingInvoicePage({
     });
 
     return () => {
+      clearInterval(pollInterval);
       unsubBill();
       unsubQueue();
     };
