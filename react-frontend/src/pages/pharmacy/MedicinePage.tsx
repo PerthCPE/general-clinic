@@ -1271,13 +1271,13 @@ export default function MedicinePage() {
               <table className="stock-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                 <thead>
                   <tr>
-                    <th style={{ textAlign: 'center', width: '12%', padding: '12px 6px' }}>รหัสยา</th>
-                    <th style={{ textAlign: 'center', width: '23%', padding: '12px 8px' }}>ชื่อยา</th>
-                    <th style={{ textAlign: 'center', width: '18%', padding: '12px 6px' }}>ชนิด / หมวดหมู่ยา</th>
+                    <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>รหัสยา</th>
+                    <th style={{ textAlign: 'center', width: '22%', padding: '12px 8px' }}>ชื่อยา</th>
+                    <th style={{ textAlign: 'center', width: '16%', padding: '12px 6px' }}>ชนิด / หมวดหมู่ยา</th>
                     <th style={{ textAlign: 'center', width: '11%', padding: '12px 6px' }}>คงเหลือในคลัง</th>
                     <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>สถานะคลังยา</th>
                     <th style={{ textAlign: 'center', width: '9%', padding: '12px 6px' }}>จ่ายวันนี้</th>
-                    <th style={{ textAlign: 'center', width: '16%', padding: '12px 6px' }}>การจัดการ</th>
+                    <th style={{ textAlign: 'center', width: '21%', padding: '12px 16px 12px 6px' }}>การจัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1367,8 +1367,8 @@ export default function MedicinePage() {
                           </span>
                         </td>
                         <td className="dispensed-cell" style={{ textAlign: 'center', padding: '10px 6px', whiteSpace: 'nowrap', fontSize: '13.5px' }}>{med.dispensedToday} เม็ด</td>
-                        <td style={{ textAlign: 'center', padding: '10px 6px', whiteSpace: 'nowrap' }}>
-                          <div style={{ display: 'inline-flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                        <td style={{ textAlign: 'center', padding: '10px 16px 10px 6px', whiteSpace: 'nowrap' }}>
+                          <div style={{ display: 'inline-flex', gap: '5px', justifyContent: 'center', alignItems: 'center' }}>
                             <button
                               type="button"
                               onClick={() => handleOpenEditDetailMedDirect(med)}

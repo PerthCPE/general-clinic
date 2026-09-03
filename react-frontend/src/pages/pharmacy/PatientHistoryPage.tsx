@@ -558,14 +558,14 @@ export default function PatientHistoryPage() {
                 <table className="patient-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                   <thead>
                     <tr>
-                      <th style={{ textAlign: 'center', width: '11%', padding: '12px 6px' }}>ID (HN)</th>
-                      <th style={{ textAlign: 'left', width: '20%', padding: '12px 14px' }}>ชื่อผู้ป่วย</th>
-                      <th style={{ textAlign: 'center', width: '8%', padding: '12px 4px' }}>อายุ</th>
-                      <th style={{ textAlign: 'center', width: '8%', padding: '12px 4px' }}>กรุ๊ปเลือด</th>
-                      <th style={{ textAlign: 'center', width: '18%', padding: '12px 6px' }}>สิทธิการรักษา</th>
-                      <th style={{ textAlign: 'center', width: '13%', padding: '12px 6px' }}>จำนวนเข้ารักษา</th>
-                      <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>โรคประจำตัว</th>
-                      <th style={{ textAlign: 'center', width: '12%', padding: '12px 6px' }}>การจัดการ</th>
+                      <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>ID (HN)</th>
+                      <th style={{ textAlign: 'left', width: '18%', padding: '12px 14px' }}>ชื่อผู้ป่วย</th>
+                      <th style={{ textAlign: 'center', width: '7%', padding: '12px 4px' }}>อายุ</th>
+                      <th style={{ textAlign: 'center', width: '7%', padding: '12px 4px' }}>กรุ๊ปเลือด</th>
+                      <th style={{ textAlign: 'center', width: '16%', padding: '12px 6px' }}>สิทธิการรักษา</th>
+                      <th style={{ textAlign: 'center', width: '12%', padding: '12px 6px' }}>จำนวนเข้ารักษา</th>
+                      <th style={{ textAlign: 'center', width: '14%', padding: '12px 6px' }}>โรคประจำตัว</th>
+                      <th style={{ textAlign: 'center', width: '16%', padding: '12px 16px 12px 6px' }}>การจัดการ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -620,7 +620,7 @@ export default function PatientHistoryPage() {
                               ))}
                             </div>
                           </td>
-                          <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <td style={{ textAlign: 'center', padding: '10px 16px 10px 6px', whiteSpace: 'nowrap' }}>
                             <div style={{ display: 'inline-flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
                               <button
                                 type="button"
