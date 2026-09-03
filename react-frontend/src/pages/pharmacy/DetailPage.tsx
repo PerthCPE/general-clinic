@@ -677,17 +677,27 @@ export default function DetailPage({
               </button>
             </div>
 
-            {/* Patients Table */}
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', minWidth: '1000px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
-                <thead>
+            {/* Patients Table with Scrollable Container showing ~5 rows and sticky header */}
+            <div 
+              className="recent-patients-scroll-container"
+              style={{ 
+                overflowX: 'auto', 
+                overflowY: 'auto', 
+                maxHeight: '340px', 
+                border: '1px solid #E2E8F0', 
+                borderRadius: '10px' 
+              }}
+            >
+              <table style={{ width: '100%', minWidth: '1020px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F8FAFC' }}>
                   <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '100px', textAlign: 'center' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '120px' }}>HN</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', width: '160px' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '230px' }}>สถานะ / สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '160px' }}>การดำเนินการ</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '90px', textAlign: 'center' }}>ลำดับคิว</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '110px', textAlign: 'center' }}>HN</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '150px', textAlign: 'center' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', minWidth: '220px', textAlign: 'left' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '130px', textAlign: 'center' }}>สถานะคิว</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '160px', textAlign: 'center' }}>สิทธิการรักษา</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', width: '150px', textAlign: 'center' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -718,7 +728,7 @@ export default function DetailPage({
                             background: isDispensed ? '#F8FAFC' : undefined
                           }}
                         >
-                          <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
+                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
                             <span style={{ 
                               color: isDispensed ? '#64748B' : '#2563EB', 
                               fontWeight: '700', 
@@ -728,17 +738,21 @@ export default function DetailPage({
                               {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
                             </span>
                           </td>
-                          <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
-                            <CopyableText value={p.hn.replace(/[-]/g, '')} />
+                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', justifyContent: 'center' }}>
+                              <CopyableText value={p.hn.replace(/[-]/g, '')} />
+                            </div>
                           </td>
-                          <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
                             {p.nationalId && p.nationalId !== '-' ? (
-                              <CopyableText value={p.nationalId} color="#475569" />
+                              <div style={{ display: 'inline-flex', justifyContent: 'center' }}>
+                                <CopyableText value={p.nationalId} color="#475569" />
+                              </div>
                             ) : (
                               <span style={{ color: '#94A3B8' }}>-</span>
                             )}
                           </td>
-                          <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                          <td style={{ padding: '12px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'left' }}>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                               <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '14px' }}>{p.name}</span>
                               {p.doctorAdvice && (
@@ -748,29 +762,94 @@ export default function DetailPage({
                               )}
                             </div>
                           </td>
-                          <td style={{ padding: '14px 16px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                              <span style={{ 
-                                background: isDispensed ? '#DCFCE7' : '#DBEAFE',
-                                color: isDispensed ? '#15803D' : '#1E40AF',
-                                border: `1px solid ${isDispensed ? '#86EFAC' : '#93C5FD'}`,
-                                padding: '4px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {isDispensed ? '✓ จ่ายยาแล้ว' : 'รอจัดยา'}
-                              </span>
-                              <span style={{ 
-                                background: p.treatmentRights.includes('30') ? '#FEF9C3' : p.treatmentRights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
-                                color: p.treatmentRights.includes('30') ? '#92400E' : p.treatmentRights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
-                                border: `1px solid ${p.treatmentRights.includes('30') ? '#FDE68A' : p.treatmentRights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
-                                padding: '4px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: '600',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                {p.treatmentRights.includes('30') ? 'สิทธิ 30 บาท (สปสช.)' : p.treatmentRights}
-                              </span>
-                            </div>
+                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                            <span style={{ 
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: '105px',
+                              height: '28px',
+                              boxSizing: 'border-box',
+                              borderRadius: '9999px',
+                              fontSize: '12.5px',
+                              fontWeight: '700',
+                              background: isDispensed ? '#DCFCE7' : '#DBEAFE',
+                              color: isDispensed ? '#15803D' : '#1E40AF',
+                              border: `1.5px solid ${isDispensed ? '#86EFAC' : '#93C5FD'}`,
+                              whiteSpace: 'nowrap'
+                            }}>
+                              {isDispensed ? '✓ จ่ายยาแล้ว' : 'รอจัดยา'}
+                            </span>
                           </td>
-                          <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                            {(() => {
+                              const rights = p.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
+                              const is30 = rights.includes('30') || rights.includes('สปสช') || rights.includes('บัตรทอง');
+                              const isSSO = rights.includes('ประกันสังคม');
+                              const isGov = rights.includes('ข้าราชการ') || rights.includes('รัฐวิสาหกิจ');
+                              const isPriv = rights.includes('ประกันสุขภาพ') || rights.includes('เอกชน');
+                              const isSelf = rights.includes('ชำระเงินเอง') || rights.includes('เงินสด');
+
+                              let bg = '#F1F5F9';
+                              let color = '#475569';
+                              let border = '#CBD5E1';
+                              let label = rights;
+
+                              if (is30) {
+                                bg = '#FEF9C3';
+                                color = '#92400E';
+                                border = '#FDE68A';
+                                label = 'สิทธิ 30 บาท';
+                              } else if (isSSO) {
+                                bg = '#E0F2FE';
+                                color = '#075985';
+                                border = '#BAE6FD';
+                                label = 'ประกันสังคม';
+                              } else if (isGov) {
+                                bg = '#F3E8FF';
+                                color = '#6D28D9';
+                                border = '#DDD6FE';
+                                label = 'สิทธิ์ข้าราชการ';
+                              } else if (isPriv) {
+                                bg = '#F3E8FF';
+                                color = '#7C3AED';
+                                border = '#DDD6FE';
+                                label = 'ประกันสุขภาพเอกชน';
+                              } else if (isSelf) {
+                                bg = '#F1F5F9';
+                                color = '#334155';
+                                border = '#CBD5E1';
+                                label = 'ชำระเงินเอง';
+                              }
+
+                              return (
+                                <span 
+                                  title={rights}
+                                  style={{ 
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '135px',
+                                    height: '28px',
+                                    boxSizing: 'border-box',
+                                    borderRadius: '9999px',
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    background: bg,
+                                    color: color,
+                                    border: `1.5px solid ${border}`,
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    padding: '0 8px'
+                                  }}
+                                >
+                                  {label}
+                                </span>
+                              );
+                            })()}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                             {isDispensed ? (
                               <button 
                                 onClick={() => {
@@ -778,17 +857,20 @@ export default function DetailPage({
                                   if (onSelectPatientId) onSelectPatientId(p.id);
                                 }}
                                 style={{ 
-                                  padding: '7px 16px', 
-                                  background: localPatientId === p.id ? '#0D9488' : '#F1F5F9', 
+                                  width: '125px',
+                                  height: '34px',
+                                  background: localPatientId === p.id ? '#0D9488' : '#F0FDFA', 
                                   color: localPatientId === p.id ? '#FFFFFF' : '#0F766E', 
-                                  border: '1px solid #CBD5E1', borderRadius: '10px', 
+                                  border: '1.5px solid #99F6E4', borderRadius: '8px', 
                                   cursor: 'pointer', fontWeight: '700', fontSize: '13px',
                                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                                  whiteSpace: 'nowrap'
+                                  whiteSpace: 'nowrap',
+                                  boxShadow: localPatientId === p.id ? '0 2px 4px rgba(13, 148, 136, 0.25)' : 'none',
+                                  transition: 'all 0.15s ease'
                                 }}
                                 title="คลิกเพื่อดูประวัติใบสั่งยาที่ส่งไปการเงินแล้ว"
                               >
-                                <Check size={14} strokeWidth={2.5} />
+                                <Check size={14} strokeWidth={2.8} />
                                 ส่งการเงินแล้ว
                               </button>
                             ) : (
@@ -798,16 +880,18 @@ export default function DetailPage({
                                   if (onSelectPatientId) onSelectPatientId(p.id);
                                 }}
                                 style={{ 
-                                  padding: '8px 20px', 
+                                  width: '125px',
+                                  height: '34px',
                                   background: localPatientId === p.id ? '#10B981' : '#2563EB', 
-                                  color: 'white', border: 'none', borderRadius: '10px', 
-                                  cursor: 'pointer', fontWeight: '700', fontSize: '14px',
+                                  color: 'white', border: 'none', borderRadius: '8px', 
+                                  cursor: 'pointer', fontWeight: '700', fontSize: '13.5px',
                                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
-                                  whiteSpace: 'nowrap', minWidth: '100px',
-                                  boxShadow: localPatientId === p.id ? '0 2px 6px rgba(16, 185, 129, 0.25)' : '0 2px 6px rgba(37, 99, 235, 0.25)'
+                                  whiteSpace: 'nowrap',
+                                  boxShadow: localPatientId === p.id ? '0 2px 6px rgba(16, 185, 129, 0.25)' : '0 2px 6px rgba(37, 99, 235, 0.25)',
+                                  transition: 'all 0.15s ease'
                                 }}
                               >
-                                {localPatientId === p.id ? 'เลือกอยู่' : 'จัดยา'}
+                                {localPatientId === p.id ? '✓ เลือกอยู่' : 'จัดยา'}
                               </button>
                             )}
                           </td>
