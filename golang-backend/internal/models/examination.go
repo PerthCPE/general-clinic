@@ -53,6 +53,24 @@ type Examination struct {
 	AdviceLifestyle  string `json:"advice_lifestyle"`
 	AdviceDiseaseEdu string `json:"advice_disease_edu"`
 
+	// --- รายละเอียดใบสั่งยาฉบับของแพทย์ (เก็บเป็น JSON ข้อความเดียว) ---
+	//
+	// ทำไมต้องมีช่องนี้:
+	// ตาราง dispensings เป็นของห้องยา มีแค่ 3 ช่องคือ quantity, dosage, instructions
+	// แต่ฟอร์มสั่งยาของแพทย์กรอกได้ 7 อย่าง คือ
+	//   ขนาดการใช้ยา / ความถี่ / ระยะเวลา / จำนวน / ทางให้ยา / เวลารับประทาน / คำแนะนำพิเศษ
+	// ของเดิมเลยยัด ทางให้ยา+เวลา+คำแนะนำ รวมเป็นข้อความเดียวใส่ instructions
+	// ส่วน "ความถี่" กับ "ระยะเวลา" หายไปเลย ไม่มีที่เก็บ อ่านกลับมาไม่ได้
+	// พอเปิดประวัติย้อนหลังจึงไม่รู้ว่าครั้งก่อนสั่งกินวันละกี่ครั้ง กี่วัน
+	//
+	// แก้โดยเก็บใบสั่งยาฉบับเต็มของแพทย์ไว้ที่นี่ (แถวเดียวกับบันทึกการตรวจ)
+	// ไม่ไปแตะตาราง dispensings ของห้องยา ห้องยายังเห็นข้อมูลเหมือนเดิมทุกอย่าง
+	//
+	// รูปแบบ: JSON array ของ dto.PrescriptionItemDTO
+	// ค่าว่าง "" หมายถึงเป็นเวชระเบียนเก่าที่บันทึกไว้ก่อนมีช่องนี้
+	// เวลาอ่านต้อง fallback ไปอ่านจาก dispensings แทน
+	PrescriptionDetail string `gorm:"type:text" json:"prescription_detail"`
+
 	// --- นัดติดตามอาการ ---
 	FollowUpDate         *time.Time `json:"follow_up_date"`
 	FollowUpReason       string     `json:"follow_up_reason"`

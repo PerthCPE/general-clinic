@@ -68,6 +68,25 @@ func splitLines(s string) []string {
 	return out
 }
 
+// joinNonEmpty - ต่อข้อความหลายก้อนด้วยตัวคั่น โดยข้ามก้อนที่ว่าง
+func joinNonEmpty(parts []string, sep string) string {
+	clean := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if v := strings.TrimSpace(p); v != "" {
+			clean = append(clean, v)
+		}
+	}
+	return strings.Join(clean, sep)
+}
+
+// labelIfNotEmpty - ใส่หัวข้อนำหน้าข้อความ คืนค่าว่างถ้าไม่มีเนื้อหา
+func labelIfNotEmpty(label, value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	return label + ": " + strings.TrimSpace(value)
+}
+
 func joinLines(items []string) string {
 	clean := make([]string, 0, len(items))
 	for _, i := range items {
@@ -166,6 +185,18 @@ func GetExamination(c *gin.Context) {
 		detail.Editable = exam.Status != models.ExaminationStatusSigned
 		detail.PresentIllness = exam.PresentIllness
 		detail.ChiefComplaintDuration = exam.ComplaintDuration
+
+		// ถ้ามีใบสั่งยาฉบับเต็มเก็บไว้ ให้ใช้ตัวนี้แทนที่อ่านจาก dispensings ด้านบน
+		// เพราะ dispensings ไม่มีช่องความถี่ / ระยะเวลา / ทางให้ยา / เวลารับประทาน
+		// ถ้าไม่ทับ แพทย์เปิดเคสเดิมกลับมาแล้วช่องพวกนี้จะว่างเปล่าทุกครั้ง
+		// แล้วพอกดบันทึกซ้ำ ข้อมูลเดิมที่เคยกรอกไว้จะหายไปจริงๆ
+		if strings.TrimSpace(exam.PrescriptionDetail) != "" {
+			var savedRx []dto.PrescriptionItemDTO
+			if err := json.Unmarshal([]byte(exam.PrescriptionDetail), &savedRx); err == nil && len(savedRx) > 0 {
+				detail.Prescriptions = savedRx
+			}
+		}
+
 		detail.PhysicalExam = dto.PhysicalExamDTO{
 			GeneralAppearance: exam.PEGeneral,
 			Heent:             exam.PEHeent,
@@ -321,6 +352,95 @@ func SaveExamination(c *gin.Context) {
 	exam.FollowUpReason = req.FollowUp.Reason
 	exam.FollowUpInstructions = req.FollowUp.Instructions
 	exam.Status = status
+
+	// ============================================================================
+	// จับคู่ยาที่แพทย์สั่งกับคลังยาจริง แล้วเก็บใบสั่งยาฉบับเต็มลงบันทึกการตรวจ
+	// ============================================================================
+	// ต้องทำ "ก่อน" ทรานแซกชัน และทำ "ทุกครั้งที่บันทึก" ไม่ใช่เฉพาะตอนเซ็นปิดเคส
+	//
+	// เคยพลาดตรงนี้: โค้ดเดิมเก็บใบสั่งยาไว้ในบล็อก if signing ก้อนเดียวกับ
+	// การส่งใบยาต่อห้องยา ผลคือแพทย์กด "บันทึกผลการตรวจ" (ยังไม่ปิดเคส)
+	// การวินิจฉัยขึ้นในประวัติปกติ แต่ช่องยาว่างเปล่าทุกครั้ง
+	// เพราะทั้งบล็อกไม่ถูกรันเลย ดูเหมือนบันทึกยาไม่สำเร็จทั้งที่กดบันทึกแล้ว
+	//
+	// แยกให้ชัด:
+	//   prescription_detail (ตารางของแพทย์)  เขียนทุกครั้ง เป็นบันทึกว่าแพทย์สั่งอะไร
+	//   dispensings + คิวห้องยา              เขียนเฉพาะตอนเซ็นปิดเคส
+	//                                        เพราะเป็นการส่งของจริงให้ห้องยาจ่ายยา
+	//                                        ใบร่างที่ยังแก้ได้ต้องไม่หลุดไปถึงห้องยา
+	type resolvedPrescription struct {
+		item dto.PrescriptionItemDTO
+		med  models.Medicine
+	}
+	resolvedRx := make([]resolvedPrescription, 0, len(req.Prescriptions))
+
+	for _, p := range req.Prescriptions {
+		// ลำดับการค้นสำคัญมาก
+		// ถ้าหน้าจอแพทย์ส่ง medicine_id มาด้วย แปลว่าแพทย์ "เลือกจากรายการยาจริงในคลัง"
+		// ไม่ได้พิมพ์ชื่อขึ้นมาเอง จึงต้องเชื่อ id ก่อนเสมอ
+		// เพราะการค้นด้วยชื่อมีขั้นที่จับแบบขึ้นต้นเหมือนกัน ซึ่งอาจไปตรงกับยาคนละตัว
+		// (เช่น "Amoxicillin 500mg" กับ "Amoxicillin 500mg cap")
+		// โค้ดเดิมค้นด้วยชื่อก่อนแล้วค่อยใช้ id เป็นตัวสำรอง จึงมีโอกาสจ่ายยาผิดตัว
+		var med models.Medicine
+		if p.MedicineID > 0 {
+			config.DB.First(&med, p.MedicineID)
+		}
+		if med.ID == 0 {
+			med = FindMedicineByNameOrCode(p.MedicineCode, p.MedicineName)
+		}
+
+		// ยาที่หาไม่เจอในคลัง ต้องข้าม ห้ามเดา
+		//
+		// โค้ดเดิมตรงนี้ใส่ medID = 1 เมื่อหาไม่เจอ ซึ่งแปลว่าผู้ป่วยจะได้รับ
+		// "ยาแถวแรกของตาราง medicines" แทนยาที่แพทย์สั่งจริง โดยไม่มีใครรู้
+		// เป็นความผิดพลาดที่ถึงตัวผู้ป่วยโดยตรง จึงเปลี่ยนเป็นข้ามรายการนั้น
+		// แล้วส่งชื่อกลับไปเตือนแพทย์ผ่าน unmatched_medicines
+		if med.ID == 0 {
+			unmatchedMedicines = append(unmatchedMedicines, p.MedicineName)
+			continue
+		}
+
+		unitPrice := med.UnitPrice
+		if unitPrice <= 0 && p.UnitPrice > 0 {
+			unitPrice = p.UnitPrice
+		}
+		if unitPrice <= 0 {
+			unitPrice = 10.0
+		}
+		qty := p.Quantity
+		if qty <= 0 {
+			qty = 10
+		}
+
+		// เขียนทับด้วยค่าที่ตรวจสอบกับคลังยาแล้ว ไม่ใช้ค่าที่หน้าจอส่งมาดิบๆ
+		rx := p
+		rx.MedicineID = med.ID
+		if med.MedicineCode != "" {
+			rx.MedicineCode = med.MedicineCode
+		}
+		if rx.MedicineName == "" {
+			rx.MedicineName = med.Name
+		}
+		if rx.GenericName == "" {
+			rx.GenericName = med.GenericName
+		}
+		if rx.Category == "" {
+			rx.Category = med.Category
+		}
+		rx.Quantity = qty
+		rx.UnitPrice = unitPrice
+
+		resolvedRx = append(resolvedRx, resolvedPrescription{item: rx, med: med})
+	}
+
+	rxItems := make([]dto.PrescriptionItemDTO, 0, len(resolvedRx))
+	for _, r := range resolvedRx {
+		rxItems = append(rxItems, r.item)
+	}
+	if rxJSON, err := json.Marshal(rxItems); err == nil {
+		exam.PrescriptionDetail = string(rxJSON)
+	}
+
 	if signing {
 		exam.SignedAt = &now
 	}
@@ -456,73 +576,33 @@ func SaveExamination(c *gin.Context) {
 			config.DB.Model(&models.Patient{}).Where("id = ?", pat.ID).Update("chronic_diseases", req.ChronicDiseases)
 		}
 
-		// บันทึกรายการสั่งยาที่แพทย์สั่งลงตาราง dispensings
+		// ส่งใบสั่งยาต่อห้องยา ทำเฉพาะตอนเซ็นปิดเคสเท่านั้น
+		//
+		// รายการยาถูกจับคู่กับคลังยาไปแล้วตั้งแต่ก่อนเข้าทรานแซกชัน (ตัวแปร resolvedRx)
+		// ตรงนี้จึงไม่ต้องค้นยาซ้ำอีก แค่เขียนลงตาราง dispensings กับสร้างคิวห้องยา
+		//
+		// เหตุผลที่แยกจากการเก็บ prescription_detail:
+		// dispensings คือ "ของจริงที่ห้องยาจะจ่าย" ใบร่างที่แพทย์ยังแก้ได้ต้องไม่หลุดมาถึงนี่
+		// ส่วนประวัติของแพทย์อ่านจาก prescription_detail ซึ่งเขียนทุกครั้งที่กดบันทึก
 		config.DB.Where("visit_id = ?", visit.ID).Delete(&models.Dispensing{})
 		var medList []gin.H
 
-		for _, p := range req.Prescriptions {
-			// ค้นหายาและราคาต่อหน่วยจริงจากตาราง medicines
-			//
-			// ลำดับการค้นสำคัญมาก
-			// ถ้าหน้าจอแพทย์ส่ง medicine_id มาด้วย แปลว่าแพทย์ "เลือกจากรายการยาจริงในคลัง"
-			// ไม่ได้พิมพ์ชื่อขึ้นมาเอง จึงต้องเชื่อ id ก่อนเสมอ
-			// เพราะการค้นด้วยชื่อมีขั้นที่จับแบบขึ้นต้นเหมือนกัน ซึ่งอาจไปตรงกับยาคนละตัว
-			// (เช่น "Amoxicillin 500mg" กับ "Amoxicillin 500mg cap")
-			// โค้ดเดิมค้นด้วยชื่อก่อนแล้วค่อยใช้ id เป็นตัวสำรอง จึงมีโอกาสจ่ายยาผิดตัว
-			var med models.Medicine
-			if p.MedicineID > 0 {
-				config.DB.First(&med, p.MedicineID)
-			}
-			if med.ID == 0 {
-				med = FindMedicineByNameOrCode(p.MedicineCode, p.MedicineName)
-			}
-
-			// ยาที่หาไม่เจอในคลัง ต้องข้าม ห้ามเดา
-			//
-			// โค้ดเดิมตรงนี้ใส่ medID = 1 เมื่อหาไม่เจอ ซึ่งแปลว่าผู้ป่วยจะได้รับ
-			// "ยาแถวแรกของตาราง medicines" แทนยาที่แพทย์สั่งจริง โดยไม่มีใครรู้
-			// เป็นความผิดพลาดที่ถึงตัวผู้ป่วยโดยตรง จึงเปลี่ยนเป็นข้ามรายการนั้น
-			// แล้วส่งชื่อกลับไปเตือนแพทย์ผ่าน unmatched_medicines
-			medID := med.ID
-			if medID == 0 {
-				unmatchedMedicines = append(unmatchedMedicines, p.MedicineName)
-				continue
-			}
-			unitPrice := med.UnitPrice
-			if unitPrice <= 0 && p.UnitPrice > 0 {
-				unitPrice = p.UnitPrice
-			}
-			if unitPrice <= 0 {
-				unitPrice = 10.0
-			}
-			qty := p.Quantity
-			if qty <= 0 {
-				qty = 10
-			}
+		for _, r := range resolvedRx {
+			p := r.item
+			med := r.med
 
 			disp := models.Dispensing{
 				VisitID:      visit.ID,
-				MedicineID:   medID,
+				MedicineID:   p.MedicineID,
 				DoctorID:     doctorID,
-				Quantity:     qty,
+				Quantity:     p.Quantity,
 				Dosage:       p.Dosage,
 				Instructions: p.Instructions,
 			}
 			config.DB.Create(&disp)
 			prescriptionCount++
 
-			medName := p.MedicineName
-			if medName == "" && med.Name != "" {
-				medName = med.Name
-			}
-			genName := p.GenericName
-			if genName == "" && med.GenericName != "" {
-				genName = med.GenericName
-			}
 			cat := p.Category
-			if cat == "" && med.Category != "" {
-				cat = med.Category
-			}
 			if cat == "" {
 				cat = "ยาสามัญ"
 			}
@@ -533,14 +613,14 @@ func SaveExamination(c *gin.Context) {
 
 			medList = append(medList, gin.H{
 				"medId":        p.MedicineCode,
-				"name":         medName,
-				"genericName":  genName,
+				"name":         p.MedicineName,
+				"genericName":  p.GenericName,
 				"category":     cat,
 				"properties":   props,
 				"dosage":       p.Dosage,
 				"instructions": p.Instructions,
-				"price":        unitPrice,
-				"quantity":     qty,
+				"price":        p.UnitPrice,
+				"quantity":     p.Quantity,
 				"stock":        med.StockQuantity,
 				"stockStatus":  "พร้อมจ่าย",
 			})
@@ -744,11 +824,26 @@ func GetPatientVisitHistory(c *gin.Context) {
 			icdCode = d.ICDCode
 		}
 
-		// สัญญาณชีพจากการคัดกรองครั้งนั้น
+		// การวินิจฉัยรอง (ถ้ามี)
+		var secondary []gin.H
+		var others []models.Diagnosis
+		config.DB.Where("visit_id = ? AND is_primary = ?", v.ID, false).
+			Order("sort_order asc, id asc").Find(&others)
+		for _, o := range others {
+			name := o.NameTH
+			if name == "" {
+				name = o.NameEN
+			}
+			secondary = append(secondary, gin.H{"code": o.ICDCode, "name": name})
+		}
+
+		// สัญญาณชีพและอาการสำคัญจากการคัดกรองครั้งนั้น
 		var vitals gin.H
+		chiefComplaint := ""
 		var s models.Screening
 		if err := config.DB.Where("visit_id = ?", v.ID).Order("id desc").
 			First(&s).Error; err == nil {
+			chiefComplaint = s.ChiefComplaint
 			vitals = gin.H{
 				"bp":     formatBP(s.SystolicBP, s.DiastolicBP),
 				"pulse":  s.HeartRate,
@@ -758,24 +853,149 @@ func GetPatientVisitHistory(c *gin.Context) {
 			}
 		}
 
-		var followUp string
+		// บันทึกของแพทย์ครั้งนั้น
+		//
+		// เดิมดึงมาแค่วันนัดติดตามอาการ ทำให้ประวัติย้อนหลังบอกได้แค่
+		// "วันนั้นวินิจฉัยว่าเป็นอะไร" แต่ไม่รู้ว่ารักษาอย่างไรและสั่งยาอะไรไป
+		// ซึ่งเป็นข้อมูลที่แพทย์ต้องใช้ตอนผู้ป่วยกลับมาตรวจซ้ำ
+		var followUp, followUpReason, followUpInstructions string
+		var treatmentPlan, proceduresPerformed string
+		var assessmentNotes, clinicalNotes string
+		var presentIllness, complaintDuration string
+		var physicalExam, counseling gin.H
 		var e models.Examination
 		if err := config.DB.Where("visit_id = ?", v.ID).First(&e).Error; err == nil {
 			followUp = formatDateOnly(e.FollowUpDate)
+			followUpReason = e.FollowUpReason
+			followUpInstructions = e.FollowUpInstructions
+			treatmentPlan = e.TreatmentPlan
+			proceduresPerformed = e.ProceduresPerformed
+			assessmentNotes = e.AssessmentNotes
+			clinicalNotes = e.ClinicalNotes
+			presentIllness = e.PresentIllness
+			complaintDuration = e.ComplaintDuration
+
+			// ผลตรวจร่างกาย 8 ระบบ ส่งไปทั้งชุด ฝั่งหน้าจอค่อยซ่อนช่องที่ว่างเอง
+			// ต้องมีในประวัติ เพราะเป็นสิ่งที่แพทย์ตรวจพบด้วยตัวเองในวันนั้น
+			// ซึ่งใช้เทียบว่าอาการดีขึ้นหรือแย่ลงตอนผู้ป่วยกลับมาครั้งถัดไป
+			physicalExam = gin.H{
+				"generalAppearance": e.PEGeneral,
+				"heent":             e.PEHeent,
+				"cardiovascular":    e.PECardiovascular,
+				"respiratory":       e.PERespiratory,
+				"abdomen":           e.PEAbdomen,
+				"musculoskeletal":   e.PEMusculoskeletal,
+				"neurological":      e.PENeurological,
+				"skin":              e.PESkin,
+			}
+
+			// คำแนะนำ 5 ด้าน ส่งแยกทีละช่อง ไม่รวมเป็นข้อความเดียว
+			// เพื่อให้หน้าประวัติวางเป็นช่องหัวข้อได้เหมือนหน้าบันทึกการตรวจ
+			counseling = gin.H{
+				"medicationAdvice": e.AdviceMedication,
+				"dietAdvice":       e.AdviceDiet,
+				"exerciseAdvice":   e.AdviceExercise,
+				"lifestyleAdvice":  e.AdviceLifestyle,
+				"diseaseEducation": e.AdviceDiseaseEdu,
+			}
+		}
+
+		// ยาที่สั่งจ่ายในครั้งนั้น
+		//
+		// อ่าน 2 ที่ เรียงตามความครบถ้วนของข้อมูล
+		//   1. examinations.prescription_detail  ใบสั่งยาฉบับเต็มของแพทย์ (JSON)
+		//      มีครบทุกช่องที่แพทย์กรอก ความถี่ ระยะเวลา ทางให้ยา เวลารับประทาน คำแนะนำพิเศษ
+		//   2. ตาราง dispensings ของห้องยา  ใช้เป็นตัวสำรอง
+		//      สำหรับเวชระเบียนเก่าที่บันทึกไว้ก่อนจะมีช่อง prescription_detail
+		//      ข้อมูลจะไม่ครบ เหลือแค่ ยา + ขนาด + จำนวน + วิธีใช้รวมเป็นข้อความเดียว
+		//
+		// ห้ามสลับลำดับนี้ ถ้าเอา dispensings ขึ้นก่อน ข้อมูลใหม่จะถูกทับด้วยข้อมูลที่ครบน้อยกว่า
+		prescriptions := make([]gin.H, 0)
+
+		if strings.TrimSpace(e.PrescriptionDetail) != "" {
+			var saved []dto.PrescriptionItemDTO
+			if err := json.Unmarshal([]byte(e.PrescriptionDetail), &saved); err == nil {
+				for i, p := range saved {
+					id := p.ID
+					if id == "" {
+						id = fmt.Sprintf("rx-%d", i+1)
+					}
+					prescriptions = append(prescriptions, gin.H{
+						"id":                  id,
+						"medicineId":          p.MedicineID,
+						"medicineCode":        p.MedicineCode,
+						"medicineName":        p.MedicineName,
+						"genericName":         p.GenericName,
+						"category":            p.Category,
+						"dosage":              p.Dosage,
+						"frequency":           p.Frequency,
+						"duration":            p.Duration,
+						"quantity":            p.Quantity,
+						"unitPrice":           p.UnitPrice,
+						"route":               p.Route,
+						"timing":              p.Timing,
+						"specialInstructions": p.SpecialInstructions,
+						"instructions":        p.Instructions,
+					})
+				}
+			}
+		}
+
+		if len(prescriptions) == 0 {
+			var disp []models.Dispensing
+			if err := config.DB.Preload("Medicine").Where("visit_id = ?", v.ID).
+				Order("id asc").Find(&disp).Error; err == nil {
+				for _, d := range disp {
+					prescriptions = append(prescriptions, gin.H{
+						"id":           fmt.Sprintf("rx-%d", d.ID),
+						"medicineId":   d.MedicineID,
+						"medicineCode": d.Medicine.MedicineCode,
+						"medicineName": d.Medicine.Name,
+						"dosage":       d.Dosage,
+						"quantity":     d.Quantity,
+						"unitPrice":    d.Medicine.UnitPrice,
+						"instructions": d.Instructions,
+					})
+				}
+			}
+		}
+
+		// เหตุผลการยกเลิก เก็บอยู่ในช่อง note ของคิว ไม่ได้อยู่ในตาราง visit
+		cancelReason := ""
+		if normalizeVisitStatus(v.Status) == models.VisitStatusCancelled {
+			var q models.Queue
+			if err := config.DB.Where("visit_id = ?", v.ID).Order("id desc").
+				First(&q).Error; err == nil {
+				cancelReason = q.Note
+			}
 		}
 
 		items = append(items, gin.H{
-			"id":           v.ID,
-			"vn":           v.VN,
-			"visitDate":    visitDate,
-			"visitTime":    visitTime,
-			"doctorName":   v.Doctor.FullName,
-			"department":   v.Department,
-			"diagnosis":    diagnosis,
-			"icdCode":      icdCode,
-			"vitals":       vitals,
-			"followUpDate": followUp,
-			"status":       normalizeVisitStatus(v.Status),
+			"id":                   v.ID,
+			"vn":                   v.VN,
+			"visitDate":            visitDate,
+			"visitTime":            visitTime,
+			"doctorName":           v.Doctor.FullName,
+			"department":           v.Department,
+			"chiefComplaint":       chiefComplaint,
+			"presentIllness":       presentIllness,
+			"complaintDuration":    complaintDuration,
+			"physicalExam":         physicalExam,
+			"diagnosis":            diagnosis,
+			"icdCode":              icdCode,
+			"secondaryDiagnoses":   secondary,
+			"treatmentPlan":        treatmentPlan,
+			"proceduresPerformed":  proceduresPerformed,
+			"assessmentNotes":      assessmentNotes,
+			"clinicalNotes":        clinicalNotes,
+			"counseling":           counseling,
+			"prescriptions":        prescriptions,
+			"vitals":               vitals,
+			"followUpDate":         followUp,
+			"followUpReason":       followUpReason,
+			"followUpInstructions": followUpInstructions,
+			"cancelReason":         cancelReason,
+			"status":               normalizeVisitStatus(v.Status),
 		})
 	}
 

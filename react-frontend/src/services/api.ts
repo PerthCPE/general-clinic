@@ -1,4 +1,30 @@
 // Central API Service Client for Clinic Management System
+//
+// ==============================================================================
+// ไฟล์นี้เป็นของกลาง ทุก role ใช้ร่วมกัน  ห้ามเขียนทับทั้งไฟล์เด็ดขาด
+// ==============================================================================
+// ทุกคนในทีมเพิ่ม export ของตัวเองไว้ในไฟล์นี้ เช่น
+//   doctorApi / examinationApi (แพทย์)   dmsApi (งานเอกสาร)
+//   pharmacyApi (ห้องยา)                  billingApi (การเงิน)
+//
+// เคยเกิดขึ้นจริง: มีคนแก้ไฟล์นี้โดยใช้สำเนาเก่าที่ดึงไว้ก่อนเพื่อน merge งานเข้ามา
+// พอเซฟทับ export ของเพื่อนที่เพิ่งเพิ่ม (dmsApi) หายไปทั้งก้อน
+// ผลคือ "ทั้งเว็บจอขาว" ทุก role ใช้งานไม่ได้เลย เพราะไฟล์ที่ import ไม่เจอ
+// จะหยุดทั้งโมดูลตั้งแต่ตอนโหลด error ที่ขึ้นคือ
+//
+//   Uncaught SyntaxError: The requested module '/src/services/api.ts'
+//   does not provide an export named 'dmsApi'
+//
+// อาการหลอกมาก เพราะ tsc ผ่าน build ผ่าน และหน้าจอไม่ขึ้นอะไรให้เดาเลย
+// ต้องเปิด DevTools > Console ถึงจะเห็น
+//
+// กติกาเวลาแก้ไฟล์นี้
+//   1. git pull ก่อนเสมอ ให้แน่ใจว่าถืออยู่เวอร์ชันล่าสุด
+//   2. แก้เฉพาะบล็อกของตัวเอง อย่าจัดรูปแบบหรือเรียงลำดับใหม่ทั้งไฟล์
+//   3. ก่อน commit เช็คว่า export ของคนอื่นยังอยู่ครบ
+//      grep -c "dmsApi\|pharmacyApi\|billingApi\|doctorApi" src/services/api.ts
+//   4. ถ้าขนาดไฟล์ "เล็กลง" หลังแก้ ให้สงสัยไว้ก่อนว่าลบของคนอื่นไปแล้ว
+// ==============================================================================
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 const TOKEN_KEY = 'clinic_auth_token';
@@ -679,6 +705,14 @@ export interface BackendPrescriptionItem {
   instructions?: string;
   notes?: string;
   status?: string;
+
+  // 3 ช่องนี้แพทย์กรอกแยกกันบนหน้าจอ (ทางให้ยา / เวลารับประทาน / คำแนะนำพิเศษ-ฉลากยา)
+  // backend เก็บไว้ใน examinations.prescription_detail แล้วส่งกลับมาแยกช่อง
+  // ตาราง dispensings ของห้องยาเก็บรวมเป็นข้อความเดียวใน instructions ด้านบน
+  // เวชระเบียนเก่าที่บันทึกก่อนมีช่องนี้จะไม่มีค่าสามตัวนี้ ต้องเผื่อ undefined เสมอ
+  route?: string;
+  timing?: string;
+  specialInstructions?: string;
 }
 
 export interface SaveExaminationPayload {
@@ -725,8 +759,45 @@ export interface BackendPastVisit {
   visitTime: string;
   doctorName: string;
   department: string;
+
+  /** อาการสำคัญที่พยาบาลบันทึกตอนคัดกรองครั้งนั้น */
+  chiefComplaint?: string;
+
+  // ประวัติการเจ็บป่วยและผลตรวจร่างกายที่แพทย์บันทึกในวันนั้น
+  presentIllness?: string;
+  complaintDuration?: string;
+  physicalExam?: {
+    generalAppearance?: string;
+    heent?: string;
+    cardiovascular?: string;
+    respiratory?: string;
+    abdomen?: string;
+    musculoskeletal?: string;
+    neurological?: string;
+    skin?: string;
+  } | null;
+
   diagnosis: string;
   icdCode: string;
+  secondaryDiagnoses?: { code: string; name: string }[] | null;
+
+  // บันทึกของแพทย์ครั้งนั้น ใช้ตอนผู้ป่วยกลับมาตรวจซ้ำ
+  // ส่งแยกทีละช่องตามฟอร์มหน้าบันทึกการตรวจ ไม่รวมเป็นข้อความเดียว
+  assessmentNotes?: string;
+  clinicalNotes?: string;
+  treatmentPlan?: string;
+  proceduresPerformed?: string;
+  counseling?: {
+    medicationAdvice?: string;
+    dietAdvice?: string;
+    exerciseAdvice?: string;
+    lifestyleAdvice?: string;
+    diseaseEducation?: string;
+  } | null;
+
+  /** ยาที่จ่ายจริงในครั้งนั้น อ่านจากตาราง dispensings */
+  prescriptions?: BackendPrescriptionItem[] | null;
+
   vitals?: {
     bp?: string;
     pulse?: number;
@@ -735,6 +806,12 @@ export interface BackendPastVisit {
     spo2?: number;
   } | null;
   followUpDate: string;
+  followUpReason?: string;
+  followUpInstructions?: string;
+
+  /** เหตุผลการยกเลิก มีเฉพาะ visit ที่สถานะเป็น Cancelled */
+  cancelReason?: string;
+
   status: string;
 }
 

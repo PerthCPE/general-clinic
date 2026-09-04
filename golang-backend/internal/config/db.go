@@ -107,6 +107,15 @@ func ConnectDB() {
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS smoking_history text DEFAULT ''")
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS alcohol_history text DEFAULT ''")
 
+	// [role แพทย์] ใบสั่งยาฉบับเต็มของแพทย์ เก็บเป็น JSON
+	//
+	// ต้อง ALTER เองตรงนี้ ใช้ AutoMigrate ไม่ได้
+	// เพราะเงื่อนไขด้านบน (tableCount < 8) จะข้าม AutoMigrate ไปเลยเมื่อตารางมีครบแล้ว
+	// คอลัมน์ใหม่ที่เพิ่มใน struct จึงไม่ถูกสร้างจริงในฐานข้อมูล
+	// เคยพลาดตรงนี้มาแล้ว: แก้ struct อย่างเดียวแล้วบันทึกได้ปกติ ไม่ error
+	// แต่อ่านกลับมาได้ค่าว่างตลอด เพราะคอลัมน์ไม่มีอยู่จริง
+	database.Exec("ALTER TABLE examinations ADD COLUMN IF NOT EXISTS prescription_detail text DEFAULT ''")
+
 	// ⚡ Database Indexes สำหรับเร่งความเร็วการ Query คิว, คนไข้, ประวัติการเงิน บน Supabase
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_created_at ON queues(created_at)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_status ON queues(status)")

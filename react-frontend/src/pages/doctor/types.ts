@@ -84,6 +84,49 @@ export interface PastVisitRecord {
   doctorNotes?: string;
   followUpDate?: string;
   status?: string;
+
+  // ---- ข้อมูลเพิ่มเติมของการมาตรวจครั้งนั้น ----
+  // ใช้ตอนผู้ป่วยกลับมาตรวจซ้ำ แพทย์จะได้รู้ว่าครั้งก่อนรักษาอย่างไร
+  /** การวินิจฉัยรอง นอกเหนือจากโรคหลัก */
+  secondaryDiagnoses?: { code: string; name: string }[];
+  /** แผนการรักษาที่แพทย์วางไว้ครั้งนั้น */
+  treatmentPlan?: string;
+  /** หัตถการที่ทำในครั้งนั้น */
+  proceduresPerformed?: string;
+  /** เหตุผลทางการแพทย์และการประเมิน */
+  assessmentNotes?: string;
+  /** บันทึกทางคลินิกเพิ่มเติม */
+  clinicalNotes?: string;
+  /** คำแนะนำที่ให้ผู้ป่วย แยกเป็น 5 ด้านตามฟอร์มหน้าบันทึกการตรวจ */
+  counseling?: {
+    medicationAdvice?: string;
+    dietAdvice?: string;
+    exerciseAdvice?: string;
+    lifestyleAdvice?: string;
+    diseaseEducation?: string;
+  };
+  /** เหตุผลที่นัดติดตามอาการ */
+  followUpReason?: string;
+  /** คำแนะนำเพิ่มเติมสำหรับการนัดครั้งถัดไป */
+  followUpInstructions?: string;
+  /** เหตุผลการยกเลิก มีเฉพาะครั้งที่ถูกยกเลิกการรับบริการ */
+  cancelReason?: string;
+
+  /** ประวัติการเจ็บป่วยปัจจุบันที่แพทย์ซักในวันนั้น */
+  presentIllness?: string;
+  /** เป็นมานานเท่าไรก่อนมาพบแพทย์ */
+  complaintDuration?: string;
+  /** ผลตรวจร่างกาย 8 ระบบ ช่องที่แพทย์ไม่ได้กรอกจะเป็นค่าว่าง */
+  physicalExam?: {
+    generalAppearance?: string;
+    heent?: string;
+    cardiovascular?: string;
+    respiratory?: string;
+    abdomen?: string;
+    musculoskeletal?: string;
+    neurological?: string;
+    skin?: string;
+  };
 }
 
 export interface AttachmentItem {

@@ -122,6 +122,17 @@ type PrescriptionItemDTO struct {
 	Instructions string  `json:"instructions"`
 	Notes        string  `json:"notes"`
 	Status       string  `json:"status"`
+
+	// 3 ช่องล่างนี้เป็นช่องที่แพทย์กรอกแยกกันบนหน้าจอ
+	//   ทางให้ยา (route) / เวลารับประทาน (timing) / คำแนะนำพิเศษ-ฉลากยา (specialInstructions)
+	//
+	// ตอนส่งให้ห้องยา สามช่องนี้ถูกรวมเป็นข้อความเดียวใส่ Instructions ด้านบน
+	// เพราะตาราง dispensings มีช่องเดียว (ยังทำเหมือนเดิม ห้องยาไม่กระทบ)
+	// แต่ต้องรับค่าแยกมาด้วย เพื่อเก็บใบสั่งยาฉบับเต็มลง examinations.prescription_detail
+	// ไม่งั้นเปิดประวัติย้อนหลังแล้วแยกไม่ออกว่าอันไหนคือทางให้ยา อันไหนคือคำแนะนำ
+	Route               string `json:"route"`
+	Timing              string `json:"timing"`
+	SpecialInstructions string `json:"specialInstructions"`
 }
 
 // SaveExaminationRequest - body ของ PUT /api/doctor/visits/:id/examination

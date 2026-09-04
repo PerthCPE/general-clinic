@@ -15,6 +15,7 @@ const DoctorExaminationPage: React.FC<DoctorExaminationPageProps> = ({ onNavigat
     activeExamPatient,
     setActiveExamPatient,
     handleSavePatient,
+    handleUpdateStatus,
     isExamLoading,
     isSaving,
     saveError,
@@ -128,10 +129,30 @@ const DoctorExaminationPage: React.FC<DoctorExaminationPageProps> = ({ onNavigat
         <ExaminationView
           key={activeExamPatient.visitId ?? activeExamPatient.id}
           patient={activeExamPatient}
-          onBackToQueue={() => {
+          onBackToQueue={(nextStatus, note) => {
+            /**
+             * ออกจากหน้าตรวจ พร้อมจัดการสถานะคิวให้ถูกต้อง
+             *
+             * ทำไมต้องมี nextStatus: ตอนแพทย์กด "ตรวจผู้ป่วย" ในหน้าคิว
+             * ระบบเปลี่ยนสถานะในฐานข้อมูลเป็น "กำลังตรวจ" ไปแล้ว
+             * ถ้าออกจากหน้านี้เฉยๆ ผู้ป่วยจะค้างเป็น "กำลังตรวจ" ตลอดไป
+             * ทั้งที่ไม่มีใครตรวจอยู่ และไม่มีแพทย์คนไหนกล้าหยิบเคสนั้นไปทำต่อ
+             *
+             *   'Waiting'   = กด "ออกจากหน้าตรวจ" คืนคิวให้ผู้ป่วยรอตรวจตามเดิม
+             *   'Cancelled' = กด "ยกเลิกการรับบริการ" เอาผู้ป่วยออกจากคิววันนี้
+             *   undefined   = บันทึกเสร็จแล้วออกเอง สถานะถูกตั้งโดยการบันทึกไปแล้ว
+             *                 ห้ามเขียนทับ ไม่งั้นเคสที่เพิ่งปิดจะเด้งกลับเข้าคิว
+             */
+            if (nextStatus) {
+              // note = เหตุผลการยกเลิก ที่แพทย์เลือกในกล่องยืนยัน
+              // ไปลงช่อง note ของคิว จะได้ตอบได้ทีหลังว่าทำไมเคสนี้ถูกยกเลิก
+              handleUpdateStatus(activeExamPatient.id, nextStatus, note);
+            }
+
             // ปิดเคสแล้วไม่ต้องค้างผู้ป่วยคนเดิมไว้ในหน้าตรวจ
             // (ฉบับร่างยังเก็บไว้ เพราะแพทย์ต้องกลับมาทำต่อ)
-            if (activeExamPatient.status === 'Completed') {
+            // ออกแบบคืนคิวหรือยกเลิกก็ต้องล้างเช่นกัน ไม่งั้นกดเมนูกลับมาจะเจอฟอร์มเดิมค้าง
+            if (activeExamPatient.status === 'Completed' || nextStatus) {
               setActiveExamPatient(null);
             }
             onNavigate('doctor-queue');
