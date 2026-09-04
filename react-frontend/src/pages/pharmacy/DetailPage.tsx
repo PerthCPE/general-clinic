@@ -404,64 +404,7 @@ export default function DetailPage({
 
 
 
-  // จำลองแพทย์ส่งคนไข้ใหม่ - บันทึกลง DB จริงแบบ Real-time
-  const handleSimulateDoctorSubmit = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/system/simulate-prescription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const pName = data.patient_name || 'ผู้ป่วยใหม่';
-        const qNo = data.queue?.queue_number || 'Q0001';
-        const qId = String(data.queue?.id || Date.now());
 
-        const newPatient: PatientConfig = {
-          id: qId,
-          visitId: data.visit_id || 1,
-          hn: data.hn || `HN-${Date.now()}`,
-          nationalId: data.patient?.national_id || '',
-          queueNumber: qNo,
-          ticket: qNo,
-          name: pName,
-          shortName: pName,
-          gender: data.patient?.gender || 'ชาย',
-          age: data.patient?.birthdate ? (new Date().getFullYear() - new Date(data.patient.birthdate).getFullYear()) : 35,
-          treatmentRights: data.patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
-          patientType: 'ผู้ป่วยนอก (OPD)',
-          allergies: data.patient?.allergies ? [data.patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
-          chronicDiseases: data.patient?.chronic_diseases || 'ไม่มี',
-          vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-          visitStatus: 'รอรับยา / ชำระเงิน',
-          visitDate: new Date().toLocaleDateString('th-TH'),
-          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-          doctorAdvice: data.queue?.note || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
-          medications: data.medications || []
-        };
-
-        setQueueList(prev => [newPatient, ...prev.filter(q => q.id !== newPatient.id)]);
-        setLocalPatientId(newPatient.id);
-        if (onSelectPatientId) onSelectPatientId(newPatient.id);
-
-        triggerToast(`บันทึกใบสั่งยาเรียบร้อยแล้ว`, 'doctor');
-      } else {
-        fallbackSimulate();
-      }
-    } catch {
-      fallbackSimulate();
-    }
-  };
-
-  const fallbackSimulate = () => {
-    // Backend fetch failed, do not use CLINIC_CONFIG mock data anymore.
-    // Ensure you start the backend before clicking this.
-    triggerToast(`ไม่สามารถเชื่อมต่อฐานข้อมูลได้`, 'error');
-  };
 
   // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - กดยืนยันจ่ายยาแล้วอัปเดตหน้าจอทันทีใน 0 ms และส่งขึ้น Supabase เบื้องหลัง
   const handleSendToBilling = async () => {
@@ -576,12 +519,6 @@ export default function DetailPage({
           <h1 className="page-title">รายละเอียดการจ่ายยา</h1>
           <p className="page-subtitle">บันทึกและตรวจสอบคำสั่งจ่ายยา คัดกรองรายการยา และตัดสต็อกยา</p>
         </div>
-        <button className="doctor-submit-sim-btn" onClick={handleSimulateDoctorSubmit}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-          </svg>
-          จำลองหมอกด Submit ใบสั่งยา
-        </button>
       </div>
 
       {/* Executive Pharmacy Stat Cards (Image 2 Format) */}
