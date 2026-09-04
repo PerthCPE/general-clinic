@@ -1355,3 +1355,31 @@ body.dark-mode .dms-notice-sub {
   cursor: not-allowed;
   transform: none;
 }
+
+/* Storage Breakdown Section */
+.dms-storage-breakdown-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed #CBD5E1;
+}
+
+body.dark-mode .dms-storage-breakdown-section {
+  border-top-color: #333F53;
+}
+
+.dms-breakdown-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 12px 0;
+}
+
+body.dark-mode .dms-breakdown-title {
+  color: #F8FAFC;
+}
+
+.dms-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

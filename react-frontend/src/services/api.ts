@@ -334,6 +334,25 @@ export const vitalsApi = {
 // ==============================================================================
 // 6. Officer DMS (Document Management & Forwarding) API
 // ==============================================================================
+export interface StorageBreakdown {
+  type: string;
+  size_bytes: number;
+  size_mb: number;
+  count: number;
+}
+
+export interface StorageStats {
+  quota_bytes: number;
+  quota_mb: number;
+  used_bytes: number;
+  used_mb: number;
+  remaining_bytes: number;
+  remaining_mb: number;
+  percentage: number;
+  total_files: number;
+  breakdown?: StorageBreakdown[];
+}
+
 export interface BackendUser {
   id: number;
   username: string;
@@ -348,6 +367,7 @@ export interface BackendDocument {
   external_doc_ref: string;
   subject: string;
   file_url: string;
+  file_size?: number;
   status?: 'reviewing' | 'approved' | 'draft' | string;
   doc_type?: string;
   created_by: number;
@@ -377,6 +397,7 @@ export const dmsApi = {
     external_doc_ref?: string;
     subject: string;
     file_url?: string;
+    file_size?: number;
     doc_type?: string;
     status?: string;
   }) =>
@@ -393,6 +414,7 @@ export const dmsApi = {
       method: 'PUT',
       body: JSON.stringify({ status }),
     }),
+  getStorageStats: () => request<StorageStats>('/api/officer/storage/stats'),
   getForwards: () => request<BackendDocumentForward[]>('/api/officer/documents/forwards'),
   forwardDocument: (payload: {
     doc_id: number;

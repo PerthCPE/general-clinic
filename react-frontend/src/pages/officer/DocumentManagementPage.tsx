@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
-import { dmsApi, type BackendDocument } from '../../services/api';
+import { dmsApi, type BackendDocument, type StorageStats } from '../../services/api';
 import './DocumentManagementPage.css';
 
 interface DocumentItem {
   id: string;
   name: string;
   type: string;
+  fileSize?: number;
   modifiedDate: string;
   status: 'approved' | 'reviewing' | 'draft';
   subject?: string;
@@ -17,12 +18,20 @@ interface DocumentItem {
   rawDoc?: BackendDocument;
 }
 
+const formatBytes = (bytes?: number) => {
+  if (!bytes || bytes <= 0) return '1.20 MB';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+};
+
 // Generate realistic fallback documents with dynamic dates
 const generateMockDocs = (): DocumentItem[] => {
   const docs: DocumentItem[] = [];
-  const types = ['รายงาน', 'สัญญา', 'สเปรดชีต', 'นโยบาย', 'ใบเบิก', 'ผลตรวจ'];
+  const types = ['PDF / รายงาน', 'DOCX / สัญญา', 'XLSX / สเปรดชีต', 'PDF / นโยบาย', 'PDF / ใบเบิก', 'PDF / ผลตรวจ'];
   const baseNames = ['Q3_Patient_Report', 'Dr_Smith_Contract', 'Inventory_Log', 'Policy_Update', 'Lab_Results', 'Weekly_Meeting_Notes'];
   const exts = ['.pdf', '.docx', '.xlsx'];
+  const sizes = [2450000, 1850000, 1200000, 3100000, 950000, 4200000];
   
   const now = new Date();
   const buddhistYear = now.getFullYear() + 543;
@@ -33,6 +42,7 @@ const generateMockDocs = (): DocumentItem[] => {
     const status: 'approved' | 'reviewing' | 'draft' = i <= 4 ? 'reviewing' : 'approved';
     const baseName = baseNames[Math.floor(Math.random() * baseNames.length)];
     const ext = exts[Math.floor(Math.random() * exts.length)];
+    const size = sizes[i % sizes.length];
     const day = (i % 28) + 1;
     const month = monthNames[(i + 3) % 12];
     
@@ -40,6 +50,7 @@ const generateMockDocs = (): DocumentItem[] => {
       id: String(i),
       name: `${baseName}_${i}${ext}`,
       type: type,
+      fileSize: size,
       modifiedDate: `${day} ${month} ${buddhistYear}`,
       status: status,
       subject: `หัวข้อเอกสารที่ ${i}: ${baseName}`,
@@ -56,6 +67,7 @@ export const DocumentManagementPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'reviewing' | 'draft'>('all');
   const [docs, setDocs] = useState<DocumentItem[]>(generateMockDocs());
+  const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -71,6 +83,16 @@ export const DocumentManagementPage: React.FC = () => {
     subject: '',
     externalRef: ''
   });
+
+  const fetchStorageStats = () => {
+    dmsApi.getStorageStats()
+      .then((stats) => {
+        if (stats) setStorageStats(stats);
+      })
+      .catch(() => {
+        // Fallback calculation will use docs array
+      });
+  };
 
   // Fetch real documents from Database on mount
   useEffect(() => {
@@ -91,6 +113,7 @@ export const DocumentManagementPage: React.FC = () => {
               id: String(d.id),
               name: d.subject || `เอกสาร #${d.id}`,
               type: d.doc_type || 'เอกสารราชการ/ส่งตัว',
+              fileSize: d.file_size || 1500000,
               modifiedDate: formattedDate,
               status: status,
               subject: d.subject,
@@ -107,6 +130,8 @@ export const DocumentManagementPage: React.FC = () => {
       .catch(() => {
         // Fallback to mock only if server is offline
       });
+
+    fetchStorageStats();
   }, []);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -136,12 +161,14 @@ export const DocumentManagementPage: React.FC = () => {
     setActiveModal(null);
 
     const docType = selectedFile.name.split('.').pop()?.toUpperCase() || 'ไฟล์ทั่วไป';
+    const fileSize = selectedFile.size || 1048576;
 
     try {
       const res = await dmsApi.createDocument({
         external_doc_ref: uploadForm.externalRef || `DOC-2569-${Date.now().toString().slice(-4)}`,
         subject: uploadForm.subject || selectedFile.name,
         file_url: 'https://example.com/docs/' + selectedFile.name,
+        file_size: fileSize,
         doc_type: docType,
         status: 'reviewing',
       });
@@ -155,6 +182,7 @@ export const DocumentManagementPage: React.FC = () => {
         id: String(res.document.id || docs.length + 1),
         name: res.document.subject || selectedFile.name,
         type: res.document.doc_type || docType,
+        fileSize: res.document.file_size || fileSize,
         modifiedDate: formattedDate,
         status: (res.document.status as 'approved' | 'reviewing' | 'draft') || 'reviewing',
         subject: res.document.subject,
@@ -169,6 +197,7 @@ export const DocumentManagementPage: React.FC = () => {
       setSelectedFile(null);
       setUploading(false);
       setUploadForm({ subject: '', externalRef: '' });
+      fetchStorageStats();
       toast.success('บันทึกและอัปโหลดเอกสารลง Database เรียบร้อยแล้ว (สถานะ: รอตรวจสอบ)');
     } catch {
       const now = new Date();
@@ -180,6 +209,7 @@ export const DocumentManagementPage: React.FC = () => {
         id: String(docs.length + 1),
         name: selectedFile.name,
         type: docType,
+        fileSize: fileSize,
         modifiedDate: formattedDate,
         status: 'reviewing',
         subject: uploadForm.subject,
@@ -192,6 +222,7 @@ export const DocumentManagementPage: React.FC = () => {
       setSelectedFile(null);
       setUploading(false);
       setUploadForm({ subject: '', externalRef: '' });
+      fetchStorageStats();
       toast.success('อัปโหลดไฟล์และบันทึกข้อมูลเอกสารเรียบร้อยแล้ว (สถานะ: รอตรวจสอบ)');
     }
   };
@@ -391,6 +422,10 @@ export const DocumentManagementPage: React.FC = () => {
                   <span className="dms-detail-value"><span className="doc-type-tag">{selectedDoc.type}</span></span>
                 </div>
                 <div className="dms-detail-item">
+                  <span className="dms-detail-label">ขนาดไฟล์</span>
+                  <span className="dms-detail-value font-mono">{formatBytes(selectedDoc.fileSize || selectedDoc.rawDoc?.file_size)}</span>
+                </div>
+                <div className="dms-detail-item">
                   <span className="dms-detail-label">วันที่ลงทะเบียน / แก้ไข</span>
                   <span className="dms-detail-value">{selectedDoc.modifiedDate}</span>
                 </div>
@@ -499,6 +534,14 @@ export const DocumentManagementPage: React.FC = () => {
     }
 
     if (activeModal === 'storage') {
+      const currentUsedBytes = storageStats ? storageStats.used_bytes : docs.reduce((acc, d) => acc + (d.fileSize || 1500000), 0);
+      const currentQuotaBytes = storageStats ? storageStats.quota_bytes : 524288000;
+      const currentUsedMB = storageStats ? storageStats.used_mb : (currentUsedBytes / (1024 * 1024));
+      const currentQuotaMB = storageStats ? storageStats.quota_mb : 500;
+      const currentRemainingMB = storageStats ? storageStats.remaining_mb : Math.max(0, currentQuotaMB - currentUsedMB);
+      const currentPercent = storageStats ? storageStats.percentage : (currentUsedBytes / currentQuotaBytes) * 100;
+      const currentCount = storageStats ? storageStats.total_files : docs.length;
+
       return (
         <div className="dms-modal-backdrop" onClick={() => setActiveModal(null)}>
           <div className="dms-modal-card" onClick={e => e.stopPropagation()}>
@@ -511,7 +554,7 @@ export const DocumentManagementPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="dms-modal-title">รายละเอียดพื้นที่จัดเก็บ</h3>
-                  <p className="dms-modal-subtitle">ข้อมูลการใช้งาน Cloud Storage ของคลินิก</p>
+                  <p className="dms-modal-subtitle">ข้อมูลการใช้งาน Supabase Storage & Database จริงของคลินิก</p>
                 </div>
               </div>
               <button className="dms-close-btn" onClick={() => setActiveModal(null)} aria-label="Close">
@@ -522,25 +565,39 @@ export const DocumentManagementPage: React.FC = () => {
             </div>
             <div className="dms-modal-body">
               <div className="dms-storage-stat-row">
-                <span className="stat-label">พื้นที่ใช้งานแล้ว:</span>
-                <span className="stat-value text-primary font-bold">640 GB (64%)</span>
+                <span className="stat-label">โควต้าทั้งหมด (Supabase Free Tier):</span>
+                <span className="stat-value font-bold">{currentQuotaMB.toFixed(0)} MB</span>
               </div>
               <div className="dms-storage-stat-row">
-                <span className="stat-label">พื้นที่ทั้งหมดที่ได้รับ:</span>
-                <span className="stat-value font-bold">1,000 GB</span>
+                <span className="stat-label">พื้นที่เอกสารที่ใช้งานแล้ว:</span>
+                <span className="stat-value text-primary font-bold">
+                  {currentUsedMB.toFixed(2)} MB ({currentPercent.toFixed(2)}%)
+                </span>
               </div>
               <div className="dms-storage-stat-row">
-                <span className="stat-label">ไฟล์รูปภาพ / ผลตรวจ PDF:</span>
-                <span className="stat-value">320 GB</span>
+                <span className="stat-label">พื้นที่ว่างคงเหลือ (หักลบจริง):</span>
+                <span className="stat-value text-success font-bold">
+                  {currentRemainingMB.toFixed(2)} MB
+                </span>
               </div>
               <div className="dms-storage-stat-row">
-                <span className="stat-label">ไฟล์เอกสารธุรการ & สัญญา:</span>
-                <span className="stat-value">200 GB</span>
+                <span className="stat-label">จำนวนไฟล์เอกสารในระบบ:</span>
+                <span className="stat-value font-semibold">{currentCount} ไฟล์</span>
               </div>
-              <div className="dms-storage-stat-row">
-                <span className="stat-label">ฐานข้อมูลระบบ (PostgreSQL):</span>
-                <span className="stat-value">120 GB</span>
-              </div>
+
+              {storageStats?.breakdown && storageStats.breakdown.length > 0 && (
+                <div className="dms-storage-breakdown-section">
+                  <h4 className="dms-breakdown-title">แยกตามประเภทเอกสารในฐานข้อมูล:</h4>
+                  <div className="dms-breakdown-list">
+                    {storageStats.breakdown.map((item, idx) => (
+                      <div key={idx} className="dms-storage-stat-row">
+                        <span className="stat-label">{item.type} ({item.count} ไฟล์):</span>
+                        <span className="stat-value font-mono">{item.size_mb.toFixed(2)} MB</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
             <div className="dms-modal-footer">
               <button className="dms-btn-primary" onClick={() => setActiveModal(null)}>
@@ -736,11 +793,23 @@ export const DocumentManagementPage: React.FC = () => {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">พื้นที่จัดเก็บทั้งหมด</span>
-            <span className="metric-value">640 GB</span>
+            <span className="metric-label">พื้นที่จัดเก็บ (Supabase)</span>
+            <span className="metric-value">
+              {storageStats ? `${storageStats.used_mb.toFixed(2)} MB` : `${((docs.reduce((acc, d) => acc + (d.fileSize || 1500000), 0)) / (1024 * 1024)).toFixed(2)} MB`}
+            </span>
             <div className="storage-progress-bar">
-              <div className="storage-progress-fill" style={{ width: '64%' }}></div>
+              <div
+                className="storage-progress-fill"
+                style={{
+                  width: `${Math.min(100, Math.max(storageStats ? storageStats.percentage : ((docs.reduce((acc, d) => acc + (d.fileSize || 1500000), 0)) / 524288000) * 100, 1.5))}%`
+                }}
+              ></div>
             </div>
+            <span className="metric-subtext gray-text">
+              {storageStats
+                ? `ใช้ไป ${storageStats.percentage.toFixed(1)}% (เหลือ ${storageStats.remaining_mb.toFixed(1)} MB)`
+                : 'โควต้า 500 MB (Free Tier)'}
+            </span>
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"math"
 	"net/http"
 	"strconv"
 	"time"
@@ -17,8 +18,28 @@ type CreateDocumentReq struct {
 	ExternalDocRef string `json:"external_doc_ref"`
 	Subject        string `json:"subject" binding:"required"`
 	FileURL        string `json:"file_url"`
+	FileSize       int64  `json:"file_size"`
 	DocType        string `json:"doc_type"`
 	Status         string `json:"status"`
+}
+
+type StorageBreakdown struct {
+	Type      string  `json:"type"`
+	SizeBytes int64   `json:"size_bytes"`
+	SizeMB    float64 `json:"size_mb"`
+	Count     int64   `json:"count"`
+}
+
+type StorageStatsResponse struct {
+	QuotaBytes     int64              `json:"quota_bytes"`
+	QuotaMB        float64            `json:"quota_mb"`
+	UsedBytes      int64              `json:"used_bytes"`
+	UsedMB         float64            `json:"used_mb"`
+	RemainingBytes int64              `json:"remaining_bytes"`
+	RemainingMB    float64            `json:"remaining_mb"`
+	Percentage     float64            `json:"percentage"`
+	TotalFiles     int64              `json:"total_files"`
+	Breakdown      []StorageBreakdown `json:"breakdown"`
 }
 
 type UpdateDocumentStatusReq struct {
@@ -101,11 +122,16 @@ func CreateDocument(c *gin.Context) {
 		ExternalDocRef: docRef,
 		Subject:        req.Subject,
 		FileURL:        req.FileURL,
+		FileSize:       req.FileSize,
 		DocType:        docType,
 		Status:         status,
 		CreatedBy:      userID,
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
+	}
+
+	if newDoc.FileSize <= 0 {
+		newDoc.FileSize = 1048576 // ค่าเริ่มต้น 1 MB หากไม่ได้ระบุขนาดไฟล์
 	}
 
 	if err := config.DB.Create(&newDoc).Error; err != nil {
@@ -122,6 +148,64 @@ func CreateDocument(c *gin.Context) {
 		"message":  "บันทึกเอกสารเรียบร้อยแล้ว (สถานะ: รอตรวจสอบ)",
 		"document": newDoc,
 	})
+}
+
+// 2.0 GetStorageStats - ดึงข้อมูลสถิติพื้นที่จัดเก็บจริงจาก Supabase (PostgreSQL / Document Files)
+func GetStorageStats(c *gin.Context) {
+	// Supabase Free Tier Storage / Database Quota = 500 MB (524,288,000 bytes)
+	const quotaBytes int64 = 524288000
+	const quotaMB float64 = 500.0
+
+	var totalBytes int64
+	config.DB.Model(&models.Document{}).Select("COALESCE(SUM(file_size), 0)").Scan(&totalBytes)
+
+	var totalFiles int64
+	config.DB.Model(&models.Document{}).Count(&totalFiles)
+
+	// แยกสรุปตามประเภทเอกสาร
+	type TypeSum struct {
+		DocType string
+		Total   int64
+		Count   int64
+	}
+	var typeSums []TypeSum
+	config.DB.Model(&models.Document{}).
+		Select("COALESCE(doc_type, 'ทั่วไป') as doc_type, COALESCE(SUM(file_size), 0) as total, COUNT(*) as count").
+		Group("doc_type").
+		Scan(&typeSums)
+
+	breakdown := make([]StorageBreakdown, 0)
+	for _, ts := range typeSums {
+		sizeMB := float64(ts.Total) / (1024.0 * 1024.0)
+		breakdown = append(breakdown, StorageBreakdown{
+			Type:      ts.DocType,
+			SizeBytes: ts.Total,
+			SizeMB:    math.Round(sizeMB*100) / 100,
+			Count:     ts.Count,
+		})
+	}
+
+	usedMB := float64(totalBytes) / (1024.0 * 1024.0)
+	remainingBytes := quotaBytes - totalBytes
+	if remainingBytes < 0 {
+		remainingBytes = 0
+	}
+	remainingMB := float64(remainingBytes) / (1024.0 * 1024.0)
+	percentage := (float64(totalBytes) / float64(quotaBytes)) * 100.0
+
+	resp := StorageStatsResponse{
+		QuotaBytes:     quotaBytes,
+		QuotaMB:        quotaMB,
+		UsedBytes:      totalBytes,
+		UsedMB:         math.Round(usedMB*100) / 100,
+		RemainingBytes: remainingBytes,
+		RemainingMB:    math.Round(remainingMB*100) / 100,
+		Percentage:     math.Round(percentage*100) / 100,
+		TotalFiles:     totalFiles,
+		Breakdown:      breakdown,
+	}
+
+	c.JSON(http.StatusOK, resp)
 }
 
 // 2.1 ApproveDocument - อนุมัติเอกสาร

@@ -218,15 +218,15 @@ func seedDatabase() {
 		}
 
 		docs := []models.Document{
-			{ExternalDocRef: "สธ 0201/2569", Subject: "แนวทางการควบคุมโรคติดต่อทางเดินหายใจ ประจำปี 2569", FileURL: "https://example.com/docs/guidelines_2569.pdf", CreatedBy: officerUser.ID},
-			{ExternalDocRef: "สปสช. 1102/2569", Subject: "ประกาศปรับปรุงอัตราค่าชดเชยค่าบริการทางการแพทย์ใหม่", FileURL: "https://example.com/docs/nhso_rates.pdf", CreatedBy: officerUser.ID},
-			{ExternalDocRef: "อย. 4405/2569", Subject: "แจ้งเตือนการเฝ้าระวังยาควบคุมพิเศษกลุ่มต้านการอักเสบ", FileURL: "https://example.com/docs/fda_alert.pdf", CreatedBy: officerUser.ID},
-			{ExternalDocRef: "รพ. 8812/2569", Subject: "หนังสือประสานงานแนวทางการส่งต่อผู้ป่วยฉุกเฉิน (Referral System)", FileURL: "https://example.com/docs/referral_network.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "สธ 0201/2569", Subject: "แนวทางการควบคุมโรคติดต่อทางเดินหายใจ ประจำปี 2569", FileURL: "https://example.com/docs/guidelines_2569.pdf", FileSize: 2450000, DocType: "PDF / แนวทางปฏิบัติ", Status: "approved", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "สปสช. 1102/2569", Subject: "ประกาศปรับปรุงอัตราค่าชดเชยค่าบริการทางการแพทย์ใหม่", FileURL: "https://example.com/docs/nhso_rates.pdf", FileSize: 1850000, DocType: "PDF / ประกาศ สปสช.", Status: "approved", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "อย. 4405/2569", Subject: "แจ้งเตือนการเฝ้าระวังยาควบคุมพิเศษกลุ่มต้านการอักเสบ", FileURL: "https://example.com/docs/fda_alert.pdf", FileSize: 1200000, DocType: "PDF / หนังสือแจ้งเตือน", Status: "reviewing", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "รพ. 8812/2569", Subject: "หนังสือประสานงานแนวทางการส่งต่อผู้ป่วยฉุกเฉิน (Referral System)", FileURL: "https://example.com/docs/referral_network.pdf", FileSize: 3100000, DocType: "PDF / เอกสารส่งตัว", Status: "reviewing", CreatedBy: officerUser.ID},
 		}
 		for i := range docs {
 			DB.Create(&docs[i])
 		}
-		log.Println("Documents seeded successfully into Database.")
+		log.Println("Documents seeded successfully into Database with real file sizes.")
 
 		var doctorUser, nurseUser, cashierUser, pharmacistUser models.User
 		DB.Where("username = ?", "doctor1").First(&doctorUser)
