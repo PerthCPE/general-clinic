@@ -13,8 +13,8 @@ export const ClinicSkeleton: React.FC<SkeletonProps> = ({
   rows = 5, 
   type = 'table',
   showLoadingPopup = true,
-  popupTitle = 'กำลังโหลดข้อมูล',
-  popupSubtitle = 'กรุณารอสักครู่ ระบบกำลังดึงข้อมูลจากฐานข้อมูล...'
+  popupTitle = 'กำลังโหลดข้อมูลจากฐานข้อมูล',
+  popupSubtitle = 'กรุณารอสักครู่ ระบบกำลังดึงข้อมูล...'
 }) => {
   return (
     <div className="clinic-skeleton-container" style={{ width: '100%', padding: '16px 0', animation: 'fadeIn 0.3s ease-out' }}>
@@ -23,10 +23,14 @@ export const ClinicSkeleton: React.FC<SkeletonProps> = ({
           0% { background-position: -200% 0; }
           100% { background-position: 200% 0; }
         }
+        @keyframes doctorPulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
         .skel-bone {
           background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
           background-size: 200% 100%;
-          animation: shimmerGPU 1.5s infinite;
+          animation: shimmerGPU 1.5s infinite, doctorPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
           border-radius: 8px;
         }
         body.dark-mode .skel-bone {
@@ -35,7 +39,7 @@ export const ClinicSkeleton: React.FC<SkeletonProps> = ({
         }
       `}</style>
 
-      {/* ป๊อกอัพโหลดข้อมูลตรงกลางจอพร้อมฉากหลังเบลอสวยงาม และล็อก Scroll */}
+      {/* ป๊อกอัพโหลดข้อมูลตรงกลางจอพร้อมฉากหลังเบลอสวยงาม และล็อก Scroll สไตล์แผนกแพทย์ */}
       {showLoadingPopup && (
         <ClinicActionLoadingModal
           isOpen={true}
