@@ -22,11 +22,13 @@ body.dark-mode .patient-history-container {
 }
 
 .patient-history-container .page-title {
-  color: #0F172A;
-  font-size: 28px;
+  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
+  font-size: 30px;
   font-weight: 700;
+  line-height: 38px;
+  color: #0F172A;
   margin: 0 0 4px 0;
-  line-height: 1.25;
+  transition: color 0.5s ease;
 }
 
 body.dark-mode .patient-history-container .page-title {
@@ -34,10 +36,13 @@ body.dark-mode .patient-history-container .page-title {
 }
 
 .patient-history-container .page-subtitle {
-  font-size: 14.5px;
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 22px;
   color: #64748B;
   margin: 0;
-  line-height: 1.4;
+  transition: color 0.5s ease;
 }
 
 body.dark-mode .patient-history-container .page-subtitle {
@@ -252,23 +257,27 @@ body.dark-mode .patient-history-container .history-name-link {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(15, 23, 42, 0.65);
-  z-index: 9999;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 3000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 20px;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .patient-history-container .patient-history-modal-card {
   background: white;
   border-radius: 18px;
-  max-width: 780px;
+  max-width: 580px;
   width: 100%;
-  padding: 28px 32px;
-  box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.25);
-  max-height: 90vh;
+  padding: 0;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  max-height: calc(100vh - 48px);
   overflow-y: auto;
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 body.dark-mode .patient-history-container .patient-history-modal-card {

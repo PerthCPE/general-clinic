@@ -1666,7 +1666,7 @@ export default function MedicinePage() {
       {/* Medicine Info Detail Modal (รองรับทั้งดูรายละเอียด และแก้ไขลง DB ทันที) */}
       {detailModalMed && (
         <div className="modal-overlay" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>
-          <div className="med-detail-modal-card card" style={{ maxWidth: '680px', width: '92%' }} onClick={(e) => e.stopPropagation()}>
+          <div className="med-detail-modal-card card" style={{ maxWidth: '580px', width: '92%' }} onClick={(e) => e.stopPropagation()}>
             <div className="med-detail-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #E2E8F0', paddingBottom: '16px', marginBottom: '18px' }}>
               <div className="med-detail-title-box" style={{ flex: 1, minWidth: 0, paddingRight: '20px' }}>
                 <div style={{ marginBottom: '8px' }}>

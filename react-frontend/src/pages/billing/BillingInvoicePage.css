@@ -276,11 +276,14 @@ body.dark-mode .billing-invoice-container .queue-strip-item:hover {
 }
 
 .billing-invoice-container .page-title {
-  font-size: 1.4rem;
-  font-weight: 800;
+  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 38px;
   color: #0F172A;
   margin: 0 0 4px 0;
   letter-spacing: -0.3px;
+  transition: color 0.5s ease;
 }
 
 body.dark-mode .billing-invoice-container .page-title {
@@ -288,9 +291,17 @@ body.dark-mode .billing-invoice-container .page-title {
 }
 
 .billing-invoice-container .page-subtitle {
-  font-size: 0.88rem;
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 22px;
   color: #64748B;
   margin: 0;
+  transition: color 0.5s ease;
+}
+
+body.dark-mode .billing-invoice-container .page-subtitle {
+  color: #94A3B8;
 }
 
 .billing-invoice-container .billing-patient-card {
@@ -339,10 +350,11 @@ body.dark-mode .billing-invoice-container .banner-rights-select option {
 }
 
 .billing-invoice-container .fee-card-title {
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
+  font-size: 18px;
+  font-weight: 700;
   color: #0F172A;
-  margin: 0 0 20px 0;
+  margin: 0 0 18px 0;
   border-bottom: 1px solid #E2E8F0;
   padding-bottom: 12px;
 }
@@ -461,20 +473,27 @@ body.dark-mode .billing-invoice-container .grand-price {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(15, 23, 42, 0.65);
-  z-index: 999;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 3000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 20px;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .billing-invoice-container .qr-modal-card {
   background: white;
-  border-radius: 16px;
-  max-width: 800px;
+  border-radius: 18px;
+  max-width: 580px;
   width: 100%;
-  padding: 24px 28px;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 body.dark-mode .billing-invoice-container .qr-modal-card {
@@ -496,8 +515,9 @@ body.dark-mode .billing-invoice-container .qr-modal-header {
 }
 
 .billing-invoice-container .qr-modal-title {
-  font-size: 1.25rem;
-  font-weight: 800;
+  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
+  font-size: 18px;
+  font-weight: 700;
   margin: 0 0 2px 0;
   color: #0F172A;
 }

@@ -1480,8 +1480,9 @@ export default function DetailPage({
           style={{
             position: 'fixed',
             top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(15, 23, 42, 0.65)',
+            background: 'rgba(15, 23, 42, 0.6)',
             backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -1493,21 +1494,21 @@ export default function DetailPage({
           <div 
             style={{
               background: '#FFFFFF',
-              borderRadius: '16px',
-              maxWidth: '520px',
-              width: '100%',
-              padding: '28px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
-              border: '1px solid #E2E8F0'
+              borderRadius: '18px',
+              maxWidth: '540px',
+              width: '92%',
+              padding: '24px 26px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              border: '1px solid #E2E8F0',
+              animation: 'modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards'
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                
                 <div>
                   <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748B' }}>{selectedMedInfo.medId}</span>
-                  <h3 style={{ margin: 0, fontSize: '18px', color: '#0F172A', fontWeight: 'bold' }}>{selectedMedInfo.name}</h3>
+                  <h3 style={{ margin: 0, fontSize: '18px', color: '#0F172A', fontWeight: '700', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>{selectedMedInfo.name}</h3>
                 </div>
               </div>
               <button 

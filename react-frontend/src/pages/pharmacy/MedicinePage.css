@@ -41,11 +41,12 @@ body.dark-mode .medicine-page-container {
 
 .medicine-page-container .header-titles h1,
 .medicine-page-container .page-title {
-  font-size: 28px;
+  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
+  font-size: 30px;
   font-weight: 700;
+  line-height: 38px;
   color: #0F172A;
   margin: 0 0 4px 0;
-  line-height: 1.25;
   transition: color 0.5s ease;
 }
 
@@ -56,10 +57,12 @@ body.dark-mode .medicine-page-container .page-title {
 
 .medicine-page-container .header-titles p,
 .medicine-page-container .page-subtitle {
-  font-size: 14.5px;
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 22px;
   color: #64748B;
   margin: 0;
-  line-height: 1.4;
   transition: color 0.5s ease;
 }
 
@@ -456,11 +459,14 @@ body.dark-mode .medicine-page-container .update-stock-btn {
   right: 0;
   bottom: 0;
   background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
-  animation: mpFadeIn 0.2s ease-out;
+  z-index: 3000;
+  padding: 20px;
+  animation: mpFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes mpFadeIn {
@@ -634,12 +640,13 @@ body.dark-mode .medicine-page-container .med-name-link {
 .medicine-page-container .med-detail-modal-card {
   background: white;
   border-radius: 18px;
-  max-width: 740px;
+  max-width: 580px;
   width: 100%;
-  padding: 28px 32px;
-  box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.25);
-  max-height: 90vh;
+  padding: 24px 26px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  max-height: calc(100vh - 48px);
   overflow-y: auto;
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 body.dark-mode .medicine-page-container .med-detail-modal-card {
@@ -664,10 +671,10 @@ body.dark-mode .medicine-page-container .med-detail-header {
   display: inline-block;
   background: #EFF6FF;
   color: #2563EB;
-  font-size: 0.82rem;
-  font-weight: 500;
-  padding: 5px 12px;
-  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 4px 14px;
+  border-radius: 9999px;
   margin-bottom: 6px;
 }
 
@@ -677,10 +684,12 @@ body.dark-mode .medicine-page-container .med-detail-badge {
 }
 
 .medicine-page-container .med-detail-name {
-  font-size: 1.75rem;
-  font-weight: 600;
+  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
+  font-size: 24px;
+  font-weight: 700;
   color: #0F172A;
   margin: 0 0 4px 0;
+  line-height: 1.3;
 }
 
 body.dark-mode .medicine-page-container .med-detail-name {
@@ -688,8 +697,9 @@ body.dark-mode .medicine-page-container .med-detail-name {
 }
 
 .medicine-page-container .med-detail-generic {
-  font-size: 1.05rem;
-  color: #475569;
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+  font-size: 14px;
+  color: #64748B;
   font-weight: 500;
 }
 
@@ -700,15 +710,16 @@ body.dark-mode .medicine-page-container .med-detail-generic {
 .medicine-page-container .med-detail-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .medicine-page-container .category-section {
   background: #F0F9FF;
-  border: 1px solid #BAE6FD;
-  padding: 14px 18px;
-  border-radius: 10px;
-  font-size: 1.05rem;
+  border: 1.5px solid #BAE6FD;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
 }
 
 body.dark-mode .medicine-page-container .category-section {
@@ -729,14 +740,15 @@ body.dark-mode .medicine-page-container .category-tag {
 .medicine-page-container .med-info-grid {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .medicine-page-container .med-info-box {
-  background: #F8FAFC;
-  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
   border-radius: 12px;
-  padding: 18px 20px;
+  padding: 14px 18px;
+  transition: all 0.2s ease;
 }
 
 body.dark-mode .medicine-page-container .med-info-box {
@@ -746,8 +758,10 @@ body.dark-mode .medicine-page-container .med-info-box {
 
 .medicine-page-container .warning-box {
   background: #FEF2F2;
-  border-color: #FECACA;
+  border: 1px solid #FECACA;
   border-left: 5px solid #EF4444;
+  border-radius: 12px;
+  padding: 14px 18px;
 }
 
 body.dark-mode .medicine-page-container .warning-box {
@@ -756,10 +770,14 @@ body.dark-mode .medicine-page-container .warning-box {
 }
 
 .medicine-page-container .info-box-title {
-  font-size: 1.15rem;
-  font-weight: 600;
+  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
+  font-size: 15px;
+  font-weight: 700;
   color: #0F172A;
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 body.dark-mode .medicine-page-container .info-box-title {
@@ -767,15 +785,16 @@ body.dark-mode .medicine-page-container .info-box-title {
 }
 
 .medicine-page-container .info-box-desc {
-  font-size: 1.05rem;
-  color: #1E293B;
-  line-height: 1.65;
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.6;
   margin: 0;
-  font-weight: 500;
+  font-weight: 400;
 }
 
 body.dark-mode .medicine-page-container .info-box-desc {
-  color: #F8FAFC;
+  color: #CBD5E1;
 }
 
 .medicine-page-container .med-stock-summary-bar {
