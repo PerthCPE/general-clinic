@@ -89,45 +89,117 @@ body.dark-mode .billing-invoice-container .input-group input {
 .billing-invoice-container .page-header-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
+  align-items: flex-start;
+  gap: 20px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.billing-invoice-container .header-titles {
+  flex-shrink: 0;
+}
+
+.billing-invoice-container .invoice-patient-switcher-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: 65%;
+}
+
+.billing-invoice-container .switcher-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748B;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+body.dark-mode .billing-invoice-container .switcher-label {
+  color: #94A3B8;
 }
 
 .billing-invoice-container .invoice-patient-switcher {
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  max-height: 90px;
+  overflow-y: auto;
+  padding: 2px;
 }
 
 .billing-invoice-container .patient-switch-btn {
   background: #FFFFFF;
-  border: 1px solid #CBD5E1;
+  border: 1px solid #E2E8F0;
   color: #334155;
-  padding: 8px 16px;
+  padding: 5px 12px;
   border-radius: 999px;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.billing-invoice-container .pill-queue-code {
+  background: #F1F5F9;
+  color: #0284C7;
+  font-weight: 800;
+  font-size: 0.78rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.billing-invoice-container .pill-patient-name {
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 body.dark-mode .billing-invoice-container .patient-switch-btn {
-  background: #2D2D2D;
-  border-color: #475569;
+  background: #1E293B;
+  border-color: #334155;
   color: #E2E8F0;
 }
 
+body.dark-mode .billing-invoice-container .pill-queue-code {
+  background: #0F172A;
+  color: #38BDF8;
+}
+
+.billing-invoice-container .patient-switch-btn:hover {
+  border-color: #3B82F6;
+  background: #F8FAFC;
+}
+
+body.dark-mode .billing-invoice-container .patient-switch-btn:hover {
+  background: #334155;
+}
+
 .billing-invoice-container .patient-switch-btn.active {
-  background: #2563EB;
+  background: #0284C7;
   color: #FFFFFF;
-  border-color: #2563EB;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  border-color: #0284C7;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+}
+
+.billing-invoice-container .patient-switch-btn.active .pill-queue-code {
+  background: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
 }
 
 .billing-invoice-container .page-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.4rem;
+  font-weight: 800;
   color: #0F172A;
   margin: 0 0 4px 0;
+  letter-spacing: -0.3px;
 }
 
 body.dark-mode .billing-invoice-container .page-title {
@@ -135,75 +207,33 @@ body.dark-mode .billing-invoice-container .page-title {
 }
 
 .billing-invoice-container .page-subtitle {
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   color: #64748B;
   margin: 0;
 }
 
-.billing-invoice-container .patient-dark-banner {
-  background: linear-gradient(135deg, #0D3B66 0%, #1565C0 100%);
-  border-radius: 14px;
-  padding: 24px 28px;
-  color: white;
-  margin-bottom: 24px;
-  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+.billing-invoice-container .billing-patient-card {
+  background: #FFFFFF;
+  border-radius: 16px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.04);
 }
 
-.billing-invoice-container .patient-dark-name {
-  font-size: 1.7rem;
-  font-weight: 800;
-  color: #FFFFFF;
-  margin: 0 0 4px 0;
+body.dark-mode .billing-invoice-container .billing-patient-card {
+  background: #1E293B;
+  border-color: #334155;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.2);
 }
 
-.billing-invoice-container .patient-dark-sub {
-  font-size: 1.05rem;
-  color: #F1F5F9;
-  font-weight: 500;
-  margin-bottom: 16px;
+body.dark-mode .billing-invoice-container .banner-rights-select {
+  background: #0F172A !important;
+  color: #F8FAFC !important;
+  border-color: #475569 !important;
 }
 
-.billing-invoice-container .patient-dark-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  font-size: 0.98rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.15);
-  padding-top: 18px;
+body.dark-mode .billing-invoice-container .banner-rights-select option {
+  background: #0F172A;
   color: #F8FAFC;
-}
-
-.billing-invoice-container .dark-info-col {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.billing-invoice-container .dark-label {
-  color: #93C5FD;
-  font-weight: 700;
-  font-size: 0.95rem;
-  margin-right: 4px;
-}
-
-.billing-invoice-container .banner-rights-select {
-  background: #0D3B66;
-  color: #60A5FA;
-  border: 1.5px solid #3B82F6;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.92rem;
-  font-weight: 700;
-  cursor: pointer;
-  outline: none;
-  margin-top: 2px;
-}
-
-.billing-invoice-container .banner-rights-select option {
-  background: #0D3B66;
-  color: #FFFFFF;
-  font-weight: 600;
 }
 
 .billing-invoice-container .allergy-tag {

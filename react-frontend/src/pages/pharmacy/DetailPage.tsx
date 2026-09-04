@@ -291,7 +291,7 @@ export default function DetailPage({
 
     const unsubPay = subscribe('PAYMENT_CONFIRMED', () => {
       fetchQueues();
-      triggerToast('ผู้ป่วยชำระเงินและเสร็จสิ้นกระบวนการเรียบร้อยแล้ว', 'success');
+      triggerToast('ชำระเงินเรียบร้อยแล้ว', 'success');
     });
 
     const unsubBillHist = subscribe('BILLING_HISTORY_CREATED', () => {
@@ -300,7 +300,7 @@ export default function DetailPage({
 
     const unsubExam = subscribe('EXAMINATION_SAVED', (data: any) => {
       fetchQueues();
-      triggerToast('แพทย์บันทึกการตรวจและส่งข้อมูลมายังห้องยาแล้ว', 'doctor');
+      triggerToast('แพทย์ส่งใบสั่งยาเรียบร้อยแล้ว', 'doctor');
     });
 
     const unsubVisit = subscribe('VISIT_UPDATED', () => {
@@ -311,13 +311,13 @@ export default function DetailPage({
       if (data) {
         const pName = data.patient?.full_name || data.patient_name || `ผู้ป่วยคิว ${data.queue_number || ''}`;
         fetchQueues();
-        triggerToast(`ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์: ${pName}`, 'doctor');
+        triggerToast(`ได้รับใบสั่งยา: ${pName}`, 'doctor');
       }
     });
 
     const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', () => {
       fetchQueues();
-      triggerToast('ได้รับข้อมูลใบสั่งยาล่าสุดจากแพทย์', 'doctor');
+      triggerToast('ได้รับใบสั่งยาเรียบร้อยแล้ว', 'doctor');
     });
 
     return () => {
@@ -448,7 +448,7 @@ export default function DetailPage({
         setLocalPatientId(newPatient.id);
         if (onSelectPatientId) onSelectPatientId(newPatient.id);
 
-        triggerToast(`แพทย์ส่งใบสั่งยาลง DB จริงสำเร็จ: ${pName} (${data.hn || ''})`, 'doctor');
+        triggerToast(`บันทึกใบสั่งยาเรียบร้อยแล้ว`, 'doctor');
       } else {
         fallbackSimulate();
       }
@@ -460,7 +460,7 @@ export default function DetailPage({
   const fallbackSimulate = () => {
     // Backend fetch failed, do not use CLINIC_CONFIG mock data anymore.
     // Ensure you start the backend before clicking this.
-    triggerToast(`ข้อผิดพลาด: ไม่สามารถเชื่อมต่อกับฐานข้อมูลหลังบ้านได้ โปรดเปิดเซิร์ฟเวอร์`, 'error');
+    triggerToast(`ไม่สามารถเชื่อมต่อฐานข้อมูลได้`, 'error');
   };
 
   // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - กดยืนยันจ่ายยาแล้วอัปเดตหน้าจอทันทีใน 0 ms และส่งขึ้น Supabase เบื้องหลัง
@@ -484,7 +484,7 @@ export default function DetailPage({
       return [...updated].sort((a, b) => Number(a.status === 'dispensed') - Number(b.status === 'dispensed'));
     });
 
-    triggerToast(`ยืนยันการจ่ายยาเรียบร้อย! ส่งข้อมูลใบสั่งยาของ ${pName} ไปยังระบบการเงินแล้ว`, 'success');
+    triggerToast(`จัดเก็บเอกสารเข้าแฟ้มเรียบร้อยแล้ว`, 'success');
 
     // สลับไปยังผู้ป่วยคนถัดไปที่ยังรอจัดยา (ถ้ามี)
     const nextPending = queueList.find(p => p.id !== activePatient.id && p.status !== 'dispensed');
@@ -1406,11 +1406,33 @@ export default function DetailPage({
       {toast && (
         <div className={`bottom-left-toast toast-${toast.type} ${isToastFading ? 'toast-fading' : ''}`}>
           <div className="toast-icon">
-            {toast.type === 'success' && '✓'}
-            {toast.type === 'doctor' && ''}
-            {toast.type === 'error' && '✕'}
+            {toast.type === 'success' && (
+              <span className="toast-icon-circle">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+            )}
+            {toast.type === 'doctor' && (
+              <span className="toast-icon-circle">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+              </span>
+            )}
+            {toast.type === 'error' && (
+              <span className="toast-icon-circle">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </span>
+            )}
           </div>
-          <div className="toast-message">{toast.message}</div>
+          <div className="toast-message" style={{ fontWeight: '600', color: '#0F172A' }}>{toast.message}</div>
         </div>
       )}
 

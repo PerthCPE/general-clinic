@@ -133,57 +133,83 @@ body.dark-mode .billing-dispense-container .page-title {
   color: #F8FAFC;
 }
 
-.billing-dispense-container .metrics-grid {
+/* ===== Stat Cards - Pharmacy Block Style ===== */
+.billing-dispense-container .stat-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
   margin-bottom: 24px;
 }
 
-.billing-dispense-container .metric-card {
-  padding: 20px !important;
-  display: flex !important;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 0 !important;
+.billing-dispense-container .stat-card-box {
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 18px 20px;
+  border: 1.5px solid #E2E8F0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
 }
 
-.billing-dispense-container .metric-icon-bg {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+.billing-dispense-container .stat-card-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.billing-dispense-container .stat-card-box.active-stat {
+  border: 2px solid #2563EB !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.16) !important;
+}
+
+.billing-dispense-container .stat-icon-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
-.billing-dispense-container .orange-bg {
-  background: #FFEDD5;
-  color: #F97316;
+.billing-dispense-container .stat-icon-wrap.icon-blue {
+  background: #EFF6FF;
+  color: #2563EB;
 }
 
-body.dark-mode .billing-dispense-container .orange-bg {
-  background: rgba(249, 115, 22, 0.15);
+.billing-dispense-container .stat-icon-wrap.icon-amber {
+  background: #FFFBEB;
+  color: #D97706;
 }
 
-.billing-dispense-container .green-bg {
-  background: #DCFCE7;
+.billing-dispense-container .stat-icon-wrap.icon-teal {
+  background: #F0FDFA;
+  color: #0D9488;
+}
+
+.billing-dispense-container .stat-icon-wrap.icon-green {
+  background: #F0FDF4;
   color: #16A34A;
 }
 
-body.dark-mode .billing-dispense-container .green-bg {
-  background: rgba(22, 163, 74, 0.15);
+body.dark-mode .billing-dispense-container .stat-card-box {
+  background: #1E293B;
+  border-color: #334155;
 }
 
-.billing-dispense-container .metric-label {
-  font-size: 0.9rem;
-  color: #64748B;
-  font-weight: 600;
-  display: block;
+body.dark-mode .billing-dispense-container .stat-card-box span {
+  color: #E2E8F0;
 }
 
-body.dark-mode .billing-dispense-container .metric-label {
-  color: #94A3B8;
+body.dark-mode .billing-dispense-container .stat-card-box div {
+  color: #F8FAFC;
+}
+
+body.dark-mode .billing-dispense-container .stat-card-box.active-stat {
+  border-color: #3B82F6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
 }
 
 .billing-dispense-container .metric-val-row {
@@ -201,6 +227,192 @@ body.dark-mode .billing-dispense-container .metric-label {
 
 body.dark-mode .billing-dispense-container .metric-value {
   color: #F8FAFC;
+}
+
+/* ===== Patient Card Header Banner - Modern Light Clinic Theme ===== */
+.billing-dispense-container .searched-details-wrapper {
+  margin-bottom: 24px;
+}
+
+.billing-dispense-container .patient-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  overflow: hidden;
+  color: #0F172A;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  border: 1.5px solid #E2E8F0;
+  transition: all 0.2s ease;
+}
+
+body.dark-mode .billing-dispense-container .patient-card {
+  background: #1E293B;
+  border-color: #334155;
+  color: #F8FAFC;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.billing-dispense-container .patient-card-main {
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%);
+  border-bottom: 1.5px solid #E2E8F0;
+}
+
+body.dark-mode .billing-dispense-container .patient-card-main {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+  border-bottom-color: #334155;
+}
+
+.billing-dispense-container .patient-avatar {
+  width: 54px;
+  height: 54px;
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  color: #FFFFFF;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  font-weight: 700;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
+  border: 2.5px solid #FFFFFF;
+}
+
+body.dark-mode .billing-dispense-container .patient-avatar {
+  border-color: #334155;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+}
+
+.billing-dispense-container .patient-info-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.billing-dispense-container .patient-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+}
+
+.billing-dispense-container .patient-name {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: #0F172A;
+  letter-spacing: -0.3px;
+}
+
+body.dark-mode .billing-dispense-container .patient-name {
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .patient-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.billing-dispense-container .patient-details {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #475569;
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+body.dark-mode .billing-dispense-container .patient-details {
+  color: #94A3B8;
+}
+
+.billing-dispense-container .patient-card-footer {
+  background: #FFFFFF;
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px 18px;
+}
+
+body.dark-mode .billing-dispense-container .patient-card-footer {
+  background: #1E293B;
+}
+
+@media (max-width: 960px) {
+  .billing-dispense-container .patient-card-footer {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .billing-dispense-container .patient-card-footer {
+    grid-template-columns: 1fr;
+  }
+}
+
+.billing-dispense-container .info-box {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.billing-dispense-container .info-box:hover {
+  border-color: #CBD5E1;
+  background: #F1F5F9;
+}
+
+body.dark-mode .billing-dispense-container .info-box {
+  background: #0F172A;
+  border-color: #334155;
+}
+
+body.dark-mode .billing-dispense-container .info-box:hover {
+  border-color: #475569;
+  background: #1E293B;
+}
+
+.billing-dispense-container .info-label {
+  color: #64748B;
+  font-weight: 700;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body.dark-mode .billing-dispense-container .info-label {
+  color: #94A3B8;
+}
+
+.billing-dispense-container .info-val {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #0F172A;
+  line-height: 1.4;
+}
+
+body.dark-mode .billing-dispense-container .info-val {
+  color: #F8FAFC;
+}
+
+.billing-dispense-container .badge-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 2px;
 }
 
 .billing-dispense-container .dispense-grid {
@@ -478,22 +690,42 @@ body.dark-mode .billing-dispense-container .total-price {
   transform: translateY(-1px);
 }
 
-/* Toast Notification Banner */
+/* Toast Notification Banner - Compact & Clean UI */
 .billing-dispense-container .bottom-left-toast {
   position: fixed;
   top: 88px;
   right: 28px;
-  padding: 12px 20px;
-  border-radius: 999px;
-  font-size: 0.9rem;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-family: 'IBM Plex Sans Thai', 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.95rem;
   font-weight: 600;
+  letter-spacing: -0.2px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+  gap: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
   z-index: 999;
   animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+.billing-dispense-container .toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.billing-dispense-container .toast-icon-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .billing-dispense-container .bottom-left-toast.toast-fading {
@@ -502,21 +734,42 @@ body.dark-mode .billing-dispense-container .total-price {
 }
 
 .billing-dispense-container .toast-success {
-  background: #DCFCE7;
-  color: #166534;
-  border: 1px solid #86EFAC;
+  background: #FFFFFF;
+  color: #0F172A;
+  border: 1px solid #E2E8F0;
+}
+
+.billing-dispense-container .toast-success .toast-icon-circle {
+  background: #10B981;
+  color: #FFFFFF;
 }
 
 .billing-dispense-container .toast-doctor {
-  background: #E0F2FE;
-  color: #0369A1;
-  border: 1px solid #7DD3FC;
+  background: #FFFFFF;
+  color: #0F172A;
+  border: 1px solid #E2E8F0;
+}
+
+.billing-dispense-container .toast-doctor .toast-icon-circle {
+  background: #0284C7;
+  color: #FFFFFF;
 }
 
 .billing-dispense-container .toast-error {
-  background: #FEF2F2;
-  color: #991B1B;
+  background: #FFFFFF;
+  color: #0F172A;
   border: 1px solid #FCA5A5;
+}
+
+.billing-dispense-container .toast-error .toast-icon-circle {
+  background: #EF4444;
+  color: #FFFFFF;
+}
+
+body.dark-mode .billing-dispense-container .bottom-left-toast {
+  background: #1E293B !important;
+  color: #F8FAFC !important;
+  border-color: #334155 !important;
 }
 
 /* Dark Mode Table Styling Matching Queue Management */

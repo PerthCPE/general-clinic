@@ -4,9 +4,15 @@ export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:80
 const TOKEN_KEY = 'clinic_auth_token';
 
 export const tokenStorage = {
-  get: () => localStorage.getItem(TOKEN_KEY),
-  set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
-  remove: () => localStorage.removeItem(TOKEN_KEY),
+  get: () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token'),
+  set: (token: string) => {
+    localStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem('token', token);
+  },
+  remove: () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('token');
+  },
 };
 
 // Helper to ensure valid token from server
@@ -15,13 +21,15 @@ async function ensureToken(): Promise<string | null> {
   if (!token) {
     try {
       const savedUserStr = localStorage.getItem('clinic_auth_user');
-      let username = 'registrar1';
+      let username = 'cashier1';
       if (savedUserStr) {
         try {
           const savedUser = JSON.parse(savedUserStr);
           if (savedUser.role === 'nurse') username = 'nurse1';
           else if (savedUser.role === 'nurse_assistant') username = 'assistant1';
           else if (savedUser.role === 'doctor') username = 'doctor1';
+          else if (savedUser.role === 'pharmacist') username = 'pharmacist1';
+          else if (savedUser.role === 'cashier') username = 'cashier1';
           else if (savedUser.username) username = savedUser.username;
         } catch {
           // ignore

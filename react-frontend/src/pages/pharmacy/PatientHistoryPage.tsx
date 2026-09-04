@@ -352,15 +352,14 @@ export default function PatientHistoryPage() {
     setSelectedPatientModal(patient);
     setPatientMedHistory([]);
     try {
-      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-      let res = await fetch(`/api/pharmacy/patient-medicines/${patient.hn}`, { headers });
-      if (!res.ok) {
-        res = await fetch(`/api/system/patient-medicines/${patient.hn}`);
-      }
-      if (res.ok) {
+      const res = await fetch(`/api/pharmacy/patient-medicines/${patient.hn}`, { headers })
+        .then(r => r.ok ? r : fetch(`/api/system/patient-medicines/${patient.hn}`))
+        .catch(() => null);
+
+      if (res && res.ok) {
         const data = await res.json();
         
         // อัปเดตข้อมูลผู้ป่วยและค่าสัญญาณชีพ/คิวล่าสุด
@@ -851,7 +850,7 @@ export default function PatientHistoryPage() {
                   </div>
                   <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
                     <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>อุณหภูมิ (Temp)</div>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>{selectedPatientModal.vitals?.temp || 36.5} <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>°C</span></div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>{typeof selectedPatientModal.vitals?.temp === 'number' ? selectedPatientModal.vitals.temp.toFixed(1) : (parseFloat(String(selectedPatientModal.vitals?.temp || '36.5')) || 36.5).toFixed(1)} <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>°C</span></div>
                     <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
                   </div>
                 </div>

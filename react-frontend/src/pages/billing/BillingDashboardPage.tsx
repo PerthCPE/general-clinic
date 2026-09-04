@@ -129,19 +129,19 @@ export default function BillingDashboardPage() {
 
     const unsubPay = subscribe('PAYMENT_CONFIRMED', (data: any) => {
       fetchBillings();
-      setLiveNotify(`✓ ชำระเงินสำเร็จ: บิล #${data?.id || ''}`);
+      setLiveNotify(`ชำระเงินสำเร็จ: บิล #${data?.id || ''}`);
       setTimeout(() => setLiveNotify(null), 4000);
     });
 
     const unsubHistory = subscribe('BILLING_HISTORY_CREATED', (data: any) => {
       fetchBillings();
-      setLiveNotify(`✓ บันทึกประวัติการเงิน: ${data?.patient_name || ''} (${data?.receipt_number || ''})`);
+      setLiveNotify(`บันทึกประวัติการเงิน: ${data?.patient_name || ''} (${data?.receipt_number || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
     });
 
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
       fetchBillings();
-      setLiveNotify(`⚡ มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
+      setLiveNotify(`มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
     });
 
@@ -215,7 +215,7 @@ export default function BillingDashboardPage() {
     });
   };
 
-  // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - บันทึกการแก้ไขข้อมูลทันทีใน 0 ms
+  // [บุญให้เพิ่มเทคนิคนี้] (Supabase + Optimistic UI + WebSocket) - บันทึกการแก้ไขข้อมูลทันทีใน 0 ms
   const handleSaveEditRecord = () => {
     if (!editingRecord) return;
     const numAmt = parseFloat(editRecordForm.amount) || editingRecord.numericAmount;
@@ -235,7 +235,7 @@ export default function BillingDashboardPage() {
     setEditingRecord(null);
   };
 
-  // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ลบข้อมูลจากหน้าจอทันทีใน 0 ms
+  // [บุญให้เพิ่มเทคนิคนี้] (Supabase + Optimistic UI + WebSocket) - ลบข้อมูลจากหน้าจอทันทีใน 0 ms
   const handleConfirmDeleteRecord = () => {
     if (!deleteRecord) return;
     setRecords(prev => prev.filter(r => r.id !== deleteRecord.id));
@@ -330,112 +330,123 @@ export default function BillingDashboardPage() {
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {liveNotify && (
-            <span className="success-badge" style={{ background: '#DBEAFE', color: '#1E40AF', padding: '6px 14px', borderRadius: '20px', fontWeight: 'bold' }}>
+            <span className="success-badge" style={{ background: '#DBEAFE', color: '#1E40AF', padding: '6px 14px', borderRadius: '20px', fontWeight: 'bold', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 14 14"></polyline>
+              </svg>
               {liveNotify}
             </span>
           )}
           {hasSearched && (
-            <span className="success-badge">
-              <span className="check-icon">✓</span> ค้นหาผู้ป่วยสำเร็จ
+            <span className="success-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              ค้นหาผู้ป่วยสำเร็จ
             </span>
           )}
         </div>
       </div>
 
-      {/* Metric Cards Section - Dynamic Calculated from DB */}
-      <div className="metrics-grid">
-        <div className="metric-card card" style={{ padding: '16px 20px' }}>
-          <div className="metric-icon-bg blue-bg" style={{ flexShrink: 0 }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
-          </div>
-          <div className="metric-info" style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-              <span className="metric-label" style={{ margin: 0, fontSize: '13px', fontWeight: '700' }}>รายได้รวมวันนี้ (Total Revenue)</span>
-              <span style={{ fontSize: '12px', fontWeight: '800', color: '#1D4ED8', background: '#EFF6FF', padding: '2px 8px', borderRadius: '12px', border: '1px solid #BFDBFE' }}>
-                รวม ฿{totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            {/* 2 บรรทัด: บน สด, ล่าง Qr code ให้อยู่ใน Block เดียวกัน */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {/* บรรทัดบน: เงินสด */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F0FDF4', padding: '4px 10px', borderRadius: '8px', border: '1px solid #BBF7D0' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '800', padding: '1px 6px', borderRadius: '4px', background: '#16A34A', color: '#FFFFFF' }}>
-                    สด
-                  </span>
-                  <span style={{ fontSize: '12.5px', color: '#166534', fontWeight: '600' }}>เงินสด:</span>
-                </div>
-                <span style={{ fontSize: '14px', fontWeight: '800', color: '#15803D' }}>
-                  ฿ {cashTotalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              {/* บรรทัดล่าง: Qr code */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAF5FF', padding: '4px 10px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: '800', padding: '1px 6px', borderRadius: '4px', background: '#9333EA', color: '#FFFFFF' }}>
-                    QR
-                  </span>
-                  <span style={{ fontSize: '12.5px', color: '#7E22CE', fontWeight: '600' }}>Qr code:</span>
-                </div>
-                <span style={{ fontSize: '14px', fontWeight: '800', color: '#7E22CE' }}>
-                  ฿ {qrTotalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
+      {/* Executive Billing Dashboard Stat Cards (Pharmacy Format) */}
+      <div className="stat-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div 
+          className={`stat-card-box ${statusFilter === 'all' ? 'active-stat' : ''}`}
+          onClick={() => setStatusFilter('all')}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: statusFilter === 'all' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
+            boxShadow: statusFilter === 'all' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>รายได้รวมวันนี้</span>
+            <div className="stat-icon-wrap icon-blue">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
             </div>
           </div>
-        </div>
-
-        <div className="metric-card card">
-          <div className="metric-icon-bg orange-bg">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#0F172A', lineHeight: '38px' }}>
+            ฿{totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="metric-info">
-            <span className="metric-label" style={{ fontSize: '13px', fontWeight: '700', color: '#475569' }}>รอชำระเงิน (Pending Payment)</span>
-            <span className="metric-value" style={{ fontSize: '1.65rem', fontWeight: '800', color: '#0F172A' }}>{pendingCount} คิว</span>
-          </div>
-        </div>
-
-        <div className="metric-card card">
-          <div className="metric-icon-bg green-bg">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-              <polyline points="22 4 12 14.01 9 11.01"></polyline>
-            </svg>
-          </div>
-          <div className="metric-info">
-            <span className="metric-label" style={{ fontSize: '13px', fontWeight: '700', color: '#475569' }}>ชำระเงินสำเร็จแล้ว (Completed)</span>
-            <span className="metric-value" style={{ fontSize: '1.65rem', fontWeight: '800', color: '#0F172A' }}>{completedCount} รายการ</span>
-          </div>
-        </div>
-
-        <div className="metric-card card">
-          <div className="metric-icon-bg purple-bg">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <rect x="7" y="7" width="3" height="3"></rect>
-              <rect x="14" y="7" width="3" height="3"></rect>
-              <rect x="7" y="14" width="3" height="3"></rect>
-              <rect x="14" y="14" width="3" height="3"></rect>
-            </svg>
-          </div>
-          <div className="metric-info" style={{ flex: 1 }}>
-            <span className="metric-label" style={{ fontSize: '13px', fontWeight: '700', color: '#475569' }}>
-              สัดส่วนช่องทางรับชำระเงิน
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: '#15803D', background: '#F0FDF4', padding: '2px 8px', borderRadius: '6px', border: '1px solid #BBF7D0' }}>
+              สด ฿{cashTotalRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
-            <div className="metric-val-row" style={{ marginTop: '2px', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-              <span className="metric-value" style={{ fontSize: '1.65rem', fontWeight: '800', color: '#0F172A' }}>
-                QR {qrPercentage}%
-              </span>
-              <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#16A34A' }}>
-                • สด {cashPercentage}%
-              </span>
+            <span style={{ fontSize: '12px', fontWeight: '700', color: '#7E22CE', background: '#FAF5FF', padding: '2px 8px', borderRadius: '6px', border: '1px solid #E9D5FF' }}>
+              QR ฿{qrTotalRevenue.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </span>
+          </div>
+        </div>
+
+        <div 
+          className={`stat-card-box ${statusFilter === 'pending' ? 'active-stat' : ''}`}
+          onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: statusFilter === 'pending' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
+            boxShadow: statusFilter === 'pending' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>รอชำระเงิน & ออกบิล</span>
+            <div className="stat-icon-wrap icon-amber">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 16 14"/></svg>
             </div>
           </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#2563EB', lineHeight: '38px' }}>
+            {pendingCount}
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
+            รอชำระเงิน {pendingCount} คิว
+          </div>
+        </div>
+
+        <div 
+          className={`stat-card-box ${statusFilter === 'completed' ? 'active-stat' : ''}`}
+          onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: statusFilter === 'completed' ? '2px solid #2563EB' : '1.5px solid #E2E8F0',
+            boxShadow: statusFilter === 'completed' ? '0 0 0 2px rgba(37, 99, 235, 0.16)' : '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>ชำระเงินสำเร็จแล้ว</span>
+            <div className="stat-icon-wrap icon-teal">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="18" y2="12"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: '#0D9488', lineHeight: '38px' }}>
+            {completedCount}
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
+            บันทึกประวัติ {completedCount} รายการ
+          </div>
+        </div>
+
+        <div 
+          className="stat-card-box"
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>สัดส่วนช่องทางชำระ</span>
+            <div className="stat-icon-wrap icon-green">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '26px', fontWeight: '800', color: '#16A34A', lineHeight: '38px' }}>
+            QR {qrPercentage}% • สด {cashPercentage}%
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>เสร็จสิ้น • รับชำระเรียบร้อย</div>
         </div>
       </div>
 
@@ -503,20 +514,22 @@ export default function BillingDashboardPage() {
       <div className="table-card card" style={{ padding: '24px 20px', overflow: 'hidden' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h2 className="table-title" style={{ margin: 0 }}>ประวัติการชำระเงินรายวันของพนักงานการเงิน (Billing History)</h2>
-          <span style={{ fontSize: '13px', color: '#64748B' }}>พบทั้งหมด {filteredRecords.length} รายการ</span>
+          <span className="count-badge-green">
+            {filteredRecords.length} รายการ
+          </span>
         </div>
 
         <div className="table-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
           <table className="payment-table" style={{ width: '100%', tableLayout: 'fixed' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'center', width: '15%', padding: '12px 4px' }}>เลขที่ใบเสร็จ</th>
-                <th style={{ textAlign: 'left', width: '21%', padding: '12px 14px' }}>HN & ชื่อผู้ป่วย</th>
+                <th style={{ textAlign: 'center', width: '160px', padding: '12px 6px' }}>เลขที่ใบเสร็จ</th>
+                <th style={{ textAlign: 'left', width: '220px', padding: '12px 14px 12px 28px' }}>HN & ชื่อผู้ป่วย</th>
                 <th style={{ textAlign: 'center', width: '14%', padding: '12px 4px' }}>เวลาที่ชำระเงิน</th>
                 <th style={{ textAlign: 'right', width: '12%', padding: '12px 14px' }}>จำนวนเงินสุทธิ</th>
                 <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>สถานะ</th>
                 <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>วิธีการชำระ</th>
-                <th style={{ textAlign: 'center', width: '16%', padding: '12px 4px' }}>จัดการ (Action)</th>
+                <th style={{ textAlign: 'center', width: '16%', padding: '12px 4px' }}>จัดการ</th>
               </tr>
             </thead>
             <tbody>
@@ -563,7 +576,7 @@ export default function BillingDashboardPage() {
                     <td 
                       className="patient-name-cell clickable-patient"
                       onClick={() => handleOpenDetail(record)}
-                      style={{ textAlign: 'left', padding: '12px 14px' }}
+                      style={{ textAlign: 'left', padding: '12px 14px 12px 28px' }}
                     >
                       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '3px' }}>
                         <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '13.5px', whiteSpace: 'nowrap' }}>
