@@ -18,6 +18,19 @@ interface DocumentItem {
   rawDoc?: BackendDocument;
 }
 
+export const CLINIC_DOCUMENT_TYPES = [
+  'หนังสือราชการ / เอกสารภายนอก (สธ./สปสช./อย.)',
+  'เอกสารส่งตัว / ส่งต่อผู้ป่วย (Referral Form)',
+  'ใบรับรองแพทย์ / ประวัติการตรวจรักษา (Medical Certificate & Record)',
+  'ผลตรวจทางห้องปฏิบัติการและรังสี (Lab & X-Ray Report)',
+  'เอกสารสิทธิ์การรักษาและเคลมประกัน (Insurance & Scheme Claim)',
+  'ใบสั่งยาและเอกสารคลังเวชภัณฑ์ (Prescription & Pharmacy Log)',
+  'เอกสารการเงินและใบเสร็จรับเงิน (Financial & Receipt Document)',
+  'สัญญาจ้างและเอกสารบุคลากร (Staff Contract & HR Agreement)',
+  'นโยบายและแนวทางมาตรฐานการปฏิบัติงาน (SOP & Policy)',
+  'บันทึกข้อความภายในและเอกสารทั่วไป (General Internal Memo)',
+] as const;
+
 const formatBytes = (bytes?: number) => {
   if (!bytes || bytes <= 0) return '1.20 MB';
   if (bytes < 1024) return `${bytes} B`;
@@ -28,7 +41,6 @@ const formatBytes = (bytes?: number) => {
 // Generate realistic fallback documents with dynamic dates
 const generateMockDocs = (): DocumentItem[] => {
   const docs: DocumentItem[] = [];
-  const types = ['PDF / รายงาน', 'DOCX / สัญญา', 'XLSX / สเปรดชีต', 'PDF / นโยบาย', 'PDF / ใบเบิก', 'PDF / ผลตรวจ'];
   const baseNames = ['Q3_Patient_Report', 'Dr_Smith_Contract', 'Inventory_Log', 'Policy_Update', 'Lab_Results', 'Weekly_Meeting_Notes'];
   const exts = ['.pdf', '.docx', '.xlsx'];
   const sizes = [2450000, 1850000, 1200000, 3100000, 950000, 4200000];
@@ -38,7 +50,7 @@ const generateMockDocs = (): DocumentItem[] => {
   const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
   for (let i = 1; i <= 12; i++) {
-    const type = types[Math.floor(Math.random() * types.length)];
+    const type = CLINIC_DOCUMENT_TYPES[(i - 1) % CLINIC_DOCUMENT_TYPES.length];
     const status: 'approved' | 'reviewing' | 'draft' = i <= 4 ? 'reviewing' : 'approved';
     const baseName = baseNames[Math.floor(Math.random() * baseNames.length)];
     const ext = exts[Math.floor(Math.random() * exts.length)];
@@ -80,7 +92,8 @@ export const DocumentManagementPage: React.FC = () => {
   // Upload Form State based on Document model attributes
   const [uploadForm, setUploadForm] = useState({
     subject: '',
-    externalRef: ''
+    externalRef: '',
+    docType: CLINIC_DOCUMENT_TYPES[0] as string,
   });
 
   const fetchStorageStats = () => {
@@ -111,7 +124,7 @@ export const DocumentManagementPage: React.FC = () => {
             return {
               id: String(d.id),
               name: d.subject || `เอกสาร #${d.id}`,
-              type: d.doc_type || 'เอกสารราชการ/ส่งตัว',
+              type: d.doc_type || 'หนังสือราชการ / เอกสารภายนอก (สธ./สปสช./อย.)',
               fileSize: d.file_size || 1500000,
               modifiedDate: formattedDate,
               status: status,
@@ -143,9 +156,32 @@ export const DocumentManagementPage: React.FC = () => {
       setSelectedFile(file);
       // Auto-fill subject with file name without extension for speed and convenience
       const defaultSubject = file.name.replace(/\.[^/.]+$/, '').replace(/[_\-]/g, ' ');
+      
+      // Auto-detect likely clinic document type from file name if applicable
+      let detectedType = CLINIC_DOCUMENT_TYPES[0] as string;
+      const lower = file.name.toLowerCase();
+      if (lower.includes('referral') || lower.includes('ส่งตัว') || lower.includes('ส่งต่อ')) {
+        detectedType = CLINIC_DOCUMENT_TYPES[1];
+      } else if (lower.includes('cert') || lower.includes('ใบรับรอง') || lower.includes('ประวัติ') || lower.includes('patient')) {
+        detectedType = CLINIC_DOCUMENT_TYPES[2];
+      } else if (lower.includes('lab') || lower.includes('xray') || lower.includes('x-ray') || lower.includes('ผลตรวจ') || lower.includes('blood')) {
+        detectedType = CLINIC_DOCUMENT_TYPES[3];
+      } else if (lower.includes('claim') || lower.includes('ประกัน') || lower.includes('สปสช') || lower.includes('nhso') || lower.includes('สิทธิ์')) {
+        detectedType = CLINIC_DOCUMENT_TYPES[4];
+      } else if (lower.includes('drug') || lower.includes('med') || lower.includes('ยา') || lower.includes('เวชภัณฑ์') || lower.includes('pharmacy')) {
+        detectedType = CLINIC_DOCUMENT_TYPES[5];
+      } else if (lower.includes('bill') || lower.includes('receipt') || lower.includes('การเงิน') || lower.includes('ใบเสร็จ') || lower.includes('invoice')) {
+        detectedType = CLINIC_DOCUMENT_TYPES[6];
+      } else if (lower.includes('contract') || lower.includes('สัญญา') || lower.includes('hr') || lower.includes('บุคลากร') || lower.includes('เวร')) {
+        detectedType = CLINIC_DOCUMENT_TYPES[7];
+      } else if (lower.includes('policy') || lower.includes('sop') || lower.includes('นโยบาย') || lower.includes('คู่มือ') || lower.includes('guideline')) {
+        detectedType = CLINIC_DOCUMENT_TYPES[8];
+      }
+
       setUploadForm({
         subject: defaultSubject,
-        externalRef: ''
+        externalRef: '',
+        docType: detectedType,
       });
       setActiveModal('upload');
     }
@@ -159,7 +195,7 @@ export const DocumentManagementPage: React.FC = () => {
     setUploading(true);
     setActiveModal(null);
 
-    const docType = selectedFile.name.split('.').pop()?.toUpperCase() || 'ไฟล์ทั่วไป';
+    const docType = uploadForm.docType || CLINIC_DOCUMENT_TYPES[0];
     const fileSize = selectedFile.size || 1048576;
 
     try {
@@ -195,7 +231,7 @@ export const DocumentManagementPage: React.FC = () => {
       setDocs([newDoc, ...docs]);
       setSelectedFile(null);
       setUploading(false);
-      setUploadForm({ subject: '', externalRef: '' });
+      setUploadForm({ subject: '', externalRef: '', docType: CLINIC_DOCUMENT_TYPES[0] });
       fetchStorageStats();
       toast.success('บันทึกและอัปโหลดเอกสารลง Database เรียบร้อยแล้ว (สถานะ: รอตรวจสอบ)');
     } catch {
@@ -220,7 +256,7 @@ export const DocumentManagementPage: React.FC = () => {
       setDocs([newDoc, ...docs]);
       setSelectedFile(null);
       setUploading(false);
-      setUploadForm({ subject: '', externalRef: '' });
+      setUploadForm({ subject: '', externalRef: '', docType: CLINIC_DOCUMENT_TYPES[0] });
       fetchStorageStats();
       toast.success('อัปโหลดไฟล์และบันทึกข้อมูลเอกสารเรียบร้อยแล้ว (สถานะ: รอตรวจสอบ)');
     }
@@ -317,6 +353,24 @@ export const DocumentManagementPage: React.FC = () => {
                     <span className="dms-file-name">{selectedFile?.name}</span>
                     <span className="dms-file-size">({(Number(selectedFile?.size || 0) / 1024).toFixed(1)} KB)</span>
                   </div>
+                </div>
+                
+                <div className="dms-form-group">
+                  <label className="dms-form-label">
+                    ประเภทเอกสาร <span className="text-required">*</span>
+                  </label>
+                  <select
+                    className="dms-form-select"
+                    required
+                    value={uploadForm.docType}
+                    onChange={e => setUploadForm({ ...uploadForm, docType: e.target.value })}
+                  >
+                    {CLINIC_DOCUMENT_TYPES.map((type, idx) => (
+                      <option key={idx} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div className="dms-form-group">

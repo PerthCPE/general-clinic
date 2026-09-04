@@ -838,7 +838,8 @@ body.dark-mode .dms-form-label {
   color: #EF4444;
 }
 
-.dms-form-input {
+.dms-form-input,
+.dms-form-select {
   width: 100%;
   height: 48px;
   padding: 0 16px;
@@ -851,16 +852,42 @@ body.dark-mode .dms-form-label {
   font-family: inherit;
 }
 
-body.dark-mode .dms-form-input {
-  background: #1C2230;
+.dms-form-select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2364748B'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 18px;
+  padding-right: 44px;
+}
+
+body.dark-mode .dms-form-input,
+body.dark-mode .dms-form-select {
+  background-color: #1C2230;
   border-color: #333F53;
   color: #FFFFFF;
 }
 
-.dms-form-input:focus {
+body.dark-mode .dms-form-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2394A3B8'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+}
+
+.dms-form-input:focus,
+.dms-form-select:focus {
   outline: none;
   border-color: #2563EB;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.dms-form-select option {
+  background-color: #FFFFFF;
+  color: #0F172A;
+}
+
+body.dark-mode .dms-form-select option {
+  background-color: #1C2230;
+  color: #F8FAFC;
 }
 
 .dms-file-preview-box {
