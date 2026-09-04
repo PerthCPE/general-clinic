@@ -91,6 +91,8 @@ export const DocumentManagementPage: React.FC = () => {
   // Modals state
   const [activeModal, setActiveModal] = useState<'all' | 'reviewing' | 'recent' | 'storage' | 'upload' | 'detail' | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
+  const [modalStatusFilter, setModalStatusFilter] = useState<'all' | 'approved' | 'reviewing' | 'draft'>('all');
 
   // Upload Form State based on Document model attributes
   const [uploadForm, setUploadForm] = useState({
@@ -709,50 +711,124 @@ export const DocumentManagementPage: React.FC = () => {
     }
 
     let title = '';
+    let iconColor = '#2563EB';
     let dataList: DocumentItem[] = [];
     
-    if (activeModal === 'all') { title = `เอกสารทั้งหมด (${docs.length} รายการ)`; dataList = docs; }
-    if (activeModal === 'reviewing') { title = `เอกสารรอตรวจสอบ (${reviewingDocs.length} รายการ)`; dataList = reviewingDocs; }
-    if (activeModal === 'recent') { title = `เอกสารเพิ่มล่าสุด (${addedRecentlyDocs.length} รายการ)`; dataList = addedRecentlyDocs; }
+    if (activeModal === 'all') { title = `เอกสารทั้งหมด (${docs.length} รายการ)`; dataList = docs; iconColor = '#2563EB'; }
+    if (activeModal === 'reviewing') { title = `เอกสารรอตรวจสอบ (${reviewingDocs.length} รายการ)`; dataList = reviewingDocs; iconColor = '#F59E0B'; }
+    if (activeModal === 'recent') { title = `เอกสารเพิ่มล่าสุด (${addedRecentlyDocs.length} รายการ)`; dataList = addedRecentlyDocs; iconColor = '#10B981'; }
 
     if (!activeModal || !title) return null;
 
+    const filteredModalDocs = dataList.filter(doc => {
+      const q = modalSearchTerm.toLowerCase().trim();
+      const matchesSearch = !q ||
+        doc.name.toLowerCase().includes(q) ||
+        (doc.externalRef && doc.externalRef.toLowerCase().includes(q)) ||
+        doc.type.toLowerCase().includes(q) ||
+        (doc.subject && doc.subject.toLowerCase().includes(q)) ||
+        (doc.description && doc.description.toLowerCase().includes(q));
+      const matchesStatus = modalStatusFilter === 'all' || doc.status === modalStatusFilter;
+      return matchesSearch && matchesStatus;
+    });
+
+    const closeModal = () => {
+      setActiveModal(null);
+      setModalSearchTerm('');
+      setModalStatusFilter('all');
+    };
+
     return (
-      <div className="dms-modal-backdrop" onClick={() => setActiveModal(null)}>
-        <div className="dms-modal-card dms-modal-wide" onClick={e => e.stopPropagation()}>
+      <div className="dms-modal-backdrop" onClick={closeModal}>
+        <div className="dms-modal-card dms-modal-wide dms-modal-doc-list" onClick={e => e.stopPropagation()}>
           <div className="dms-modal-header">
             <div className="dms-modal-title-group">
-              <div className="dms-modal-icon-badge">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2">
+              <div
+                className="dms-modal-icon-badge"
+                style={{
+                  color: iconColor,
+                  backgroundColor: activeModal === 'reviewing' ? 'rgba(245, 158, 11, 0.15)' : activeModal === 'recent' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(37, 99, 235, 0.15)',
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                   <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </div>
               <div>
                 <h3 className="dms-modal-title">{title}</h3>
-                <p className="dms-modal-subtitle">คลิกแถวเอกสารเพื่อดูรายละเอียดและอนุมัติ</p>
+                <p className="dms-modal-subtitle">คลิกแถวเอกสารหรือกดปุ่มรูปตาเพื่อดูรายละเอียด ตรวจสอบ และอนุมัติเอกสาร</p>
               </div>
             </div>
-            <button className="dms-close-btn" onClick={() => setActiveModal(null)} aria-label="Close">
+            <button className="dms-close-btn" onClick={closeModal} aria-label="Close">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                 <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
           </div>
+
+          {/* Modal Search & Filter Toolbar */}
+          <div className="dms-modal-toolbar">
+            <div className="dms-modal-search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2" className="search-icon">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                type="text"
+                className="dms-modal-search-input"
+                placeholder="ค้นหาชื่อเอกสาร, เลขที่อ้างอิง หรือประเภท..."
+                value={modalSearchTerm}
+                onChange={e => setModalSearchTerm(e.target.value)}
+              />
+              {modalSearchTerm && (
+                <button type="button" className="search-clear-btn" onClick={() => setModalSearchTerm('')} aria-label="Clear Search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                    <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            <div className="dms-modal-filter-chips">
+              <button
+                type="button"
+                className={`filter-chip ${modalStatusFilter === 'all' ? 'active' : ''}`}
+                onClick={() => setModalStatusFilter('all')}
+              >
+                ทั้งหมด ({dataList.length})
+              </button>
+              <button
+                type="button"
+                className={`filter-chip ${modalStatusFilter === 'reviewing' ? 'active' : ''}`}
+                onClick={() => setModalStatusFilter('reviewing')}
+              >
+                รอตรวจสอบ ({dataList.filter(d => d.status === 'reviewing').length})
+              </button>
+              <button
+                type="button"
+                className={`filter-chip ${modalStatusFilter === 'approved' ? 'active' : ''}`}
+                onClick={() => setModalStatusFilter('approved')}
+              >
+                อนุมัติแล้ว ({dataList.filter(d => d.status === 'approved').length})
+              </button>
+            </div>
+          </div>
+
           <div className="dms-modal-body dms-modal-scrollable">
             <div className="table-responsive">
               <table className="dms-master-table">
                 <thead>
                   <tr>
-                    <th>ชื่อเอกสาร</th>
-                    <th>ประเภท</th>
-                    <th>วันที่แก้ไข</th>
-                    <th>สถานะ</th>
-                    <th style={{ textAlign: 'center' }}>การจัดการ</th>
+                    <th style={{ width: '38%', minWidth: '260px' }}>ชื่อเอกสารและเลขที่อ้างอิง</th>
+                    <th style={{ width: '24%', minWidth: '180px' }}>ประเภทเอกสาร</th>
+                    <th style={{ width: '16%', minWidth: '120px' }}>วันที่แก้ไข</th>
+                    <th style={{ width: '14%', minWidth: '110px' }}>สถานะ</th>
+                    <th style={{ width: '8%', minWidth: '80px', textAlign: 'center' }}>จัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dataList.map((doc) => (
+                  {filteredModalDocs.map((doc) => (
                     <tr key={doc.id} onClick={() => openDocDetail(doc)} className="dms-clickable-row">
                       <td>
                         <div className="doc-name-cell">
@@ -765,14 +841,16 @@ export const DocumentManagementPage: React.FC = () => {
                           <div className="doc-text-wrapper">
                             <span className="doc-name-text">{doc.name}</span>
                             {doc.externalRef ? (
-                              <span className="doc-subject-text">เลขที่: {doc.externalRef}</span>
+                              <span className="doc-ref-pill">เลขที่: {doc.externalRef}</span>
                             ) : doc.subject && doc.subject !== doc.name ? (
                               <span className="doc-subject-text">เรื่อง: {doc.subject}</span>
                             ) : null}
                           </div>
                         </div>
                       </td>
-                      <td><span className="doc-type-tag">{doc.type}</span></td>
+                      <td>
+                        <span className="doc-type-tag" title={doc.type}>{doc.type}</span>
+                      </td>
                       <td className="doc-date-text">{doc.modifiedDate}</td>
                       <td>
                         <span className={`status-pill ${doc.status}`}>
@@ -801,11 +879,20 @@ export const DocumentManagementPage: React.FC = () => {
                       </td>
                     </tr>
                   ))}
-                  {dataList.length === 0 && (
+                  {filteredModalDocs.length === 0 && (
                     <tr>
                       <td colSpan={5} className="no-data-cell">
                         <div className="no-data-content">
-                          <p>ไม่พบรายการเอกสารในหมวดหมู่นี้</p>
+                          <p>ไม่พบรายการเอกสารที่ตรงกับเงื่อนไขการค้นหา</p>
+                          {(modalSearchTerm || modalStatusFilter !== 'all') && (
+                            <button
+                              type="button"
+                              className="dms-btn-secondary dms-btn-small"
+                              onClick={() => { setModalSearchTerm(''); setModalStatusFilter('all'); }}
+                            >
+                              ล้างตัวกรอง
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -815,7 +902,7 @@ export const DocumentManagementPage: React.FC = () => {
             </div>
           </div>
           <div className="dms-modal-footer">
-            <button className="dms-btn-primary" onClick={() => setActiveModal(null)}>
+            <button className="dms-btn-primary" onClick={closeModal}>
               ปิดหน้าต่าง
             </button>
           </div>
@@ -983,11 +1070,11 @@ export const DocumentManagementPage: React.FC = () => {
             <table className="dms-master-table">
               <thead>
                 <tr>
-                  <th>ชื่อเอกสาร</th>
-                  <th>ประเภท</th>
-                  <th>วันที่แก้ไข</th>
-                  <th>สถานะ</th>
-                  <th style={{ textAlign: 'center' }}>การจัดการ</th>
+                  <th style={{ width: '38%', minWidth: '260px' }}>ชื่อเอกสารและเลขที่อ้างอิง</th>
+                  <th style={{ width: '24%', minWidth: '180px' }}>ประเภทเอกสาร</th>
+                  <th style={{ width: '16%', minWidth: '120px' }}>วันที่แก้ไข</th>
+                  <th style={{ width: '14%', minWidth: '110px' }}>สถานะ</th>
+                  <th style={{ width: '8%', minWidth: '80px', textAlign: 'center' }}>จัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -1004,7 +1091,7 @@ export const DocumentManagementPage: React.FC = () => {
                         <div className="doc-text-wrapper">
                           <span className="doc-name-text">{doc.name}</span>
                           {doc.externalRef ? (
-                            <span className="doc-subject-text">เลขที่: {doc.externalRef}</span>
+                            <span className="doc-ref-pill">เลขที่: {doc.externalRef}</span>
                           ) : doc.subject && doc.subject !== doc.name ? (
                             <span className="doc-subject-text">เรื่อง: {doc.subject}</span>
                           ) : null}
