@@ -20,18 +20,35 @@ interface DocumentItem {
 }
 
 export const CLINIC_DOCUMENT_TYPES = [
-  'หนังสือราชการ / เอกสารภายนอก (สธ./สปสช./อย.)',
-  'เอกสารส่งตัว / ส่งต่อผู้ป่วย (Referral Form)',
-  'ใบรับรองแพทย์ / ประวัติการตรวจรักษา (Medical Certificate & Record)',
-  'ผลตรวจทางห้องปฏิบัติการและรังสี (Lab & X-Ray Report)',
-  'เอกสารสิทธิ์การรักษาและเคลมประกัน (Insurance & Scheme Claim)',
-  'ใบสั่งยาและเอกสารคลังเวชภัณฑ์ (Prescription & Pharmacy Log)',
-  'เอกสารการเงินและใบเสร็จรับเงิน (Financial & Receipt Document)',
-  'สัญญาจ้างและเอกสารบุคลากร (Staff Contract & HR Agreement)',
-  'นโยบายและแนวทางมาตรฐานการปฏิบัติงาน (SOP & Policy)',
-  'บันทึกข้อความภายในและเอกสารทั่วไป (General Internal Memo)',
+  'หนังสือราชการ',
+  'ใบส่งตัวผู้ป่วย',
+  'ใบรับรองแพทย์',
+  'ผลตรวจ Lab/X-Ray',
+  'เอกสารสิทธิ์/ประกัน',
+  'ใบสั่งยา/เวชภัณฑ์',
+  'เอกสารการเงิน/ใบเสร็จ',
+  'เอกสารบุคลากร',
+  'นโยบาย/คู่มือ SOP',
+  'บันทึกข้อความ',
   'อื่นๆ (โปรดระบุ)',
 ] as const;
+
+export const formatDocType = (type?: string): string => {
+  if (!type) return 'เอกสารทั่วไป';
+  const t = type.trim();
+  if (t.includes('หนังสือราชการ') || t.includes('สธ.') || t.includes('สปสช') || t.includes('ภายนอก')) return 'หนังสือราชการ';
+  if (t.includes('ส่งตัว') || t.includes('Referral')) return 'ใบส่งตัวผู้ป่วย';
+  if (t.includes('ใบรับรอง') || t.includes('Medical Certificate')) return 'ใบรับรองแพทย์';
+  if (t.includes('ผลตรวจ') || t.includes('ห้องปฏิบัติการ') || t.includes('Lab') || t.includes('X-Ray')) return 'ผลตรวจ Lab/X-Ray';
+  if (t.includes('สิทธิ์') || t.includes('ประกัน') || t.includes('Claim') || t.includes('Insurance')) return 'เอกสารสิทธิ์/ประกัน';
+  if (t.includes('ใบสั่งยา') || t.includes('เวชภัณฑ์') || t.includes('Prescription') || t.includes('Pharmacy')) return 'ใบสั่งยา/เวชภัณฑ์';
+  if (t.includes('การเงิน') || t.includes('ใบเสร็จ') || t.includes('Financial') || t.includes('Receipt')) return 'เอกสารการเงิน/ใบเสร็จ';
+  if (t.includes('สัญญา') || t.includes('บุคลากร') || t.includes('Contract') || t.includes('HR')) return 'เอกสารบุคลากร';
+  if (t.includes('นโยบาย') || t.includes('SOP') || t.includes('Policy')) return 'นโยบาย/คู่มือ SOP';
+  if (t.includes('บันทึกข้อความ') || t.includes('Internal Memo')) return 'บันทึกข้อความ';
+  if (t.length > 20) return t.slice(0, 18) + '...';
+  return t;
+};
 
 const formatBytes = (bytes?: number) => {
   if (!bytes || bytes <= 0) return '1.20 MB';
@@ -131,7 +148,7 @@ export const DocumentManagementPage: React.FC = () => {
             return {
               id: String(d.id),
               name: d.subject || `เอกสาร #${d.id}`,
-              type: d.doc_type || 'หนังสือราชการ / เอกสารภายนอก (สธ./สปสช./อย.)',
+              type: formatDocType(d.doc_type),
               fileSize: d.file_size || 1500000,
               modifiedDate: formattedDate,
               status: status,
@@ -820,11 +837,11 @@ export const DocumentManagementPage: React.FC = () => {
               <table className="dms-master-table">
                 <thead>
                   <tr>
-                    <th style={{ width: '38%', minWidth: '260px' }}>ชื่อเอกสารและเลขที่อ้างอิง</th>
-                    <th style={{ width: '24%', minWidth: '180px' }}>ประเภทเอกสาร</th>
+                    <th style={{ width: '42%', minWidth: '280px' }}>ชื่อเอกสารและเลขที่อ้างอิง</th>
+                    <th style={{ width: '18%', minWidth: '130px' }}>ประเภท</th>
                     <th style={{ width: '16%', minWidth: '120px' }}>วันที่แก้ไข</th>
                     <th style={{ width: '14%', minWidth: '110px' }}>สถานะ</th>
-                    <th style={{ width: '8%', minWidth: '80px', textAlign: 'center' }}>จัดการ</th>
+                    <th style={{ width: '10%', minWidth: '80px', textAlign: 'center' }}>จัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -849,7 +866,7 @@ export const DocumentManagementPage: React.FC = () => {
                         </div>
                       </td>
                       <td>
-                        <span className="doc-type-tag" title={doc.type}>{doc.type}</span>
+                        <span className="doc-type-tag" title={doc.type}>{formatDocType(doc.type)}</span>
                       </td>
                       <td className="doc-date-text">{doc.modifiedDate}</td>
                       <td>
@@ -1070,11 +1087,11 @@ export const DocumentManagementPage: React.FC = () => {
             <table className="dms-master-table">
               <thead>
                 <tr>
-                  <th style={{ width: '38%', minWidth: '260px' }}>ชื่อเอกสารและเลขที่อ้างอิง</th>
-                  <th style={{ width: '24%', minWidth: '180px' }}>ประเภทเอกสาร</th>
+                  <th style={{ width: '42%', minWidth: '280px' }}>ชื่อเอกสารและเลขที่อ้างอิง</th>
+                  <th style={{ width: '18%', minWidth: '130px' }}>ประเภท</th>
                   <th style={{ width: '16%', minWidth: '120px' }}>วันที่แก้ไข</th>
                   <th style={{ width: '14%', minWidth: '110px' }}>สถานะ</th>
-                  <th style={{ width: '8%', minWidth: '80px', textAlign: 'center' }}>จัดการ</th>
+                  <th style={{ width: '10%', minWidth: '80px', textAlign: 'center' }}>จัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -1098,7 +1115,7 @@ export const DocumentManagementPage: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    <td><span className="doc-type-tag">{doc.type}</span></td>
+                    <td><span className="doc-type-tag" title={doc.type}>{formatDocType(doc.type)}</span></td>
                     <td className="doc-date-text">{doc.modifiedDate}</td>
                     <td>
                       <span className={`status-pill ${doc.status}`}>

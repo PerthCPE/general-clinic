@@ -513,14 +513,16 @@ body.dark-mode .doc-subject-text {
 }
 
 .doc-type-tag {
-  display: inline-block;
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
   border-radius: 6px;
   background: #F1F5F9;
   color: #334155;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
+  white-space: nowrap;
   border: 1px solid #E2E8F0;
 }
 
