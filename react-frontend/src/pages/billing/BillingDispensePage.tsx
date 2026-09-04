@@ -4,6 +4,8 @@ import './BillingDispensePage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
+import { BillingDispenseSkeleton } from '../../components/Common/ClinicSkeleton';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface ToastState {
   message: string;
@@ -474,7 +476,7 @@ export default function BillingDispensePage({
       } finally {
         if (isInitial && isMounted) {
           const elapsed = Date.now() - loadStartTime;
-          const remaining = Math.max(0, 600 - elapsed);
+          const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
           setTimeout(() => {
             if (isMounted) setIsInitialLoading(false);
           }, remaining);
@@ -696,12 +698,16 @@ export default function BillingDispensePage({
       if (onNavigateToBilling) {
         onNavigateToBilling();
       }
-    }, 600);
+    }, CLINIC_ANIMATION_CONFIG.submitModalDurationMs);
   };
 
   const medTotal = activePatient && Array.isArray(activePatient.medications) 
     ? activePatient.medications.reduce((sum, m: any) => sum + ((Number(m?.price || m?.unit_price) || 0) * (Number(m?.quantity) || 1)), 0) 
     : 0;
+
+  if (isInitialLoading) {
+    return <BillingDispenseSkeleton />;
+  }
 
   return (
     <div className="billing-dispense-container">
@@ -736,7 +742,7 @@ export default function BillingDispensePage({
               flexDirection: 'column',
               alignItems: 'center',
               gap: '16px',
-              animation: 'scaleIn 0.2s ease-out'
+              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
             <div
@@ -758,7 +764,7 @@ export default function BillingDispensePage({
                   borderRadius: '50%',
                   border: '4px solid #BFDBFE',
                   borderTopColor: '#2563EB',
-                  animation: 'spin 1s linear infinite'
+                  animation: 'clinicSpinGPU 0.85s linear infinite'
                 }}
               />
             </div>
@@ -774,59 +780,8 @@ export default function BillingDispensePage({
         </div>
       )}
 
-      {/* 2. หน้าจอแสดงอนิเมะชันตอนโหลดข้อมูลเริ่มต้นจากฐานข้อมูล (ตรงตามรูปภาพ 1) */}
-      {isInitialLoading ? (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            minHeight: 'calc(100vh - 180px)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: 'translateY(-30px)',
-            gap: '16px',
-            textAlign: 'center',
-            padding: '24px'
-          }}
-        >
-          <div style={{ position: 'relative', width: '56px', height: '56px', marginBottom: '8px' }}>
-            <div
-              style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '50%',
-                border: '4px solid #E2E8F0',
-                boxSizing: 'border-box'
-              }}
-            />
-            <Loader2
-              style={{
-                width: '56px',
-                height: '56px',
-                color: '#2563EB',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                animation: 'spin 1s linear infinite'
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#1E293B', margin: 0 }}>
-              กำลังโหลดข้อมูลจากฐานข้อมูล
-            </p>
-            <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-              กรุณารอสักครู่
-            </p>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Page Header */}
-          <div className="page-header" style={{ marginBottom: '32px' }}>
+      {/* Page Header */}
+      <div className="page-header" style={{ marginBottom: '32px' }}>
             <div className="header-titles">
               <h1 className="page-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
                 คิดเงินและออกบิลชำระเงิน
@@ -1693,8 +1648,6 @@ export default function BillingDispensePage({
           <h3>ยังไม่ได้เลือกผู้ป่วยในคิว</h3>
           <p>กรุณาเลือกลำดับคิวจาก Dropdown หรือกดปุ่มคิวผู้ป่วยด้านบนเพื่อดำเนินการต่อ</p>
         </div>
-      )}
-        </>
       )}
 
       {/* Toast Notification */}

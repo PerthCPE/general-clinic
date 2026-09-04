@@ -3,6 +3,8 @@ import { Loader2 } from 'lucide-react';
 import './MedicinePage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
+import { PharmacyMedicineSkeleton } from '../../components/Common/ClinicSkeleton';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface Medicine {
   id: string;
@@ -559,7 +561,7 @@ export default function MedicinePage() {
     const finishLoading = () => {
       if (isInitial) {
         const elapsed = Date.now() - startTime;
-        const remaining = Math.max(0, 500 - elapsed);
+        const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
         setTimeout(() => setIsInitialLoading(false), remaining);
       }
     };
@@ -877,7 +879,7 @@ export default function MedicinePage() {
 
     const completeSubmit = () => {
       const elapsed = Date.now() - start;
-      const remaining = Math.max(0, 800 - elapsed);
+      const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
       setTimeout(() => {
         setIsSubmitting(false);
         setIsAddModalOpen(false);
@@ -998,7 +1000,7 @@ export default function MedicinePage() {
     }).catch(() => {});
 
     const elapsed = Date.now() - start;
-    const remaining = Math.max(0, 800 - elapsed);
+    const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
     setTimeout(() => {
       setIsSubmitting(false);
       handleCloseModal();
@@ -1085,6 +1087,10 @@ export default function MedicinePage() {
 
   const isReduceInvalid = selectedMedicine && updateMode === 'reduce' && quantity !== '' && Number(quantity) > selectedMedicine.stock;
 
+  if (isInitialLoading) {
+    return <PharmacyMedicineSkeleton />;
+  }
+
   return (
     <div className="medicine-page-container">
 
@@ -1118,7 +1124,7 @@ export default function MedicinePage() {
               flexDirection: 'column',
               alignItems: 'center',
               gap: '16px',
-              animation: 'scaleIn 0.2s ease-out'
+              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
             <div
@@ -1140,7 +1146,7 @@ export default function MedicinePage() {
                   borderRadius: '50%',
                   border: '4px solid #BFDBFE',
                   borderTopColor: '#2563EB',
-                  animation: 'spin 1s linear infinite'
+                  animation: 'clinicSpinGPU 0.85s linear infinite'
                 }}
               />
             </div>
@@ -1156,58 +1162,7 @@ export default function MedicinePage() {
         </div>
       )}
 
-      {/* 2. หน้าจอแสดงอนิเมะชันตอนโหลดข้อมูลเริ่มต้นจากฐานข้อมูล (ตรงตามรูปภาพ 1) */}
-      {isInitialLoading ? (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            minHeight: 'calc(100vh - 180px)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: 'translateY(-30px)',
-            gap: '16px',
-            textAlign: 'center',
-            padding: '24px'
-          }}
-        >
-          <div style={{ position: 'relative', width: '56px', height: '56px', marginBottom: '8px' }}>
-            <div
-              style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '50%',
-                border: '4px solid #E2E8F0',
-                boxSizing: 'border-box'
-              }}
-            />
-            <Loader2
-              style={{
-                width: '56px',
-                height: '56px',
-                color: '#2563EB',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                animation: 'spin 1s linear infinite'
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#1E293B', margin: 0 }}>
-              กำลังโหลดข้อมูลจากฐานข้อมูล
-            </p>
-            <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-              กรุณารอสักครู่
-            </p>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="page-header" style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
+      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
         <div className="header-titles" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <h1 className="page-title" style={{ margin: 0, fontSize: '28px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', letterSpacing: '-0.5px' }}>
@@ -2202,8 +2157,6 @@ export default function MedicinePage() {
             </div>
           </div>
         </div>
-      )}
-        </>
       )}
     </div>
   );

@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import './BillingDashboardPage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
+import { BillingDashboardSkeleton } from '../../components/Common/ClinicSkeleton';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface PaymentRecord {
   id: string;
@@ -51,6 +53,11 @@ export default function BillingDashboardPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitTitle, setSubmitTitle] = useState('กำลังบันทึกลงฐานข้อมูล');
+  const [submitSubtitle, setSubmitSubtitle] = useState('กรุณารอสักครู่...');
+
   const handleSearch = () => {
     setHasSearched(true);
     setCurrentPage(1);
@@ -65,7 +72,8 @@ export default function BillingDashboardPage() {
   };
 
   // Sync Real Billings & BillingHistory from Supabase / Postgres DB
-  const fetchBillings = useCallback(async () => {
+  const fetchBillings = useCallback(async (isInitial = false) => {
+    const startTime = Date.now();
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
@@ -120,12 +128,18 @@ export default function BillingDashboardPage() {
       }
     } catch (err) {
       console.error('Failed to fetch dashboard billing records:', err);
+    } finally {
+      if (isInitial) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+        setTimeout(() => setIsInitialLoading(false), remaining);
+      }
     }
   }, []);
 
   // Real-time WebSocket Listeners for Billing & Cashier
   useEffect(() => {
-    fetchBillings();
+    fetchBillings(true);
 
     const unsubPay = subscribe('PAYMENT_CONFIRMED', (data: any) => {
       fetchBillings();
@@ -218,6 +232,10 @@ export default function BillingDashboardPage() {
   // [บุญให้เพิ่มเทคนิคนี้] (Supabase + Optimistic UI + WebSocket) - บันทึกการแก้ไขข้อมูลทันทีใน 0 ms
   const handleSaveEditRecord = () => {
     if (!editingRecord) return;
+    setIsSubmitting(true);
+    setSubmitTitle('กำลังบันทึกการแก้ไขข้อมูล');
+    setSubmitSubtitle('กรุณารอสักครู่ ระบบกำลังอัปเดตประวัติการเงินลงฐานข้อมูล');
+    const start = Date.now();
     const numAmt = parseFloat(editRecordForm.amount) || editingRecord.numericAmount;
     setRecords(prev => prev.map(r => {
       if (r.id === editingRecord.id) {
@@ -233,13 +251,23 @@ export default function BillingDashboardPage() {
       return r;
     }));
     setEditingRecord(null);
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
+    setTimeout(() => setIsSubmitting(false), remaining);
   };
 
   // [บุญให้เพิ่มเทคนิคนี้] (Supabase + Optimistic UI + WebSocket) - ลบข้อมูลจากหน้าจอทันทีใน 0 ms
   const handleConfirmDeleteRecord = () => {
     if (!deleteRecord) return;
+    setIsSubmitting(true);
+    setSubmitTitle('กำลังลบรายการประวัติการเงิน');
+    setSubmitSubtitle('กรุณารอสักครู่ ระบบกำลังลบรายการออกจากฐานข้อมูล');
+    const start = Date.now();
     setRecords(prev => prev.filter(r => r.id !== deleteRecord.id));
     setDeleteRecord(null);
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
+    setTimeout(() => setIsSubmitting(false), remaining);
   };
 
   const filteredRecords = useMemo(() => {
@@ -305,8 +333,80 @@ export default function BillingDashboardPage() {
     setSelectedDetail(detail);
   };
 
+  if (isInitialLoading) {
+    return <BillingDashboardSkeleton />;
+  }
+
   return (
     <div className="billing-dashboard-container">
+      {/* Submitting Modal for Edit / Delete */}
+      {isSubmitting && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              padding: '36px 32px',
+              textAlign: 'center',
+              maxWidth: '380px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+            <div
+              style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                backgroundColor: '#EFF6FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '4px solid #BFDBFE',
+                  borderTopColor: '#2563EB',
+                  animation: 'clinicSpinGPU 0.85s linear infinite'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0F172A', margin: 0 }}>
+                {submitTitle}
+              </h3>
+              <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                {submitSubtitle}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="dashboard-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div className="header-titles">

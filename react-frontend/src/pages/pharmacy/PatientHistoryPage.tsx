@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useWebSocket } from '../../context/WebSocketContext';
 import './PatientHistoryPage.css';
 import CopyableText from '../../components/Common/CopyableText';
+import { PharmacyHistorySkeleton } from '../../components/Common/ClinicSkeleton';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface Patient {
   id: string;
@@ -121,7 +123,7 @@ const mockMedHistory: MedicationHistory[] = [
 export default function PatientHistoryPage() {
   const { subscribe } = useWebSocket();
   const [patients, setPatients] = useState<Patient[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
@@ -172,6 +174,7 @@ export default function PatientHistoryPage() {
   const handleSavePatientEdit = async () => {
     if (!editPatientModal) return;
     setIsSavingPatient(true);
+    const start = Date.now();
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -223,13 +226,16 @@ export default function PatientHistoryPage() {
     } catch (err) {
       console.error('Failed to update patient:', err);
     } finally {
-      setIsSavingPatient(false);
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
+      setTimeout(() => setIsSavingPatient(false), remaining);
     }
   };
 
   const handleDeletePatient = async () => {
     if (!deleteConfirmPatient) return;
     setIsDeletingPatient(true);
+    const start = Date.now();
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
       const headers: Record<string, string> = {};
@@ -253,7 +259,9 @@ export default function PatientHistoryPage() {
     } catch (err) {
       console.error('Failed to delete patient:', err);
     } finally {
-      setIsDeletingPatient(false);
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
+      setTimeout(() => setIsDeletingPatient(false), remaining);
     }
   };
 
@@ -277,7 +285,8 @@ export default function PatientHistoryPage() {
     }
   };
 
-  const fetchPatientMedicines = async () => {
+  const fetchPatientMedicines = async (isInitial = false) => {
+    const startTime = Date.now();
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
       const headers: Record<string, string> = {};
@@ -321,19 +330,24 @@ export default function PatientHistoryPage() {
           });
 
           setPatients(mapped);
-          setLoading(false);
           return;
         }
       }
+      setPatients([]);
     } catch (err) {
       console.error('Failed to fetch patient medicines:', err);
+      setPatients([]);
+    } finally {
+      if (isInitial) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+        setTimeout(() => setIsInitialLoading(false), remaining);
+      }
     }
-    setPatients([]);
-    setLoading(false);
   };
 
   useEffect(() => {
-    fetchPatientMedicines();
+    fetchPatientMedicines(true);
 
     const unsub1 = subscribe('PATIENT_MEDICINE_UPDATED', fetchPatientMedicines);
     const unsub2 = subscribe('DISPENSE_RECORDED', fetchPatientMedicines);
@@ -447,8 +461,82 @@ export default function PatientHistoryPage() {
   const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredPatients.length);
   const paginatedPatients = filteredPatients.slice(startIndex, endIndex);
 
+  if (isInitialLoading) {
+    return <PharmacyHistorySkeleton />;
+  }
+
   return (
     <div className="patient-history-container">
+      {/* Submitting Modal for Edit / Delete */}
+      {(isSavingPatient || isDeletingPatient) && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              padding: '36px 32px',
+              textAlign: 'center',
+              maxWidth: '380px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}
+          >
+            <div
+              style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                backgroundColor: '#EFF6FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '4px solid #BFDBFE',
+                  borderTopColor: '#2563EB',
+                  animation: 'clinicSpinGPU 0.85s linear infinite'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0F172A', margin: 0 }}>
+                {isDeletingPatient ? 'กำลังลบข้อมูลผู้ป่วย' : 'กำลังบันทึกข้อมูลผู้ป่วย'}
+              </h3>
+              <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                {isDeletingPatient
+                  ? 'กรุณารอสักครู่ ระบบกำลังลบข้อมูลออกจากฐานข้อมูล'
+                  : 'กรุณารอสักครู่ ระบบกำลังบันทึกข้อมูลลงฐานข้อมูล'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="list-view-container">
         <div className="page-header" style={{ marginBottom: '24px' }}>
           <div className="header-titles">

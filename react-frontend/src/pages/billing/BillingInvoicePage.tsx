@@ -5,6 +5,8 @@ import { useWebSocket } from '../../context/WebSocketContext';
 import { QRCodeSVG } from 'qrcode.react';
 import generatePayload from 'promptpay-qr';
 import html2pdf from 'html2pdf.js';
+import { BillingInvoiceSkeleton } from '../../components/Common/ClinicSkeleton';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface BillingInvoicePageProps {
   selectedPatientId?: string;
@@ -45,7 +47,7 @@ export default function BillingInvoicePage({
   });
   const receiptRef = useRef<HTMLDivElement>(null);
   const printableReceiptRef = useRef<HTMLDivElement>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showQrModal, setShowQrModal] = useState(false);
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
@@ -149,6 +151,7 @@ export default function BillingInvoicePage({
   };
 
   const fetchQueues = async () => {
+    const startTime = Date.now();
     try {
       const token = localStorage.getItem('token');
       const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -262,12 +265,13 @@ export default function BillingInvoicePage({
 
       // ถ้าไม่มีคิวจาก DB จะแสดง 0 รายการ (ไม่มี fallback mock)
       setQueueList(mapped);
-      setLoading(false);
-      return;
     } catch (err) {
       console.error('Failed to fetch queues in billing invoice:', err);
+    } finally {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+      setTimeout(() => setLoading(false), remaining);
     }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -504,9 +508,9 @@ export default function BillingInvoicePage({
     } catch (err) {
       console.error('Failed to confirm payment:', err);
     } finally {
-      // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลอย่างน้อย 850ms
+      // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;
-      const remaining = Math.max(0, 850 - elapsed);
+      const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
       setTimeout(() => {
         setIsSubmitting(false);
         setIsPaymentConfirmed(true);
@@ -546,56 +550,7 @@ export default function BillingInvoicePage({
   };
 
   if (loading) {
-    return (
-      <div
-        className="billing-invoice-container"
-        style={{
-          minHeight: 'calc(100vh - 134px)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          transform: 'translateY(-48px)',
-          gap: '16px',
-          textAlign: 'center',
-          padding: '24px'
-        }}
-      >
-        <div style={{ position: 'relative', width: '56px', height: '56px', marginBottom: '8px' }}>
-          <div
-            style={{
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              border: '4px solid #E2E8F0',
-              boxSizing: 'border-box'
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '56px',
-              height: '56px',
-              borderRadius: '50%',
-              border: '4px solid transparent',
-              borderTopColor: '#2563EB',
-              animation: 'spin 1s linear infinite'
-            }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#1E293B', margin: 0 }}>
-            กำลังโหลดข้อมูลจากฐานข้อมูล
-          </p>
-          <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-            กรุณารอสักครู่
-          </p>
-        </div>
-      </div>
-    );
+    return <BillingInvoiceSkeleton />;
   }
 
   if (!activePatient) {
@@ -686,7 +641,7 @@ export default function BillingInvoicePage({
               flexDirection: 'column',
               alignItems: 'center',
               gap: '16px',
-              animation: 'scaleIn 0.2s ease-out'
+              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
             <div
@@ -708,7 +663,7 @@ export default function BillingInvoicePage({
                   borderRadius: '50%',
                   border: '4px solid #BFDBFE',
                   borderTopColor: '#2563EB',
-                  animation: 'spin 1s linear infinite'
+                  animation: 'clinicSpinGPU 0.85s linear infinite'
                 }}
               />
             </div>

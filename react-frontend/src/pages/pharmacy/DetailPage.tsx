@@ -4,6 +4,8 @@ import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
 import { Check, Plus, Minus, Loader2 } from 'lucide-react';
+import { PharmacyDetailSkeleton } from '../../components/Common/ClinicSkeleton';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface ToastState {
   message: string;
@@ -281,7 +283,7 @@ export default function DetailPage({
       } finally {
         if (isInitial && isMounted) {
           const elapsed = Date.now() - loadStartTime;
-          const remaining = Math.max(0, 600 - elapsed);
+          const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
           setTimeout(() => {
             if (isMounted) setIsInitialLoading(false);
           }, remaining);
@@ -501,9 +503,9 @@ export default function DetailPage({
         body: JSON.stringify(payload)
       }).catch(() => {});
     } finally {
-      // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลอย่างน้อย 850ms
+      // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;
-      const remaining = Math.max(0, 850 - elapsed);
+      const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
       setTimeout(() => {
         setIsSubmitting(false);
       }, remaining);
@@ -536,6 +538,10 @@ export default function DetailPage({
 
 
   const [statFilter, setStatFilter] = useState<'all' | 'pending' | 'dispensed' | 'completed'>('all');
+
+  if (isInitialLoading) {
+    return <PharmacyDetailSkeleton />;
+  }
 
   return (
     <div className="detail-page-container">
@@ -570,7 +576,7 @@ export default function DetailPage({
               flexDirection: 'column',
               alignItems: 'center',
               gap: '16px',
-              animation: 'scaleIn 0.2s ease-out'
+              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
             }}
           >
             <div
@@ -592,7 +598,7 @@ export default function DetailPage({
                   borderRadius: '50%',
                   border: '4px solid #BFDBFE',
                   borderTopColor: '#2563EB',
-                  animation: 'spin 1s linear infinite'
+                  animation: 'clinicSpinGPU 0.85s linear infinite'
                 }}
               />
             </div>
@@ -608,59 +614,8 @@ export default function DetailPage({
         </div>
       )}
 
-      {/* 2. หน้าจอแสดงอนิเมะชันตอนโหลดข้อมูลเริ่มต้นจากฐานข้อมูล (ตรงตามรูปภาพ 1) */}
-      {isInitialLoading ? (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            minHeight: 'calc(100vh - 180px)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transform: 'translateY(-30px)',
-            gap: '16px',
-            textAlign: 'center',
-            padding: '24px'
-          }}
-        >
-          <div style={{ position: 'relative', width: '56px', height: '56px', marginBottom: '8px' }}>
-            <div
-              style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '50%',
-                border: '4px solid #E2E8F0',
-                boxSizing: 'border-box'
-              }}
-            />
-            <Loader2
-              style={{
-                width: '56px',
-                height: '56px',
-                color: '#2563EB',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                animation: 'spin 1s linear infinite'
-              }}
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#1E293B', margin: 0 }}>
-              กำลังโหลดข้อมูลจากฐานข้อมูล
-            </p>
-            <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
-              กรุณารอสักครู่
-            </p>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Action Bar (Top) */}
-          <div className="page-header" style={{ marginBottom: '24px' }}>
+      {/* Action Bar (Top) */}
+      <div className="page-header" style={{ marginBottom: '24px' }}>
             <div className="header-titles">
               <h1 className="page-title">รายละเอียดการจ่ายยา</h1>
               <p className="page-subtitle">บันทึกและตรวจสอบคำสั่งจ่ายยา คัดกรองรายการยา และตัดสต็อกยา</p>
@@ -1484,8 +1439,6 @@ export default function DetailPage({
           </div>
         )}
         </div>
-        </>
-      )}
 
       {/* Toast Notification */}
       {toast && (
