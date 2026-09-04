@@ -374,7 +374,11 @@ export const DocumentManagementPage: React.FC = () => {
                           </div>
                           <div className="doc-text-wrapper">
                             <span className="doc-name-text">{doc.name}</span>
-                            {doc.subject && <span className="doc-subject-text">เรื่อง: {doc.subject}</span>}
+                            {doc.externalRef ? (
+                              <span className="doc-subject-text">เลขที่: {doc.externalRef}</span>
+                            ) : doc.subject && doc.subject !== doc.name ? (
+                              <span className="doc-subject-text">เรื่อง: {doc.subject}</span>
+                            ) : null}
                           </div>
                         </div>
                       </td>
@@ -570,7 +574,11 @@ export const DocumentManagementPage: React.FC = () => {
                         </div>
                         <div className="doc-text-wrapper">
                           <span className="doc-name-text">{doc.name}</span>
-                          {doc.subject && <span className="doc-subject-text">เรื่อง: {doc.subject}</span>}
+                          {doc.externalRef ? (
+                            <span className="doc-subject-text">เลขที่: {doc.externalRef}</span>
+                          ) : doc.subject && doc.subject !== doc.name ? (
+                            <span className="doc-subject-text">เรื่อง: {doc.subject}</span>
+                          ) : null}
                         </div>
                       </div>
                     </td>
