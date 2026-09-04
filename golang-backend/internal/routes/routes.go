@@ -125,7 +125,10 @@ func SetUpRoutes(r *gin.Engine) {
 	officerRoutes.Use(middleware.RoleRequired("officer", "registrar", "doctor", "nurse", "nurse_assistant", "pharmacist", "cashier"))
 	{
 		officerRoutes.GET("/documents", controllers.GetDocuments)
+		officerRoutes.GET("/documents/:id", controllers.GetDocumentByID)
 		officerRoutes.POST("/documents", controllers.CreateDocument)
+		officerRoutes.PUT("/documents/:id/approve", controllers.ApproveDocument)
+		officerRoutes.PUT("/documents/:id/status", controllers.UpdateDocumentStatus)
 		officerRoutes.GET("/documents/forwards", controllers.GetDocumentForwards)
 		officerRoutes.POST("/documents/forward", controllers.ForwardDocument)
 		officerRoutes.PUT("/documents/forwards/:id/ack", controllers.AcknowledgeDocumentForward)

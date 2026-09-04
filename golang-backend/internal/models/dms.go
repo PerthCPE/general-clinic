@@ -7,11 +7,15 @@ type Document struct {
 	ExternalDocRef string    `json:"external_doc_ref"`
 	Subject        string    `gorm:"not null" json:"subject"`
 	FileURL        string    `json:"file_url"`
+	Status         string    `gorm:"default:'reviewing'" json:"status"` // reviewing, approved, draft
+	DocType        string    `json:"doc_type"`
 	CreatedBy      uint      `json:"created_by"`
+	ApprovedBy     *uint     `json:"approved_by"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 
-	Creator User `gorm:"foreignKey:CreatedBy;references:ID" json:"creator"`
+	Creator  User  `gorm:"foreignKey:CreatedBy;references:ID" json:"creator"`
+	Approver *User `gorm:"foreignKey:ApprovedBy;references:ID" json:"approver"`
 }
 
 type DocumentForward struct {

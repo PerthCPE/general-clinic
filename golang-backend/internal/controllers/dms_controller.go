@@ -17,6 +17,12 @@ type CreateDocumentReq struct {
 	ExternalDocRef string `json:"external_doc_ref"`
 	Subject        string `json:"subject" binding:"required"`
 	FileURL        string `json:"file_url"`
+	DocType        string `json:"doc_type"`
+	Status         string `json:"status"`
+}
+
+type UpdateDocumentStatusReq struct {
+	Status string `json:"status"`
 }
 
 type ForwardDocumentReq struct {
@@ -27,7 +33,7 @@ type ForwardDocumentReq struct {
 // 1. GetDocuments - ดึงรายการเอกสารทั้งหมดจาก Database
 func GetDocuments(c *gin.Context) {
 	var docs []models.Document
-	err := config.DB.Preload("Creator").Order("created_at desc").Find(&docs).Error
+	err := config.DB.Preload("Creator").Preload("Approver").Order("created_at desc").Find(&docs).Error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถดึงข้อมูลเอกสารได้"})
 		return
@@ -36,7 +42,25 @@ func GetDocuments(c *gin.Context) {
 	c.JSON(http.StatusOK, docs)
 }
 
-// 2. CreateDocument - บันทึกและลงทะเบียนเอกสารใหม่เข้าระบบ
+// 1.1 GetDocumentByID - ดึงข้อมูลรายละเอียดเอกสารรายชิ้น
+func GetDocumentByID(c *gin.Context) {
+	idParam := c.Param("id")
+	docID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสเอกสารไม่ถูกต้อง"})
+		return
+	}
+
+	var doc models.Document
+	if err := config.DB.Preload("Creator").Preload("Approver").First(&doc, uint(docID)).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบข้อมูลเอกสาร"})
+		return
+	}
+
+	c.JSON(http.StatusOK, doc)
+}
+
+// 2. CreateDocument - บันทึกและลงทะเบียนเอกสารใหม่เข้าระบบ (สถานะเริ่มต้น: reviewing / รอตรวจสอบ)
 func CreateDocument(c *gin.Context) {
 	var req CreateDocumentReq
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -63,10 +87,22 @@ func CreateDocument(c *gin.Context) {
 		docRef = "DOC-" + time.Now().Format("2006") + "-" + strconv.FormatInt(count+1, 10)
 	}
 
+	docType := req.DocType
+	if docType == "" {
+		docType = "เอกสารราชการ/ส่งตัว"
+	}
+
+	status := req.Status
+	if status == "" {
+		status = "reviewing" // เอกสารที่เพิ่มใหม่จะอยู่ในสถานะ "รอตรวจสอบ" ตามที่ผู้ใช้กำหนด
+	}
+
 	newDoc := models.Document{
 		ExternalDocRef: docRef,
 		Subject:        req.Subject,
 		FileURL:        req.FileURL,
+		DocType:        docType,
+		Status:         status,
 		CreatedBy:      userID,
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
@@ -77,14 +113,109 @@ func CreateDocument(c *gin.Context) {
 		return
 	}
 
-	config.DB.Preload("Creator").First(&newDoc, newDoc.ID)
+	config.DB.Preload("Creator").Preload("Approver").First(&newDoc, newDoc.ID)
 
 	// แจ้งเตือน WebSocket Hub
 	ws.BroadcastEvent("DOCUMENT_CREATED", newDoc)
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":  "บันทึกเอกสารเรียบร้อยแล้ว",
+		"message":  "บันทึกเอกสารเรียบร้อยแล้ว (สถานะ: รอตรวจสอบ)",
 		"document": newDoc,
+	})
+}
+
+// 2.1 ApproveDocument - อนุมัติเอกสาร
+func ApproveDocument(c *gin.Context) {
+	idParam := c.Param("id")
+	docID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสเอกสารไม่ถูกต้อง"})
+		return
+	}
+
+	var doc models.Document
+	if err := config.DB.First(&doc, uint(docID)).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบข้อมูลเอกสาร"})
+		return
+	}
+
+	userIDVal, exists := c.Get("user_id")
+	var userID uint = 1
+	if exists {
+		if uid, ok := userIDVal.(float64); ok {
+			userID = uint(uid)
+		} else if uid, ok := userIDVal.(uint); ok {
+			userID = uid
+		}
+	}
+
+	doc.Status = "approved"
+	doc.ApprovedBy = &userID
+	doc.UpdatedAt = time.Now()
+
+	if err := config.DB.Save(&doc).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถอนุมัติเอกสารได้"})
+		return
+	}
+
+	config.DB.Preload("Creator").Preload("Approver").First(&doc, doc.ID)
+
+	ws.BroadcastEvent("DOCUMENT_APPROVED", doc)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "อนุมัติเอกสารเรียบร้อยแล้ว",
+		"document": doc,
+	})
+}
+
+// 2.2 UpdateDocumentStatus - อัปเดตสถานะเอกสาร
+func UpdateDocumentStatus(c *gin.Context) {
+	idParam := c.Param("id")
+	docID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสเอกสารไม่ถูกต้อง"})
+		return
+	}
+
+	var req UpdateDocumentStatusReq
+	if err := c.ShouldBindJSON(&req); err != nil || req.Status == "" {
+		req.Status = "approved"
+	}
+
+	var doc models.Document
+	if err := config.DB.First(&doc, uint(docID)).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบข้อมูลเอกสาร"})
+		return
+	}
+
+	userIDVal, exists := c.Get("user_id")
+	var userID uint = 1
+	if exists {
+		if uid, ok := userIDVal.(float64); ok {
+			userID = uint(uid)
+		} else if uid, ok := userIDVal.(uint); ok {
+			userID = uid
+		}
+	}
+
+	doc.Status = req.Status
+	if req.Status == "approved" {
+		doc.ApprovedBy = &userID
+	}
+	doc.UpdatedAt = time.Now()
+
+	if err := config.DB.Save(&doc).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถอัปเดตสถานะเอกสารได้"})
+		return
+	}
+
+	config.DB.Preload("Creator").Preload("Approver").First(&doc, doc.ID)
+
+	ws.BroadcastEvent("DOCUMENT_STATUS_UPDATED", doc)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "อัปเดตสถานะเอกสารเรียบร้อยแล้ว",
+		"document": doc,
 	})
 }
 

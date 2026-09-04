@@ -11,13 +11,16 @@ interface DocumentItem {
   status: 'approved' | 'reviewing' | 'draft';
   subject?: string;
   externalRef?: string;
+  fileUrl?: string;
+  creatorName?: string;
+  approverName?: string;
+  rawDoc?: BackendDocument;
 }
 
 // Generate realistic fallback documents with dynamic dates
 const generateMockDocs = (): DocumentItem[] => {
   const docs: DocumentItem[] = [];
   const types = ['รายงาน', 'สัญญา', 'สเปรดชีต', 'นโยบาย', 'ใบเบิก', 'ผลตรวจ'];
-  const statuses: ('approved' | 'reviewing' | 'draft')[] = ['approved', 'reviewing', 'draft'];
   const baseNames = ['Q3_Patient_Report', 'Dr_Smith_Contract', 'Inventory_Log', 'Policy_Update', 'Lab_Results', 'Weekly_Meeting_Notes'];
   const exts = ['.pdf', '.docx', '.xlsx'];
   
@@ -27,7 +30,7 @@ const generateMockDocs = (): DocumentItem[] => {
 
   for (let i = 1; i <= 12; i++) {
     const type = types[Math.floor(Math.random() * types.length)];
-    const status = i <= 4 ? 'reviewing' : statuses[Math.floor(Math.random() * statuses.length)];
+    const status: 'approved' | 'reviewing' | 'draft' = i <= 4 ? 'reviewing' : 'approved';
     const baseName = baseNames[Math.floor(Math.random() * baseNames.length)];
     const ext = exts[Math.floor(Math.random() * exts.length)];
     const day = (i % 28) + 1;
@@ -38,7 +41,12 @@ const generateMockDocs = (): DocumentItem[] => {
       name: `${baseName}_${i}${ext}`,
       type: type,
       modifiedDate: `${day} ${month} ${buddhistYear}`,
-      status: status
+      status: status,
+      subject: `หัวข้อเอกสารที่ ${i}: ${baseName}`,
+      externalRef: `สธ ${String(i).padStart(4, '0')}/2569`,
+      fileUrl: `https://example.com/docs/${baseName}_${i}${ext}`,
+      creatorName: 'เจ้าหน้าที่ธุรการ',
+      approverName: status === 'approved' ? 'นพ. ผู้อำนวยการคลินิก' : undefined,
     });
   }
   return docs;
@@ -51,10 +59,12 @@ export const DocumentManagementPage: React.FC = () => {
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
   
   // Modals state
-  const [activeModal, setActiveModal] = useState<'all' | 'reviewing' | 'recent' | 'storage' | 'folder' | 'upload' | null>(null);
+  const [activeModal, setActiveModal] = useState<'all' | 'reviewing' | 'recent' | 'storage' | 'folder' | 'upload' | 'detail' | null>(null);
   const [activeFolderTitle, setActiveFolderTitle] = useState('');
+  const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
 
   // Upload Form State based on Document model attributes
   const [uploadForm, setUploadForm] = useState({
@@ -72,14 +82,23 @@ export const DocumentManagementPage: React.FC = () => {
             const createdAt = new Date(d.created_at || Date.now());
             const bYear = createdAt.getFullYear() + 543;
             const formattedDate = `${createdAt.getDate()} ${monthNames[createdAt.getMonth()]} ${bYear}`;
+            const status: 'approved' | 'reviewing' | 'draft' = 
+              (d.status === 'approved' || d.status === 'draft' || d.status === 'reviewing')
+                ? (d.status as 'approved' | 'reviewing' | 'draft')
+                : 'reviewing';
+
             return {
               id: String(d.id),
               name: d.subject || `เอกสาร #${d.id}`,
-              type: 'เอกสารราชการ/ส่งตัว',
+              type: d.doc_type || 'เอกสารราชการ/ส่งตัว',
               modifiedDate: formattedDate,
-              status: 'approved',
+              status: status,
               subject: d.subject,
               externalRef: d.external_doc_ref,
+              fileUrl: d.file_url,
+              creatorName: d.creator?.full_name || 'เจ้าหน้าที่ธุรการ',
+              approverName: d.approver?.full_name,
+              rawDoc: d,
             };
           });
           setDocs(mapped);
@@ -99,7 +118,7 @@ export const DocumentManagementPage: React.FC = () => {
       const file = e.target.files[0];
       setSelectedFile(file);
       // Auto-fill subject with file name without extension for speed and convenience
-      const defaultSubject = file.name.replace(/\.[^/.]+$/, '').replace(/[_\\-]/g, ' ');
+      const defaultSubject = file.name.replace(/\.[^/.]+$/, '').replace(/[_\-]/g, ' ');
       setUploadForm({
         subject: defaultSubject,
         externalRef: ''
@@ -116,11 +135,15 @@ export const DocumentManagementPage: React.FC = () => {
     setUploading(true);
     setActiveModal(null);
 
+    const docType = selectedFile.name.split('.').pop()?.toUpperCase() || 'ไฟล์ทั่วไป';
+
     try {
       const res = await dmsApi.createDocument({
         external_doc_ref: uploadForm.externalRef || `DOC-2569-${Date.now().toString().slice(-4)}`,
         subject: uploadForm.subject || selectedFile.name,
         file_url: 'https://example.com/docs/' + selectedFile.name,
+        doc_type: docType,
+        status: 'reviewing',
       });
 
       const now = new Date();
@@ -131,18 +154,22 @@ export const DocumentManagementPage: React.FC = () => {
       const newDoc: DocumentItem = {
         id: String(res.document.id || docs.length + 1),
         name: res.document.subject || selectedFile.name,
-        type: selectedFile.name.split('.').pop()?.toUpperCase() || 'ไฟล์ทั่วไป',
+        type: res.document.doc_type || docType,
         modifiedDate: formattedDate,
-        status: 'approved',
+        status: (res.document.status as 'approved' | 'reviewing' | 'draft') || 'reviewing',
         subject: res.document.subject,
         externalRef: res.document.external_doc_ref,
+        fileUrl: res.document.file_url,
+        creatorName: res.document.creator?.full_name || 'เจ้าหน้าที่ธุรการ',
+        approverName: res.document.approver?.full_name,
+        rawDoc: res.document,
       };
 
       setDocs([newDoc, ...docs]);
       setSelectedFile(null);
       setUploading(false);
       setUploadForm({ subject: '', externalRef: '' });
-      toast.success('บันทึกและอัปโหลดเอกสารลง Database เรียบร้อยแล้ว');
+      toast.success('บันทึกและอัปโหลดเอกสารลง Database เรียบร้อยแล้ว (สถานะ: รอตรวจสอบ)');
     } catch {
       const now = new Date();
       const buddhistYear = now.getFullYear() + 543;
@@ -152,19 +179,63 @@ export const DocumentManagementPage: React.FC = () => {
       const newDoc: DocumentItem = {
         id: String(docs.length + 1),
         name: selectedFile.name,
-        type: selectedFile.name.split('.').pop()?.toUpperCase() || 'ไฟล์ทั่วไป',
+        type: docType,
         modifiedDate: formattedDate,
         status: 'reviewing',
         subject: uploadForm.subject,
-        externalRef: uploadForm.externalRef
+        externalRef: uploadForm.externalRef || `DOC-2569-${Date.now().toString().slice(-4)}`,
+        fileUrl: 'https://example.com/docs/' + selectedFile.name,
+        creatorName: 'เจ้าหน้าที่ธุรการ',
       };
       
       setDocs([newDoc, ...docs]);
       setSelectedFile(null);
       setUploading(false);
       setUploadForm({ subject: '', externalRef: '' });
-      toast.success('อัปโหลดไฟล์และบันทึกข้อมูลเอกสารเรียบร้อยแล้ว');
+      toast.success('อัปโหลดไฟล์และบันทึกข้อมูลเอกสารเรียบร้อยแล้ว (สถานะ: รอตรวจสอบ)');
     }
+  };
+
+  const handleApproveDocument = async (docId: string) => {
+    setIsApproving(true);
+    try {
+      const res = await dmsApi.approveDocument(docId);
+      toast.success('อนุมัติเอกสารเรียบร้อยแล้ว');
+      
+      setDocs(prev => prev.map(d => {
+        if (d.id === docId) {
+          return {
+            ...d,
+            status: 'approved',
+            approverName: res.document?.approver?.full_name || 'เจ้าหน้าที่ธุรการ / ผู้อนุมัติ',
+            rawDoc: res.document || d.rawDoc,
+          };
+        }
+        return d;
+      }));
+
+      if (selectedDoc && selectedDoc.id === docId) {
+        setSelectedDoc({
+          ...selectedDoc,
+          status: 'approved',
+          approverName: res.document?.approver?.full_name || 'เจ้าหน้าที่ธุรการ / ผู้อนุมัติ',
+          rawDoc: res.document || selectedDoc.rawDoc,
+        });
+      }
+    } catch {
+      setDocs(prev => prev.map(d => d.id === docId ? { ...d, status: 'approved', approverName: 'เจ้าหน้าที่ธุรการ' } : d));
+      if (selectedDoc && selectedDoc.id === docId) {
+        setSelectedDoc({ ...selectedDoc, status: 'approved', approverName: 'เจ้าหน้าที่ธุรการ' });
+      }
+      toast.success('อนุมัติเอกสารเรียบร้อยแล้ว');
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const openDocDetail = (doc: DocumentItem) => {
+    setSelectedDoc(doc);
+    setActiveModal('detail');
   };
 
   const filteredDocs = docs.filter(doc => {
@@ -200,7 +271,7 @@ export const DocumentManagementPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="dms-modal-title">อัปโหลดเอกสารใหม่</h3>
-                  <p className="dms-modal-subtitle">กรอกรายละเอียดเอกสารเพื่อจัดเก็บในระบบ</p>
+                  <p className="dms-modal-subtitle">กรอกรายละเอียดเอกสารเพื่อจัดเก็บในระบบ (สถานะเริ่มต้น: รอตรวจสอบ)</p>
                 </div>
               </div>
               <button className="dms-close-btn" onClick={() => setActiveModal(null)} aria-label="Close">
@@ -259,6 +330,169 @@ export const DocumentManagementPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      );
+    }
+
+    if (activeModal === 'detail' && selectedDoc) {
+      return (
+        <div className="dms-modal-backdrop" onClick={() => setActiveModal(null)}>
+          <div className="dms-modal-card dms-modal-detail" onClick={e => e.stopPropagation()}>
+            <div className="dms-modal-header">
+              <div className="dms-modal-title-group">
+                <div className="dms-modal-icon-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="22" height="22">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M16 13H8M16 17H8M10 9H8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="dms-modal-title">รายละเอียดเอกสาร</h3>
+                  <p className="dms-modal-subtitle">ข้อมูลการลงทะเบียนและสถานะเอกสารในระบบ</p>
+                </div>
+              </div>
+              <button className="dms-close-btn" onClick={() => setActiveModal(null)} aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+
+            <div className="dms-modal-body">
+              {/* Header Banner with Document Name & Status */}
+              <div className="dms-detail-banner">
+                <div className="dms-detail-banner-info">
+                  <span className="dms-detail-code">{selectedDoc.externalRef || `DOC-${selectedDoc.id}`}</span>
+                  <h2 className="dms-detail-title">{selectedDoc.name}</h2>
+                  {selectedDoc.subject && selectedDoc.subject !== selectedDoc.name && (
+                    <p className="dms-detail-subject">เรื่อง: {selectedDoc.subject}</p>
+                  )}
+                </div>
+                <div className="dms-detail-banner-status">
+                  <span className={`status-pill ${selectedDoc.status} dms-pill-lg`}>
+                    <span className="status-dot"></span>
+                    {selectedDoc.status === 'approved' && 'อนุมัติแล้ว'}
+                    {selectedDoc.status === 'reviewing' && 'รอตรวจสอบ'}
+                    {selectedDoc.status === 'draft' && 'ฉบับร่าง'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Details Grid */}
+              <div className="dms-detail-grid">
+                <div className="dms-detail-item">
+                  <span className="dms-detail-label">เลขที่อ้างอิงเอกสาร</span>
+                  <span className="dms-detail-value font-mono">{selectedDoc.externalRef || `DOC-2569-${selectedDoc.id.padStart(4, '0')}`}</span>
+                </div>
+                <div className="dms-detail-item">
+                  <span className="dms-detail-label">ประเภทเอกสาร</span>
+                  <span className="dms-detail-value"><span className="doc-type-tag">{selectedDoc.type}</span></span>
+                </div>
+                <div className="dms-detail-item">
+                  <span className="dms-detail-label">วันที่ลงทะเบียน / แก้ไข</span>
+                  <span className="dms-detail-value">{selectedDoc.modifiedDate}</span>
+                </div>
+                <div className="dms-detail-item">
+                  <span className="dms-detail-label">ผู้ลงทะเบียน</span>
+                  <span className="dms-detail-value">{selectedDoc.creatorName || 'เจ้าหน้าที่ธุรการ'}</span>
+                </div>
+                <div className="dms-detail-item">
+                  <span className="dms-detail-label">สถานะการอนุมัติ</span>
+                  <span className="dms-detail-value">
+                    {selectedDoc.status === 'approved' ? (
+                      <span className="text-success font-semibold">อนุมัติแล้ว โดย {selectedDoc.approverName || 'ผู้อนุมัติเอกสาร'}</span>
+                    ) : selectedDoc.status === 'reviewing' ? (
+                      <span className="text-warning font-semibold">อยู่ระหว่างรอการตรวจสอบ</span>
+                    ) : (
+                      <span>ฉบับร่าง</span>
+                    )}
+                  </span>
+                </div>
+                <div className="dms-detail-item">
+                  <span className="dms-detail-label">การเข้าถึงไฟล์</span>
+                  <div className="dms-detail-file-access">
+                    <a
+                      href={selectedDoc.fileUrl || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="dms-file-link-btn"
+                      onClick={e => {
+                        if (!selectedDoc.fileUrl || selectedDoc.fileUrl.startsWith('https://example.com')) {
+                          e.preventDefault();
+                          toast.success(`กำลังเปิดพรีวิวไฟล์: ${selectedDoc.name}`);
+                        }
+                      }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      เปิดดูไฟล์เอกสาร
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pending Review Notice Box */}
+              {selectedDoc.status === 'reviewing' && (
+                <div className="dms-review-notice-box">
+                  <div className="dms-notice-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" width="20" height="20">
+                      <circle cx="12" cy="12" r="10" strokeLinecap="round" strokeLinejoin="round"/>
+                      <line x1="12" y1="8" x2="12" y2="12" strokeLinecap="round" strokeLinejoin="round"/>
+                      <line x1="12" y1="16" x2="12.01" y2="16" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div className="dms-notice-text">
+                    <h4 className="dms-notice-heading">เอกสารนี้ยังไม่ได้รับการอนุมัติ (รอตรวจสอบ)</h4>
+                    <p className="dms-notice-sub">กรุณาตรวจสอบความถูกต้องของข้อมูลและเอกสารแนบก่อนกดปุ่มอนุมัติด้านล่าง</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Approved Info Box */}
+              {selectedDoc.status === 'approved' && (
+                <div className="dms-approved-notice-box">
+                  <div className="dms-notice-icon-success">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" width="20" height="20">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round" strokeLinejoin="round"/>
+                      <polyline points="22 4 12 14.01 9 11.01" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <div className="dms-notice-text">
+                    <h4 className="dms-notice-heading-success">เอกสารได้รับการอนุมัติอย่างสมบูรณ์แล้ว</h4>
+                    <p className="dms-notice-sub">พร้อมสำหรับการส่งต่อหรือนำไปอ้างอิงในกระบวนการรักษาและส่งตัวผู้ป่วย</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="dms-modal-footer">
+              <button type="button" className="dms-btn-secondary" onClick={() => setActiveModal(null)}>
+                ปิดหน้าต่าง
+              </button>
+              {selectedDoc.status === 'reviewing' && (
+                <button
+                  type="button"
+                  className="dms-btn-approve"
+                  disabled={isApproving}
+                  onClick={() => handleApproveDocument(selectedDoc.id)}
+                >
+                  {isApproving ? (
+                    'กำลังดำเนินการ...'
+                  ) : (
+                    <>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="16" height="16">
+                        <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      อนุมัติเอกสารนี้
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       );
@@ -341,7 +575,7 @@ export const DocumentManagementPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="dms-modal-title">{title}</h3>
-                <p className="dms-modal-subtitle">รายการเอกสารตามเงื่อนไขที่เลือก</p>
+                <p className="dms-modal-subtitle">คลิกแถวเอกสารเพื่อดูรายละเอียดและอนุมัติ</p>
               </div>
             </div>
             <button className="dms-close-btn" onClick={() => setActiveModal(null)} aria-label="Close">
@@ -359,11 +593,12 @@ export const DocumentManagementPage: React.FC = () => {
                     <th>ประเภท</th>
                     <th>วันที่แก้ไข</th>
                     <th>สถานะ</th>
+                    <th style={{ textAlign: 'center' }}>การจัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
                   {dataList.map((doc) => (
-                    <tr key={doc.id}>
+                    <tr key={doc.id} onClick={() => openDocDetail(doc)} className="dms-clickable-row">
                       <td>
                         <div className="doc-name-cell">
                           <div className="doc-type-icon-box">
@@ -388,12 +623,37 @@ export const DocumentManagementPage: React.FC = () => {
                         <span className={`status-pill ${doc.status}`}>
                           <span className="status-dot"></span>
                           {doc.status === 'approved' && 'อนุมัติแล้ว'}
-                          {doc.status === 'reviewing' && 'กำลังตรวจสอบ'}
+                          {doc.status === 'reviewing' && 'รอตรวจสอบ'}
                           {doc.status === 'draft' && 'ฉบับร่าง'}
                         </span>
                       </td>
+                      <td style={{ textAlign: 'center' }}>
+                        <button
+                          type="button"
+                          className="dms-action-view-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDocDetail(doc);
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
+                            <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          ดูรายละเอียด
+                        </button>
+                      </td>
                     </tr>
                   ))}
+                  {dataList.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="no-data-cell">
+                        <div className="no-data-content">
+                          <p>ไม่พบรายการเอกสารในหมวดหมู่นี้</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -422,7 +682,7 @@ export const DocumentManagementPage: React.FC = () => {
           </div>
           <div>
             <h1 className="page-main-title">การจัดการเอกสาร (Document Management)</h1>
-            <p className="page-sub-title">จัดการ จัดเก็บ และสืบค้นเอกสารและบันทึกข้อมูลสำคัญของคลินิก</p>
+            <p className="page-sub-title">จัดการ จัดเก็บ ตรวจสอบ และอนุมัติเอกสารสำคัญของคลินิก</p>
           </div>
         </div>
       </div>
@@ -449,9 +709,9 @@ export const DocumentManagementPage: React.FC = () => {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">รอตรวจสอบ</span>
+            <span className="metric-label">เอกสารรอตรวจสอบ</span>
             <span className="metric-value">{reviewingDocs.length}</span>
-            <span className="metric-subtext red-text">คลิกเพื่อดูรายการ</span>
+            <span className="metric-subtext red-text">ต้องดำเนินการอนุมัติ</span>
           </div>
         </div>
 
@@ -462,21 +722,21 @@ export const DocumentManagementPage: React.FC = () => {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">เพิ่มล่าสุด</span>
-            <span className="metric-value">15</span>
-            <span className="metric-subtext green-text">คลิกเพื่อดูรายการ</span>
+            <span className="metric-label">เพิ่มเข้ามาล่าสุด</span>
+            <span className="metric-value">+{addedRecentlyDocs.length}</span>
+            <span className="metric-subtext green-text">ในเดือนนี้</span>
           </div>
         </div>
 
         <div className="dms-card metric-card interactive" onClick={() => setActiveModal('storage')}>
           <div className="metric-icon-wrapper gray-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2" width="24" height="24">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2" width="24" height="24">
               <path d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">พื้นที่จัดเก็บที่ใช้</span>
-            <span className="metric-value">64%</span>
+            <span className="metric-label">พื้นที่จัดเก็บทั้งหมด</span>
+            <span className="metric-value">640 GB</span>
             <div className="storage-progress-bar">
               <div className="storage-progress-fill" style={{ width: '64%' }}></div>
             </div>
@@ -484,16 +744,16 @@ export const DocumentManagementPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. Main Grid Layout */}
+      {/* 3. Main Master Layout */}
       <div className="dms-main-grid">
-        {/* Left Table Section */}
+        {/* Left Master Table Section */}
         <div className="dms-card docs-table-section">
           <div className="docs-table-header">
             <div>
-              <h2 className="section-title">เอกสารล่าสุด</h2>
-              <p className="section-subtitle">แสดงรายการเอกสารที่มีการเคลื่อนไหวล่าสุด</p>
+              <h2 className="section-title">รายการเอกสารสำคัญล่าสุด</h2>
+              <p className="section-subtitle">คลิกที่แถวเอกสารเพื่อดูข้อมูลรายละเอียดและดำเนินการอนุมัติ</p>
             </div>
-            
+
             <div className="table-actions-group">
               {/* Filter Chips */}
               <div className="filter-chips-row">
@@ -559,11 +819,12 @@ export const DocumentManagementPage: React.FC = () => {
                   <th>ประเภท</th>
                   <th>วันที่แก้ไข</th>
                   <th>สถานะ</th>
+                  <th style={{ textAlign: 'center' }}>การจัดการ</th>
                 </tr>
               </thead>
               <tbody>
                 {recentDocs.map((doc) => (
-                  <tr key={doc.id}>
+                  <tr key={doc.id} onClick={() => openDocDetail(doc)} className="dms-clickable-row">
                     <td>
                       <div className="doc-name-cell">
                         <div className="doc-type-icon-box">
@@ -588,15 +849,31 @@ export const DocumentManagementPage: React.FC = () => {
                       <span className={`status-pill ${doc.status}`}>
                         <span className="status-dot"></span>
                         {doc.status === 'approved' && 'อนุมัติแล้ว'}
-                        {doc.status === 'reviewing' && 'กำลังตรวจสอบ'}
+                        {doc.status === 'reviewing' && 'รอตรวจสอบ'}
                         {doc.status === 'draft' && 'ฉบับร่าง'}
                       </span>
+                    </td>
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        className="dms-action-view-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDocDetail(doc);
+                        }}
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
+                          <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        ดูรายละเอียด
+                      </button>
                     </td>
                   </tr>
                 ))}
                 {recentDocs.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="no-data-cell">
+                    <td colSpan={5} className="no-data-cell">
                       <div className="no-data-content">
                         <svg viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" width="40" height="40">
                           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeLinecap="round" strokeLinejoin="round"/>

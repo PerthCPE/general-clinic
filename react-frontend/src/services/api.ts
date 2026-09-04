@@ -338,6 +338,7 @@ export interface BackendUser {
   id: number;
   username: string;
   fullname?: string;
+  full_name?: string;
   role: string;
   phone?: string;
 }
@@ -347,10 +348,14 @@ export interface BackendDocument {
   external_doc_ref: string;
   subject: string;
   file_url: string;
+  status?: 'reviewing' | 'approved' | 'draft' | string;
+  doc_type?: string;
   created_by: number;
+  approved_by?: number | null;
   created_at: string;
   updated_at: string;
   creator?: BackendUser;
+  approver?: BackendUser;
 }
 
 export interface BackendDocumentForward {
@@ -367,14 +372,26 @@ export interface BackendDocumentForward {
 
 export const dmsApi = {
   getDocuments: () => request<BackendDocument[]>('/api/officer/documents'),
+  getDocumentById: (id: number | string) => request<BackendDocument>(`/api/officer/documents/${id}`),
   createDocument: (payload: {
     external_doc_ref?: string;
     subject: string;
     file_url?: string;
+    doc_type?: string;
+    status?: string;
   }) =>
     request<{ message: string; document: BackendDocument }>('/api/officer/documents', {
       method: 'POST',
       body: JSON.stringify(payload),
+    }),
+  approveDocument: (id: number | string) =>
+    request<{ message: string; document: BackendDocument }>(`/api/officer/documents/${id}/approve`, {
+      method: 'PUT',
+    }),
+  updateDocumentStatus: (id: number | string, status: 'approved' | 'reviewing' | 'draft') =>
+    request<{ message: string; document: BackendDocument }>(`/api/officer/documents/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
     }),
   getForwards: () => request<BackendDocumentForward[]>('/api/officer/documents/forwards'),
   forwardDocument: (payload: {
