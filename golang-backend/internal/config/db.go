@@ -117,8 +117,8 @@ func ConnectDB() {
 
 	DB = database
 
-	seedDatabase()
 	seedDoctorProfiles()
+	seedDatabase()
 }
 
 func seedDoctorProfiles() {
@@ -252,16 +252,16 @@ func seedDatabase() {
 	var schCount int64
 	DB.Model(&models.DoctorSchedule{}).Count(&schCount)
 	if schCount == 0 {
-		var doctors []models.User
-		DB.Where("role = ?", "doctor").Order("id asc").Find(&doctors)
-		if len(doctors) > 0 {
+		var doctorProfiles []models.Doctor
+		DB.Order("id asc").Find(&doctorProfiles)
+		if len(doctorProfiles) > 0 {
 			var officerUser models.User
 			DB.Where("username = ?", "officer1").First(&officerUser)
 
 			now := time.Now()
 			for d := 0; d < 7; d++ {
 				workDate := now.AddDate(0, 0, d)
-				for i, doc := range doctors {
+				for i, doc := range doctorProfiles {
 					shiftType := "Morning"
 					if (i+d)%2 == 1 {
 						shiftType = "Afternoon"
