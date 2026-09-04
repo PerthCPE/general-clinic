@@ -686,10 +686,10 @@ export default function BillingDispensePage({
       {/* Page Header */}
       <div className="page-header" style={{ marginBottom: '32px' }}>
         <div className="header-titles">
-          <h1 className="page-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
+          <h1 className="page-title">
             คิดเงินและออกบิลชำระเงิน
           </h1>
-          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '1.1rem' }}>
+          <p className="page-subtitle">
             สรุปรายการค่ายา ค่าบริการทางการแพทย์ คำนวณส่วนลดสิทธิ์ และรับชำระเงิน
           </p>
         </div>

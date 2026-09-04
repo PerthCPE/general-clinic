@@ -311,7 +311,7 @@ export default function BillingDashboardPage() {
       <div className="dashboard-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div className="header-titles">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <h1 className="dashboard-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0', letterSpacing: '-0.5px' }}>
+            <h1 className="dashboard-title">
               แดชบอร์ดสรุปรายรับและการเงินประจำวัน
             </h1>
             <span style={{
@@ -324,7 +324,7 @@ export default function BillingDashboardPage() {
               {isConnected ? 'Real-time WebSocket Live' : 'Offline / Polling'}
             </span>
           </div>
-          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0', fontSize: '1.1rem' }}>
+          <p className="page-subtitle">
             สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน (อัปเดต Real-time จากฐานข้อมูล)
           </p>
         </div>
@@ -735,7 +735,7 @@ export default function BillingDashboardPage() {
       {/* Patient Detail System Modal */}
       {selectedDetail && (
         <div className="modal-overlay" onClick={() => setSelectedDetail(null)}>
-          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '650px', borderRadius: '16px', overflow: 'hidden' }}>
+          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', width: '92%', borderRadius: '18px', overflow: 'hidden' }}>
             <div className="dash-modal-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
               <div>
                 <h2 className="dash-modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
@@ -871,7 +871,7 @@ export default function BillingDashboardPage() {
       {/* Edit Record Modal on Dashboard */}
       {editingRecord && (
         <div className="modal-overlay" onClick={() => setEditingRecord(null)}>
-          <div className="modal-card edit-patient-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', width: '90%', borderRadius: '16px', background: '#FFFFFF', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+          <div className="modal-card edit-patient-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', width: '92%', borderRadius: '18px', background: '#FFFFFF', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -881,7 +881,7 @@ export default function BillingDashboardPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>แก้ไขข้อมูลการเงิน (Edit Record)</h3>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>แก้ไขข้อมูลการเงิน (Edit Record)</h3>
                   <p style={{ margin: 0, fontSize: '12.5px', color: '#64748B' }}>ใบเสร็จ: {editingRecord.id} • HN: {editingRecord.hn}</p>
                 </div>
               </div>
@@ -968,7 +968,7 @@ export default function BillingDashboardPage() {
       {/* Delete Record Confirmation Modal on Dashboard */}
       {deleteRecord && (
         <div className="modal-overlay" onClick={() => setDeleteRecord(null)}>
-          <div className="modal-card delete-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '90%', borderRadius: '16px', background: '#FFFFFF', padding: '24px', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+          <div className="modal-card delete-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '92%', borderRadius: '18px', background: '#FFFFFF', padding: '24px', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -977,7 +977,7 @@ export default function BillingDashboardPage() {
                 <line x1="14" y1="11" x2="14" y2="17"></line>
               </svg>
             </div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>ยืนยันการลบรายการประวัติการเงิน</h3>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>ยืนยันการลบรายการประวัติการเงิน</h3>
             <p style={{ margin: '0 0 20px 0', fontSize: '13.5px', color: '#64748B', lineHeight: '1.5' }}>
               ท่านต้องการลบรายการใบเสร็จ <strong style={{ color: '#0F172A' }}>{deleteRecord.id}</strong> ของ <strong style={{ color: '#0F172A' }}>{deleteRecord.patientName}</strong> ใช่หรือไม่?
             </p>

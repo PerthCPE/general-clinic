@@ -732,11 +732,11 @@ export default function PatientHistoryPage() {
       {/* Patient Full History Pop-up Modal (Images 1 & 2 Pattern) */}
       {selectedPatientModal && (
         <div className="modal-overlay" onClick={() => setSelectedPatientModal(null)}>
-          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: 'none' }}>
+          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', width: '92%', borderRadius: '18px', overflow: 'hidden', border: 'none' }}>
             {/* Modal Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <h2 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>
                   รายละเอียดประวัติสุขภาพ & ข้อมูลการรับยา
                 </h2>
                 <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -927,10 +927,10 @@ export default function PatientHistoryPage() {
       {/* Edit Patient History Modal */}
       {editPatientModal && (
         <div className="modal-overlay" onClick={() => setEditPatientModal(null)}>
-          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: 'none', background: '#FFFFFF' }}>
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', width: '92%', borderRadius: '18px', overflow: 'hidden', border: 'none', background: '#FFFFFF', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -1093,7 +1093,7 @@ export default function PatientHistoryPage() {
       {/* Delete Patient Confirmation Modal */}
       {deleteConfirmPatient && (
         <div className="modal-overlay" onClick={() => setDeleteConfirmPatient(null)}>
-          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: 'none', background: '#FFFFFF', textAlign: 'center', padding: '24px' }}>
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '92%', borderRadius: '18px', overflow: 'hidden', border: 'none', background: '#FFFFFF', textAlign: 'center', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -1102,7 +1102,7 @@ export default function PatientHistoryPage() {
                 <line x1="14" y1="11" x2="14" y2="17"></line>
               </svg>
             </div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>
               ยืนยันการลบประวัติผู้ป่วย?
             </h3>
             <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#64748B', lineHeight: '1.5' }}>
