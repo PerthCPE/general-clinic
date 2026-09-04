@@ -59,6 +59,20 @@ interface DoctorDataContextType {
   // สถานะการเชื่อมต่อ backend
   summary: BackendDoctorQueueSummary | null;
   isLoading: boolean;
+
+  /**
+   * true ตั้งแต่เปิดหน้ามา จนกว่าจะโหลดคิวจากฐานข้อมูลจบ "รอบแรก"
+   *
+   * ต่างจาก isLoading ตรงที่ isLoading เป็น true ทุกครั้งที่ยิง API รวมถึง
+   * การรีเฟรชเบื้องหลังทุก 4 วินาที และทุกครั้งที่มี WebSocket event เข้ามา
+   * ถ้าเอา isLoading ไปคุมหน้าจอโหลด หน้าจะกะพริบเป็นหน้าโหลดตลอดเวลา
+   * ยิ่งเปิด simulator ไว้ยิ่งกะพริบถี่ เพราะมันยิง event ตลอด
+   *
+   * ตัวนี้จึงเป็น true แค่รอบแรกรอบเดียว ใช้คุมหน้าจอ "กำลังโหลดข้อมูล"
+   * ที่บังทั้งหน้าได้อย่างปลอดภัย
+   */
+  isInitialLoading: boolean;
+
   isSaving: boolean;
   isExamLoading: boolean;
 
@@ -93,6 +107,10 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const [summary, setSummary] = useState<BackendDoctorQueueSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  // เริ่มต้นเป็น true เสมอ เพราะตอน component เพิ่งถูกสร้าง ยังไม่มีข้อมูลจากฐานข้อมูลเลย
+  // ถ้าเริ่มเป็น false หน้าจะแว่บโชว์ "ไม่พบข้อมูลผู้ป่วย" พร้อมเลข 0 ก่อนข้อมูลจริงจะมา
+  // ซึ่งทำให้แพทย์เข้าใจผิดว่าวันนี้ไม่มีคิว
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   // true ระหว่างดึงผลตรวจเดิมของเคสที่เพิ่งเปิด (ครั้งแรกของแต่ละ visit)
   const [isExamLoading, setIsExamLoading] = useState<boolean>(false);
@@ -119,6 +137,9 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setError(err instanceof Error ? err.message : 'ไม่สามารถโหลดคิวผู้ป่วยได้');
     } finally {
       setIsLoading(false);
+      // ปลดหน้าจอโหลดใน finally ไม่ใช่ใน try
+      // เพื่อให้กรณีต่อ backend ไม่ได้ ผู้ใช้ได้เห็นข้อความ error ไม่ใช่ค้างที่หน้าโหลดตลอดไป
+      setIsInitialLoading(false);
     }
   }, [isDoctor]);
 
@@ -159,6 +180,9 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setRecordPatients([]);
       setSummary(null);
       setError(null);
+      // ผู้ใช้ที่ไม่ใช่แพทย์จะไม่มีการยิง refresh เลย
+      // ถ้าไม่ปิดตรงนี้ isInitialLoading จะค้างเป็น true ตลอดไป = หน้าโหลดหมุนไม่หยุด
+      setIsInitialLoading(false);
       return;
     }
     void refresh();
@@ -368,6 +392,7 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         handleUpdateStatus,
         summary,
         isLoading,
+        isInitialLoading,
         isSaving,
         isExamLoading,
         saveError,

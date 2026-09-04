@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Patient, QueueStatus } from '../types';
 import { StatusBadge } from './StatusBadge';
 import { CopyableText } from './CopyableText';
-import { Stethoscope, Clock, AlertCircle, Search, X, Edit3 } from 'lucide-react';
+import { Stethoscope, Clock, AlertCircle, Search, X, Edit3, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
 import { displayVN } from '../utils/vnGenerator';
@@ -66,6 +66,49 @@ export const QueueTable: React.FC<QueueTableProps> = ({
     // .filter() คืน array ใหม่อยู่แล้ว จึง .sort() ได้โดยไม่กระทบ props เดิม
     // และ sort ของ JS เป็น stable ลำดับคิวเดิมภายในกลุ่มเดียวกันจึงไม่เปลี่ยน
     .sort((a, b) => Number(a.status === 'Completed') - Number(b.status === 'Completed'));
+
+  /**
+   * ============================================================================
+   * แบ่งหน้าตารางคิว (Pagination)
+   * ============================================================================
+   * คิวจริงในคลินิกมีวันละหลายสิบคน ถ้าแสดงทั้งหมดในหน้าเดียวต้องเลื่อนจอยาวมาก
+   * กว่าจะถึงคนท้ายๆ และเสียจุดอ้างอิงว่าดูถึงไหนแล้ว จึงตัดเป็นหน้าละ 5 คิว
+   *
+   * ข้อควรระวังที่ทำให้พังบ่อย 2 จุด (แก้ไว้แล้วด้านล่าง)
+   * 1. ผู้ใช้อยู่หน้า 4 แล้วพิมพ์ค้นหาจนเหลือ 2 รายการ ถ้าไม่รีเซ็ตหน้า
+   *    จะเห็นตารางว่างเปล่าทั้งที่มีผลลัพธ์ -> useEffect รีเซ็ตกลับหน้า 1
+   * 2. simulator หรือเพื่อนเปลี่ยนสถานะคิว ทำให้จำนวนรายการลดลงเอง
+   *    โดยที่ผู้ใช้ไม่ได้แตะอะไรเลย -> ใช้ safePage หนีบค่าไว้ไม่ให้เกินหน้าสุดท้าย
+   *    (หนีบตอน render ไม่ใช่ตอน setState เพื่อไม่ให้เห็นตารางว่างวาบก่อนแล้วค่อยเด้ง)
+   */
+  const PAGE_SIZE = 5;
+  const [page, setPage] = useState(1);
+
+  // เปลี่ยนคำค้นหรือเปลี่ยนแท็บสถานะ = ดูชุดข้อมูลใหม่ ต้องกลับไปหน้าแรกเสมอ
+  useEffect(() => {
+    setPage(1);
+  }, [queueSearch, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(displayedPatients.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const startIndex = (safePage - 1) * PAGE_SIZE;
+  const pagePatients = displayedPatients.slice(startIndex, startIndex + PAGE_SIZE);
+
+  // เลขหน้าที่จะแสดงเป็นปุ่ม แสดงมากสุด 5 ปุ่มโดยให้หน้าปัจจุบันอยู่กลาง
+  // ถ้ามีหลายสิบหน้าแล้วโชว์ทุกปุ่ม แถบล่างจะยาวล้นจอ
+  const pageNumbers = React.useMemo(() => {
+    const maxButtons = 5;
+    if (totalPages <= maxButtons) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+    let start = Math.max(1, safePage - 2);
+    let end = start + maxButtons - 1;
+    if (end > totalPages) {
+      end = totalPages;
+      start = end - maxButtons + 1;
+    }
+    return Array.from({ length: maxButtons }, (_, i) => start + i);
+  }, [totalPages, safePage]);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
@@ -157,7 +200,7 @@ export const QueueTable: React.FC<QueueTableProps> = ({
                 </td>
               </tr>
             ) : (
-              displayedPatients.map((patient) => (
+              pagePatients.map((patient) => (
                 <tr
                   key={patient.id}
                   className="hover:bg-slate-50/80 transition-colors group"
@@ -235,6 +278,93 @@ export const QueueTable: React.FC<QueueTableProps> = ({
           </tbody>
         </table>
       </div>
+
+      {/* แถบแบ่งหน้า ซ่อนทั้งแถบเมื่อไม่มีผลลัพธ์ เพราะข้อความ "แสดง 0-0 จาก 0" ไม่มีประโยชน์
+          ส่วนปุ่มเลขหน้าซ่อนเมื่อมีหน้าเดียว แต่ยังคงข้อความบอกจำนวนไว้ */}
+      {displayedPatients.length > 0 && (
+        <div className="px-6 py-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3">
+          <p className="text-xs text-slate-500 shrink-0">
+            {language === 'th'
+              ? `แสดง ${startIndex + 1}-${startIndex + pagePatients.length} จาก ${displayedPatients.length} คิว`
+              : `Showing ${startIndex + 1}-${startIndex + pagePatients.length} of ${displayedPatients.length}`}
+          </p>
+
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1 sm:ml-auto">
+              <button
+                type="button"
+                onClick={() => setPage(safePage - 1)}
+                disabled={safePage === 1}
+                title={language === 'th' ? 'หน้าก่อนหน้า' : 'Previous page'}
+                className={`p-1.5 rounded-lg border transition-colors ${
+                  safePage === 1
+                    ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer'
+                }`}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {/* หน้าแรกจะถูกดันหลุดกรอบ 5 ปุ่มเมื่ออยู่หน้าท้ายๆ ใส่ทางลัดกลับไว้ให้ */}
+              {pageNumbers[0] > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setPage(1)}
+                    className="min-w-8 px-2 py-1 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer transition-colors"
+                  >
+                    1
+                  </button>
+                  <span className="px-0.5 text-slate-400 text-xs">…</span>
+                </>
+              )}
+
+              {pageNumbers.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setPage(n)}
+                  aria-current={n === safePage ? 'page' : undefined}
+                  className={`min-w-8 px-2 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    n === safePage
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+
+              {pageNumbers[pageNumbers.length - 1] < totalPages && (
+                <>
+                  <span className="px-0.5 text-slate-400 text-xs">…</span>
+                  <button
+                    type="button"
+                    onClick={() => setPage(totalPages)}
+                    className="min-w-8 px-2 py-1 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-100 cursor-pointer transition-colors"
+                  >
+                    {totalPages}
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setPage(safePage + 1)}
+                disabled={safePage === totalPages}
+                title={language === 'th' ? 'หน้าถัดไป' : 'Next page'}
+                className={`p-1.5 rounded-lg border transition-colors ${
+                  safePage === totalPages
+                    ? 'border-slate-200 text-slate-300 cursor-not-allowed'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 cursor-pointer'
+                }`}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
