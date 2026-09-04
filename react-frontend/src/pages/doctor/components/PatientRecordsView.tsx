@@ -29,6 +29,7 @@ import { StatusBadge } from './StatusBadge';
 import { CopyableText } from './CopyableText';
 import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
+import { StatusFilterTabs } from './StatusFilterTabs';
 import { displayVN } from '../utils/vnGenerator';
 
 /**
@@ -60,7 +61,8 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   // Filter status: 'in_progress' | 'waiting' | 'all'
-  const [statusFilter, setStatusFilter] = useState<'in_progress' | 'waiting' | 'completed' | 'all'>('all');
+  // ค่าเริ่มต้นเป็น "รอตรวจ" ให้ตรงกับหน้าคิว จะได้ไม่ต้องปรับความเข้าใจตอนสลับหน้า
+  const [statusFilter, setStatusFilter] = useState<'in_progress' | 'waiting' | 'completed' | 'all'>('waiting');
   const [selectedPatient, setSelectedPatientState] = useState<Patient | null>(selectedPatientProp || null);
 
   React.useEffect(() => {
@@ -251,76 +253,20 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                 </h2>
               </div>
 
-              {/* Status Filter Toggle Tabs: กำลังตรวจ, รอตรวจ, ทั้งหมด */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200/80 self-start sm:self-auto">
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('in_progress')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    statusFilter === 'in_progress'
-                      ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>{language === 'th' ? 'กำลังตรวจ' : 'In Progress'}</span>
-                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
-                    statusFilter === 'in_progress' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>
-                    {inProgressCount}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('waiting')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    statusFilter === 'waiting'
-                      ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>{language === 'th' ? 'รอตรวจ' : 'Waiting'}</span>
-                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
-                    statusFilter === 'waiting' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>
-                    {waitingCount}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('completed')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    statusFilter === 'completed'
-                      ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>{language === 'th' ? 'ตรวจเสร็จแล้ว' : 'Completed'}</span>
-                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
-                    statusFilter === 'completed' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>
-                    {completedCount}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('all')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    statusFilter === 'all'
-                      ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>{language === 'th' ? 'ทั้งหมด' : 'All'}</span>
-                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
-                    statusFilter === 'all' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>
-                    {activePatientsCount}
-                  </span>
-                </button>
-              </div>
+              {/* แถบกรองสถานะ ใช้คอมโพเนนต์เดียวกับหน้าคิวผู้ป่วย
+                  ลำดับปุ่มและสีจึงตรงกันทั้งสองหน้าโดยอัตโนมัติ */}
+              <StatusFilterTabs
+                value={statusFilter}
+                onChange={(next) =>
+                  setStatusFilter(next as 'all' | 'waiting' | 'in_progress' | 'completed')
+                }
+                options={[
+                  { value: 'all', label: language === 'th' ? 'ทั้งหมด' : 'All', count: activePatientsCount },
+                  { value: 'waiting', label: language === 'th' ? 'รอตรวจ' : 'Waiting', count: waitingCount },
+                  { value: 'in_progress', label: language === 'th' ? 'กำลังตรวจ' : 'In Progress', count: inProgressCount },
+                  { value: 'completed', label: language === 'th' ? 'ตรวจเสร็จแล้ว' : 'Completed', count: completedCount },
+                ]}
+              />
             </div>
 
             {filteredPatients.length > 0 ? (
@@ -540,16 +486,18 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
               {/* TAB 1: PAST VISIT HISTORY */}
               {activeTab === 'history' && (
                 <div className="space-y-6">
-                  {/* Sub-search bar inside History */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200">
+                  {/* ช่องค้นหาในประวัติ
+                      เดิมมีกล่องสีเทาครอบอีกชั้นซ้อนอยู่ในการ์ดใหญ่ กลายเป็นกรอบซ้อนกรอบ
+                      เอาออกให้เหลือแค่ตัวช่องค้นหา ส่วนจำนวนรายการย้ายไปอยู่ท้ายช่อง */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <div className="relative flex-1 w-full">
-                      <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400" />
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
                         value={historySearch}
                         onChange={(e) => setHistorySearch(e.target.value)}
                         placeholder={language === 'th' ? 'ค้นหาในประวัติรักษา (โรค, วันที่, ชื่อแพทย์, ยา)...' : 'Filter visits by diagnosis, date, doctor, medicine...'}
-                        className="w-full pl-9 pr-4 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden"
+                        className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl text-xs font-medium placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                       />
                     </div>
                     <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">

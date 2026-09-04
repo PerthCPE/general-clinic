@@ -6,6 +6,7 @@ import { Stethoscope, Clock, AlertCircle, Search, X, Edit3 } from 'lucide-react'
 import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
 import { displayVN } from '../utils/vnGenerator';
+import { StatusFilterTabs } from './StatusFilterTabs';
 import { matchPatientSearch } from '../utils/searchUtils';
 
 /**
@@ -29,6 +30,10 @@ interface QueueTableProps {
   onUpdateStatus: (patientId: string, status: QueueStatus) => void;
   statusFilter?: string;
   setStatusFilter?: (status: string) => void;
+
+  /** จำนวนผู้ป่วยแยกตามสถานะ ต้องนับจากรายการ "ก่อนกรอง" จึงให้หน้าเจ้าของส่งเข้ามา
+   *  (patients ที่ส่งมาถูกกรองตาม statusFilter แล้ว ถ้านับจากตรงนี้ตัวเลขจะเพี้ยน) */
+  statusCounts?: Record<string, number>;
 }
 
 export const QueueTable: React.FC<QueueTableProps> = ({
@@ -36,7 +41,8 @@ export const QueueTable: React.FC<QueueTableProps> = ({
   onExamine,
   onUpdateStatus,
   statusFilter = 'All',
-  setStatusFilter
+  setStatusFilter,
+  statusCounts
 }) => {
   const { language, t } = useLanguage();
   const [queueSearch, setQueueSearch] = useState('');
@@ -64,21 +70,28 @@ export const QueueTable: React.FC<QueueTableProps> = ({
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
       {/* Header section with Title, Search Bar, and Filters */}
-      <div className="p-6 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100">
-        <div>
+      <div className="p-6 pb-4 flex flex-col md:flex-row md:items-center gap-4 border-b border-slate-100">
+        {/* คอลัมน์หัวข้อกว้างคงที่
+            ถ้าปล่อยให้กว้างตามข้อความ พอค้นหาแล้วจำนวนรายการเปลี่ยนจาก 22 เป็น 1
+            ความกว้างจะหดลง แล้วช่องค้นหาที่อยู่ถัดไปจะขยับตามทุกครั้งที่พิมพ์
+            ซึ่งกวนสายตามากเพราะเป็นช่องที่ผู้ใช้กำลังมองอยู่พอดี */}
+        <div className="shrink-0 md:w-60">
           <h2 className="text-xl font-bold text-slate-800 tracking-tight">
             {t('todaysQueue')}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
+            {/* ไม่ต้องขึ้นคำค้นซ้ำตรงนี้ เพราะผู้ใช้เห็นสิ่งที่ตัวเองพิมพ์ในช่องค้นหาอยู่แล้ว
+                และข้อความยาวไม่เท่ากันจะทำให้ความกว้างขยับ */}
             {language === 'th'
-              ? `แสดง ${displayedPatients.length} รายการคิวผู้ป่วย${queueSearch ? ` (จากผลการค้นหา "${queueSearch}")` : ''}`
+              ? `แสดง ${displayedPatients.length} รายการคิวผู้ป่วย`
               : `Showing ${displayedPatients.length} patient${displayedPatients.length !== 1 ? 's' : ''} in queue`}
           </p>
         </div>
 
-        <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 max-w-3xl">
-          {/* Patient Search Input for Queue Table */}
-          <div className="relative flex-1 min-w-[260px] max-w-md">
+        {/* ช่องค้นหาชิดซ้ายต่อจากหัวข้อ ยืดหดตามพื้นที่ว่าง
+            แถบกรองสถานะถูกดันไปชิดขวาด้วย ml-auto และไม่ยอมให้หด (shrink-0)
+            ถ้าปล่อยให้หด ปุ่มจะถูกบีบจนต้องมีแถบเลื่อนซึ่งผู้ใช้มักมองไม่เห็น */}
+        <div className="relative flex-1 min-w-[200px] max-w-md">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -97,27 +110,21 @@ export const QueueTable: React.FC<QueueTableProps> = ({
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
-          </div>
-
-          {/* Status Quick Filters */}
-          {setStatusFilter && (
-            <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-medium self-start sm:self-auto overflow-x-auto max-w-full">
-              {['All', 'Waiting', 'Examining', 'Completed'].map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1.5 rounded-lg transition-all whitespace-nowrap cursor-pointer ${
-                    statusFilter === st
-                      ? 'bg-white text-slate-900 shadow-2xs font-semibold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  {getFilterLabel(st)}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
+
+        {/* Status Quick Filters */}
+        {setStatusFilter && (
+          <StatusFilterTabs
+            className="md:ml-auto"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={['All', 'Waiting', 'Examining', 'Completed'].map((st) => ({
+              value: st,
+              label: getFilterLabel(st),
+              count: statusCounts?.[st],
+            }))}
+          />
+        )}
       </div>
 
       {/* Patients Table */}
