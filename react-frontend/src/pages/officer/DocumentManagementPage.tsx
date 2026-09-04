@@ -74,8 +74,7 @@ export const DocumentManagementPage: React.FC = () => {
   const [isApproving, setIsApproving] = useState(false);
   
   // Modals state
-  const [activeModal, setActiveModal] = useState<'all' | 'reviewing' | 'recent' | 'storage' | 'folder' | 'upload' | 'detail' | null>(null);
-  const [activeFolderTitle, setActiveFolderTitle] = useState('');
+  const [activeModal, setActiveModal] = useState<'all' | 'reviewing' | 'recent' | 'storage' | 'upload' | 'detail' | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<DocumentItem | null>(null);
 
   // Upload Form State based on Document model attributes
@@ -280,11 +279,6 @@ export const DocumentManagementPage: React.FC = () => {
   const recentDocs = filteredDocs.slice(0, 8);
   const reviewingDocs = docs.filter(d => d.status === 'reviewing');
   const addedRecentlyDocs = docs.slice(0, 15);
-
-  const openFolderModal = (title: string) => {
-    setActiveFolderTitle(title);
-    setActiveModal('folder');
-  };
 
   const renderModalContent = () => {
     if (activeModal === 'upload') {
@@ -615,7 +609,6 @@ export const DocumentManagementPage: React.FC = () => {
     if (activeModal === 'all') { title = `เอกสารทั้งหมด (${docs.length} รายการ)`; dataList = docs; }
     if (activeModal === 'reviewing') { title = `เอกสารรอตรวจสอบ (${reviewingDocs.length} รายการ)`; dataList = reviewingDocs; }
     if (activeModal === 'recent') { title = `เอกสารเพิ่มล่าสุด (${addedRecentlyDocs.length} รายการ)`; dataList = addedRecentlyDocs; }
-    if (activeModal === 'folder') { title = `แฟ้ม: ${activeFolderTitle}`; dataList = docs.slice(0, 20); }
 
     if (!activeModal || !title) return null;
 
@@ -977,51 +970,6 @@ export const DocumentManagementPage: React.FC = () => {
               </p>
               <p className="upload-sub-text">คลิกเพื่อเลือกไฟล์ PDF, Word หรือ Excel</p>
             </label>
-          </div>
-
-          {/* Quick Folders Menu */}
-          <div className="dms-card quick-menu-card">
-            <div className="quick-menu-header">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="20" height="20">
-                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <h3 className="sidebar-section-title">แฟ้มเอกสารด่วน</h3>
-            </div>
-            <ul className="quick-menu-list">
-              <li className="quick-menu-item" onClick={() => openFolderModal('ประวัติผู้ป่วย')}>
-                <div className="menu-left">
-                  <div className="folder-icon-box">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="18" height="18">
-                      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <span className="folder-name-text">ประวัติผู้ป่วย</span>
-                </div>
-                <span className="menu-badge">45</span>
-              </li>
-              <li className="quick-menu-item" onClick={() => openFolderModal('ฝ่ายบุคคลและกำลังพล')}>
-                <div className="menu-left">
-                  <div className="folder-icon-box">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2" width="18" height="18">
-                      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <span className="folder-name-text">ฝ่ายบุคคลและกำลังพล</span>
-                </div>
-                <span className="menu-badge">18</span>
-              </li>
-              <li className="quick-menu-item" onClick={() => openFolderModal('รายงานการเงิน')}>
-                <div className="menu-left">
-                  <div className="folder-icon-box">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" width="18" height="18">
-                      <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <span className="folder-name-text">รายงานการเงิน</span>
-                </div>
-                <span className="menu-badge">32</span>
-              </li>
-            </ul>
           </div>
         </div>
       </div>
