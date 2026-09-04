@@ -487,7 +487,7 @@ func SaveExamination(c *gin.Context) {
 			}
 			qty := p.Quantity
 			if qty <= 0 {
-				qty = 1
+				qty = 10
 			}
 
 			disp := models.Dispensing{
@@ -616,6 +616,65 @@ func SaveExamination(c *gin.Context) {
 			"doctor_advice": fullAdvice,
 			"medications":   medList,
 		})
+
+		// คำนวณราคายารวม
+		totalMedsAmount := 0.0
+		for _, m := range medList {
+			if p, ok := m["price"].(float64); ok {
+				if q, ok := m["quantity"].(int); ok {
+					totalMedsAmount += p * float64(q)
+				}
+			}
+		}
+
+		// สร้าง/อัปเดต BillingQueue ในสถานะ pending รอชำระเงินทันที
+		var bq models.BillingQueue
+		if err := config.DB.Where("visit_id = ?", visit.ID).First(&bq).Error; err != nil {
+			var bCount int64
+			config.DB.Model(&models.BillingQueue{}).Count(&bCount)
+			bQueueNo := fmt.Sprintf("B-%03d", bCount+1)
+			bq = models.BillingQueue{
+				QueueNumber:  bQueueNo,
+				HN:           pat.HN,
+				PatientName:  pat.FullName,
+				NationalID:   pat.NationalID,
+				Gender:       pat.Gender,
+				Age:          age,
+				SchemeType:   pat.SchemeType,
+				VisitID:      visit.ID,
+				TotalAmount:  totalMedsAmount,
+				Status:       "pending",
+				DoctorAdvice: fullAdvice,
+				Medications:  string(medsJSON),
+			}
+			config.DB.Create(&bq)
+		} else {
+			bq.Medications = string(medsJSON)
+			bq.DoctorAdvice = fullAdvice
+			bq.TotalAmount = totalMedsAmount
+			bq.Status = "pending"
+			config.DB.Save(&bq)
+		}
+
+		ws.BroadcastEvent("BILLING_CREATED", gin.H{
+			"id":            bq.ID,
+			"queue_id":      bq.ID,
+			"queue_number":  bq.QueueNumber,
+			"visit_id":      bq.VisitID,
+			"patient_name":  bq.PatientName,
+			"hn":            bq.HN,
+			"national_id":   bq.NationalID,
+			"gender":        bq.Gender,
+			"age":           bq.Age,
+			"scheme_type":   bq.SchemeType,
+			"total_amount":  bq.TotalAmount,
+			"net_amount":    bq.TotalAmount,
+			"status":        "pending",
+			"doctor_advice": bq.DoctorAdvice,
+			"medications":   medList,
+			"created_at":    bq.CreatedAt,
+		})
+
 		if hasQueue {
 			config.DB.Preload("Patient").First(&updatedQueue, updatedQueue.ID)
 			ws.BroadcastEvent("QUEUE_UPDATED", updatedQueue)

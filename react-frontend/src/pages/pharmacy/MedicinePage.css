@@ -218,13 +218,14 @@ body.dark-mode .medicine-page-container .table-title {
 }
 
 .medicine-page-container .stock-table th {
-  padding: 12px 14px;
-  font-size: 14.5px;
+  padding: 10px 8px;
+  font-size: 13.5px;
   font-weight: 700;
   color: #0F172A;
   background-color: #F8FAFC;
   border-bottom: 2px solid #E2E8F0;
   white-space: nowrap;
+  text-align: center;
 }
 
 body.dark-mode .medicine-page-container .stock-table th {
@@ -234,11 +235,12 @@ body.dark-mode .medicine-page-container .stock-table th {
 }
 
 .medicine-page-container .stock-table td {
-  padding: 12px 14px;
-  font-size: 14px;
+  padding: 9px 8px;
+  font-size: 13.5px;
   border-bottom: 1px solid #F1F5F9;
   color: #1E293B;
   vertical-align: middle;
+  text-align: center;
 }
 
 body.dark-mode .medicine-page-container .stock-table td {
@@ -482,11 +484,36 @@ body.dark-mode .medicine-page-container .modal-title {
 }
 
 .medicine-page-container .close-btn {
-  background: transparent;
-  border: none;
-  font-size: 16px;
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
   cursor: pointer;
   color: #64748B;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.medicine-page-container .close-btn:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+  transform: scale(1.05);
+}
+
+body.dark-mode .medicine-page-container .close-btn {
+  background: #334155;
+  border-color: #475569;
+  color: #CBD5E1;
+}
+
+body.dark-mode .medicine-page-container .close-btn:hover {
+  background: #475569;
+  color: #F8FAFC;
 }
 
 .medicine-page-container .mode-selector {

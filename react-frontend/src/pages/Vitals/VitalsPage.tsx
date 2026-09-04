@@ -238,26 +238,38 @@ export const VitalsPage: React.FC = () => {
   // Auto-sync / reconnect draft patient once queueList is loaded from DB
   useEffect(() => {
     if (queueList.length > 0) {
+      const waiting = queueList.filter((p) => p.queueStatus === 'รอคัดกรอง');
       const targetId = selectedPatientId || initialDraft?.selectedPatientId;
       const targetQNo = initialDraft?.patientQueueNo;
+      let found: QueuePatientItem | undefined;
+
       if (targetId || targetQNo) {
-        const found = queueList.find(
+        found = waiting.find(
           (p) =>
             (targetId && (p.id === targetId || String(p.queueId) === targetId)) ||
             (targetQNo && p.queueNo.toLowerCase() === targetQNo.toLowerCase())
         );
-        if (found) {
-          if (found.id !== selectedPatientId) {
-            setSelectedPatientId(found.id);
-          }
-          const formattedStr = `${found.queueNo} - ${found.fullName} (HN: ${found.hn} | มาถึง ${found.registeredTime})`;
-          if (!searchQuery || searchQuery.trim() === '') {
-            setSearchQuery(formattedStr);
-          }
+      }
+
+      // ถ้าคนไข้เดิมไม่อยู่ในคิวรอคัดกรองแล้ว แต่มีคิวรอคัดกรองอยู่ ให้เลือกคิวแรกที่รออยู่ทันที!
+      if (!found && waiting.length > 0) {
+        found = waiting[0];
+      }
+
+      if (found) {
+        if (found.id !== selectedPatientId) {
+          setSelectedPatientId(found.id);
         }
+        const formattedStr = `${found.queueNo} - ${found.fullName} (HN: ${found.hn} | มาถึง ${found.registeredTime})`;
+        setSearchQuery(formattedStr);
+        if (found.allergies && !allergies) setAllergies(found.allergies);
+        if (found.chronicDiseases && !medicalHistory) setMedicalHistory(found.chronicDiseases);
+      } else {
+        setSelectedPatientId('');
+        setSearchQuery('');
       }
     }
-  }, [queueList, selectedPatientId, initialDraft?.selectedPatientId, initialDraft?.patientQueueNo, searchQuery]);
+  }, [queueList]);
 
   // Auto-save draft on change with debounce
   useEffect(() => {
@@ -346,18 +358,30 @@ export const VitalsPage: React.FC = () => {
   // Filtered waiting queue options for the searchable dropdown
   const filteredWaitingQueues = useMemo(() => {
     const waiting = queueList.filter((p) => p.queueStatus === 'รอคัดกรอง');
-    if (!searchQuery.trim()) return waiting;
-    const q = searchQuery.toLowerCase().trim();
-    // If the searchQuery is exactly the formatted selected string, show all waiting queues on click
-    if (selectedPatient && searchQuery === `${selectedPatient.queueNo} - ${selectedPatient.fullName} (HN: ${selectedPatient.hn} | มาถึง ${selectedPatient.registeredTime})`) {
+    if (!searchQuery || !searchQuery.trim()) return waiting;
+
+    // ถ้า searchQuery เป็นข้อความยาว หรือเป็นฟอร์แมตคนไข้ (มี ' - ' หรือ 'HN:' หรือ 'มาถึง')
+    // หรือตรงกับ selectedPatient ให้คืนค่ารายการคิวรอคัดกรองทั้งหมดทันที เพื่อให้ผู้ใช้เลือกเปลี่ยนคนไข้ได้เสมอ
+    if (
+      searchQuery.includes(' - ') || 
+      searchQuery.includes('HN:') || 
+      searchQuery.includes('มาถึง') || 
+      searchQuery.length > 25 ||
+      (selectedPatient && searchQuery.includes(selectedPatient.queueNo))
+    ) {
       return waiting;
     }
-    return waiting.filter((p) =>
+
+    const q = searchQuery.toLowerCase().trim();
+    const matches = waiting.filter((p) =>
       p.queueNo.toLowerCase().includes(q) ||
       p.fullName.toLowerCase().includes(q) ||
       p.hn.toLowerCase().includes(q) ||
-      p.nationalId.includes(q)
+      (p.nationalId && p.nationalId.includes(q))
     );
+
+    // ป้องกันการล็อกหน้าจอ: ถ้าค้นหาไม่ตรงกับใครเลย แต่มีคิวรอคัดกรองอยู่ ให้คืนค่าคิวรอคัดกรองทั้งหมด
+    return matches.length > 0 ? matches : waiting;
   }, [queueList, searchQuery, selectedPatient]);
 
   // BMI Calculation (Asian WHO standard)
