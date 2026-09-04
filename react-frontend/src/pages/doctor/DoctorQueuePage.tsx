@@ -29,6 +29,18 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
     [patients, statusFilter]
   );
 
+  // จำนวนแยกตามสถานะ ส่งให้แถบกรองในตารางคิวไปแสดงเป็นตัวเลขห้อยท้ายปุ่ม
+  // ต้องนับจาก patients ที่ยังไม่ถูกกรอง ไม่ใช่ filteredPatients
+  const statusCounts = useMemo(
+    () => ({
+      All: patients.length,
+      Waiting: patients.filter((p) => p.status === 'Waiting').length,
+      Examining: patients.filter((p) => p.status === 'Examining').length,
+      Completed: patients.filter((p) => p.status === 'Completed').length,
+    }),
+    [patients]
+  );
+
   const totalToday = patients.length;
   const currentlyWaiting = patients.filter((p) => p.status === 'Waiting').length;
   const completedVisits = patients.filter((p) => p.status === 'Completed').length;
@@ -74,6 +86,7 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
           onUpdateStatus={handleUpdateStatus}
           statusFilter={statusFilter}
           setStatusFilter={setStatusFilter}
+          statusCounts={statusCounts}
         />
       </section>
     </div>

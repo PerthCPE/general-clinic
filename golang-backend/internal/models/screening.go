@@ -21,6 +21,12 @@ type Screening struct {
 	HeartRate        int       `json:"heart_rate"`
 	RespiratoryRate  int       `json:"respiratory_rate"`
 	SpO2             int       `json:"spo2"`
+	PainScore        int       `json:"pain_score"`
+	BloodSugar       int       `json:"blood_sugar"`
+	FoodAllergies    string    `json:"food_allergies"`
+	CurrentMedications string  `json:"current_medications"`
+	SmokingHistory   string    `json:"smoking_history"`
+	AlcoholHistory   string    `json:"alcohol_history"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 

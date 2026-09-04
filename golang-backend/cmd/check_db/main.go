@@ -1,9 +1,11 @@
 package main
+
 import (
-	"fmt"
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"fmt"
 )
+
 func main() {
 	config.LoadConfig()
 	if config.AppConfig == nil || config.AppConfig.DBHost == "" {
@@ -18,7 +20,7 @@ func main() {
 	}
 	config.ConnectDB()
 	db := config.DB
-	
+
 	var pc, vc, sc, mc, dc, bc, qc, docCount, fwdCount, schCount, swpCount int64
 	db.Model(&models.Patient{}).Count(&pc)
 	db.Model(&models.VisitRecord{}).Count(&vc)

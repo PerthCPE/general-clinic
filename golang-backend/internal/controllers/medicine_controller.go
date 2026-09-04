@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
@@ -105,3 +108,200 @@ func UpdateMedicineStock(c *gin.Context) {
 		"medicine": medicine,
 	})
 }
+
+// DTO สำหรับการเพิ่มยาใหม่เข้าคลัง
+type CreateMedicineRequest struct {
+	MedicineCode  string  `json:"medicine_code"`
+	Name          string  `json:"name" binding:"required"`
+	GenericName   string  `json:"generic_name"`
+	Category      string  `json:"category"`
+	Properties    string  `json:"properties"`
+	Dosage        string  `json:"dosage"`
+	Manufacturer  string  `json:"manufacturer"`
+	StockQuantity int     `json:"stock_quantity"`
+	UnitPrice     float64 `json:"unit_price"`
+}
+
+// POST /api/pharmacy/medicines - เพิ่มยาใหม่เข้าคลัง
+func CreateMedicine(c *gin.Context) {
+	var req CreateMedicineRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	code := strings.TrimSpace(req.MedicineCode)
+	if code == "" {
+		// หาเลขรหัสยาสูงสุดที่มีอยู่แล้วใน DB เพื่อรันลำดับต่ออัตโนมัติ ไม่ให้ชนกัน
+		var allCodes []string
+		config.DB.Model(&models.Medicine{}).Pluck("medicine_code", &allCodes)
+
+		maxNum := 0
+		for _, cStr := range allCodes {
+			clean := strings.TrimPrefix(cStr, "MED-")
+			clean = strings.TrimPrefix(clean, "MED")
+			if n, err := strconv.Atoi(clean); err == nil {
+				if n > maxNum {
+					maxNum = n
+				}
+			}
+		}
+
+		var count int64
+		config.DB.Model(&models.Medicine{}).Count(&count)
+		if int(count) > maxNum {
+			maxNum = int(count)
+		}
+
+		code = fmt.Sprintf("MED-%03d", maxNum+1)
+	}
+
+	medicine := models.Medicine{
+		MedicineCode:  code,
+		Name:          req.Name,
+		GenericName:   req.GenericName,
+		Category:      req.Category,
+		Properties:    req.Properties,
+		Dosage:        req.Dosage,
+		Manufacturer:  req.Manufacturer,
+		StockQuantity: req.StockQuantity,
+		UnitPrice:     req.UnitPrice,
+	}
+
+	if err := config.DB.Create(&medicine).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create medicine: " + err.Error()})
+		return
+	}
+
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", medicine)
+
+	c.JSON(http.StatusCreated, gin.H{
+		"status":   "success",
+		"message":  "Medicine created successfully",
+		"medicine": medicine,
+	})
+}
+
+// DELETE /api/pharmacy/medicines/:id - ลบยาออกจากคลัง
+func DeleteMedicine(c *gin.Context) {
+	param := strings.TrimSpace(c.Param("id"))
+
+	var medicine models.Medicine
+	var err error
+
+	// ค้นหาอย่างยืดหยุ่น: ทั้ง ID ตัวเลข, medicine_code, MED-xxx, และ Name
+	if id, parseErr := strconv.Atoi(param); parseErr == nil {
+		err = config.DB.Where("id = ? OR medicine_code = ? OR medicine_code = ?", id, param, fmt.Sprintf("MED-%03d", id)).First(&medicine).Error
+	}
+	if err != nil || medicine.ID == 0 {
+		cleanCode := strings.TrimPrefix(param, "MED-")
+		cleanCode = strings.TrimPrefix(cleanCode, "MED")
+		err = config.DB.Where("medicine_code = ? OR medicine_code = ? OR name = ? OR generic_name = ?", param, "MED-"+cleanCode, param, param).First(&medicine).Error
+	}
+
+	if err != nil || medicine.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Medicine not found"})
+		return
+	}
+
+	// ลบรายการอ้างอิงใน dispensings เพื่อไม่ให้ติด Foreign Key Constraint
+	config.DB.Where("medicine_id = ?", medicine.ID).Delete(&models.Dispensing{})
+
+	if err := config.DB.Delete(&medicine).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete medicine: " + err.Error()})
+		return
+	}
+
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", gin.H{"deleted_code": medicine.MedicineCode, "deleted_id": medicine.ID})
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":       "success",
+		"message":      "Medicine deleted successfully",
+		"deleted_id":   medicine.ID,
+		"deleted_code": medicine.MedicineCode,
+	})
+}
+
+// DTO สำหรับการแก้ไขข้อมูลรายละเอียดตัวยา
+type UpdateMedicineDetailsRequest struct {
+	Name          string   `json:"name"`
+	GenericName   string   `json:"generic_name"`
+	Category      string   `json:"category"`
+	Properties    string   `json:"properties"`
+	Dosage        string   `json:"dosage"`
+	Manufacturer  string   `json:"manufacturer"`
+	StockQuantity *int     `json:"stock_quantity"`
+	UnitPrice     *float64 `json:"unit_price"`
+}
+
+// PUT /api/pharmacy/medicines/:id หรือ POST /api/pharmacy/medicines/:id/update - แก้ไขข้อมูลรายละเอียดตัวยาใน DB ทันที
+func UpdateMedicineDetails(c *gin.Context) {
+	param := strings.TrimSpace(c.Param("id"))
+
+	var req UpdateMedicineDetailsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var medicine models.Medicine
+	var err error
+
+	// ค้นหาตัวยาด้วย ID ตัวเลข, medicine_code (เช่น MED-002) หรือ Name
+	if id, parseErr := strconv.Atoi(param); parseErr == nil {
+		err = config.DB.Where("id = ? OR medicine_code = ?", id, param).First(&medicine).Error
+	}
+	if err != nil || medicine.ID == 0 {
+		cleanCode := strings.TrimPrefix(param, "MED-")
+		cleanCode = strings.TrimPrefix(cleanCode, "MED")
+		err = config.DB.Where("medicine_code = ? OR medicine_code = ? OR name = ?", param, "MED-"+cleanCode, param).First(&medicine).Error
+	}
+
+	if err != nil || medicine.ID == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Medicine not found"})
+		return
+	}
+
+	// อัปเดตฟิลด์ต่างๆ หากมีการส่งค่ามา
+	if strings.TrimSpace(req.Name) != "" {
+		medicine.Name = strings.TrimSpace(req.Name)
+	}
+	if strings.TrimSpace(req.GenericName) != "" {
+		medicine.GenericName = strings.TrimSpace(req.GenericName)
+	}
+	if strings.TrimSpace(req.Category) != "" {
+		medicine.Category = strings.TrimSpace(req.Category)
+	}
+	if strings.TrimSpace(req.Properties) != "" {
+		medicine.Properties = strings.TrimSpace(req.Properties)
+	}
+	if strings.TrimSpace(req.Dosage) != "" {
+		medicine.Dosage = strings.TrimSpace(req.Dosage)
+	}
+	if strings.TrimSpace(req.Manufacturer) != "" {
+		medicine.Manufacturer = strings.TrimSpace(req.Manufacturer)
+	}
+	if req.UnitPrice != nil && *req.UnitPrice >= 0 {
+		medicine.UnitPrice = *req.UnitPrice
+	}
+	if req.StockQuantity != nil && *req.StockQuantity >= 0 {
+		medicine.StockQuantity = *req.StockQuantity
+	}
+
+	// บันทึกลง Database ทันที
+	if err := config.DB.Save(&medicine).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update medicine: " + err.Error()})
+		return
+	}
+
+	// ส่งสัญญาณ Real-time แจ้งทุกไคลเอนต์ให้ซิงก์ข้อมูลคลังยาตรงกัน
+	ws.BroadcastEvent("MEDICINE_UPDATED", medicine)
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", medicine)
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":   "success",
+		"message":  "Medicine details updated successfully in database",
+		"medicine": medicine,
+	})
+}
+

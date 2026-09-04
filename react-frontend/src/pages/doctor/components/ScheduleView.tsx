@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { StatusFilterTabs } from './StatusFilterTabs';
 import { useLanguage } from '../context/LanguageContext';
 import {
   Calendar as CalendarIcon,
@@ -565,36 +566,17 @@ export const ScheduleView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* View Mode Toggle Switcher (Month / Week / List) */}
-          <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200">
-            <button
-              onClick={() => setViewMode('month')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'month' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <CalendarRange className="w-3.5 h-3.5" />
-              <span>{t('monthlyView')}</span>
-            </button>
-            <button
-              onClick={() => setViewMode('week')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'week' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <CalendarDays className="w-3.5 h-3.5" />
-              <span>{t('weeklyView')}</span>
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'list' ? 'bg-white text-blue-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ListFilter className="w-3.5 h-3.5" />
-              <span>{t('dutyList')}</span>
-            </button>
-          </div>
+          {/* ปุ่มสลับมุมมอง ใช้คอมโพเนนต์เดียวกับแถบกรองในหน้าคิวและหน้าประวัติ
+              หน้าตาจึงตรงกันทั้งระบบ แก้ที่เดียวมีผลทุกหน้า */}
+          <StatusFilterTabs
+            value={viewMode}
+            onChange={(next) => setViewMode(next as 'month' | 'week' | 'list')}
+            options={[
+              { value: 'month', label: t('monthlyView'), icon: <CalendarRange className="w-3.5 h-3.5" /> },
+              { value: 'week', label: t('weeklyView'), icon: <CalendarDays className="w-3.5 h-3.5" /> },
+              { value: 'list', label: t('dutyList'), icon: <ListFilter className="w-3.5 h-3.5" /> },
+            ]}
+          />
 
           {/* Add Shift Button */}
           <button

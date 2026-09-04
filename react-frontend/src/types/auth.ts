@@ -1,4 +1,4 @@
-export type UserRole = 'registrar' | 'nurse' | 'nurse_assistant' | 'pharmacist' | 'cashier' | 'doctor' | 'officer';
+export type UserRole = 'registrar' | 'nurse' | 'nurse_assistant' | 'pharmacist' | 'cashier' | 'doctor' | 'admin' | 'officer';
 
 export interface User {
   id: string;
@@ -10,11 +10,12 @@ export interface User {
   department: string;
   avatarText?: string;
   avatarColor?: string;
+  email?: string;
 }
 
 export interface NavItem {
   id: string;
   title: string;
-  iconType: 'registration' | 'queue' | 'eligibility' | 'vitals' | 'history' | 'dispense' | 'stock' | 'invoice' | 'dashboard' | 'examination' | 'schedule' | 'records' | 'document' | 'calendar' | 'forward';
+  iconType: 'registration' | 'queue' | 'eligibility' | 'vitals' | 'history' | 'dispense' | 'stock' | 'invoice' | 'dashboard' | 'appointment' | 'admin-users' | 'admin-access' | 'examination' | 'schedule' | 'records' | 'document' | 'calendar' | 'forward';
   path: string;
 }

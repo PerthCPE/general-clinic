@@ -22,17 +22,25 @@ interface VitalsFormCardProps {
   heartRate: string;
   respiratoryRate: string;
   spo2: string;
+  painScore: string;
+  bloodSugar: string;
   chiefComplaint: string;
   allergies: string;
+  foodAllergies: string;
   medicalHistory: string;
+  currentMedications: string;
+  smokingHistory: string;
+  alcoholHistory: string;
   assignedDoctorId: number;
   doctorOptions: DoctorOption[];
   isAccordionOpen: boolean;
   onToggleAccordion: () => void;
   onChangeField: (field: string, value: string | number) => void;
+  onRandomVitals?: () => void;
   onSubmit: (e: React.FormEvent) => void;
   onReset: () => void;
   isSaving: boolean;
+  savedDraftTime?: string | null;
 }
 
 export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
@@ -54,17 +62,25 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
   heartRate,
   respiratoryRate,
   spo2,
+  painScore,
+  bloodSugar,
   chiefComplaint,
   allergies,
+  foodAllergies,
   medicalHistory,
+  currentMedications,
+  smokingHistory,
+  alcoholHistory,
   assignedDoctorId,
   doctorOptions,
   isAccordionOpen,
   onToggleAccordion,
   onChangeField,
+  onRandomVitals,
   onSubmit,
   onReset,
   isSaving,
+  savedDraftTime,
 }) => {
   // Clinical flags
   const tempNum = parseFloat(temperature);
@@ -142,33 +158,29 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               <div className="combobox-input-wrap">
                 <span className="combobox-search-icon">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
+                    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                    <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                 </span>
                 <input
-                  id="queue-select-input"
-                  name="queue_patient_search_no_autofill"
                   type="text"
                   className="combobox-input"
-                  placeholder="พิมพ์ค้นหาด้วยเลขคิว (เช่น Q0001), ชื่อผู้ป่วย, HN (เช่น HN0001), หรือเลขบัตรประชาชน..."
+                  placeholder="ค้นหาด้วยชื่อ, นามสกุล, HN, เลขคิว หรือคลิกลูกศรเพื่อเลือกผู้ป่วย..."
                   value={searchQuery}
-                  onFocus={() => onToggleQueueDropdown(true)}
                   onClick={() => onToggleQueueDropdown(true)}
-                  onChange={(e) => onSearchQueryChange(e.target.value)}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  data-lpignore="true"
-                  data-form-type="other"
+                  onChange={(e) => {
+                    onSearchQueryChange(e.target.value);
+                    if (!isQueueDropdownOpen) onToggleQueueDropdown(true);
+                  }}
+                  onFocus={(e) => {
+                    onToggleQueueDropdown(true);
+                    if (searchQuery.includes(' - ') || searchQuery.includes('HN:') || searchQuery.includes('มาถึง')) {
+                      e.target.select();
+                    }
+                  }}
+                  aria-label="ค้นหาคิวผู้ป่วย"
                 />
-                {searchQuery && (
+                {(searchQuery || selectedPatient) && (
                   <button
                     type="button"
                     className="combobox-clear-btn"
@@ -177,12 +189,9 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                       onResetSelection();
                       onToggleQueueDropdown(true);
                     }}
-                    title="ล้างการค้นหา"
+                    title="ล้างคำค้นหา / ดูคิวทั้งหมด"
                   >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
+                    ✕
                   </button>
                 )}
                 <button
@@ -208,7 +217,26 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 <div className="combobox-dropdown-menu">
                   <div className="combobox-menu-header">
                     <span>ผู้ป่วยที่รอคัดกรอง ({filteredWaitingQueues.length} คิว)</span>
-                    {searchQuery && <span className="search-hint">คลิกเลือกผู้ป่วย</span>}
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSearchQueryChange('');
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#2563EB',
+                          fontSize: '12px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          padding: 0
+                        }}
+                      >
+                        แสดงคิวทั้งหมด ({waitingCount} คิว)
+                      </button>
+                    )}
                   </div>
                   <div className="combobox-options-list">
                     {filteredWaitingQueues.length > 0 ? (
@@ -246,8 +274,26 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                         );
                       })
                     ) : (
-                      <div className="combobox-empty-item">
-                        <span>ไม่พบคิวผู้ป่วยที่ตรงกับคำค้นหา "{searchQuery}"</span>
+                      <div className="combobox-empty-item" style={{ padding: '20px 16px', textAlign: 'center' }}>
+                        <div style={{ color: '#64748B', fontSize: '13px', marginBottom: '10px' }}>
+                          ไม่พบคิวผู้ป่วยที่ตรงกับคำค้นหา "{searchQuery}"
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => onSearchQueryChange('')}
+                          style={{
+                            background: '#EFF6FF',
+                            color: '#2563EB',
+                            border: '1px solid #BFDBFE',
+                            borderRadius: '8px',
+                            padding: '6px 16px',
+                            fontSize: '13px',
+                            fontWeight: '700',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          คลิกดูคิวที่รอคัดกรองทั้งหมด ({waitingCount} คิว)
+                        </button>
                       </div>
                     )}
                   </div>
@@ -273,9 +319,35 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
           </div>
           {/* Section 2: Physical Measurements */}
           <div className="vitals-form-section">
-            <div className="vitals-section-header">
-              <span className="vitals-section-num">2</span>
-              <span className="vitals-section-title">สรีรวิทยาและสัญญาณชีพพื้นฐาน (Physical & Vitals)</span>
+            <div className="vitals-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="vitals-section-num">2</span>
+                <span className="vitals-section-title">สรีรวิทยาและสัญญาณชีพพื้นฐาน (Physical & Vitals)</span>
+              </div>
+              {onRandomVitals && (
+                <button
+                  type="button"
+                  className="vitals-random-btn"
+                  onClick={onRandomVitals}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#EFF6FF',
+                    color: '#2563EB',
+                    border: '1px solid #BFDBFE',
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                  }}
+                  title="สุ่มกรอกข้อมูลสัญญาณชีพและอาการสำคัญสำหรับการทดสอบ"
+                >
+                  🎲 สุ่มข้อมูลสัญญาณชีพ
+                </button>
+              )}
             </div>
 
             <div className="vitals-grid-3">
@@ -451,13 +523,52 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Row 4: Pain Score & Blood Sugar (DTX) */}
+            <div className="vitals-grid-2">
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">
+                  <span className="vitals-label-title">ระดับความเจ็บปวด (Pain Score)</span>
+                </label>
+                <div className="vitals-input-suffix-wrap">
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    className="vitals-input"
+                    placeholder="เช่น 0 - 10"
+                    value={painScore}
+                    onChange={(e) => onChangeField('painScore', e.target.value)}
+                  />
+                  <span className="vitals-input-suffix">/10</span>
+                </div>
+              </div>
+
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">
+                  <span className="vitals-label-title">ระดับน้ำตาลในเลือด (Blood Sugar / DTX)</span>
+                </label>
+                <div className="vitals-input-suffix-wrap">
+                  <input
+                    type="number"
+                    min="20"
+                    max="600"
+                    className="vitals-input"
+                    placeholder="เช่น 105"
+                    value={bloodSugar}
+                    onChange={(e) => onChangeField('bloodSugar', e.target.value)}
+                  />
+                  <span className="vitals-input-suffix">mg/dL</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Section 3: Clinical Symptoms & Medical History */}
           <div className="vitals-form-section">
             <div className="vitals-section-header">
               <span className="vitals-section-num">3</span>
-              <span className="vitals-section-title">อาการสำคัญและประวัติทางการแพทย์ (Clinical History)</span>
+              <span className="vitals-section-title">ประวัติทางการแพทย์ แพ้ยา และพฤติกรรมสุขภาพ (Clinical & Social History)</span>
             </div>
 
             {/* Chief Complaint */}
@@ -475,11 +586,11 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
               ></textarea>
             </div>
 
-            {/* Allergies & Chronic Diseases Grid */}
+            {/* Allergies: Drug & Food Allergies Grid */}
             <div className="vitals-grid-2">
               <div className="vitals-form-group">
                 <label className="vitals-form-label">
-                  ประวัติการแพ้ยา (Allergies)
+                  ประวัติการแพ้ยา (Drug Allergies)
                   {hasAllergy && (
                     <span className="clinical-badge badge-allergy-alert">
                       <svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor" style={{ marginRight: '4px' }}>
@@ -492,20 +603,72 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 <input
                   type="text"
                   className={`vitals-input ${hasAllergy ? 'input-allergy' : ''}`}
-                  placeholder="เช่น แพ้ยา Penicillin, Sulfa หรือ ปฏิเสธการแพ้ยา"
+                  placeholder="เช่น แพ้ยา Penicillin (ผื่นคัน, ลมพิษ) หรือ ปฏิเสธการแพ้ยา"
                   value={allergies}
                   onChange={(e) => onChangeField('allergies', e.target.value)}
                 />
               </div>
 
               <div className="vitals-form-group">
-                <label className="vitals-form-label">โรคประจำตัว (Medical History / Chronic Diseases)</label>
+                <label className="vitals-form-label">
+                  ประวัติการแพ้อาหาร (Food Allergies)
+                </label>
+                <input
+                  type="text"
+                  className="vitals-input"
+                  placeholder="เช่น กุ้ง, อาหารทะเล, ถั่วลิสง หรือ ปฏิเสธการแพ้อาหาร"
+                  value={foodAllergies}
+                  onChange={(e) => onChangeField('foodAllergies', e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Chronic Diseases & Current Medications Grid */}
+            <div className="vitals-grid-2" style={{ marginTop: '12px' }}>
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">โรคประจำตัว (Chronic / Underlying Diseases)</label>
                 <input
                   type="text"
                   className="vitals-input"
                   placeholder="เช่น ความดันโลหิตสูง, เบาหวาน, โรคหัวใจ หรือ ไม่มี"
                   value={medicalHistory}
                   onChange={(e) => onChangeField('medicalHistory', e.target.value)}
+                />
+              </div>
+
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">ยาที่รับประทานประจำ (Current Medications)</label>
+                <input
+                  type="text"
+                  className="vitals-input"
+                  placeholder="เช่น Amlodipine 5mg tab 1x daily (Morning) หรือ ไม่มี"
+                  value={currentMedications}
+                  onChange={(e) => onChangeField('currentMedications', e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Social Habits: Smoking & Alcohol History Grid */}
+            <div className="vitals-grid-2" style={{ marginTop: '12px' }}>
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">ประวัติการสูบบุหรี่ (Smoking History)</label>
+                <input
+                  type="text"
+                  className="vitals-input"
+                  placeholder="เช่น ไม่สูบ, สูบบุหรี่ (10 มวน/วัน 5 ปี) หรือ เลิกสูบแล้ว"
+                  value={smokingHistory}
+                  onChange={(e) => onChangeField('smokingHistory', e.target.value)}
+                />
+              </div>
+
+              <div className="vitals-form-group">
+                <label className="vitals-form-label">ประวัติการดื่มแอลกอฮอล์ (Alcohol History)</label>
+                <input
+                  type="text"
+                  className="vitals-input"
+                  placeholder="เช่น ไม่ดื่ม, ดื่มแอลกอฮอล์ (2-3 ครั้ง/สัปดาห์ 8 ปี) หรือ เลิกดื่มแล้ว"
+                  value={alcoholHistory}
+                  onChange={(e) => onChangeField('alcoholHistory', e.target.value)}
                 />
               </div>
             </div>

@@ -3,6 +3,7 @@
 
 export interface PatientConfig {
   id: string;
+  visitId?: number;
   hn: string;
   nationalId: string;
   queueNumber: string;
@@ -11,15 +12,17 @@ export interface PatientConfig {
   shortName: string;
   age: number;
   gender: string;
-  dob: string;
-  phone: string;
-  occupation: string;
+  dob?: string;
+  phone?: string;
+  occupation?: string;
   treatmentRights: string;
   patientType: 'ผู้ป่วยนอก (OPD)' | 'ผู้ป่วยใน (IPD)';
   allergies: string[];
   chronicDiseases: string;
   vitals: string;
   visitStatus: string;
+  status?: 'pending' | 'dispensed' | 'completed';
+  dispensedAt?: string;
   visitDate: string;
   visitTime: string;
   doctorAdvice: string;
@@ -30,6 +33,7 @@ export interface PatientConfig {
     instructions: string;
     stock: number;
     stockStatus: 'in-stock' | 'low-stock' | 'out-stock';
+    quantity?: number;
     price: number;
     properties: string;
   }[];

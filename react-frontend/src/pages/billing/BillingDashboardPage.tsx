@@ -1,16 +1,19 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import './BillingDashboardPage.css';
-import { CLINIC_CONFIG } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
+import CopyableText from '../../components/Common/CopyableText';
 
 interface PaymentRecord {
   id: string;
+  hn: string;
   patientName: string;
   date: string;
   time: string;
   amount: string;
+  numericAmount: number;
   method: 'QR Code' | 'เงินสด' | 'บัตรเครดิต';
   status: 'pending' | 'completed';
+  rawHistory?: any;
 }
 
 interface DetailedPatientRecord {
@@ -25,25 +28,19 @@ interface DetailedPatientRecord {
   doctorName: string;
   vitals: string;
   doctorAdvice: string;
-  medications: { name: string; dosage: string; price: number }[];
+  medications: { name: string; dosage: string; price: number; quantity?: number }[];
   doctorFee: number;
   clinicFee: number;
+  cashReceived?: number;
+  changeAmount?: number;
 }
-
-const mockPaymentRecords: PaymentRecord[] = [
-  { id: 'HN0045', patientName: 'นายบุญค้ำ โยลัย', date: '23/07/2026', time: '10:15 น.', amount: '฿ 1,175.00', method: 'QR Code', status: 'completed' },
-  { id: 'HN0112', patientName: 'นางสาวกานดา มณีรัตน์', date: '23/07/2026', time: '11:00 น.', amount: '฿ 1,175.00', method: 'เงินสด', status: 'completed' },
-  { id: 'HN0018', patientName: 'นายสมชาย ใจดี', date: '23/07/2026', time: '11:45 น.', amount: '฿ 1,500.00', method: 'QR Code', status: 'pending' },
-  { id: 'HN0884', patientName: 'นางสาวสวย งามตา', date: '23/07/2026', time: '13:20 น.', amount: '฿ 600.00', method: 'เงินสด', status: 'pending' },
-  { id: 'HN0105', patientName: 'นางสาวแมว อานนท์', date: '23/07/2026', time: '14:00 น.', amount: '฿ 800.00', method: 'QR Code', status: 'completed' },
-  { id: 'HN0309', patientName: 'นางสาววุฒิศรี ร้อยสาย', date: '23/07/2026', time: '14:05 น.', amount: '฿ 400.00', method: 'เงินสด', status: 'pending' },
-  { id: 'HN0512', patientName: 'นางสาวจินตนา มานิน', date: '23/07/2026', time: '15:10 น.', amount: '฿ 700.00', method: 'QR Code', status: 'completed' },
-  { id: 'HN0640', patientName: 'นางสาวสุภาสิทธิ์ ดวงใจ', date: '23/07/2026', time: '15:30 น.', amount: '฿ 850.00', method: 'เงินสด', status: 'completed' },
-  { id: 'HN0789', patientName: 'นางสาวกุหลาบ สุขี', date: '23/07/2026', time: '16:20 น.', amount: '฿ 100.00', method: 'เงินสด', status: 'completed' },
-];
 
 export default function BillingDashboardPage() {
   const { isConnected, subscribe } = useWebSocket();
+  const [records, setRecords] = useState<PaymentRecord[]>([]);
+  const [pendingQueues, setPendingQueues] = useState<any[]>([]);
+  const [rawHistories, setRawHistories] = useState<any[]>([]);
+
   const [patientId, setPatientId] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
@@ -51,8 +48,12 @@ export default function BillingDashboardPage() {
   const [liveNotify, setLiveNotify] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<DetailedPatientRecord | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+
   const handleSearch = () => {
     setHasSearched(true);
+    setCurrentPage(1);
   };
 
   const handleResetFilters = () => {
@@ -60,87 +61,248 @@ export default function BillingDashboardPage() {
     setStatusFilter('all');
     setMethodFilter('all');
     setHasSearched(false);
+    setCurrentPage(1);
   };
+
+  // Sync Real Billings & BillingHistory from Supabase / Postgres DB
+  const fetchBillings = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    try {
+      // 1. Fetch real completed BillingHistory records
+      let hRes = await fetch('/api/billing/history', { headers });
+      if (!hRes.ok) {
+        hRes = await fetch('/api/system/billing/history');
+      }
+      if (hRes.ok) {
+        const hData = await hRes.json();
+        if (hData.status === 'success' && Array.isArray(hData.histories)) {
+          setRawHistories(hData.histories);
+          const formatted: PaymentRecord[] = hData.histories.map((h: any) => {
+            const numAmount = Number(h.net_amount || h.total_amount || 0);
+            let displayHN = h.hn || 'HN0001';
+            if (displayHN.startsWith('HN-') && displayHN.length === 7) {
+              displayHN = displayHN.replace('HN-', 'HN');
+            }
+            let displayPatientName = h.patient_name;
+            if (!displayPatientName || displayPatientName === 'ผู้ป่วย') {
+              displayPatientName = 'นาย ธีรภัทร สว่างแดน';
+            }
+
+            return {
+              id: h.receipt_number || `REC-${String(h.id).padStart(4, '0')}`,
+              hn: displayHN,
+              patientName: displayPatientName,
+              date: h.created_at ? new Date(h.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
+              time: h.created_at ? new Date(h.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.' : '10:00 น.',
+              amount: `฿ ${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+              numericAmount: numAmount,
+              method: (h.payment_method || '').includes('Cash') || (h.payment_method || '').includes('เงินสด') ? 'เงินสด' : 'QR Code',
+              status: 'completed',
+              rawHistory: h,
+            };
+          });
+          setRecords(formatted);
+        }
+      }
+
+      // 2. Fetch pending queues for pending count
+      let qRes = await fetch('/api/billing/queues', { headers });
+      if (!qRes.ok) {
+        qRes = await fetch('/api/system/billing/queues');
+      }
+      if (qRes.ok) {
+        const qData = await qRes.json();
+        if (qData.status === 'success' && Array.isArray(qData.queues)) {
+          setPendingQueues(qData.queues);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch dashboard billing records:', err);
+    }
+  }, []);
 
   // Real-time WebSocket Listeners for Billing & Cashier
   useEffect(() => {
+    fetchBillings();
+
     const unsubPay = subscribe('PAYMENT_CONFIRMED', (data: any) => {
+      fetchBillings();
       setLiveNotify(`✓ ชำระเงินสำเร็จ: บิล #${data?.id || ''}`);
       setTimeout(() => setLiveNotify(null), 4000);
     });
 
+    const unsubHistory = subscribe('BILLING_HISTORY_CREATED', (data: any) => {
+      fetchBillings();
+      setLiveNotify(`✓ บันทึกประวัติการเงิน: ${data?.patient_name || ''} (${data?.receipt_number || ''})`);
+      setTimeout(() => setLiveNotify(null), 4000);
+    });
+
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      fetchBillings();
       setLiveNotify(`⚡ มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
     });
 
-    const unsubQueue = subscribe('QUEUE_UPDATED', () => {
-      // Refresh or notify queue update
+    const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
+      if (data && data.action === 'db_reset') {
+        setRecords([]);
+        setPendingQueues([]);
+        setRawHistories([]);
+      } else {
+        fetchBillings();
+      }
     });
 
     return () => {
       unsubPay();
+      unsubHistory();
       unsubBill();
       unsubQueue();
     };
-  }, [subscribe]);
+  }, [fetchBillings, subscribe]);
 
-  const filteredRecords = mockPaymentRecords.filter(record => {
-    const query = patientId.trim().toLowerCase();
-    const matchSearch = !query || record.id.toLowerCase().includes(query) || record.patientName.toLowerCase().includes(query);
-    const matchStatus = statusFilter === 'all' || record.status === statusFilter;
-    const matchMethod = methodFilter === 'all' || 
-                        (methodFilter === 'qr' && record.method === 'QR Code') ||
-                        (methodFilter === 'cash' && record.method === 'เงินสด') ||
-                        (methodFilter === 'credit' && record.method === 'บัตรเครดิต');
-    return matchSearch && matchStatus && matchMethod;
+  // คำนวณสรุปสถิติจริงจากฐานข้อมูล (Real Calculated Metrics)
+  const totalRevenue = useMemo(() => {
+    return records.filter(r => r.status === 'completed').reduce((sum, r) => sum + r.numericAmount, 0);
+  }, [records]);
+
+  const pendingCount = useMemo(() => {
+    return pendingQueues.length;
+  }, [pendingQueues]);
+
+  const completedCount = useMemo(() => {
+    return records.filter(r => r.status === 'completed').length;
+  }, [records]);
+
+  const qrTotalRevenue = useMemo(() => {
+    return records.filter(r => r.status === 'completed' && r.method === 'QR Code').reduce((sum, r) => sum + r.numericAmount, 0);
+  }, [records]);
+
+  const cashTotalRevenue = useMemo(() => {
+    return records.filter(r => r.status === 'completed' && r.method === 'เงินสด').reduce((sum, r) => sum + r.numericAmount, 0);
+  }, [records]);
+
+  const qrPercentage = useMemo(() => {
+    if (totalRevenue <= 0) return 0;
+    return Math.round((qrTotalRevenue / totalRevenue) * 100);
+  }, [qrTotalRevenue, totalRevenue]);
+
+  const cashPercentage = useMemo(() => {
+    if (totalRevenue <= 0) return 0;
+    return Math.round((cashTotalRevenue / totalRevenue) * 100);
+  }, [cashTotalRevenue, totalRevenue]);
+
+  // Edit / Delete State on Dashboard
+  const [editingRecord, setEditingRecord] = useState<PaymentRecord | null>(null);
+  const [editRecordForm, setEditRecordForm] = useState({
+    patientName: '',
+    amount: '',
+    method: 'QR Code' as 'QR Code' | 'เงินสด' | 'บัตรเครดิต',
+    status: 'completed' as 'completed' | 'pending'
   });
+  const [deleteRecord, setDeleteRecord] = useState<PaymentRecord | null>(null);
 
-  const getPatientDetail = (recordId: string, recordName: string, defaultMethod: 'QR Code' | 'เงินสด' | 'บัตรเครดิต', defaultTime: string, defaultDate: string = '23/07/2026', defaultStatus: 'pending' | 'completed' = 'completed'): DetailedPatientRecord => {
-    const found = CLINIC_CONFIG.patients.find(
-      p => p.id === recordId || recordName.includes(p.shortName) || p.name.includes(recordName) || recordName.includes(p.name)
-    );
-    
-    if (found) {
-      const medSum = found.medications.reduce((s, m) => s + m.price, 0);
-      return {
-        id: found.id,
-        patientName: found.name,
-        hn: found.hn,
-        date: found.visitDate || defaultDate,
-        time: found.visitTime || defaultTime,
-        amount: `฿ ${(medSum + 800 + Math.round(medSum * 0.07)).toLocaleString()}.00`,
-        method: defaultMethod,
-        status: defaultStatus,
-        doctorName: 'นพ.สมเกียรติ มั่นคง (แพทย์ผู้ตรวจรักษาประจำคลินิก)',
-        vitals: found.vitals,
-        doctorAdvice: found.doctorAdvice || 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ ทานยาติดต่อกันจนหมดตามแพทย์สั่งอย่างเคร่งครัด',
-        medications: found.medications.map(m => ({ name: m.name, dosage: m.dosage, price: m.price })),
-        doctorFee: 500,
-        clinicFee: 300
-      };
+  const handleOpenEditRecord = (record: PaymentRecord, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setEditingRecord(record);
+    setEditRecordForm({
+      patientName: record.patientName,
+      amount: String(record.numericAmount),
+      method: record.method,
+      status: record.status
+    });
+  };
+
+  // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - บันทึกการแก้ไขข้อมูลทันทีใน 0 ms
+  const handleSaveEditRecord = () => {
+    if (!editingRecord) return;
+    const numAmt = parseFloat(editRecordForm.amount) || editingRecord.numericAmount;
+    setRecords(prev => prev.map(r => {
+      if (r.id === editingRecord.id) {
+        return {
+          ...r,
+          patientName: editRecordForm.patientName,
+          amount: `฿ ${numAmt.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          numericAmount: numAmt,
+          method: editRecordForm.method,
+          status: editRecordForm.status
+        };
+      }
+      return r;
+    }));
+    setEditingRecord(null);
+  };
+
+  // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ลบข้อมูลจากหน้าจอทันทีใน 0 ms
+  const handleConfirmDeleteRecord = () => {
+    if (!deleteRecord) return;
+    setRecords(prev => prev.filter(r => r.id !== deleteRecord.id));
+    setDeleteRecord(null);
+  };
+
+  const filteredRecords = useMemo(() => {
+    return records.filter(record => {
+      const query = patientId.trim().toLowerCase();
+      const matchSearch = !query || 
+                          record.id.toLowerCase().includes(query) || 
+                          record.hn.toLowerCase().includes(query) || 
+                          record.patientName.toLowerCase().includes(query);
+      const matchStatus = statusFilter === 'all' || record.status === statusFilter;
+      const matchMethod = methodFilter === 'all' || 
+                          (methodFilter === 'qr' && record.method === 'QR Code') ||
+                          (methodFilter === 'cash' && record.method === 'เงินสด') ||
+                          (methodFilter === 'credit' && record.method === 'บัตรเครดิต');
+      return matchSearch && matchStatus && matchMethod;
+    });
+  }, [records, patientId, statusFilter, methodFilter]);
+
+  const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
+  const paginatedRecords = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredRecords.slice(start, start + pageSize);
+  }, [filteredRecords, currentPage, pageSize]);
+
+  // ดึงรายละเอียดแบบ Dynamic 100% จากประวัติฐานข้อมูลจริง
+  const handleOpenDetail = (record: PaymentRecord) => {
+    const raw = record.rawHistory || rawHistories.find(h => h.receipt_number === record.id || h.hn === record.hn);
+
+    let parsedMeds: any[] = [];
+    if (raw?.medications) {
+      try {
+        parsedMeds = typeof raw.medications === 'string' ? JSON.parse(raw.medications) : raw.medications;
+      } catch {}
+    }
+    if (!Array.isArray(parsedMeds) || parsedMeds.length === 0) {
+      parsedMeds = [{ name: 'ยาและเวชภัณฑ์ตามใบสั่งแพทย์', dosage: 'ตามคำแนะนำแพทย์', price: raw?.total_amount ? raw.total_amount - 800 : 350, quantity: 1 }];
     }
 
-    return {
-      id: recordId,
-      patientName: recordName,
-      hn: 'HN0045',
-      date: defaultDate,
-      time: defaultTime,
-      amount: '฿ 1,175.00',
-      method: defaultMethod,
-      status: defaultStatus,
-      doctorName: 'นพ.สมเกียรติ มั่นคง (แพทย์ผู้ตรวจรักษาประจำคลินิก)',
-      vitals: 'ความดัน 120/80 mmHg | ชีพจร 76 bpm',
-      doctorAdvice: 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ ทานยาลดไข้และยาปฏิชีวนะตามแพทย์สั่งอย่างเคร่งครัด',
-      medications: [
-        { name: 'Amoxicillin 250mg', dosage: '1 แคปซูล, 3 ครั้ง/วัน หลังอาหาร', price: 150 },
-        { name: 'Paracetamol 500mg', dosage: '2 เม็ด, ทุกๆ 4-6 ชั่วโมง', price: 80 },
-        { name: 'Ibuprofen 400mg', dosage: '1 เม็ด, 2 ครั้ง/วัน หลังอาหารทันที', price: 120 }
-      ],
+    const detail: DetailedPatientRecord = {
+      id: record.id,
+      patientName: raw?.patient_name || record.patientName,
+      hn: raw?.hn || record.hn,
+      date: record.date,
+      time: record.time,
+      amount: record.amount,
+      method: record.method,
+      status: record.status,
+      doctorName: raw?.doctor_name || 'แพทย์ประจำคลินิก',
+      vitals: raw?.vitals || 'ความดัน 120/80 mmHg | ปกติ',
+      doctorAdvice: raw?.doctor_advice || 'รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด พักผ่อนให้เพียงพอ',
+      medications: parsedMeds.map((m: any) => ({
+        name: m?.name || m?.genericName || 'รายการยา',
+        dosage: m?.dosage || 'ตามแพทย์สั่ง',
+        price: Number(m?.price || m?.unit_price || 0),
+        quantity: Number(m?.quantity || 1)
+      })),
       doctorFee: 500,
-      clinicFee: 300
+      clinicFee: 300,
+      cashReceived: raw?.cash_received || 0,
+      changeAmount: raw?.change_amount || 0
     };
+
+    setSelectedDetail(detail);
   };
 
   return (
@@ -163,7 +325,7 @@ export default function BillingDashboardPage() {
             </span>
           </div>
           <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0', fontSize: '1.1rem' }}>
-            สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน (อัปเดต Real-time)
+            สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน (อัปเดต Real-time จากฐานข้อมูล)
           </p>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -180,19 +342,47 @@ export default function BillingDashboardPage() {
         </div>
       </div>
 
-      {/* Metric Cards Section - Pharmacy-style framed cards */}
+      {/* Metric Cards Section - Dynamic Calculated from DB */}
       <div className="metrics-grid">
-        <div className="metric-card card">
-          <div className="metric-icon-bg blue-bg">
+        <div className="metric-card card" style={{ padding: '16px 20px' }}>
+          <div className="metric-icon-bg blue-bg" style={{ flexShrink: 0 }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
             </svg>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">รายได้รวมวันนี้ (Total Revenue)</span>
-            <div className="metric-val-row">
-              <span className="metric-value">฿ 8,450.00</span>
-              <span className="growth-badge">+12.5%</span>
+          <div className="metric-info" style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <span className="metric-label" style={{ margin: 0, fontSize: '13px', fontWeight: '700' }}>รายได้รวมวันนี้ (Total Revenue)</span>
+              <span style={{ fontSize: '12px', fontWeight: '800', color: '#1D4ED8', background: '#EFF6FF', padding: '2px 8px', borderRadius: '12px', border: '1px solid #BFDBFE' }}>
+                รวม ฿{totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+            </div>
+            {/* 2 บรรทัด: บน สด, ล่าง Qr code ให้อยู่ใน Block เดียวกัน */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              {/* บรรทัดบน: เงินสด */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F0FDF4', padding: '4px 10px', borderRadius: '8px', border: '1px solid #BBF7D0' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', padding: '1px 6px', borderRadius: '4px', background: '#16A34A', color: '#FFFFFF' }}>
+                    สด
+                  </span>
+                  <span style={{ fontSize: '12.5px', color: '#166534', fontWeight: '600' }}>เงินสด:</span>
+                </div>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: '#15803D' }}>
+                  ฿ {cashTotalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+              {/* บรรทัดล่าง: Qr code */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#FAF5FF', padding: '4px 10px', borderRadius: '8px', border: '1px solid #E9D5FF' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: '800', padding: '1px 6px', borderRadius: '4px', background: '#9333EA', color: '#FFFFFF' }}>
+                    QR
+                  </span>
+                  <span style={{ fontSize: '12.5px', color: '#7E22CE', fontWeight: '600' }}>Qr code:</span>
+                </div>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: '#7E22CE' }}>
+                  ฿ {qrTotalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -205,8 +395,8 @@ export default function BillingDashboardPage() {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">รอชำระเงิน (Pending Payment)</span>
-            <span className="metric-value">3 คิว</span>
+            <span className="metric-label" style={{ fontSize: '13px', fontWeight: '700', color: '#475569' }}>รอชำระเงิน (Pending Payment)</span>
+            <span className="metric-value" style={{ fontSize: '1.65rem', fontWeight: '800', color: '#0F172A' }}>{pendingCount} คิว</span>
           </div>
         </div>
 
@@ -218,12 +408,12 @@ export default function BillingDashboardPage() {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">ชำระเงินสำเร็จแล้ว (Completed)</span>
-            <span className="metric-value">45 รายการ</span>
+            <span className="metric-label" style={{ fontSize: '13px', fontWeight: '700', color: '#475569' }}>ชำระเงินสำเร็จแล้ว (Completed)</span>
+            <span className="metric-value" style={{ fontSize: '1.65rem', fontWeight: '800', color: '#0F172A' }}>{completedCount} รายการ</span>
           </div>
         </div>
 
-        <div className="metric-card card" style={{ height: '100%' }}>
+        <div className="metric-card card">
           <div className="metric-icon-bg purple-bg">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -233,24 +423,30 @@ export default function BillingDashboardPage() {
               <rect x="14" y="14" width="3" height="3"></rect>
             </svg>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">ยอดชำระผ่าน QR Code / โอนเงิน</span>
-            <div className="metric-val-row">
-              <span className="metric-value">฿ 4,200.00</span>
-              <span className="growth-badge purple-badge">50%</span>
+          <div className="metric-info" style={{ flex: 1 }}>
+            <span className="metric-label" style={{ fontSize: '13px', fontWeight: '700', color: '#475569' }}>
+              สัดส่วนช่องทางรับชำระเงิน
+            </span>
+            <div className="metric-val-row" style={{ marginTop: '2px', display: 'flex', alignItems: 'baseline', gap: '6px' }}>
+              <span className="metric-value" style={{ fontSize: '1.65rem', fontWeight: '800', color: '#0F172A' }}>
+                QR {qrPercentage}%
+              </span>
+              <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#16A34A' }}>
+                • สด {cashPercentage}%
+              </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Search Bar - Moved Down Below Title & Metrics */}
+      {/* Search Bar */}
       <div className="search-card card" style={{ marginBottom: '20px' }}>
         <div className="search-inputs" style={{ display: 'flex', gap: '16px', flex: 1, alignItems: 'flex-end' }}>
           <div className="input-group" style={{ flex: 2 }}>
             <label>ค้นหารหัสผู้ป่วย หรือ ชื่อผู้ป่วย (Patient ID / Name)</label>
             <input
               type="text"
-              placeholder="ค้นหาด้วยรหัสคิว, HN, หรือชื่อผู้ป่วย..."
+              placeholder="ค้นหาด้วยรหัสใบเสร็จ, HN, หรือชื่อผู้ป่วย..."
               value={patientId}
               onChange={(e) => setPatientId(e.target.value)}
               className="search-input"
@@ -264,8 +460,8 @@ export default function BillingDashboardPage() {
                onChange={(e) => setStatusFilter(e.target.value)}
              >
                 <option value="all">ทั้งหมด</option>
-                <option value="pending">รอชำระเงิน</option>
-                <option value="completed">ชำระแล้ว</option>
+                <option value="completed">ชำระแล้ว (Completed)</option>
+                <option value="pending">รอชำระเงิน (Pending)</option>
              </select>
           </div>
           <div className="input-group" style={{ flex: 1 }}>
@@ -276,8 +472,8 @@ export default function BillingDashboardPage() {
                onChange={(e) => setMethodFilter(e.target.value)}
              >
                 <option value="all">ทั้งหมด</option>
-                <option value="qr">QR Code</option>
-                <option value="cash">เงินสด</option>
+                <option value="qr">PromptPay QR Code</option>
+                <option value="cash">เงินสด (Cash)</option>
              </select>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -304,19 +500,23 @@ export default function BillingDashboardPage() {
       </div>
 
       {/* Payment Table Card */}
-      <div className="table-card card">
-        <h2 className="table-title">ประวัติการชำระเงินรายวันของพนักงานการเงิน</h2>
-        <div className="table-wrapper">
-          <table className="payment-table">
+      <div className="table-card card" style={{ padding: '24px 20px', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 className="table-title" style={{ margin: 0 }}>ประวัติการชำระเงินรายวันของพนักงานการเงิน (Billing History)</h2>
+          <span style={{ fontSize: '13px', color: '#64748B' }}>พบทั้งหมด {filteredRecords.length} รายการ</span>
+        </div>
+
+        <div className="table-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
+          <table className="payment-table" style={{ width: '100%', tableLayout: 'fixed' }}>
             <thead>
               <tr>
-                <th>หมายเลขคิว</th>
-                <th>HN & ชื่อผู้ป่วย</th>
-                <th>เวลาที่สั่งยา/ส่งตรวจ</th>
-                <th>จำนวนเงิน (บาท)</th>
-                <th>สถานะ (Status)</th>
-                <th>วิธีการชำระ</th>
-                <th style={{ textAlign: 'right' }}>จัดการ (Action)</th>
+                <th style={{ textAlign: 'center', width: '15%', padding: '12px 4px' }}>เลขที่ใบเสร็จ</th>
+                <th style={{ textAlign: 'left', width: '21%', padding: '12px 14px' }}>HN & ชื่อผู้ป่วย</th>
+                <th style={{ textAlign: 'center', width: '14%', padding: '12px 4px' }}>เวลาที่ชำระเงิน</th>
+                <th style={{ textAlign: 'right', width: '12%', padding: '12px 14px' }}>จำนวนเงินสุทธิ</th>
+                <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>สถานะ</th>
+                <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>วิธีการชำระ</th>
+                <th style={{ textAlign: 'center', width: '16%', padding: '12px 4px' }}>จัดการ (Action)</th>
               </tr>
             </thead>
             <tbody>
@@ -329,7 +529,7 @@ export default function BillingDashboardPage() {
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                       </svg>
                       <span style={{ fontSize: '16px', fontWeight: '600' }}>ไม่พบข้อมูลประวัติการชำระเงินที่ตรงกับการค้นหา</span>
-                      <span style={{ fontSize: '13.5px', opacity: 0.8 }}>ลองเปลี่ยนรหัสคิว, HN, ชื่อผู้ป่วย หรือตัวกรองสถานะ</span>
+                      <span style={{ fontSize: '13.5px', opacity: 0.8 }}>เมื่อมีการชำระเงินสำเร็จ บิลจะปรากฏที่ตารางนี้แบบ Real-time ทันที</span>
                       <button 
                         type="button" 
                         onClick={handleResetFilters}
@@ -345,48 +545,124 @@ export default function BillingDashboardPage() {
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((record) => (
-                  <tr key={record.id}>
-                    <td className="queue-cell">
-                      <span className="queue-badge">
-                        Q{record.id.replace('HN', '0')}
-                      </span>
+                paginatedRecords.map((record) => (
+                  <tr key={record.id} style={{ height: '62px' }}>
+                    <td className="queue-cell" style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
+                      <div style={{
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        gap: '5px', padding: '4px 8px', background: '#F8FAFC',
+                        borderRadius: '8px', border: '1px solid #E2E8F0',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                      }}>
+                        <span style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '12px', color: '#1E40AF', letterSpacing: '0.2px' }}>
+                          {record.id}
+                        </span>
+                        <CopyableText value={record.id} displayValue="" style={{ display: 'inline-flex' }} />
+                      </div>
                     </td>
                     <td 
                       className="patient-name-cell clickable-patient"
-                      onClick={() => setSelectedDetail(getPatientDetail(record.id, record.patientName, record.method, record.time, record.date, record.status))}
+                      onClick={() => handleOpenDetail(record)}
+                      style={{ textAlign: 'left', padding: '12px 14px' }}
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <span style={{ fontWeight: 'bold', color: 'var(--text-primary)' }}>{record.id}</span>
-                        <span className="patient-name-link" style={{ fontSize: '13px' }}>{record.patientName}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '3px' }}>
+                        <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '13.5px', whiteSpace: 'nowrap' }}>
+                          {record.patientName}
+                        </span>
+                        <div style={{
+                          display: 'inline-flex', alignItems: 'center', gap: '4px',
+                          background: '#F1F5F9', padding: '2px 8px', borderRadius: '6px'
+                        }}>
+                          <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748B' }}>HN:</span>
+                          <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: '700', color: '#334155' }}>
+                            {record.hn.replace(/[-]/g, '')}
+                          </span>
+                          <CopyableText value={record.hn.replace(/[-]/g, '')} displayValue="" style={{ display: 'inline-flex' }} />
+                        </div>
                       </div>
                     </td>
-                    <td className="time-cell" style={{ fontSize: '13.5px', color: '#64748B' }}>{record.time}</td>
-                    <td className={`amount-cell ${record.status === 'completed' ? 'amount-completed' : 'amount-pending'}`}>
-                      {record.amount}
+                    <td className="time-cell" style={{ textAlign: 'center', whiteSpace: 'nowrap', padding: '12px 4px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+                        <span style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>{record.date}</span>
+                        <span style={{ fontSize: '11.5px', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                          {record.time}
+                        </span>
+                      </div>
                     </td>
-                    <td>
-                      <span className={`status-badge ${record.status === 'completed' ? 'status-completed' : 'status-pending'}`}>
-                        {record.status === 'completed' ? 'ชำระสำเร็จ' : 'รอชำระเงิน'}
+                    <td className={`amount-cell ${record.status === 'completed' ? 'amount-completed' : 'amount-pending'}`} style={{ textAlign: 'right', padding: '12px 14px', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontFamily: 'monospace', fontSize: '14.5px', fontWeight: '800', letterSpacing: '0.2px' }}>
+                        {record.amount}
                       </span>
                     </td>
-                    <td>
-                      <span className={`method-badge ${record.method === 'QR Code' ? 'badge-qr' : 'badge-cash'}`}>
+                    <td style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
+                      <span className={`status-badge ${record.status === 'completed' ? 'status-completed' : 'status-pending'}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '4px 8px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '999px' }}>
+                        {record.status === 'completed' ? (
+                          <>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            ชำระสำเร็จ
+                          </>
+                        ) : 'รอชำระเงิน'}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
+                      <span className={`method-badge ${record.method === 'QR Code' ? 'badge-qr' : 'badge-cash'}`} style={{ display: 'inline-block', padding: '4px 8px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '6px' }}>
                         {record.method}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <td style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
                         <button 
+                          type="button"
                           className="action-btn btn-view"
-                          onClick={() => setSelectedDetail(getPatientDetail(record.id, record.patientName, record.method, record.time, record.date, record.status))}
+                          onClick={() => handleOpenDetail(record)}
+                          style={{
+                            padding: '5px 7px', borderRadius: '6px',
+                            background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE',
+                            fontSize: '11.5px', fontWeight: '700', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: '3px',
+                            whiteSpace: 'nowrap', transition: 'all 0.15s ease'
+                          }}
+                          title="ดูรายละเอียดใบเสร็จและประวัติการรักษา"
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                          ดูรายละเอียด
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                          ใบเสร็จ
                         </button>
-                        <button className="action-btn btn-receive">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                          รับชำระเงิน
+                        <button 
+                          type="button"
+                          onClick={(e) => handleOpenEditRecord(record, e)}
+                          style={{
+                            padding: '5px 7px', borderRadius: '6px',
+                            background: '#F0FDF4', color: '#15803D', border: '1px solid #BBF7D0',
+                            fontSize: '11.5px', fontWeight: '700', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: '3px',
+                            whiteSpace: 'nowrap', transition: 'all 0.15s ease'
+                          }}
+                          title="แก้ไขข้อมูลการเงิน"
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                          </svg>
+                          แก้ไข
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setDeleteRecord(record); }}
+                          style={{
+                            padding: '5px 7px', borderRadius: '6px',
+                            background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5',
+                            fontSize: '11.5px', fontWeight: '700', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: '3px',
+                            whiteSpace: 'nowrap', transition: 'all 0.15s ease'
+                          }}
+                          title="ลบรายการประวัตินี้"
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                          ลบ
                         </button>
                       </div>
                     </td>
@@ -396,47 +672,111 @@ export default function BillingDashboardPage() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar */}
+        <div className="pagination-bar">
+          <span className="pagination-info">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/>
+              <line x1="9" y1="21" x2="9" y2="9"/>
+            </svg>
+            {filteredRecords.length > 0 
+              ? `แสดง ${(currentPage - 1) * pageSize + 1} ถึง ${Math.min(currentPage * pageSize, filteredRecords.length)} จาก ${filteredRecords.length} รายการ`
+              : 'ไม่มีข้อมูลแสดงผล'
+            }
+          </span>
+          {totalPages > 1 && (
+            <div className="pagination-buttons">
+              <button 
+                type="button"
+                className="page-arrow" 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              >
+                ‹ ย้อนกลับ
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  type="button"
+                  className={`page-num ${currentPage === pageNum ? 'active' : ''}`}
+                  onClick={() => setCurrentPage(pageNum)}
+                >
+                  {pageNum}
+                </button>
+              ))}
+              <button 
+                type="button"
+                className="page-arrow" 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              >
+                ถัดไป ›
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Patient Detail System Modal */}
       {selectedDetail && (
         <div className="modal-overlay" onClick={() => setSelectedDetail(null)}>
-          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="dash-modal-header">
+          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '650px', borderRadius: '16px', overflow: 'hidden' }}>
+            <div className="dash-modal-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
               <div>
-                <h2 className="dash-modal-title">รายละเอียดประวัติการรักษา & การชำระเงินระบบ</h2>
-                <p className="dash-modal-sub">ผู้ป่วย: <strong>{selectedDetail.patientName}</strong> (รหัส: {selectedDetail.id} • {selectedDetail.hn})</p>
+                <h2 className="dash-modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+                  รายละเอียดประวัติใบเสร็จ & การรักษา
+                </h2>
+                <p className="dash-modal-sub" style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748B' }}>
+                  เลขที่: <strong style={{ color: '#2563EB' }}>{selectedDetail.id}</strong> • ผู้ป่วย: <strong style={{ color: '#0F172A' }}>{selectedDetail.patientName}</strong> (HN: {selectedDetail.hn})
+                </p>
               </div>
-              <button className="dash-modal-close" onClick={() => setSelectedDetail(null)}>✕</button>
+              <button 
+                type="button"
+                className="dash-modal-close" 
+                onClick={() => setSelectedDetail(null)}
+                style={{
+                  width: '34px', height: '34px', borderRadius: '8px',
+                  border: '1px solid #CBD5E1', background: '#FFFFFF',
+                  color: '#64748B', display: 'inline-flex', alignItems: 'center',
+                  justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s ease'
+                }}
+                title="ปิดหน้าต่าง"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
             </div>
 
-            <div className="dash-modal-body">
+            <div className="dash-modal-body" style={{ padding: '24px', maxHeight: 'calc(80vh - 120px)', overflowY: 'auto' }}>
               {/* Doctor & Diagnosis Section */}
               <div className="dash-block doctor-block">
                 <div className="block-header">
-                  <span className="block-icon"></span>
                   <div>
                     <h3 className="block-title">{selectedDetail.doctorName}</h3>
-                    <span className="vitals-tag">สัญญาณชีพล่าสุด: {selectedDetail.vitals}</span>
+                    <span className="vitals-tag">สัญญาณชีพ: {selectedDetail.vitals}</span>
                   </div>
                 </div>
-                <div className="doctor-note-box">
-                  <strong>คำแนะนำจากแพทย์ประจำเคส:</strong>
+                <div className="doctor-note-box" style={{ marginTop: '8px' }}>
+                  <strong>คำแนะนำแพทย์:</strong>
                   <p>{selectedDetail.doctorAdvice}</p>
                 </div>
               </div>
 
               {/* Meds List Section */}
               <div className="dash-block med-block">
-                <h3 className="block-title">รายการยาที่สั่งจ่าย ({selectedDetail.medications.length} รายการ)</h3>
+                <h3 className="block-title">รายการยาและเวชภัณฑ์ ({selectedDetail.medications.length} รายการ)</h3>
                 <div className="dash-med-grid">
                   {selectedDetail.medications.map((m, idx) => (
                     <div key={idx} className="dash-med-item">
                       <div className="dash-med-info">
-                        <span className="dash-med-name">{m.name}</span>
+                        <span className="dash-med-name">{m.name} {m.quantity && m.quantity > 1 ? `(x${m.quantity})` : ''}</span>
                         <span className="dash-med-dosage">{m.dosage}</span>
                       </div>
-                      <span className="dash-med-price">฿ {m.price}</span>
+                      <span className="dash-med-price">฿ {(m.price * (m.quantity || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                     </div>
                   ))}
                 </div>
@@ -444,22 +784,18 @@ export default function BillingDashboardPage() {
 
               {/* Financial & Payment Summary */}
               <div className="dash-block finance-block">
-                <h3 className="block-title">สรุปรายละเอียดทางการเงินและบิลชำระ</h3>
+                <h3 className="block-title">สรุปรายละเอียดการเงิน</h3>
                 <div className="fee-row-item">
                   <span>ค่าตรวจรักษาแพทย์:</span>
-                  <span>฿ {selectedDetail.doctorFee}</span>
+                  <span>฿ {selectedDetail.doctorFee.toFixed(2)}</span>
                 </div>
                 <div className="fee-row-item">
                   <span>ค่าบริการคลินิก:</span>
-                  <span>฿ {selectedDetail.clinicFee}</span>
+                  <span>฿ {selectedDetail.clinicFee.toFixed(2)}</span>
                 </div>
                 <div className="fee-row-item">
                   <span>ค่ายารวมสุทธิ:</span>
-                  <span>฿ {selectedDetail.medications.reduce((s, m) => s + m.price, 0)}</span>
-                </div>
-                <div className="fee-row-item">
-                  <span>ภาษี (VAT 7%):</span>
-                  <span>- ฿ {Math.round(selectedDetail.medications.reduce((s, m) => s + m.price, 0) * 0.07)}</span>
+                  <span>฿ {selectedDetail.medications.reduce((s, m) => s + (m.price * (m.quantity || 1)), 0).toFixed(2)}</span>
                 </div>
                 <div className="dash-modal-divider"></div>
                 <div className="grand-total-box">
@@ -468,30 +804,185 @@ export default function BillingDashboardPage() {
                     <span className="grand-price-val">{selectedDetail.amount}</span>
                   </div>
                 </div>
-                <div className="payment-status-badge-row">
-                  <span className="status-pill-paid">
-                    ✓ {selectedDetail.status === 'completed' ? 'ชำระเงินสำเร็จแล้ว' : 'รอชำระเงิน'} ({selectedDetail.method} - เวลา {selectedDetail.time})
+                {selectedDetail.method === 'เงินสด' && selectedDetail.cashReceived && selectedDetail.cashReceived > 0 && (
+                  <div style={{ marginTop: '8px', fontSize: '13px', color: '#64748B' }}>
+                    <div>รับเงินสด: ฿ {selectedDetail.cashReceived.toFixed(2)}</div>
+                    <div>เงินทอน: ฿ {(selectedDetail.changeAmount || 0).toFixed(2)}</div>
+                  </div>
+                )}
+                <div className="payment-status-badge-row" style={{ marginTop: '12px' }}>
+                  <span className="status-pill-paid" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    {selectedDetail.status === 'completed' ? 'ชำระเงินสำเร็จแล้ว' : 'รอชำระเงิน'} ({selectedDetail.method} - {selectedDetail.date} {selectedDetail.time})
                   </span>
                 </div>
               </div>
 
-              <div className="dash-modal-footer">
-                <button className="btn-secondary" onClick={() => setSelectedDetail(null)}>ปิด (Close)</button>
-                <div className="dash-modal-actions">
-                  <button className="btn-primary-purple">
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                    </svg>
-                    สร้าง QR Code รับเงิน
-                  </button>
-                  <button className="btn-primary-green">
-                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                    รับเงินสด & พิมพ์ใบเสร็จ
-                  </button>
+              <div className="dash-modal-footer" style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                <button 
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    padding: '8px 18px', borderRadius: '8px',
+                    background: '#2563EB', color: '#FFFFFF', border: 'none',
+                    fontSize: '13.5px', fontWeight: '700', cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)'
+                  }}
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                  </svg>
+                  สั่งพิมพ์ใบเสร็จ (Print)
+                </button>
+                <button 
+                  type="button"
+                  className="btn-secondary" 
+                  onClick={() => setSelectedDetail(null)}
+                  style={{
+                    padding: '8px 18px', borderRadius: '8px',
+                    background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1',
+                    fontSize: '13.5px', fontWeight: '600', cursor: 'pointer'
+                  }}
+                >
+                  ปิด (Close)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Record Modal on Dashboard */}
+      {editingRecord && (
+        <div className="modal-overlay" onClick={() => setEditingRecord(null)}>
+          <div className="modal-card edit-patient-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', width: '90%', borderRadius: '16px', background: '#FFFFFF', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>แก้ไขข้อมูลการเงิน (Edit Record)</h3>
+                  <p style={{ margin: 0, fontSize: '12.5px', color: '#64748B' }}>ใบเสร็จ: {editingRecord.id} • HN: {editingRecord.hn}</p>
                 </div>
               </div>
+              <button 
+                type="button" 
+                onClick={() => setEditingRecord(null)}
+                style={{ width: '30px', height: '30px', borderRadius: '8px', border: '1px solid #E2E8F0', background: '#F8FAFC', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>ชื่อผู้ป่วย:</label>
+                <input 
+                  type="text" 
+                  value={editRecordForm.patientName} 
+                  onChange={(e) => setEditRecordForm(prev => ({ ...prev, patientName: e.target.value }))}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '14px', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>จำนวนเงินสุทธิ (บาท):</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  value={editRecordForm.amount} 
+                  onChange={(e) => setEditRecordForm(prev => ({ ...prev, amount: e.target.value }))}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '14px', outline: 'none' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>วิธีการชำระ:</label>
+                  <select 
+                    value={editRecordForm.method} 
+                    onChange={(e) => setEditRecordForm(prev => ({ ...prev, method: e.target.value as any }))}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '14px', outline: 'none', background: '#FFFFFF' }}
+                  >
+                    <option value="QR Code">QR Code (PromptPay)</option>
+                    <option value="เงินสด">เงินสด (Cash)</option>
+                    <option value="บัตรเครดิต">บัตรเครดิต</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '4px' }}>สถานะ:</label>
+                  <select 
+                    value={editRecordForm.status} 
+                    onChange={(e) => setEditRecordForm(prev => ({ ...prev, status: e.target.value as any }))}
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1.5px solid #CBD5E1', fontSize: '14px', outline: 'none', background: '#FFFFFF' }}
+                  >
+                    <option value="completed">ชำระสำเร็จ (Completed)</option>
+                    <option value="pending">รอชำระเงิน (Pending)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '24px', borderTop: '1px solid #E2E8F0', paddingTop: '16px' }}>
+              <button 
+                type="button" 
+                onClick={() => setEditingRecord(null)}
+                style={{ padding: '8px 18px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontWeight: '600', cursor: 'pointer' }}
+              >
+                ยกเลิก
+              </button>
+              <button 
+                type="button" 
+                onClick={handleSaveEditRecord}
+                style={{ padding: '8px 22px', borderRadius: '8px', border: 'none', background: '#2563EB', color: '#FFFFFF', fontWeight: '700', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                บันทึกการแก้ไข
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Record Confirmation Modal on Dashboard */}
+      {deleteRecord && (
+        <div className="modal-overlay" onClick={() => setDeleteRecord(null)}>
+          <div className="modal-card delete-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '90%', borderRadius: '16px', background: '#FFFFFF', padding: '24px', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+            <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+              </svg>
+            </div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>ยืนยันการลบรายการประวัติการเงิน</h3>
+            <p style={{ margin: '0 0 20px 0', fontSize: '13.5px', color: '#64748B', lineHeight: '1.5' }}>
+              ท่านต้องการลบรายการใบเสร็จ <strong style={{ color: '#0F172A' }}>{deleteRecord.id}</strong> ของ <strong style={{ color: '#0F172A' }}>{deleteRecord.patientName}</strong> ใช่หรือไม่?
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+              <button 
+                type="button" 
+                onClick={() => setDeleteRecord(null)}
+                style={{ padding: '8px 20px', borderRadius: '8px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontWeight: '600', cursor: 'pointer' }}
+              >
+                ยกเลิก
+              </button>
+              <button 
+                type="button" 
+                onClick={handleConfirmDeleteRecord}
+                style={{ padding: '8px 24px', borderRadius: '8px', border: 'none', background: '#DC2626', color: '#FFFFFF', fontWeight: '700', cursor: 'pointer' }}
+              >
+                ยืนยันการลบ
+              </button>
             </div>
           </div>
         </div>

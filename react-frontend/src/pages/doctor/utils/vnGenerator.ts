@@ -46,3 +46,26 @@ export function generateVN(dateStr?: string, timeStr?: string, queueIndex: numbe
   const seq = queueIndex < 1 ? 1 : queueIndex;
   return `${shortYear}${month}${day}${hhmm}${seq}`;
 }
+
+/**
+ * ข้อความที่ใช้แทนเลข VN เมื่อผู้ป่วยยังไม่ถูกเรียกเข้าตรวจ
+ *
+ * เลข VN ออกจริงที่ฝั่ง backend ตอนแพทย์กด "ตรวจผู้ป่วย" (หรือบันทึกฉบับร่าง
+ * ครั้งแรก) ก่อนหน้านั้นในฐานข้อมูลยังไม่มีเลขนี้
+ */
+export const VN_NOT_ISSUED = '—';
+
+/**
+ * เลข VN ที่เอาไปแสดงบนหน้าจอ
+ *
+ * เดิมหลายจุดเขียนว่า `patient.vn || generateVN(...)` ซึ่งทำให้หน้าจอ "สร้าง"
+ * เลข VN ปลอมขึ้นมาเองเมื่อฐานข้อมูลยังไม่มี ผลคือ
+ *   1. เลขที่เห็นไม่ตรงกับที่บันทึกไว้จริง (เป็นเลขเวชระเบียน ห้ามมั่ว)
+ *   2. ค้นหาด้วยเลขนั้นไม่เจอ เพราะตัวค้นหาเทียบกับ patient.vn ที่ยังว่างอยู่
+ *
+ * จึงเปลี่ยนมาแสดงขีดแทน ให้รู้ชัดว่ายังไม่ออกเลข
+ */
+export function displayVN(vn?: string): string {
+  const value = (vn || '').trim();
+  return value !== '' ? value : VN_NOT_ISSUED;
+}

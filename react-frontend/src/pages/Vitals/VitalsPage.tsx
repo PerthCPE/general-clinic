@@ -14,16 +14,55 @@ import { VitalsFormCard } from './components/VitalsFormCard';
 import { queueApi, vitalsApi, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
-import toast from 'react-hot-toast';
 import './VitalsPage.css';
 
 export { formatHN, formatQueueNo };
 
+const VITALS_DRAFT_KEY = 'clinic_vitals_draft_v1';
+
+interface VitalsDraftPayload {
+  selectedPatientId: string;
+  patientQueueNo?: string;
+  searchQuery: string;
+  weight: string;
+  height: string;
+  temperature: string;
+  systolicBP: string;
+  diastolicBP: string;
+  heartRate: string;
+  respiratoryRate: string;
+  spo2: string;
+  painScore: string;
+  bloodSugar: string;
+  chiefComplaint: string;
+  allergies: string;
+  foodAllergies: string;
+  medicalHistory: string;
+  currentMedications: string;
+  smokingHistory: string;
+  alcoholHistory: string;
+  selectedTriage: TriageLevelKey;
+  assignedDoctorId: number;
+  savedAt: string;
+}
+
+const getInitialDraft = (): VitalsDraftPayload | null => {
+  try {
+    const saved = localStorage.getItem(VITALS_DRAFT_KEY);
+    if (saved) {
+      return JSON.parse(saved);
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+};
+
 // Initial Fallback Doctors
 const DEFAULT_DOCTORS: DoctorOption[] = [
-  { doctorId: 4, fullName: 'พญ.สุดา สุขสมบูรณ์', specialty: 'เวชปฏิบัติทั่วไป', roomName: 'ห้องตรวจ 1' },
-  { doctorId: 5, fullName: 'นพ.วิชัย ชาญการแพทย์', specialty: 'อายุรกรรมทั่วไป', roomName: 'ห้องตรวจ 2' },
-  { doctorId: 6, fullName: 'พญ.เกศรา รักษาดี', specialty: 'กุมารเวชศาสตร์', roomName: 'ห้องตรวจ 3' },
+  { doctorId: 4, fullName: 'พญ.สุดา สุขสมบูรณ์', specialty: 'เวชปฏิบัติทั่วไป', roomName: 'ห้องตรวจ 1 (พญ.สุดา)' },
+  { doctorId: 5, fullName: 'นพ.วิชัย ชาญการแพทย์', specialty: 'อายุรกรรมทั่วไป', roomName: 'ห้องตรวจ 2 (นพ.วิชัย)' },
+  { doctorId: 6, fullName: 'พญ.เกศรา รักษาดี', specialty: 'กุมารเวชศาสตร์', roomName: 'ห้องตรวจ 3 (พญ.เกศรา)' },
 ];
 
 const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
@@ -65,10 +104,11 @@ const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
 
 export const VitalsPage: React.FC = () => {
   const { currentUser } = useAuth();
+  const initialDraft = useMemo(() => getInitialDraft(), []);
 
-  // Queue & Patient State
+  // Queue & Patient State (Auto-restored from draft if available)
   const [queueList, setQueueList] = useState<QueuePatientItem[]>([]);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(() => initialDraft?.selectedPatientId || '');
   const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTORS);
 
   // ดึงรายการคิวจาก Backend DB
@@ -91,12 +131,22 @@ export const VitalsPage: React.FC = () => {
     try {
       const data = await vitalsApi.getDoctors();
       if (Array.isArray(data) && data.length > 0) {
-        const mapped: DoctorOption[] = data.map((d, index) => ({
-          doctorId: d.id,
-          fullName: d.fullname,
-          specialty: index === 0 ? 'เวชปฏิบัติทั่วไป' : index === 1 ? 'อายุรกรรมทั่วไป' : 'กุมารเวชศาสตร์',
-          roomName: `ห้องตรวจ ${index + 1}`,
-        }));
+        const mapped: DoctorOption[] = data.map((d, index) => {
+          const shortName = d.fullname.includes('สุดา')
+            ? 'พญ.สุดา'
+            : d.fullname.includes('วิชัย')
+            ? 'นพ.วิชัย'
+            : d.fullname.includes('เกศรา')
+            ? 'พญ.เกศรา'
+            : d.fullname.split(' ')[0] || '';
+          const roomLabel = `ห้องตรวจ ${index + 1}${shortName ? ` (${shortName})` : ''}`;
+          return {
+            doctorId: d.id,
+            fullName: d.fullname,
+            specialty: index === 0 ? 'เวชปฏิบัติทั่วไป' : index === 1 ? 'อายุรกรรมทั่วไป' : 'กุมารเวชศาสตร์',
+            roomName: roomLabel,
+          };
+        });
         setDoctorList(mapped);
       }
     } catch (err) {
@@ -127,28 +177,34 @@ export const VitalsPage: React.FC = () => {
     };
   }, [fetchQueues, fetchDoctors, subscribe]);
 
-  // Form State (empty initially, waiting for input)
-  const [weight, setWeight] = useState<string>('');
-  const [height, setHeight] = useState<string>('');
-  const [temperature, setTemperature] = useState<string>('');
-  const [systolicBP, setSystolicBP] = useState<string>('');
-  const [diastolicBP, setDiastolicBP] = useState<string>('');
-  const [heartRate, setHeartRate] = useState<string>('');
-  const [respiratoryRate, setRespiratoryRate] = useState<string>('');
-  const [spo2, setSpo2] = useState<string>('');
-  const [chiefComplaint, setChiefComplaint] = useState<string>('');
-  const [allergies, setAllergies] = useState<string>('');
-  const [medicalHistory, setMedicalHistory] = useState<string>('');
-  const [selectedTriage, setSelectedTriage] = useState<TriageLevelKey>('ปกติ (Normal)');
-  const [assignedDoctorId, setAssignedDoctorId] = useState<number>(4);
+  // Form State (Auto-restored from in-progress draft)
+  const [weight, setWeight] = useState<string>(() => initialDraft?.weight || '');
+  const [height, setHeight] = useState<string>(() => initialDraft?.height || '');
+  const [temperature, setTemperature] = useState<string>(() => initialDraft?.temperature || '');
+  const [systolicBP, setSystolicBP] = useState<string>(() => initialDraft?.systolicBP || '');
+  const [diastolicBP, setDiastolicBP] = useState<string>(() => initialDraft?.diastolicBP || '');
+  const [heartRate, setHeartRate] = useState<string>(() => initialDraft?.heartRate || '');
+  const [respiratoryRate, setRespiratoryRate] = useState<string>(() => initialDraft?.respiratoryRate || '');
+  const [spo2, setSpo2] = useState<string>(() => initialDraft?.spo2 || '');
+  const [painScore, setPainScore] = useState<string>(() => initialDraft?.painScore || '');
+  const [bloodSugar, setBloodSugar] = useState<string>(() => initialDraft?.bloodSugar || '');
+  const [chiefComplaint, setChiefComplaint] = useState<string>(() => initialDraft?.chiefComplaint || '');
+  const [allergies, setAllergies] = useState<string>(() => initialDraft?.allergies || '');
+  const [foodAllergies, setFoodAllergies] = useState<string>(() => initialDraft?.foodAllergies || '');
+  const [medicalHistory, setMedicalHistory] = useState<string>(() => initialDraft?.medicalHistory || '');
+  const [currentMedications, setCurrentMedications] = useState<string>(() => initialDraft?.currentMedications || '');
+  const [smokingHistory, setSmokingHistory] = useState<string>(() => initialDraft?.smokingHistory || '');
+  const [alcoholHistory, setAlcoholHistory] = useState<string>(() => initialDraft?.alcoholHistory || '');
+  const [selectedTriage, setSelectedTriage] = useState<TriageLevelKey>(() => initialDraft?.selectedTriage || 'ปกติ (Normal)');
+  const [assignedDoctorId, setAssignedDoctorId] = useState<number>(() => initialDraft?.assignedDoctorId || 4);
+  const [draftSavedAt, setDraftSavedAt] = useState<string | null>(() => initialDraft?.savedAt || null);
 
   // Accordion and UI States
   const [isFormOpen, setIsFormOpen] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Searchable Queue Dropdown State (empty search initially)
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  // Searchable Queue Dropdown State
+  const [searchQuery, setSearchQuery] = useState<string>(() => initialDraft?.searchQuery || '');
   const [isQueueDropdownOpen, setIsQueueDropdownOpen] = useState<boolean>(false);
   const queueDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -175,25 +231,157 @@ export const VitalsPage: React.FC = () => {
     setSelectedPatientId(patient.id);
     setSearchQuery(`${patient.queueNo} - ${patient.fullName} (HN: ${patient.hn} | มาถึง ${patient.registeredTime})`);
     setIsQueueDropdownOpen(false);
-    if (patient.allergies) setAllergies(patient.allergies);
-    if (patient.chronicDiseases) setMedicalHistory(patient.chronicDiseases);
+    if (patient.allergies && !allergies) setAllergies(patient.allergies);
+    if (patient.chronicDiseases && !medicalHistory) setMedicalHistory(patient.chronicDiseases);
   };
+
+  // Auto-sync / reconnect draft patient once queueList is loaded from DB
+  useEffect(() => {
+    if (queueList.length > 0) {
+      const waiting = queueList.filter((p) => p.queueStatus === 'รอคัดกรอง');
+      const targetId = selectedPatientId || initialDraft?.selectedPatientId;
+      const targetQNo = initialDraft?.patientQueueNo;
+      let found: QueuePatientItem | undefined;
+
+      if (targetId || targetQNo) {
+        found = waiting.find(
+          (p) =>
+            (targetId && (p.id === targetId || String(p.queueId) === targetId)) ||
+            (targetQNo && p.queueNo.toLowerCase() === targetQNo.toLowerCase())
+        );
+      }
+
+      // ถ้าคนไข้เดิมไม่อยู่ในคิวรอคัดกรองแล้ว แต่มีคิวรอคัดกรองอยู่ ให้เลือกคิวแรกที่รออยู่ทันที!
+      if (!found && waiting.length > 0) {
+        found = waiting[0];
+      }
+
+      if (found) {
+        if (found.id !== selectedPatientId) {
+          setSelectedPatientId(found.id);
+        }
+        const formattedStr = `${found.queueNo} - ${found.fullName} (HN: ${found.hn} | มาถึง ${found.registeredTime})`;
+        setSearchQuery(formattedStr);
+        if (found.allergies && !allergies) setAllergies(found.allergies);
+        if (found.chronicDiseases && !medicalHistory) setMedicalHistory(found.chronicDiseases);
+      } else {
+        setSelectedPatientId('');
+        setSearchQuery('');
+      }
+    }
+  }, [queueList]);
+
+  // Auto-save draft on change with debounce
+  useEffect(() => {
+    const hasData =
+      Boolean(selectedPatientId) ||
+      Boolean(weight) ||
+      Boolean(height) ||
+      Boolean(temperature) ||
+      Boolean(systolicBP) ||
+      Boolean(diastolicBP) ||
+      Boolean(heartRate) ||
+      Boolean(respiratoryRate) ||
+      Boolean(spo2) ||
+      Boolean(painScore) ||
+      Boolean(bloodSugar) ||
+      Boolean(chiefComplaint) ||
+      Boolean(allergies) ||
+      Boolean(foodAllergies) ||
+      Boolean(medicalHistory) ||
+      Boolean(currentMedications) ||
+      Boolean(smokingHistory) ||
+      Boolean(alcoholHistory);
+
+    if (hasData) {
+      const timer = setTimeout(() => {
+        try {
+          const nowStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+          const payload: VitalsDraftPayload = {
+            selectedPatientId,
+            patientQueueNo: selectedPatient?.queueNo,
+            searchQuery,
+            weight,
+            height,
+            temperature,
+            systolicBP,
+            diastolicBP,
+            heartRate,
+            respiratoryRate,
+            spo2,
+            painScore,
+            bloodSugar,
+            chiefComplaint,
+            allergies,
+            foodAllergies,
+            medicalHistory,
+            currentMedications,
+            smokingHistory,
+            alcoholHistory,
+            selectedTriage,
+            assignedDoctorId,
+            savedAt: nowStr,
+          };
+          localStorage.setItem(VITALS_DRAFT_KEY, JSON.stringify(payload));
+          setDraftSavedAt(nowStr);
+        } catch {
+          // ignore
+        }
+      }, 400);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    selectedPatientId,
+    selectedPatient,
+    searchQuery,
+    weight,
+    height,
+    temperature,
+    systolicBP,
+    diastolicBP,
+    heartRate,
+    respiratoryRate,
+    spo2,
+    painScore,
+    bloodSugar,
+    chiefComplaint,
+    allergies,
+    foodAllergies,
+    medicalHistory,
+    currentMedications,
+    smokingHistory,
+    alcoholHistory,
+    selectedTriage,
+    assignedDoctorId,
+  ]);
 
   // Filtered waiting queue options for the searchable dropdown
   const filteredWaitingQueues = useMemo(() => {
     const waiting = queueList.filter((p) => p.queueStatus === 'รอคัดกรอง');
-    if (!searchQuery.trim()) return waiting;
-    const q = searchQuery.toLowerCase().trim();
-    // If the searchQuery is exactly the formatted selected string, show all waiting queues on click
-    if (selectedPatient && searchQuery === `${selectedPatient.queueNo} - ${selectedPatient.fullName} (HN: ${selectedPatient.hn} | มาถึง ${selectedPatient.registeredTime})`) {
+    if (!searchQuery || !searchQuery.trim()) return waiting;
+
+    // ถ้า searchQuery เป็นข้อความยาว หรือเป็นฟอร์แมตคนไข้ (มี ' - ' หรือ 'HN:' หรือ 'มาถึง')
+    // หรือตรงกับ selectedPatient ให้คืนค่ารายการคิวรอคัดกรองทั้งหมดทันที เพื่อให้ผู้ใช้เลือกเปลี่ยนคนไข้ได้เสมอ
+    if (
+      searchQuery.includes(' - ') || 
+      searchQuery.includes('HN:') || 
+      searchQuery.includes('มาถึง') || 
+      searchQuery.length > 25 ||
+      (selectedPatient && searchQuery.includes(selectedPatient.queueNo))
+    ) {
       return waiting;
     }
-    return waiting.filter((p) =>
+
+    const q = searchQuery.toLowerCase().trim();
+    const matches = waiting.filter((p) =>
       p.queueNo.toLowerCase().includes(q) ||
       p.fullName.toLowerCase().includes(q) ||
       p.hn.toLowerCase().includes(q) ||
-      p.nationalId.includes(q)
+      (p.nationalId && p.nationalId.includes(q))
     );
+
+    // ป้องกันการล็อกหน้าจอ: ถ้าค้นหาไม่ตรงกับใครเลย แต่มีคิวรอคัดกรองอยู่ ให้คืนค่าคิวรอคัดกรองทั้งหมด
+    return matches.length > 0 ? matches : waiting;
   }, [queueList, searchQuery, selectedPatient]);
 
   // BMI Calculation (Asian WHO standard)
@@ -309,14 +497,32 @@ export const VitalsPage: React.FC = () => {
       case 'spo2':
         setSpo2(String(val));
         break;
+      case 'painScore':
+        setPainScore(String(val));
+        break;
+      case 'bloodSugar':
+        setBloodSugar(String(val));
+        break;
       case 'chiefComplaint':
         setChiefComplaint(String(val));
         break;
       case 'allergies':
         setAllergies(String(val));
         break;
+      case 'foodAllergies':
+        setFoodAllergies(String(val));
+        break;
       case 'medicalHistory':
         setMedicalHistory(String(val));
+        break;
+      case 'currentMedications':
+        setCurrentMedications(String(val));
+        break;
+      case 'smokingHistory':
+        setSmokingHistory(String(val));
+        break;
+      case 'alcoholHistory':
+        setAlcoholHistory(String(val));
         break;
       case 'assignedDoctorId':
         setAssignedDoctorId(Number(val));
@@ -326,8 +532,58 @@ export const VitalsPage: React.FC = () => {
     }
   };
 
+  // Form Randomizer
+  const handleRandomVitals = () => {
+    // 1. Random realistic measurements
+    const randWeight = (50 + Math.random() * 28).toFixed(1);
+    const randHeight = Math.floor(155 + Math.random() * 25).toString();
+    const randTemp = (36.4 + Math.random() * 0.9).toFixed(1);
+    const randSys = Math.floor(115 + Math.random() * 16).toString();
+    const randDia = Math.floor(72 + Math.random() * 14).toString();
+    const randHR = Math.floor(70 + Math.random() * 18).toString();
+    const randRR = Math.floor(16 + Math.random() * 4).toString();
+    const randSpo2 = Math.floor(97 + Math.random() * 3).toString();
+    const randPain = Math.floor(Math.random() * 3).toString();
+    const randDTX = Math.floor(95 + Math.random() * 25).toString();
+
+    const sampleComplaints = [
+      'มีไข้ ไอ เจ็บคอ มีน้ำมูกใส 2 วัน',
+      'ปวดศีรษะ ปวดเมื่อยตามตัว มีไข้ต่ำๆ 1 วัน',
+      'เวียนศีรษะ บ้านหมุน คลื่นไส้เล็กน้อยช่วงเช้า',
+      'ปวดท้อง แน่นจุกเสียด ท้องอืดหลังรับประทานอาหาร',
+      'ไอแห้ง ระคายคอ ไม่มีไข้ หายใจสะดวก 3 วัน',
+      'ปวดหลัง ปวดบั้นเอวจากการยกของหนัก 2 วัน',
+    ];
+    const randComplaint = sampleComplaints[Math.floor(Math.random() * sampleComplaints.length)];
+
+    setWeight(randWeight);
+    setHeight(randHeight);
+    setTemperature(randTemp);
+    setSystolicBP(randSys);
+    setDiastolicBP(randDia);
+    setHeartRate(randHR);
+    setRespiratoryRate(randRR);
+    setSpo2(randSpo2);
+    setPainScore(randPain);
+    setBloodSugar(randDTX);
+    if (!chiefComplaint || chiefComplaint.trim() === '') {
+      setChiefComplaint(randComplaint);
+    }
+    if (!allergies) setAllergies('ปฏิเสธการแพ้ยา');
+    if (!foodAllergies) setFoodAllergies('ปฏิเสธการแพ้อาหาร');
+    if (!medicalHistory) setMedicalHistory('ปฏิเสธโรคประจำตัว');
+    if (!currentMedications) setCurrentMedications('ไม่มี');
+  };
+
   // Form Reset
   const handleResetForm = () => {
+    try {
+      localStorage.removeItem(VITALS_DRAFT_KEY);
+    } catch {
+      // ignore
+    }
+    setSelectedPatientId('');
+    setSearchQuery('');
     setWeight('');
     setHeight('');
     setTemperature('');
@@ -336,10 +592,17 @@ export const VitalsPage: React.FC = () => {
     setHeartRate('');
     setRespiratoryRate('');
     setSpo2('');
+    setPainScore('');
+    setBloodSugar('');
     setChiefComplaint('');
     setAllergies('');
+    setFoodAllergies('');
     setMedicalHistory('');
+    setCurrentMedications('');
+    setSmokingHistory('');
+    setAlcoholHistory('');
     setSelectedTriage('ปกติ (Normal)');
+    setDraftSavedAt(null);
   };
 
   // Submit Handler
@@ -362,6 +625,8 @@ export const VitalsPage: React.FC = () => {
     const numHR = parseInt(heartRate, 10) || 75;
     const numRR = parseInt(respiratoryRate, 10) || 18;
     const numSpO2 = parseInt(spo2, 10) || 98;
+    const numPain = parseInt(painScore, 10) || 0;
+    const numBS = parseInt(bloodSugar, 10) || 0;
 
     const targetPatientId = selectedPatient.patientId || parseInt(selectedPatient.id, 10) || 1;
     const targetQueueId = selectedPatient.queueId || (typeof selectedPatient.id === 'number' ? selectedPatient.id : parseInt(selectedPatient.id, 10));
@@ -380,14 +645,17 @@ export const VitalsPage: React.FC = () => {
         heart_rate: numHR,
         respiratory_rate: numRR,
         spo2: numSpO2,
+        pain_score: numPain,
+        blood_sugar: numBS,
         allergies: allergies.trim() || selectedPatient.allergies,
+        food_allergies: foodAllergies.trim(),
         medical_history: medicalHistory.trim() || selectedPatient.chronicDiseases,
+        current_medications: currentMedications.trim(),
+        smoking_history: smokingHistory.trim(),
+        alcohol_history: alcoholHistory.trim(),
         assigned_doctor_id: docObj.doctorId,
         triage_level: selectedTriage,
       });
-      if (res && res.message) {
-        toast.success(res.message, { id: 'vitals-success-toast' });
-      }
 
       // 1. ดึงรายการคิวล่าสุดจากฐานข้อมูลทันที
       const freshQueues = await fetchQueues();
@@ -410,9 +678,6 @@ export const VitalsPage: React.FC = () => {
       }
     } catch (err: any) {
       console.warn('Record vitals API error:', err);
-      if (err?.message) {
-        toast.error(`แจ้งเตือน: ${err.message}`, { id: 'vitals-error-toast' });
-      }
 
       // Local fallback กรณีเครือข่ายมีปัญหา (อัปเดตเฉพาะคิวที่เลือกเท่านั้น ไม่อ้างอิงตาม patientId)
       const updatedQueueList = queueList.map((q) =>
@@ -433,33 +698,10 @@ export const VitalsPage: React.FC = () => {
     }
 
     setIsSaving(false);
-    const msg = `บันทึกข้อมูลการคัดกรองของ ${selectedPatient.fullName} (${selectedPatient.queueNo}) สำเร็จ! ส่งต่อไปยัง ${docObj.roomName} (${docObj.fullName}) เรียบร้อยแล้ว`;
-    setToastMessage(msg);
-    toast.success(msg, { id: 'vitals-local-toast' });
-
-    // Auto dismiss toast after 5s
-    setTimeout(() => setToastMessage(null), 5000);
   };
 
   return (
     <div className="vitals-page-container">
-      {/* Toast Alert Notification */}
-      {toastMessage && (
-        <div className="vitals-toast-alert">
-          <div className="toast-icon">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
-          </div>
-          <div className="toast-text">{toastMessage}</div>
-          <button className="toast-close" onClick={() => setToastMessage(null)} aria-label="Close notification">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-      )}
 
       {/* 1. Header Banner */}
       <div className="vitals-page-header">
@@ -529,17 +771,25 @@ export const VitalsPage: React.FC = () => {
             heartRate={heartRate}
             respiratoryRate={respiratoryRate}
             spo2={spo2}
+            painScore={painScore}
+            bloodSugar={bloodSugar}
             chiefComplaint={chiefComplaint}
             allergies={allergies}
+            foodAllergies={foodAllergies}
             medicalHistory={medicalHistory}
+            currentMedications={currentMedications}
+            smokingHistory={smokingHistory}
+            alcoholHistory={alcoholHistory}
             assignedDoctorId={assignedDoctorId}
             doctorOptions={doctorList}
             isAccordionOpen={isFormOpen}
             onToggleAccordion={() => setIsFormOpen(!isFormOpen)}
             onChangeField={handleChangeField}
+            onRandomVitals={handleRandomVitals}
             onSubmit={handleSubmit}
             onReset={handleResetForm}
             isSaving={isSaving}
+            savedDraftTime={draftSavedAt}
           />
         </div>
 

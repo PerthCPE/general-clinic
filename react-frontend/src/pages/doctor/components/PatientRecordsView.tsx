@@ -29,7 +29,8 @@ import { StatusBadge } from './StatusBadge';
 import { CopyableText } from './CopyableText';
 import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
-import { generateVN } from '../utils/vnGenerator';
+import { StatusFilterTabs } from './StatusFilterTabs';
+import { displayVN } from '../utils/vnGenerator';
 
 /**
  * ==============================================================================
@@ -60,7 +61,8 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   // Filter status: 'in_progress' | 'waiting' | 'all'
-  const [statusFilter, setStatusFilter] = useState<'in_progress' | 'waiting' | 'all'>('all');
+  // ค่าเริ่มต้นเป็น "รอตรวจ" ให้ตรงกับหน้าคิว จะได้ไม่ต้องปรับความเข้าใจตอนสลับหน้า
+  const [statusFilter, setStatusFilter] = useState<'in_progress' | 'waiting' | 'completed' | 'all'>('waiting');
   const [selectedPatient, setSelectedPatientState] = useState<Patient | null>(selectedPatientProp || null);
 
   React.useEffect(() => {
@@ -84,19 +86,41 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
 
   const { language, t } = useLanguage();
 
-  const inProgressCount = patients.filter(p => (p.status as string) === 'In Progress' || p.status === 'Examining').length;
-  const waitingCount = patients.filter(p => p.status === 'Waiting').length;
-  const activePatientsCount = inProgressCount + waitingCount;
+  // ผู้ป่วยที่ปิดการตรวจไปแล้ว (รวมที่ส่งต่อห้องยา) — มาจาก /patient-records
+  // จึงเห็นย้อนหลังได้ทุกวัน ไม่ใช่เฉพาะคิวของวันนี้
+  // ผู้ป่วยที่ลงทะเบียนไว้แล้วแต่ยังไม่เคยเข้าตรวจเลย
+  // แฟ้มมีตั้งแต่วันลงทะเบียน แต่ยังไม่มีประวัติการรักษา จึงไม่นับรวมกับคิวที่รออยู่
+  const isNewPatient = (p: Patient) => (p.visitCount ?? 0) === 0;
+
+  const isCompletedPatient = (p: Patient) =>
+    !isNewPatient(p) && (p.status === 'Completed' || p.status === 'Pending Pharmacy');
+
+  const isActivePatient = (p: Patient) =>
+    !isNewPatient(p) &&
+    (p.status === 'Waiting' ||
+      p.status === 'Screened' ||
+      (p.status as string) === 'In Progress' ||
+      p.status === 'Examining');
+
+  const inProgressCount = patients.filter(p => !isNewPatient(p) && ((p.status as string) === 'In Progress' || p.status === 'Examining')).length;
+  const waitingCount = patients.filter(p => !isNewPatient(p) && p.status === 'Waiting').length;
+  const completedCount = patients.filter(isCompletedPatient).length;
+  const newPatientCount = patients.filter(isNewPatient).length;
+  const activePatientsCount = patients.length;
 
   const filteredPatients = patients.filter(p => {
     if (statusFilter === 'in_progress') {
+      if (isNewPatient(p)) return false;
       if ((p.status as string) !== 'In Progress' && p.status !== 'Examining') return false;
     } else if (statusFilter === 'waiting') {
+      if (isNewPatient(p)) return false;
       if (p.status !== 'Waiting') return false;
+    } else if (statusFilter === 'completed') {
+      if (!isCompletedPatient(p)) return false;
     } else if (statusFilter === 'all') {
-      // ทั้งหมด = ทั้งผู้ป่วยที่มีสถานะรอตรวจและกำลังตรวจ
-      const isActive = p.status === 'Waiting' || (p.status as string) === 'In Progress' || p.status === 'Examining';
-      if (!isActive && !search.trim()) return false;
+      // ทั้งหมด = ทุกคนที่โหลดมา ทั้งที่ยังรอตรวจและที่ตรวจจบไปแล้ว
+      // (เดิมกรองเฉพาะคนที่ยัง active ทำให้ผู้ป่วยที่ตรวจเสร็จแล้วหายไป)
+      if (!isActivePatient(p) && !isCompletedPatient(p) && !isNewPatient(p) && !search.trim()) return false;
     }
 
     if (!search.trim()) return true;
@@ -112,7 +136,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
     if (patient.chiefComplaint || patient.diagnosis || patient.primaryDiagnosis) {
       list.push({
         id: `current-${patient.id}`,
-        vn: patient.vn || generateVN(patient.visitDate, patient.visitTime, 1),
+        vn: displayVN(patient.vn),
         visitDate: patient.visitDate || '2026-07-23',
         visitTime: patient.visitTime || '08:45 AM',
         doctorName: language === 'th' ? 'แพทย์ประจำคลินิก (Current Session)' : 'Attending Physician (Current)',
@@ -211,75 +235,45 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                       ? (language === 'th' ? 'ผู้ป่วยกำลังตรวจ' : 'In Progress Patients')
                       : statusFilter === 'waiting'
                       ? (language === 'th' ? 'ผู้ป่วยรอตรวจ' : 'Waiting Patients')
-                      : (language === 'th' ? 'รายชื่อผู้ป่วยทั้งหมด (รอตรวจ/กำลังตรวจ)' : 'All Active Patients (Waiting & In Progress)')
+                      : statusFilter === 'completed'
+                      ? (language === 'th' ? 'ผู้ป่วยที่ตรวจเสร็จแล้ว' : 'Completed Patients')
+                      : (language === 'th' ? 'ผู้ป่วยในระบบทั้งหมด' : 'All Patients in System')
                     }
                   </span>
                   <span className="text-xs font-mono font-bold bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-lg">
                     {filteredPatients.length}
                   </span>
+                  {statusFilter === 'all' && newPatientCount > 0 && (
+                    <span className="text-[11px] font-medium text-slate-500">
+                      {language === 'th'
+                        ? `(ผู้ป่วยใหม่ยังไม่เคยตรวจ ${newPatientCount} คน)`
+                        : `(${newPatientCount} never examined)`}
+                    </span>
+                  )}
                 </h2>
               </div>
 
-              {/* Status Filter Toggle Tabs: กำลังตรวจ, รอตรวจ, ทั้งหมด */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-bold border border-slate-200/80 self-start sm:self-auto">
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('in_progress')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    statusFilter === 'in_progress'
-                      ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>{language === 'th' ? 'กำลังตรวจ' : 'In Progress'}</span>
-                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
-                    statusFilter === 'in_progress' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>
-                    {inProgressCount}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('waiting')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    statusFilter === 'waiting'
-                      ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>{language === 'th' ? 'รอตรวจ' : 'Waiting'}</span>
-                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
-                    statusFilter === 'waiting' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>
-                    {waitingCount}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('all')}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
-                    statusFilter === 'all'
-                      ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  <span>{language === 'th' ? 'ทั้งหมด' : 'All'}</span>
-                  <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${
-                    statusFilter === 'all' ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
-                  }`}>
-                    {activePatientsCount}
-                  </span>
-                </button>
-              </div>
+              {/* แถบกรองสถานะ ใช้คอมโพเนนต์เดียวกับหน้าคิวผู้ป่วย
+                  ลำดับปุ่มและสีจึงตรงกันทั้งสองหน้าโดยอัตโนมัติ */}
+              <StatusFilterTabs
+                value={statusFilter}
+                onChange={(next) =>
+                  setStatusFilter(next as 'all' | 'waiting' | 'in_progress' | 'completed')
+                }
+                options={[
+                  { value: 'all', label: language === 'th' ? 'ทั้งหมด' : 'All', count: activePatientsCount },
+                  { value: 'waiting', label: language === 'th' ? 'รอตรวจ' : 'Waiting', count: waitingCount },
+                  { value: 'in_progress', label: language === 'th' ? 'กำลังตรวจ' : 'In Progress', count: inProgressCount },
+                  { value: 'completed', label: language === 'th' ? 'ตรวจเสร็จแล้ว' : 'Completed', count: completedCount },
+                ]}
+              />
             </div>
 
             {filteredPatients.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredPatients.map((patient) => {
                   const pastCount = (patient.pastVisits?.length || 0) + (patient.chiefComplaint || patient.diagnosis ? 1 : 0);
-                  const vnCode = patient.vn || generateVN(patient.visitDate, patient.visitTime, 1);
+                  const vnCode = displayVN(patient.vn);
 
                   return (
                     <div
@@ -302,7 +296,13 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                               </div>
                             </div>
                           </div>
-                          <StatusBadge status={patient.status} />
+                          {isNewPatient(patient) ? (
+                              <span className="bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+                                {language === 'th' ? 'ผู้ป่วยใหม่' : 'New Patient'}
+                              </span>
+                            ) : (
+                              <StatusBadge status={patient.status} />
+                            )}
                         </div>
 
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs space-y-1 font-mono text-slate-600">
@@ -389,7 +389,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                   <div className="flex items-center gap-2 text-xs text-slate-500 font-mono mt-1.5 flex-wrap">
                     <CopyableText label="HN" value={selectedPatient.hn} />
                     <span>•</span>
-                    <CopyableText label="VN" value={selectedPatient.vn || generateVN(selectedPatient.visitDate, selectedPatient.visitTime, 1)} />
+                    <CopyableText label="VN" value={displayVN(selectedPatient.vn)} />
                     <span>•</span>
                     <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={selectedPatient.nationalId || '1-1002-34567-89-0'} />
                     <span>•</span>
@@ -486,16 +486,18 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
               {/* TAB 1: PAST VISIT HISTORY */}
               {activeTab === 'history' && (
                 <div className="space-y-6">
-                  {/* Sub-search bar inside History */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200">
+                  {/* ช่องค้นหาในประวัติ
+                      เดิมมีกล่องสีเทาครอบอีกชั้นซ้อนอยู่ในการ์ดใหญ่ กลายเป็นกรอบซ้อนกรอบ
+                      เอาออกให้เหลือแค่ตัวช่องค้นหา ส่วนจำนวนรายการย้ายไปอยู่ท้ายช่อง */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <div className="relative flex-1 w-full">
-                      <Search className="w-4 h-4 absolute left-3.5 top-2.5 text-slate-400" />
+                      <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
                         value={historySearch}
                         onChange={(e) => setHistorySearch(e.target.value)}
                         placeholder={language === 'th' ? 'ค้นหาในประวัติรักษา (โรค, วันที่, ชื่อแพทย์, ยา)...' : 'Filter visits by diagnosis, date, doctor, medicine...'}
-                        className="w-full pl-9 pr-4 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden"
+                        className="w-full pl-10 pr-4 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl text-xs font-medium placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                       />
                     </div>
                     <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">
@@ -945,7 +947,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-white p-3 rounded-xl border border-slate-200">
                 <div><strong>ชื่อ-นามสกุล:</strong> {selectedPatient.name}</div>
                 <div><CopyableText label="HN" value={selectedPatient.hn} /></div>
-                <div><CopyableText label="VN" value={selectedPatient.vn || generateVN(selectedPatient.visitDate, selectedPatient.visitTime, 1)} /></div>
+                <div><CopyableText label="VN" value={displayVN(selectedPatient.vn)} /></div>
                 <div><strong>เพศ/อายุ:</strong> {selectedPatient.gender}, {selectedPatient.age} ปี</div>
                 <div><strong>หมู่เลือด:</strong> {selectedPatient.bloodGroup || 'O Positive'}</div>
                 <div><strong>สิทธิ:</strong> {selectedPatient.insuranceType || 'UC'}</div>

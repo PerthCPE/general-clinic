@@ -1,8 +1,9 @@
 import './Topbar.css';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useDoctorData } from '../../pages/doctor/DoctorDataContext';
 import { matchPatientSearch } from '../../pages/doctor/utils/searchUtils';
+import { displayVN } from '../../pages/doctor/utils/vnGenerator';
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -22,7 +23,12 @@ interface NotificationItem {
 
 function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onNavigate }: TopbarProps) {
   const { currentUser, logout } = useAuth();
-  const { patients: doctorPatients, setSelectedRecordPatient } = useDoctorData();
+  const {
+    patients: doctorPatients,
+    recordPatients,
+    refreshRecords,
+    setSelectedRecordPatient,
+  } = useDoctorData();
   const isDoctor = currentUser?.role === 'doctor';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
@@ -30,12 +36,35 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // ค้นหาผู้ป่วยแบบ Live Search (เฉพาะ role หมอที่มีข้อมูลคิวผู้ป่วยให้ค้นหา)
+  // โหลดผู้ป่วยย้อนหลังไว้ให้ช่องค้นหาด้านบนใช้ด้วย ไม่งั้นจะค้นเจอเฉพาะคิววันนี้
+  useEffect(() => {
+    if (isDoctor) {
+      void refreshRecords();
+    }
+  }, [isDoctor, refreshRecords]);
+
+  // ค้นหาผู้ป่วยแบบ Live Search (เฉพาะ role หมอ)
+  //
+  // รวม 2 ชุด: คิวที่ยังเดินอยู่ + ผู้ป่วยที่เคยมาตรวจ (ไม่จำกัดวัน)
+  // ถ้าคนเดียวกันอยู่ทั้งสองชุด ยึดของคิวเพราะสถานะเป็นปัจจุบันกว่า
+  const searchablePatients = useMemo(() => {
+    if (!isDoctor) return [];
+    const merged = [...doctorPatients];
+    const seen = new Set(doctorPatients.map((p) => p.hn));
+    for (const p of recordPatients) {
+      if (!seen.has(p.hn)) {
+        seen.add(p.hn);
+        merged.push(p);
+      }
+    }
+    return merged;
+  }, [isDoctor, doctorPatients, recordPatients]);
+
   const matchingPatients = isDoctor && searchQuery.trim()
-    ? doctorPatients.filter((p) => matchPatientSearch(p, searchQuery))
+    ? searchablePatients.filter((p) => matchPatientSearch(p, searchQuery))
     : [];
 
-  const handleSelectSearchResult = (patient: (typeof doctorPatients)[number]) => {
+  const handleSelectSearchResult = (patient: (typeof searchablePatients)[number]) => {
     setSelectedRecordPatient(patient);
     setSearchQuery('');
     setIsSearchDropdownOpen(false);
@@ -87,8 +116,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     },
     {
       id: '5',
-      category: 'นัดหมายผู้ป่วย',
-      message: 'แจ้งเตือนนัดติดตามอาการ คุณวิภา ติดดี เวลา 14:00 น.',
+      category: 'การคัดกรองสัญญาณชีพ',
+      message: 'แจ้งเตือนบันทึกสัญญาณชีพผู้ป่วยกลุ่ม Triage ฉุกเฉินเรียบร้อย',
       time: '1 ชั่วโมงที่แล้ว',
       isUnread: false,
     },
@@ -375,23 +404,6 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     speakText(sampleMsg, undefined, targetPitch, targetRate);
   };
 
-  // อ่านข้อความการแจ้งเตือนทั้งหมดต่อเนื่อง
-  const handleReadAll = () => {
-    if (!('speechSynthesis' in window)) return;
-
-    if (isSpeakingAll) {
-      stopSpeech();
-      return;
-    }
-
-    const allText = notifications
-      .map((item, idx) => `การแจ้งเตือนที่ ${idx + 1}. ${item.category}. ${item.message}`)
-      .join(' ... ');
-
-    setIsSpeakingAll(true);
-    speakText(`มีแจ้งเตือนทั้งหมด ${notifications.length} รายการ. ` + allText);
-  };
-
   const toggleDropdown = () => {
     setIsDropdownOpen((prev) => !prev);
     setIsNoticeOpen(false);
@@ -499,7 +511,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                     <div className="search-result-info">
                       <span className="search-result-name">{patient.name}</span>
                       <span className="search-result-meta">
-                        HN: {patient.hn} &bull; VN: {patient.vn}
+                        HN: {patient.hn} &bull; VN: {displayVN(patient.vn)}
                       </span>
                     </div>
                   </div>
@@ -516,6 +528,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
 
       {/* Actions Group (Notifications + Profile) */}
       <div className="actions-group">
+
         {/* Notification Icon & Dropdown Panel */}
         <div className="notice-container" ref={noticeRef}>
           <button 
@@ -744,9 +757,40 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 </span>
               </button>
 
-              {/* 3. ออกจากระบบ (Text align center, no emoji) */}
+              {/* 3. ล้างข้อมูลทดสอบในระบบ */}
               <button
-                className="dropdown-menu-item dropdown-item-3 dropdown-logout-btn"
+                className="dropdown-menu-item dropdown-item-reset"
+                onClick={async () => {
+                  setIsDropdownOpen(false);
+                  if (!window.confirm('คุณต้องการล้างข้อมูลทดสอบ (ผู้ป่วย คิว และการคัดกรอง) ทั้งหมดในระบบของคุณใช่หรือไม่?')) {
+                    return;
+                  }
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch('/api/system/reset-db', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                      }
+                    });
+                    if (res.ok) {
+                      window.location.reload();
+                    }
+                  } catch (err) {
+                    console.error('Reset system error:', err);
+                  }
+                }}
+              >
+                <span>ล้างข้อมูลทดสอบในระบบ</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#2563EB' }}>
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>
+                </svg>
+              </button>
+
+              {/* 4. ออกจากระบบ (Text align center, no emoji) */}
+              <button
+                className="dropdown-menu-item dropdown-item-4 dropdown-logout-btn"
                 onClick={() => {
                   logout();
                   setIsDropdownOpen(false);

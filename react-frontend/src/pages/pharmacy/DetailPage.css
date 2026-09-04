@@ -995,3 +995,37 @@ body.dark-mode .detail-page-container input[type="text"] {
   color: #F8FAFC !important;
 }
 
+/* Recent Patients Table Smooth Scrollbar */
+.recent-patients-scroll-container {
+  scrollbar-width: thin;
+  scrollbar-color: #CBD5E1 #F8FAFC;
+}
+
+.recent-patients-scroll-container::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+.recent-patients-scroll-container::-webkit-scrollbar-track {
+  background: #F1F5F9;
+  border-radius: 8px;
+}
+
+.recent-patients-scroll-container::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 8px;
+}
+
+.recent-patients-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+body.dark-mode .recent-patients-scroll-container::-webkit-scrollbar-track {
+  background: #1E293B;
+}
+
+body.dark-mode .recent-patients-scroll-container::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+
