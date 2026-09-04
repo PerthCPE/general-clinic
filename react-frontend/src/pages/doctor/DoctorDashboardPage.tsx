@@ -4,6 +4,7 @@ import { QueueTable } from './components/QueueTable';
 import { ReportsView } from './components/ReportsView';
 import { useLanguage } from './context/LanguageContext';
 import { useDoctorData } from './DoctorDataContext';
+import { DoctorLoadingScreen, DoctorErrorScreen } from './components/DoctorLoadingScreen';
 import type { Patient } from './types';
 
 /**
@@ -22,6 +23,9 @@ const DoctorDashboardPage: React.FC<DoctorDashboardPageProps> = ({ onNavigate })
     statusFilter,
     setStatusFilter,
     handleUpdateStatus,
+    isInitialLoading,
+    error,
+    refresh,
   } = useDoctorData();
 
   const filteredPatients = useMemo(
@@ -49,6 +53,29 @@ const DoctorDashboardPage: React.FC<DoctorDashboardPageProps> = ({ onNavigate })
     setActiveExamPatient(patient);
     onNavigate('doctor-examination');
   };
+
+
+  /**
+   * รอโหลดข้อมูลรอบแรกให้เสร็จก่อนค่อยวาดหน้าจริง
+   *
+   * ถ้าปล่อยให้วาดเลย แพทย์จะเห็นเลข 0 ทั้งสามการ์ดและข้อความ
+   * "ไม่พบข้อมูลผู้ป่วยตามเงื่อนไขที่เลือก" อยู่ประมาณ 1 วินาที
+   * ซึ่งอ่านได้ว่า "วันนี้ไม่มีคิว" ทั้งที่ความจริงคือ "ยังไม่รู้ กำลังถามฐานข้อมูลอยู่"
+   *
+   * ใช้ isInitialLoading ไม่ใช่ isLoading เพราะ isLoading เป็น true
+   * ทุกครั้งที่รีเฟรชเบื้องหลัง (ทุก 4 วินาที และทุก WebSocket event)
+   * ถ้าใช้ตัวนั้นหน้าจะกะพริบเป็นจอโหลดไม่หยุด
+   */
+  if (isInitialLoading) {
+    return <DoctorLoadingScreen />;
+  }
+
+  // ต่อ backend ไม่ได้ ต้องบอกให้ชัดว่าเป็นปัญหาการเชื่อมต่อ ไม่ใช่ "วันนี้ไม่มีคิว"
+  // เช็คว่า patients ว่างด้วย เพราะถ้ายังมีข้อมูลเก่าค้างอยู่บนจอ การรีเฟรชรอบหลัง
+  // ที่พลาดไปรอบเดียวไม่ควรลบทั้งหน้าทิ้งแล้วขึ้น error
+  if (error && patients.length === 0) {
+    return <DoctorErrorScreen message={error} onRetry={() => { void refresh(); }} />;
+  }
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
