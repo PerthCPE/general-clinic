@@ -36,18 +36,146 @@ type GenerateQRRequest struct {
 
 // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ดึงรายการคิวรอชำระเงินความเร็วสูง (Single Query 30 ms)
 func GetBillingQueues(c *gin.Context) {
-	var queues []models.BillingQueue
-	if err := config.DB.Where("status = ?", "pending").Order("id desc, created_at desc").Find(&queues).Error; err != nil {
+	var rawQueues []models.BillingQueue
+	if err := config.DB.Where("status = ?", "pending").Order("id desc, created_at desc").Find(&rawQueues).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billing queues: " + err.Error()})
 		return
 	}
 
-	// 1. หากไม่มีคิวรอชำระเงินใน billing_queues ให้ดึงจาก medicine_queues
-	if len(queues) == 0 {
-		var mqs []models.MedicineQueue
-		config.DB.Where("status IN ('pending', 'dispensed')").Order("id desc").Limit(10).Find(&mqs)
-		for _, mq := range mqs {
+	var queues []models.BillingQueue
+	existingVisits := make(map[uint]bool)
+	existingQueueNos := make(map[string]bool)
+
+	// 1. ตรวจสอบคิวใน billing_queues: หากชำระเงินเสร็จสิ้นแล้ว ให้อัปเดตสถานะเป็น completed ใน DB
+	for _, bq := range rawQueues {
+		isFinished := false
+		if bq.VisitID > 0 {
+			var b models.Billing
+			if err := config.DB.Where("visit_id = ? AND payment_status = ?", bq.VisitID, "paid").First(&b).Error; err == nil {
+				isFinished = true
+			}
+			if !isFinished {
+				var bh models.BillingHistory
+				if err := config.DB.Where("visit_id = ?", bq.VisitID).First(&bh).Error; err == nil {
+					isFinished = true
+				}
+			}
+		}
+		if isFinished {
+			config.DB.Model(&models.BillingQueue{}).Where("id = ?", bq.ID).Update("status", "completed")
+		} else {
+			queues = append(queues, bq)
+			if bq.VisitID > 0 {
+				existingVisits[bq.VisitID] = true
+			}
+			if bq.QueueNumber != "" {
+				existingQueueNos[bq.QueueNumber] = true
+			}
+		}
+	}
+
+	// 2. ดึงคิวจริงของคลินิกที่อยู่ในสถานะ 'รอชำระเงิน' จากตาราง queues (ตรวจเสร็จ/ส่งมาจากห้องตรวจหรือห้องยา)
+	var cQueues []models.Queue
+	if err := config.DB.Preload("Patient").Where("status = ?", "รอชำระเงิน").Order("id desc, created_at desc").Find(&cQueues).Error; err == nil {
+		for _, cq := range cQueues {
+			vID := uint(0)
+			if cq.VisitID != nil && *cq.VisitID > 0 {
+				vID = *cq.VisitID
+			}
+			if (vID > 0 && existingVisits[vID]) || (cq.QueueNumber != "" && existingQueueNos[cq.QueueNumber]) {
+				continue
+			}
+
+			pName := "ผู้ป่วย"
+			hn := "HN0001"
+			natID := "-"
+			gender := "หญิง"
+			scheme := "บัตรทอง (สปสช.)"
+			age := 35
+			if cq.Patient.ID > 0 {
+				pName = cq.Patient.FullName
+				hn = cq.Patient.HN
+				natID = cq.Patient.NationalID
+				gender = cq.Patient.Gender
+				scheme = cq.Patient.SchemeType
+				if cq.Patient.BirthDate.Year() > 1900 {
+					age = time.Now().Year() - cq.Patient.BirthDate.Year()
+				}
+			}
+
+			// ดึงรายการยาและคำแนะนำแพทย์จาก MedicineQueue ถ้ามี
+			doctorAdvice := "ตรวจเสร็จสิ้น รอชำระค่ารักษาพยาบาล"
+			medsJSON := "[]"
+			var mq models.MedicineQueue
+			if vID > 0 {
+				config.DB.Where("visit_id = ?", vID).Order("id desc").First(&mq)
+			}
+			if mq.ID == 0 && hn != "" {
+				config.DB.Where("hn = ?", hn).Order("id desc").First(&mq)
+			}
+			if mq.ID > 0 {
+				if mq.DoctorAdvice != "" {
+					doctorAdvice = mq.DoctorAdvice
+				}
+				if mq.Medications != "" && mq.Medications != "null" {
+					medsJSON = mq.Medications
+				}
+			}
+
 			newBQ := models.BillingQueue{
+				ID:           cq.ID,
+				QueueNumber:  cq.QueueNumber,
+				HN:           hn,
+				PatientName:  pName,
+				NationalID:   natID,
+				Gender:       gender,
+				Age:          age,
+				SchemeType:   scheme,
+				VisitID:      vID,
+				Status:       "pending",
+				DoctorAdvice: doctorAdvice,
+				Medications:  medsJSON,
+				CreatedAt:    cq.CreatedAt,
+			}
+			queues = append(queues, newBQ)
+			if vID > 0 {
+				existingVisits[vID] = true
+			}
+			if cq.QueueNumber != "" {
+				existingQueueNos[cq.QueueNumber] = true
+			}
+		}
+	}
+
+	// 2.1 ดึงคิวจาก models.MedicineQueue (ทั้งที่ห้องยาจ่ายยาแล้ว 'dispensed' และรอจัดยา 'pending') ที่ยังไม่เสร็จสิ้น
+	var medQueues []models.MedicineQueue
+	if err := config.DB.Where("status IN ('dispensed', 'pending')").Order("id desc, created_at desc").Limit(50).Find(&medQueues).Error; err == nil {
+		for _, mq := range medQueues {
+			vID := mq.VisitID
+			if (vID > 0 && existingVisits[vID]) || (mq.QueueNumber != "" && existingQueueNos[mq.QueueNumber]) {
+				continue
+			}
+
+			// ตรวจสอบว่าคิวหรือ Visit ชำระเงินเสร็จสิ้นแล้วหรือยัง
+			isFinished := false
+			if vID > 0 {
+				var b models.Billing
+				if err := config.DB.Where("visit_id = ? AND payment_status = ?", vID, "paid").First(&b).Error; err == nil {
+					isFinished = true
+				}
+				if !isFinished {
+					var bh models.BillingHistory
+					if err := config.DB.Where("visit_id = ?", vID).First(&bh).Error; err == nil {
+						isFinished = true
+					}
+				}
+			}
+			if isFinished {
+				continue
+			}
+
+			newBQ := models.BillingQueue{
+				ID:           mq.ID,
 				QueueNumber:  mq.QueueNumber,
 				HN:           mq.HN,
 				PatientName:  mq.PatientName,
@@ -55,48 +183,19 @@ func GetBillingQueues(c *gin.Context) {
 				Gender:       mq.Gender,
 				Age:          mq.Age,
 				SchemeType:   mq.SchemeType,
-				VisitID:      mq.VisitID,
+				VisitID:      vID,
 				Status:       "pending",
 				DoctorAdvice: mq.DoctorAdvice,
 				Medications:  mq.Medications,
+				CreatedAt:    mq.CreatedAt,
 			}
 			queues = append(queues, newBQ)
-		}
-	}
-
-	// 2. หากยังไม่มี ให้ดึงจากคิวกลางของคลินิกที่อยู่ในสถานะรอชำระเงินหรือรอรับยา
-	if len(queues) == 0 {
-		var cQueues []models.Queue
-		config.DB.Preload("Patient").Where("status IN ('รอชำระเงิน', 'รอรับยา')").Order("id desc").Limit(10).Find(&cQueues)
-		for _, cq := range cQueues {
-			pName := "ผู้ป่วย"
-			hn := "HN0001"
-			natID := "-"
-			gender := "หญิง"
-			scheme := "บัตรทอง (สปสช.)"
-			if cq.Patient.ID > 0 {
-				pName = cq.Patient.FullName
-				hn = cq.Patient.HN
-				natID = cq.Patient.NationalID
-				gender = cq.Patient.Gender
-				scheme = cq.Patient.SchemeType
+			if vID > 0 {
+				existingVisits[vID] = true
 			}
-			vID := uint(1)
-			if cq.VisitID != nil && *cq.VisitID > 0 {
-				vID = *cq.VisitID
+			if mq.QueueNumber != "" {
+				existingQueueNos[mq.QueueNumber] = true
 			}
-			newBQ := models.BillingQueue{
-				QueueNumber: cq.QueueNumber,
-				HN:          hn,
-				PatientName: pName,
-				NationalID:  natID,
-				Gender:      gender,
-				Age:         35,
-				SchemeType:  scheme,
-				VisitID:     vID,
-				Status:      "pending",
-			}
-			queues = append(queues, newBQ)
 		}
 	}
 
@@ -473,6 +572,14 @@ func ConfirmPayment(c *gin.Context) {
 	// ปรับสถานะในตาราง queues ของคลินิกเป็น เสร็จสิ้น (completed)
 	if req.VisitID > 0 {
 		config.DB.Model(&models.Queue{}).Where("visit_id = ?", req.VisitID).Update("status", "เสร็จสิ้น")
+	}
+
+	// ปรับสถานะในตาราง medicine_queues เป็น completed
+	if req.VisitID > 0 {
+		config.DB.Model(&models.MedicineQueue{}).Where("visit_id = ?", req.VisitID).Update("status", "completed")
+	}
+	if req.HN != "" {
+		config.DB.Model(&models.MedicineQueue{}).Where("hn = ?", req.HN).Update("status", "completed")
 	}
 
 	changeAmount := 0.0

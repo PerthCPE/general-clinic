@@ -38,12 +38,10 @@ export default function BillingInvoicePage({
       const cached = localStorage.getItem('billing_active_patient_data');
       if (cached) {
         const p = JSON.parse(cached);
-        if (p && p.id) return [p];
+        if (p && (p.id || p.hn)) return [p];
       }
     } catch {}
-    const stored = getStoredDispensedPatients();
-    if (stored.length > 0) return stored;
-    return CLINIC_CONFIG.patients || [];
+    return [];
   });
   const receiptRef = useRef<HTMLDivElement>(null);
   const printableReceiptRef = useRef<HTMLDivElement>(null);
@@ -161,19 +159,23 @@ export default function BillingInvoicePage({
 
       let mapped: PatientConfig[] = [];
 
+      // 1. นำข้อมูลจาก Pharmacy Queues เป็นแหล่งข้อมูลหลัก (เพื่อให้เลขคิว QE... และคนไข้ตรงกับระบบยาทุกประการ 100%)
       if (pRes && pRes.ok) {
         try {
           const pData = await pRes.json();
           if (pData.status === 'success' && Array.isArray(pData.queues)) {
-            mapped = pData.queues.map((pq: any) => {
-              const cleanHN = (pq.hn || pq.patient?.hn || '').replace(/[-]/g, '');
-              let rawMeds = pq.medications || [];
-              if (typeof rawMeds === 'string') {
-                try { rawMeds = JSON.parse(rawMeds); } catch { rawMeds = []; }
+            pData.queues.forEach((pq: any) => {
+              const cleanHN = (pq.hn || (pq.patient && pq.patient.hn) || '').replace(/[-]/g, '');
+              let parsedMeds: any[] = [];
+              if (pq.medications && pq.medications !== 'null') {
+                try {
+                  const rawMeds = typeof pq.medications === 'string' ? JSON.parse(pq.medications) : pq.medications;
+                  if (Array.isArray(rawMeds)) {
+                    parsedMeds = rawMeds.map((m: any) => parseDispensedMed(m, masterMedicines));
+                  }
+                } catch {}
               }
-              const parsedMeds = Array.isArray(rawMeds) ? rawMeds.map((m: any) => parseDispensedMed(m, masterMedicines)) : [];
-
-              return {
+              mapped.push({
                 id: String(pq.id),
                 visitId: pq.visit_id || 1,
                 hn: cleanHN || `HN0001`,
@@ -197,22 +199,28 @@ export default function BillingInvoicePage({
                 visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
                 doctorAdvice: pq.doctor_advice || 'พักผ่อนให้เพียงพอ',
                 medications: parsedMeds
-              };
+              });
             });
           }
         } catch {}
       }
 
+      // 2. นำข้อมูลจาก Billing Queues มาเสริม (กรณีมีคิวที่สร้างเฉพาะการเงินหรือยังไม่มีใน pharmacy)
       if (bRes && bRes.ok) {
         try {
           const bData = await bRes.json();
           if (bData.status === 'success' && Array.isArray(bData.queues)) {
             bData.queues.forEach((bq: any) => {
               const cleanHN = (bq.hn || '').replace(/[-]/g, '');
-              const exists = mapped.some(q => (q.hn || '').replace(/[-]/g, '') === cleanHN || (bq.visit_id && q.visitId === bq.visit_id));
+              const exists = mapped.some(q => 
+                q.id === String(bq.id) ||
+                (cleanHN && (q.hn || '').replace(/[-]/g, '') === cleanHN && cleanHN !== 'HN0001') || 
+                (bq.visit_id && q.visitId === bq.visit_id) ||
+                (bq.queue_number && (q.queueNumber === bq.queue_number || q.ticket === bq.queue_number))
+              );
               if (!exists) {
                 let parsedMeds: any[] = [];
-                if (bq.medications) {
+                if (bq.medications && bq.medications !== 'null') {
                   try {
                     const rawMeds = typeof bq.medications === 'string' ? JSON.parse(bq.medications) : bq.medications;
                     if (Array.isArray(rawMeds)) {
@@ -251,28 +259,7 @@ export default function BillingInvoicePage({
         } catch {}
       }
 
-      // ผสานคิวจากห้องยา (Pharmacy Dispensed Log)
-      const storedDispensed = getStoredDispensedPatients();
-      storedDispensed.forEach(storedP => {
-        const cleanStoredHN = (storedP.hn || '').replace(/[-]/g, '');
-        const exists = mapped.some(q => (cleanStoredHN && (q.hn || '').replace(/[-]/g, '') === cleanStoredHN && cleanStoredHN !== 'HN0001') || q.id === storedP.id);
-        if (!exists) {
-          mapped.push({
-            ...storedP,
-            status: 'pending',
-            visitStatus: 'รอชำระเงิน'
-          });
-        }
-      });
-
-      if (mapped.length === 0 && CLINIC_CONFIG.patients && CLINIC_CONFIG.patients.length > 0) {
-        mapped = CLINIC_CONFIG.patients.map(p => ({
-          ...p,
-          status: 'pending' as const,
-          visitStatus: 'รอชำระเงิน'
-        }));
-      }
-
+      // ถ้าไม่มีคิวจาก DB จะแสดง 0 รายการ (ไม่มี fallback mock)
       setQueueList(mapped);
       setLoading(false);
       return;
