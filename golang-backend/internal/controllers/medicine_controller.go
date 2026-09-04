@@ -132,6 +132,8 @@ type CreateMedicineRequest struct {
 	Category      string  `json:"category"`
 	Properties    string  `json:"properties"`
 	Dosage        string  `json:"dosage"`
+	Instructions  string  `json:"instructions"`
+	ExpiryDate    string  `json:"expiry_date"`
 	Manufacturer  string  `json:"manufacturer"`
 	StockQuantity int     `json:"stock_quantity"`
 	UnitPrice     float64 `json:"unit_price"`
@@ -178,6 +180,8 @@ func CreateMedicine(c *gin.Context) {
 		Category:      req.Category,
 		Properties:    req.Properties,
 		Dosage:        req.Dosage,
+		Instructions:  req.Instructions,
+		ExpiryDate:    req.ExpiryDate,
 		Manufacturer:  req.Manufacturer,
 		StockQuantity: req.StockQuantity,
 		UnitPrice:     req.UnitPrice,
@@ -246,6 +250,8 @@ type UpdateMedicineDetailsRequest struct {
 	Category      string   `json:"category"`
 	Properties    string   `json:"properties"`
 	Dosage        string   `json:"dosage"`
+	Instructions  string   `json:"instructions"`
+	ExpiryDate    string   `json:"expiry_date"`
 	Manufacturer  string   `json:"manufacturer"`
 	StockQuantity *int     `json:"stock_quantity"`
 	UnitPrice     *float64 `json:"unit_price"`
@@ -294,6 +300,12 @@ func UpdateMedicineDetails(c *gin.Context) {
 	}
 	if strings.TrimSpace(req.Dosage) != "" {
 		medicine.Dosage = strings.TrimSpace(req.Dosage)
+	}
+	if strings.TrimSpace(req.Instructions) != "" {
+		medicine.Instructions = strings.TrimSpace(req.Instructions)
+	}
+	if strings.TrimSpace(req.ExpiryDate) != "" {
+		medicine.ExpiryDate = strings.TrimSpace(req.ExpiryDate)
 	}
 	if strings.TrimSpace(req.Manufacturer) != "" {
 		medicine.Manufacturer = strings.TrimSpace(req.Manufacturer)

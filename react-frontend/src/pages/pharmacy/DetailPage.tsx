@@ -742,6 +742,7 @@ export default function DetailPage({
               style={{ 
                 overflowX: 'auto', 
                 overflowY: 'auto', 
+                overscrollBehavior: 'auto',
                 maxHeight: '340px', 
                 border: '1px solid #E2E8F0', 
                 borderRadius: '10px' 

@@ -1,5 +1,4 @@
 import React from 'react';
-import { ClinicActionLoadingModal } from './ClinicModalPortal';
 
 interface SkeletonProps {
   rows?: number;
@@ -37,15 +36,80 @@ export const ClinicSkeleton: React.FC<SkeletonProps> = ({
           background: linear-gradient(90deg, #1E293B 25%, #334155 50%, #1E293B 75%);
           background-size: 200% 100%;
         }
+        .clinic-skeleton-loader-block {
+          background: rgba(255, 255, 255, 0.65);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1.5px solid rgba(226, 232, 240, 0.85);
+          box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.05);
+        }
+        body.dark-mode .clinic-skeleton-loader-block {
+          background: rgba(30, 41, 59, 0.65) !important;
+          border-color: rgba(51, 65, 85, 0.85) !important;
+          box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.3) !important;
+        }
+        body.dark-mode .clinic-skeleton-loader-block p:first-of-type {
+          color: #F8FAFC !important;
+        }
+        body.dark-mode .clinic-skeleton-loader-block p:last-of-type {
+          color: #94A3B8 !important;
+        }
       `}</style>
 
-      {/* ป๊อกอัพโหลดข้อมูลตรงกลางจอพร้อมฉากหลังเบลอสวยงาม และล็อก Scroll สไตล์แผนกแพทย์ */}
+      {/* Loading Indicator บล็อกโปร่งใสตรงกลาง (Translucent Glassmorphic Block) */}
       {showLoadingPopup && (
-        <ClinicActionLoadingModal
-          isOpen={true}
-          title={popupTitle}
-          subtitle={popupSubtitle}
-        />
+        <div 
+          role="status"
+          aria-live="polite"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px 0 24px 0',
+            animation: 'fadeIn 0.25s ease-out'
+          }}
+        >
+          <div
+            className="clinic-skeleton-loader-block"
+            style={{
+              borderRadius: '20px',
+              padding: '24px 36px',
+              textAlign: 'center',
+              display: 'inline-flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              maxWidth: '440px',
+              width: '92%',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div style={{ position: 'relative', width: '52px', height: '52px', margin: '0 auto' }}>
+              <div style={{ width: '52px', height: '52px', borderRadius: '50%', border: '4px solid #E2E8F0' }} />
+              <span 
+                style={{ 
+                  position: 'absolute', 
+                  inset: 0, 
+                  width: '52px', 
+                  height: '52px', 
+                  borderRadius: '50%', 
+                  border: '4px solid transparent', 
+                  borderTopColor: '#2563EB', 
+                  animation: 'spin 1s linear infinite' 
+                }} 
+              />
+            </div>
+            <div style={{ marginTop: '2px' }}>
+              <p style={{ fontSize: '16px', fontWeight: '700', color: '#1E293B', margin: 0, fontFamily: 'var(--font-heading, "Kanit", sans-serif)' }}>
+                {popupTitle}
+              </p>
+              <p style={{ fontSize: '13px', color: '#64748B', margin: '4px 0 0 0', fontFamily: 'var(--font-primary, "IBM Plex Sans Thai", sans-serif)' }}>
+                {popupSubtitle}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {type === 'cards' && (

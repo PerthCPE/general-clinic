@@ -11,6 +11,8 @@ type Medicine struct {
 	Category      string    `json:"category"`                                  //ชนิด / หมวดหมู่ยา
 	Properties    string    `json:"properties"`                                //สรรพคุณ
 	Dosage        string    `json:"dosage"`                                    //ขนาดและวิธีใช้
+	Instructions  string    `json:"instructions"`                              //คำแนะนำในการใช้ยา / ฉลากยา
+	ExpiryDate    string    `json:"expiry_date"`                               //วันหมดอายุ (เช่น "2027-12-31")
 	Manufacturer  string    `json:"manufacturer"`                              //ผู้ผลิต/บริษัท
 	StockQuantity int       `gorm:"not null;default:0" json:"stock_quantity"`  //คือจำนวนคงเหลือของยาในคลัง
 	UnitPrice     float64   `gorm:"not null" json:"unit_price"`                //คือราคาต่อหน่วยของยา
