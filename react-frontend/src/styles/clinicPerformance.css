@@ -1,0 +1,244 @@
+/* ==========================================================================
+   CLINIC PERFORMANCE, SKELETON & SMOOTH SCROLLING (>60 FPS / 120 FPS READY)
+   ==========================================================================
+   ระบบความลื่นไหลและแอนิเมชันระดับสูง ออกแบบมาเพื่อรันบน GPU Hardware Compositor
+   รองรับหน้าจอ 60Hz, 120Hz ProMotion และ 144Hz Gaming Display
+   สามารถปรับแต่งความเร็ว Frame Rate และระยะเวลาได้ที่ตัวแปรด้านล่างนี้
+   ========================================================================== */
+
+:root {
+  /* ------------------------------------------------------------------------
+     1. CONFIGURABLE ANIMATION TIMINGS (ปรับแต่งความเร็วแอนิเมชันที่นี่)
+     ------------------------------------------------------------------------ */
+  --clinic-shimmer-duration: 1.25s;            /* ความเร็วแสงเงา Shimmer ของ Skeleton */
+  --clinic-spin-duration: 0.85s;               /* ความเร็วหมุนของ Spinner */
+  --clinic-modal-scale-duration: 0.22s;        /* ความเร็วเด้งเปิดของ Modal */
+  --clinic-fade-duration: 0.20s;               /* ความเร็ว Fade in / out */
+  --clinic-pulse-duration: 1.5s;               /* ความเร็วการกระพริบ Pulse */
+
+  /* ------------------------------------------------------------------------
+     2. CONFIGURABLE EASING CURVES (ความโค้งของการเคลื่อนไหว)
+     ------------------------------------------------------------------------ */
+  --clinic-spring-easing: cubic-bezier(0.16, 1, 0.3, 1);  /* Spring สไตล์ Apple ลื่นและนุ่ม */
+  --clinic-smooth-easing: cubic-bezier(0.25, 1, 0.5, 1);  /* Smooth deceleration */
+
+  /* ------------------------------------------------------------------------
+     3. SKELETON THEME COLORS (สีของโครงร่างตอนโหลด)
+     ------------------------------------------------------------------------ */
+  --clinic-skel-bg: #E2E8F0;
+  --clinic-skel-bg-subtle: #F1F5F9;
+  --clinic-skel-border: #CBD5E1;
+  --clinic-skel-shimmer-color: rgba(255, 255, 255, 0.65);
+}
+
+/* Dark Mode Skeleton Theme */
+body.dark-mode {
+  --clinic-skel-bg: #1E293B;
+  --clinic-skel-bg-subtle: #0F172A;
+  --clinic-skel-border: #334155;
+  --clinic-skel-shimmer-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
+   GPU HARDWARE ACCELERATED KEYFRAMES (>60 FPS / 120 FPS PURE COMPOSITING)
+   ทุก Keyframe ใช้เฉพาะ transform3d และ opacity โดยไม่มีการรบกวน Layout / Reflow
+   ========================================================================== */
+
+@keyframes clinicShimmerGPU {
+  0% {
+    transform: translate3d(-100%, 0, 0);
+  }
+  100% {
+    transform: translate3d(100%, 0, 0);
+  }
+}
+
+@keyframes clinicSpinGPU {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(360deg);
+  }
+}
+
+@keyframes clinicScaleInGPU {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale3d(0.92, 0.92, 1);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale3d(1, 1, 1);
+  }
+}
+
+@keyframes clinicFadeInGPU {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes clinicPulseGPU {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ==========================================================================
+   SCOPED SMOOTH SCROLLING (เฉพาะระบบคลังยาและการเงิน)
+   Pharmacy & Billing Scoped Smooth Scroll + Custom Minimal Scrollbars
+   ========================================================================== */
+
+/* 1. Page Containers */
+.detail-page-container,
+.medicine-page-container,
+.patient-history-container,
+.billing-dispense-container,
+.billing-invoice-container,
+.billing-dashboard-container {
+  scroll-behavior: smooth !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  transform: translateZ(0); /* Promote page container to GPU layer */
+}
+
+/* 2. Scrollable Table & Queue List Wrappers inside Pharmacy & Billing */
+.detail-page-container .queue-list-column,
+.detail-page-container .medication-table-wrapper,
+.medicine-page-container .medicine-table-container,
+.medicine-page-container .table-wrapper,
+.patient-history-container .table-wrapper,
+.billing-dispense-container .queue-list-column,
+.billing-dispense-container .dispense-table-wrapper,
+.billing-invoice-container .invoice-content-scroll,
+.billing-dashboard-container .table-wrapper,
+.billing-dashboard-container .records-table-wrapper {
+  scroll-behavior: smooth !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  transform: translateZ(0);
+}
+
+/* 3. Ultra-Smooth Hardware Accelerated Custom Scrollbar */
+.detail-page-container ::-webkit-scrollbar,
+.medicine-page-container ::-webkit-scrollbar,
+.patient-history-container ::-webkit-scrollbar,
+.billing-dispense-container ::-webkit-scrollbar,
+.billing-invoice-container ::-webkit-scrollbar,
+.billing-dashboard-container ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.detail-page-container ::-webkit-scrollbar-track,
+.medicine-page-container ::-webkit-scrollbar-track,
+.patient-history-container ::-webkit-scrollbar-track,
+.billing-dispense-container ::-webkit-scrollbar-track,
+.billing-invoice-container ::-webkit-scrollbar-track,
+.billing-dashboard-container ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.detail-page-container ::-webkit-scrollbar-thumb,
+.medicine-page-container ::-webkit-scrollbar-thumb,
+.patient-history-container ::-webkit-scrollbar-thumb,
+.billing-dispense-container ::-webkit-scrollbar-thumb,
+.billing-invoice-container ::-webkit-scrollbar-thumb,
+.billing-dashboard-container ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+  transition: background 0.2s var(--clinic-spring-easing);
+  will-change: background;
+}
+
+.detail-page-container ::-webkit-scrollbar-thumb:hover,
+.medicine-page-container ::-webkit-scrollbar-thumb:hover,
+.patient-history-container ::-webkit-scrollbar-thumb:hover,
+.billing-dispense-container ::-webkit-scrollbar-thumb:hover,
+.billing-invoice-container ::-webkit-scrollbar-thumb:hover,
+.billing-dashboard-container ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.65);
+}
+
+/* ==========================================================================
+   SKELETON BASE UTILITIES
+   ========================================================================== */
+
+.clinic-skeleton-item {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--clinic-skel-bg);
+  border-radius: 8px;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* GPU Shimmer Sweep Overlay */
+.clinic-skeleton-item::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--clinic-skel-shimmer-color) 50%,
+    transparent 100%
+  );
+  animation: clinicShimmerGPU var(--clinic-shimmer-duration) infinite linear;
+  will-change: transform;
+  transform: translate3d(-100%, 0, 0);
+  pointer-events: none;
+}
+
+/* Top Floating Indicator Badge for Pharmacy & Billing */
+.clinic-loading-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 18px;
+  background: #FFFFFF;
+  border: 1px solid #DBEAFE;
+  border-radius: 9999px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1E40AF;
+  margin-bottom: 20px;
+  animation: clinicFadeInGPU var(--clinic-fade-duration) var(--clinic-spring-easing);
+  will-change: transform, opacity;
+}
+
+body.dark-mode .clinic-loading-status-pill {
+  background: #1E293B;
+  border-color: #3B82F6;
+  color: #93C5FD;
+}
+
+.clinic-loading-spinner-ring {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #DBEAFE;
+  border-top-color: #2563EB;
+  animation: clinicSpinGPU var(--clinic-spin-duration) infinite linear;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+body.dark-mode .clinic-loading-spinner-ring {
+  border-color: #1E3A8A;
+  border-top-color: #60A5FA;
+}

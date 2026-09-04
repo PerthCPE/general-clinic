@@ -1,5 +1,21 @@
 /* ===== BillingDispensePage - Scoped CSS ===== */
 
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .billing-dispense-container {
   padding: 24px 32px;
   max-width: 1440px;
@@ -123,14 +139,31 @@ body.dark-mode .billing-dispense-container .input-group input {
 }
 
 .billing-dispense-container .page-title {
-  font-size: 1.5rem;
-  font-weight: 500;
+  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 38px;
   color: #0F172A;
-  margin: 0 0 20px 0;
+  margin: 0 0 4px 0;
+  transition: color 0.5s ease;
 }
 
 body.dark-mode .billing-dispense-container .page-title {
   color: #F8FAFC;
+}
+
+.billing-dispense-container .page-subtitle {
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 22px;
+  color: #64748B;
+  margin: 0;
+  transition: color 0.5s ease;
+}
+
+body.dark-mode .billing-dispense-container .page-subtitle {
+  color: #94A3B8;
 }
 
 /* ===== Stat Cards - Pharmacy Block Style ===== */
@@ -900,21 +933,25 @@ body.dark-mode .billing-dispense-container .page-num.active {
   bottom: 0;
   background: rgba(15, 23, 42, 0.6);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 3000;
   padding: 20px;
+  animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .billing-dispense-container .modal-card {
   background: #FFFFFF;
-  border-radius: 16px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-radius: 18px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
   width: 100%;
-  max-width: 550px;
+  max-width: 560px;
   overflow: hidden;
   border: 1px solid #E2E8F0;
+  max-height: calc(100vh - 48px);
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 body.dark-mode .billing-dispense-container .modal-card {

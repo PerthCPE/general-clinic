@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import './BillingDashboardPage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
+import { BillingDashboardSkeleton } from '../../components/Common/ClinicSkeleton';
+import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface PaymentRecord {
   id: string;
@@ -51,6 +54,11 @@ export default function BillingDashboardPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitTitle, setSubmitTitle] = useState('กำลังบันทึกลงฐานข้อมูล');
+  const [submitSubtitle, setSubmitSubtitle] = useState('กรุณารอสักครู่...');
+
   const handleSearch = () => {
     setHasSearched(true);
     setCurrentPage(1);
@@ -65,7 +73,8 @@ export default function BillingDashboardPage() {
   };
 
   // Sync Real Billings & BillingHistory from Supabase / Postgres DB
-  const fetchBillings = useCallback(async () => {
+  const fetchBillings = useCallback(async (isInitial = false) => {
+    const startTime = Date.now();
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
@@ -120,12 +129,18 @@ export default function BillingDashboardPage() {
       }
     } catch (err) {
       console.error('Failed to fetch dashboard billing records:', err);
+    } finally {
+      if (isInitial) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+        setTimeout(() => setIsInitialLoading(false), remaining);
+      }
     }
   }, []);
 
   // Real-time WebSocket Listeners for Billing & Cashier
   useEffect(() => {
-    fetchBillings();
+    fetchBillings(true);
 
     const unsubPay = subscribe('PAYMENT_CONFIRMED', (data: any) => {
       fetchBillings();
@@ -218,6 +233,10 @@ export default function BillingDashboardPage() {
   // [บุญให้เพิ่มเทคนิคนี้] (Supabase + Optimistic UI + WebSocket) - บันทึกการแก้ไขข้อมูลทันทีใน 0 ms
   const handleSaveEditRecord = () => {
     if (!editingRecord) return;
+    setIsSubmitting(true);
+    setSubmitTitle('กำลังบันทึกการแก้ไขข้อมูล');
+    setSubmitSubtitle('กรุณารอสักครู่ ระบบกำลังอัปเดตประวัติการเงินลงฐานข้อมูล');
+    const start = Date.now();
     const numAmt = parseFloat(editRecordForm.amount) || editingRecord.numericAmount;
     setRecords(prev => prev.map(r => {
       if (r.id === editingRecord.id) {
@@ -233,13 +252,23 @@ export default function BillingDashboardPage() {
       return r;
     }));
     setEditingRecord(null);
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
+    setTimeout(() => setIsSubmitting(false), remaining);
   };
 
   // [บุญให้เพิ่มเทคนิคนี้] (Supabase + Optimistic UI + WebSocket) - ลบข้อมูลจากหน้าจอทันทีใน 0 ms
   const handleConfirmDeleteRecord = () => {
     if (!deleteRecord) return;
+    setIsSubmitting(true);
+    setSubmitTitle('กำลังลบรายการประวัติการเงิน');
+    setSubmitSubtitle('กรุณารอสักครู่ ระบบกำลังลบรายการออกจากฐานข้อมูล');
+    const start = Date.now();
     setRecords(prev => prev.filter(r => r.id !== deleteRecord.id));
     setDeleteRecord(null);
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
+    setTimeout(() => setIsSubmitting(false), remaining);
   };
 
   const filteredRecords = useMemo(() => {
@@ -305,13 +334,24 @@ export default function BillingDashboardPage() {
     setSelectedDetail(detail);
   };
 
+  if (isInitialLoading) {
+    return <BillingDashboardSkeleton />;
+  }
+
   return (
     <div className="billing-dashboard-container">
+      {/* Submitting Modal for Edit / Delete */}
+      <ClinicActionLoadingModal
+        isOpen={isSubmitting}
+        title={submitTitle}
+        subtitle={submitSubtitle}
+      />
+
       {/* Page Header */}
       <div className="dashboard-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div className="header-titles">
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <h1 className="dashboard-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0', letterSpacing: '-0.5px' }}>
+            <h1 className="dashboard-title">
               แดชบอร์ดสรุปรายรับและการเงินประจำวัน
             </h1>
             <span style={{
@@ -324,7 +364,7 @@ export default function BillingDashboardPage() {
               {isConnected ? 'Real-time WebSocket Live' : 'Offline / Polling'}
             </span>
           </div>
-          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '4px 0 0 0', fontSize: '1.1rem' }}>
+          <p className="page-subtitle">
             สรุปสถิติการรับชำระเงิน คิวรอชำระ และรายงานการเงินประจำวัน (อัปเดต Real-time จากฐานข้อมูล)
           </p>
         </div>
@@ -734,8 +774,8 @@ export default function BillingDashboardPage() {
 
       {/* Patient Detail System Modal */}
       {selectedDetail && (
-        <div className="modal-overlay" onClick={() => setSelectedDetail(null)}>
-          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '650px', borderRadius: '16px', overflow: 'hidden' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setSelectedDetail(null)} className="billing-dashboard-container">
+          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', width: '92%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden' }}>
             <div className="dash-modal-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
               <div>
                 <h2 className="dash-modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
@@ -865,13 +905,13 @@ export default function BillingDashboardPage() {
               </div>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Edit Record Modal on Dashboard */}
       {editingRecord && (
-        <div className="modal-overlay" onClick={() => setEditingRecord(null)}>
-          <div className="modal-card edit-patient-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', width: '90%', borderRadius: '16px', background: '#FFFFFF', padding: '24px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setEditingRecord(null)} className="billing-dashboard-container">
+          <div className="modal-card edit-patient-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', width: '92%', borderRadius: '18px', background: '#FFFFFF', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#EFF6FF', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -881,7 +921,7 @@ export default function BillingDashboardPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>แก้ไขข้อมูลการเงิน (Edit Record)</h3>
+                  <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>แก้ไขข้อมูลการเงิน (Edit Record)</h3>
                   <p style={{ margin: 0, fontSize: '12.5px', color: '#64748B' }}>ใบเสร็จ: {editingRecord.id} • HN: {editingRecord.hn}</p>
                 </div>
               </div>
@@ -962,13 +1002,13 @@ export default function BillingDashboardPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Delete Record Confirmation Modal on Dashboard */}
       {deleteRecord && (
-        <div className="modal-overlay" onClick={() => setDeleteRecord(null)}>
-          <div className="modal-card delete-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '90%', borderRadius: '16px', background: '#FFFFFF', padding: '24px', textAlign: 'center', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setDeleteRecord(null)} className="billing-dashboard-container">
+          <div className="modal-card delete-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '92%', borderRadius: '18px', background: '#FFFFFF', padding: '24px', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -977,7 +1017,7 @@ export default function BillingDashboardPage() {
                 <line x1="14" y1="11" x2="14" y2="17"></line>
               </svg>
             </div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>ยืนยันการลบรายการประวัติการเงิน</h3>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>ยืนยันการลบรายการประวัติการเงิน</h3>
             <p style={{ margin: '0 0 20px 0', fontSize: '13.5px', color: '#64748B', lineHeight: '1.5' }}>
               ท่านต้องการลบรายการใบเสร็จ <strong style={{ color: '#0F172A' }}>{deleteRecord.id}</strong> ของ <strong style={{ color: '#0F172A' }}>{deleteRecord.patientName}</strong> ใช่หรือไม่?
             </p>
@@ -998,7 +1038,7 @@ export default function BillingDashboardPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
     </div>
   );

@@ -119,15 +119,25 @@ func ConnectDB() {
 	// ⚡ Database Indexes สำหรับเร่งความเร็วการ Query คิว, คนไข้, ประวัติการเงิน บน Supabase
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_created_at ON queues(created_at)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_status ON queues(status)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_status_dept ON queues(status, department)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_visit_id ON queues(visit_id)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_medicine_queues_status_visit ON medicine_queues(status, visit_id)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_medicine_queues_hn ON medicine_queues(hn)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_billing_queues_status ON billing_queues(status)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_billing_queues_status_visit ON billing_queues(status, visit_id)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_billings_visit_status ON billings(visit_id, payment_status)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_billing_histories_created_at ON billing_histories(created_at)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_billing_histories_visit_hn ON billing_histories(visit_id, hn)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_dispensings_visit_id ON dispensings(visit_id)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_patient_medicines_hn ON patient_medicines(hn)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_patients_hn ON patients(hn)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_medicines_code_name ON medicines(medicine_code, name)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_patient_id ON visit_records(patient_id)")
 
 	DB = database
 
-	seedDatabase()
 	seedDoctorProfiles()
+	seedDatabase()
 }
 
 func seedDoctorProfiles() {
@@ -199,18 +209,18 @@ func seedDatabase() {
 	DB.Model(&models.Medicine{}).Count(&medCount)
 	if medCount == 0 {
 		medicines := []models.Medicine{
-			{MedicineCode: "MED-001", Name: "Paracetamol 500mg", GenericName: "Paracetamol (Acetaminophen)", Category: "ยาลดไข้ บรรเทาปวด", Properties: "บรรเทาอาการปวดเล็กน้อยถึงปานกลาง และลดไข้", Dosage: "ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.", Manufacturer: "สยามเภสัช", StockQuantity: 1000, UnitPrice: 10.0},
-			{MedicineCode: "MED-002", Name: "Amoxicillin 500mg", GenericName: "Amoxicillin Trihydrate", Category: "ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย", Properties: "รักษาการติดเชื้อแบคทีเรียระบบทางเดินหายใจ ทางเดินปัสสาวะ", Dosage: "ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร", Manufacturer: "องค์การเภสัชกรรม (GPO)", StockQuantity: 48, UnitPrice: 50.0},
-			{MedicineCode: "MED-003", Name: "Ibuprofen 400mg", GenericName: "Ibuprofen (NSAID)", Category: "ยาต้านการอักเสบ (NSAIDs)", Properties: "ลดการอักเสบ ปวดข้อ ปวดกล้ามเนื้อ ปวดฟัน", Dosage: "ครั้งละ 1 เม็ด วันละ 2-3 ครั้ง หลังอาหารทันที", Manufacturer: "เบอร์ลินซัพพลาย", StockQuantity: 0, UnitPrice: 30.0},
-			{MedicineCode: "MED-004", Name: "Cetirizine 10mg", GenericName: "Cetirizine Dihydrochloride", Category: "ยาแก้อาการแพ้ ต้านฮิสตามีน", Properties: "รักษาอาการแพ้อากาศ ลมพิษ น้ำมูกไหล จาม คันตา", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนนอน", Manufacturer: "เมดฮับ ฟาร์มาซูติคอล", StockQuantity: 600, UnitPrice: 15.0},
-			{MedicineCode: "MED-005", Name: "Omeprazole 20mg", GenericName: "Omeprazole Magnesium", Category: "ยาลดกรดในกระเพาะอาหาร", Properties: "รักษาโรคกรดไหลย้อน แผลในกระเพาะอาหาร", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนอาหารเช้า 30 นาที", Manufacturer: "แอสตร้าเซนเนก้า", StockQuantity: 400, UnitPrice: 25.0},
-			{MedicineCode: "MED-006", Name: "Amlodipine 5mg", GenericName: "Amlodipine Besylate", Category: "ยาลดความดันโลหิต", Properties: "ควบคุมระดับความดันโลหิต ป้องกันภาวะเจ็บหน้าอก", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ตอนเช้า", Manufacturer: "ไฟเซอร์ (Pfizer)", StockQuantity: 30, UnitPrice: 20.0},
-			{MedicineCode: "MED-007", Name: "Metformin 500mg", GenericName: "Metformin Hydrochloride", Category: "ยาควบคุมระดับน้ำตาล (เบาหวาน)", Properties: "ลดการสร้างน้ำตาลที่ตับ และเพิ่มความไวต่ออินซูลิน", Dosage: "ครั้งละ 1 เม็ด พร้อมอาหารเช้า-เย็น", Manufacturer: "สยามเภสัช", StockQuantity: 700, UnitPrice: 12.0},
-			{MedicineCode: "MED-008", Name: "Losartan 50mg", GenericName: "Losartan Potassium", Category: "ยาลดความดันโลหิต", Properties: "ขยายหลอดเลือด ลดความดันโลหิตและปกป้องไต", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง", Manufacturer: "เอ็มเอสดี (MSD)", StockQuantity: 450, UnitPrice: 40.0},
-			{MedicineCode: "MED-009", Name: "Bromhexine 8mg", GenericName: "Bromhexine Hydrochloride", Category: "ยาละลายเสมหะ", Properties: "ช่วยขับเสมหะ ละลายเสมหะที่เหนียวข้นในทางเดินหายใจ", Dosage: "ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร", Manufacturer: "เมดฮับ ฟาร์มาซูติคอล", StockQuantity: 350, UnitPrice: 18.0},
-			{MedicineCode: "MED-010", Name: "Dextromethorphan 15mg", GenericName: "Dextromethorphan HBr", Category: "ยากดอาการไอ", Properties: "บรรเทาอาการไอแห้ง ไอไม่มีเสมหะ", Dosage: "ครั้งละ 1 เม็ด ทุก 6-8 ชั่วโมง เมื่อมีอาการ", Manufacturer: "สยามเภสัช", StockQuantity: 25, UnitPrice: 15.0},
-			{MedicineCode: "MED-011", Name: "ORSLyte Oral Rehydration Salts", GenericName: "Oral Rehydration Salts (ORS)", Category: "เกลือแร่ทดแทนน้ำ", Properties: "ชดเชยการสูญเสียน้ำและเกลือแร่จากอาการท้องเสีย ท้องร่วง", Dosage: "ละลายน้ำสะอาด 250ml จิบเรื่อยๆ เมื่อถ่ายเหลว", Manufacturer: "องค์การเภสัชกรรม (GPO)", StockQuantity: 800, UnitPrice: 8.0},
-			{MedicineCode: "MED-012", Name: "Simethicone 80mg", GenericName: "Simethicone Chewable", Category: "ยาขับลม ขับแก๊ส", Properties: "บรรเทาอาการท้องอืด ท้องเฟ้อ แน่นท้อง จากแก๊สในกระเพาะ", Dosage: "เคี้ยวครั้งละ 1 เม็ด หลังอาหาร 3 เวลา", Manufacturer: "เบอร์ลินซัพพลาย", StockQuantity: 500, UnitPrice: 10.0},
+			{MedicineCode: "MED-001", Name: "Paracetamol 500mg", GenericName: "Paracetamol (Acetaminophen)", Category: "ยาลดไข้ บรรเทาปวด", Properties: "บรรเทาอาการปวดเล็กน้อยถึงปานกลาง และลดไข้", Dosage: "ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.", Instructions: "รับประทานเมื่อมีอาการปวดหรือมีไข้ ไม่ควรทานเกินวันละ 8 เม็ด", ExpiryDate: "2027-12-31", Manufacturer: "สยามเภสัช", StockQuantity: 1000, UnitPrice: 10.0},
+			{MedicineCode: "MED-002", Name: "Amoxicillin 500mg", GenericName: "Amoxicillin Trihydrate", Category: "ยาปฏิชีวนะ ฆ่าเชื้อแบคทีเรีย", Properties: "รักษาการติดเชื้อแบคทีเรียระบบทางเดินหายใจ ทางเดินปัสสาวะ", Dosage: "ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร", Instructions: "ควรรับประทานติดต่อกันจนยาหมดตามแพทย์สั่งอย่างเคร่งครัด", ExpiryDate: "2026-11-30", Manufacturer: "องค์การเภสัชกรรม (GPO)", StockQuantity: 48, UnitPrice: 50.0},
+			{MedicineCode: "MED-003", Name: "Ibuprofen 400mg", GenericName: "Ibuprofen (NSAID)", Category: "ยาต้านการอักเสบ (NSAIDs)", Properties: "ลดการอักเสบ ปวดข้อ ปวดกล้ามเนื้อ ปวดฟัน", Dosage: "ครั้งละ 1 เม็ด วันละ 2-3 ครั้ง หลังอาหารทันที", Instructions: "รับประทานหลังอาหารทันทีและดื่มน้ำตามมากๆ ระวังการระคายเคืองกระเพาะ", ExpiryDate: "2027-08-15", Manufacturer: "เบอร์ลินซัพพลาย", StockQuantity: 0, UnitPrice: 30.0},
+			{MedicineCode: "MED-004", Name: "Cetirizine 10mg", GenericName: "Cetirizine Dihydrochloride", Category: "ยาแก้อาการแพ้ ต้านฮิสตามีน", Properties: "รักษาอาการแพ้อากาศ ลมพิษ น้ำมูกไหล จาม คันตา", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนนอน", Instructions: "อาจทำให้เกิดอาการง่วงซึม ควรหลีกเลี่ยงการขับขี่ยานพาหนะหรือทำงานกับเครื่องจักร", ExpiryDate: "2028-03-20", Manufacturer: "เมดฮับ ฟาร์มาซูติคอล", StockQuantity: 600, UnitPrice: 15.0},
+			{MedicineCode: "MED-005", Name: "Omeprazole 20mg", GenericName: "Omeprazole Magnesium", Category: "ยาลดกรดในกระเพาะอาหาร", Properties: "รักษาโรคกรดไหลย้อน แผลในกระเพาะอาหาร", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ก่อนอาหารเช้า 30 นาที", Instructions: "ควรกลืนทั้งเม็ดพร้อมน้ำ ห้ามเคี้ยวหรือบดเม็ดยา", ExpiryDate: "2027-05-10", Manufacturer: "แอสตร้าเซนเนก้า", StockQuantity: 400, UnitPrice: 25.0},
+			{MedicineCode: "MED-006", Name: "Amlodipine 5mg", GenericName: "Amlodipine Besylate", Category: "ยาลดความดันโลหิต", Properties: "ควบคุมระดับความดันโลหิต ป้องกันภาวะเจ็บหน้าอก", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง ตอนเช้า", Instructions: "รับประทานเวลาเดิมเป็นประจำทุกวันอย่างต่อเนื่อง", ExpiryDate: "2028-01-15", Manufacturer: "ไฟเซอร์ (Pfizer)", StockQuantity: 30, UnitPrice: 20.0},
+			{MedicineCode: "MED-007", Name: "Metformin 500mg", GenericName: "Metformin Hydrochloride", Category: "ยาควบคุมระดับน้ำตาล (เบาหวาน)", Properties: "ลดการสร้างน้ำตาลที่ตับ และเพิ่มความไวต่ออินซูลิน", Dosage: "ครั้งละ 1 เม็ด พร้อมอาหารเช้า-เย็น", Instructions: "รับประทานพร้อมหรือหลังอาหารทันทีเพื่อลดผลข้างเคียงต่อระบบทางเดินอาหาร", ExpiryDate: "2027-10-31", Manufacturer: "สยามเภสัช", StockQuantity: 700, UnitPrice: 12.0},
+			{MedicineCode: "MED-008", Name: "Losartan 50mg", GenericName: "Losartan Potassium", Category: "ยาลดความดันโลหิต", Properties: "ขยายหลอดเลือด ลดความดันโลหิตและปกป้องไต", Dosage: "ครั้งละ 1 เม็ด วันละ 1 ครั้ง", Instructions: "หลีกเลี่ยงอาหารที่มีโพแทสเซียมสูงเกินไป และตรวจวัดความดันโลหิตสม่ำเสมอ", ExpiryDate: "2027-09-25", Manufacturer: "เอ็มเอสดี (MSD)", StockQuantity: 450, UnitPrice: 40.0},
+			{MedicineCode: "MED-009", Name: "Bromhexine 8mg", GenericName: "Bromhexine Hydrochloride", Category: "ยาละลายเสมหะ", Properties: "ช่วยขับเสมหะ ละลายเสมหะที่เหนียวข้นในทางเดินหายใจ", Dosage: "ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร", Instructions: "ดื่มน้ำอุ่นตามมากๆ เพื่อเพิ่มประสิทธิภาพในการขับเสมหะ", ExpiryDate: "2028-06-30", Manufacturer: "เมดฮับ ฟาร์มาซูติคอล", StockQuantity: 350, UnitPrice: 18.0},
+			{MedicineCode: "MED-010", Name: "Dextromethorphan 15mg", GenericName: "Dextromethorphan HBr", Category: "ยากดอาการไอ", Properties: "บรรเทาอาการไอแห้ง ไอไม่มีเสมหะ", Dosage: "ครั้งละ 1 เม็ด ทุก 6-8 ชั่วโมง เมื่อมีอาการ", Instructions: "ใช้สำหรับอาการไอแห้งเท่านั้น ไม่ควรใช้กับผู้ป่วยที่มีเสมหะมาก", ExpiryDate: "2027-04-18", Manufacturer: "สยามเภสัช", StockQuantity: 25, UnitPrice: 15.0},
+			{MedicineCode: "MED-011", Name: "ORSLyte Oral Rehydration Salts", GenericName: "Oral Rehydration Salts (ORS)", Category: "เกลือแร่ทดแทนน้ำ", Properties: "ชดเชยการสูญเสียน้ำและเกลือแร่จากอาการท้องเสีย ท้องร่วง", Dosage: "ละลายน้ำสะอาด 250ml จิบเรื่อยๆ เมื่อถ่ายเหลว", Instructions: "ละลายในน้ำต้มสุกที่เย็นแล้ว ห้ามใช้น้ำร้อน และควรดื่มให้หมดภายใน 24 ชม.", ExpiryDate: "2028-12-31", Manufacturer: "องค์การเภสัชกรรม (GPO)", StockQuantity: 800, UnitPrice: 8.0},
+			{MedicineCode: "MED-012", Name: "Simethicone 80mg", GenericName: "Simethicone Chewable", Category: "ยาขับลม ขับแก๊ส", Properties: "บรรเทาอาการท้องอืด ท้องเฟ้อ แน่นท้อง จากแก๊สในกระเพาะ", Dosage: "เคี้ยวครั้งละ 1 เม็ด หลังอาหาร 3 เวลา", Instructions: "ต้องเคี้ยวเม็ดยาให้ละเอียดก่อนกลืน เพื่อให้ตัวยาออกฤทธิ์ได้เต็มที่", ExpiryDate: "2027-07-20", Manufacturer: "เบอร์ลินซัพพลาย", StockQuantity: 500, UnitPrice: 10.0},
 		}
 		for i := range medicines {
 			DB.Create(&medicines[i])
@@ -261,16 +271,16 @@ func seedDatabase() {
 	var schCount int64
 	DB.Model(&models.DoctorSchedule{}).Count(&schCount)
 	if schCount == 0 {
-		var doctors []models.User
-		DB.Where("role = ?", "doctor").Order("id asc").Find(&doctors)
-		if len(doctors) > 0 {
+		var doctorProfiles []models.Doctor
+		DB.Order("id asc").Find(&doctorProfiles)
+		if len(doctorProfiles) > 0 {
 			var officerUser models.User
 			DB.Where("username = ?", "officer1").First(&officerUser)
 
 			now := time.Now()
 			for d := 0; d < 7; d++ {
 				workDate := now.AddDate(0, 0, d)
-				for i, doc := range doctors {
+				for i, doc := range doctorProfiles {
 					shiftType := "Morning"
 					if (i+d)%2 == 1 {
 						shiftType = "Afternoon"

@@ -59,7 +59,7 @@ func ResetTestDatabase(c *gin.Context) {
 func SimulateDoctorPrescription(c *gin.Context) {
 	// 1. ดึงผู้ป่วยจริงจากตาราง patients เดิม
 	var patients []models.Patient
-	config.DB.Find(&patients)
+	config.DB.Limit(30).Order("id desc").Find(&patients)
 
 	if len(patients) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -80,7 +80,7 @@ func SimulateDoctorPrescription(c *gin.Context) {
 
 	// 4. ดึงข้อมูล Medicine จริงจาก DB
 	var medicines []models.Medicine
-	config.DB.Find(&medicines)
+	config.DB.Limit(30).Find(&medicines)
 
 	if len(medicines) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{

@@ -3,7 +3,10 @@ import './DetailPage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
-import { Check, Plus, Minus } from 'lucide-react';
+import { Check, Plus, Minus, Loader2 } from 'lucide-react';
+import { PharmacyDetailSkeleton } from '../../components/Common/ClinicSkeleton';
+import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface ToastState {
   message: string;
@@ -84,6 +87,12 @@ export default function DetailPage({
   
   // คิวเริ่มต้น - เริ่มจากตารางว่างเปล่าแบบ Clean State
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
+
+  // สถานะการโหลดข้อมูลเริ่มต้นจากฐานข้อมูล (แสดงอนิเมะชันโหลดข้อมูล)
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  // สถานะกำลังส่งข้อมูลไปยังห้องการเงิน (แสดงอนิเมะชันบันทึกลงฐานข้อมูล)
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Current active patient object
   const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0];
@@ -106,8 +115,11 @@ export default function DetailPage({
 
   // Real-time Queue Listener จากระบบแพทย์
   useEffect(() => {
+    let isMounted = true;
+    const loadStartTime = Date.now();
+
     // โหลดข้อมูลจาก API ทันทีที่เปิดหน้า
-    const fetchQueues = async () => {
+    const fetchQueues = async (isInitial = false) => {
       try {
         const token = localStorage.getItem('token');
         const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -269,17 +281,25 @@ export default function DetailPage({
         }
       } catch (err) {
         console.error('Failed to fetch queues:', err);
+      } finally {
+        if (isInitial && isMounted) {
+          const elapsed = Date.now() - loadStartTime;
+          const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+          setTimeout(() => {
+            if (isMounted) setIsInitialLoading(false);
+          }, remaining);
+        }
       }
     };
 
-    fetchQueues();
+    fetchQueues(true);
 
-    // Smart Background Polling ทุกๆ 3 วินาที เพื่อดึงคิวล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket)
+    // Smart Background Polling ทุกๆ 12 วินาที เพื่อดึงคิวล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket เรียลไทม์)
     const pollInterval = setInterval(() => {
       if (!document.hidden) {
-        fetchQueues();
+        fetchQueues(false);
       }
-    }, 3000);
+    }, 12000);
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
       if (data && data.action === 'db_reset') {
@@ -321,6 +341,7 @@ export default function DetailPage({
     });
 
     return () => {
+      isMounted = false;
       clearInterval(pollInterval);
       unsubQueue();
       unsubPay();
@@ -404,68 +425,13 @@ export default function DetailPage({
 
 
 
-  // จำลองแพทย์ส่งคนไข้ใหม่ - บันทึกลง DB จริงแบบ Real-time
-  const handleSimulateDoctorSubmit = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/system/simulate-prescription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const pName = data.patient_name || 'ผู้ป่วยใหม่';
-        const qNo = data.queue?.queue_number || 'Q0001';
-        const qId = String(data.queue?.id || Date.now());
 
-        const newPatient: PatientConfig = {
-          id: qId,
-          visitId: data.visit_id || 1,
-          hn: data.hn || `HN-${Date.now()}`,
-          nationalId: data.patient?.national_id || '',
-          queueNumber: qNo,
-          ticket: qNo,
-          name: pName,
-          shortName: pName,
-          gender: data.patient?.gender || 'ชาย',
-          age: data.patient?.birthdate ? (new Date().getFullYear() - new Date(data.patient.birthdate).getFullYear()) : 35,
-          treatmentRights: data.patient?.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
-          patientType: 'ผู้ป่วยนอก (OPD)',
-          allergies: data.patient?.allergies ? [data.patient.allergies] : ['ไม่มีประวัติแพ้ยา'],
-          chronicDiseases: data.patient?.chronic_diseases || 'ไม่มี',
-          vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-          visitStatus: 'รอรับยา / ชำระเงิน',
-          visitDate: new Date().toLocaleDateString('th-TH'),
-          visitTime: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-          doctorAdvice: data.queue?.note || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
-          medications: data.medications || []
-        };
-
-        setQueueList(prev => [newPatient, ...prev.filter(q => q.id !== newPatient.id)]);
-        setLocalPatientId(newPatient.id);
-        if (onSelectPatientId) onSelectPatientId(newPatient.id);
-
-        triggerToast(`บันทึกใบสั่งยาเรียบร้อยแล้ว`, 'doctor');
-      } else {
-        fallbackSimulate();
-      }
-    } catch {
-      fallbackSimulate();
-    }
-  };
-
-  const fallbackSimulate = () => {
-    // Backend fetch failed, do not use CLINIC_CONFIG mock data anymore.
-    // Ensure you start the backend before clicking this.
-    triggerToast(`ไม่สามารถเชื่อมต่อฐานข้อมูลได้`, 'error');
-  };
 
   // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - กดยืนยันจ่ายยาแล้วอัปเดตหน้าจอทันทีใน 0 ms และส่งขึ้น Supabase เบื้องหลัง
   const handleSendToBilling = async () => {
     if (!activePatient) return;
+    setIsSubmitting(true);
+    const submitStart = Date.now();
     const pName = activePatient.name;
     const vId = activePatient.visitId || 1;
 
@@ -537,6 +503,13 @@ export default function DetailPage({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       }).catch(() => {});
+    } finally {
+      // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
+      const elapsed = Date.now() - submitStart;
+      const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
+      setTimeout(() => {
+        setIsSubmitting(false);
+      }, remaining);
     }
   };
 
@@ -567,25 +540,30 @@ export default function DetailPage({
 
   const [statFilter, setStatFilter] = useState<'all' | 'pending' | 'dispensed' | 'completed'>('all');
 
+  if (isInitialLoading) {
+    return <PharmacyDetailSkeleton />;
+  }
+
   return (
     <div className="detail-page-container">
 
+      {/* 1. Modal Popup แสดงอนิเมะชันตอนกด submit ส่งข้อมูลไปการเงิน (ฉากหลังเบลอสวยงาม ข้อความและอนิเมะชันตรงกลาง) */}
+      <ClinicActionLoadingModal
+        isOpen={isSubmitting}
+        title="กำลังบันทึกลงฐานข้อมูล"
+        subtitle="กรุณารอสักครู่ ระบบกำลังยืนยันการจ่ายยาและส่งข้อมูลไปยังห้องการเงิน..."
+      />
+
       {/* Action Bar (Top) */}
       <div className="page-header" style={{ marginBottom: '24px' }}>
-        <div className="header-titles">
-          <h1 className="page-title">รายละเอียดการจ่ายยา</h1>
-          <p className="page-subtitle">บันทึกและตรวจสอบคำสั่งจ่ายยา คัดกรองรายการยา และตัดสต็อกยา</p>
-        </div>
-        <button className="doctor-submit-sim-btn" onClick={handleSimulateDoctorSubmit}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-          </svg>
-          จำลองหมอกด Submit ใบสั่งยา
-        </button>
-      </div>
+            <div className="header-titles">
+              <h1 className="page-title">รายละเอียดการจ่ายยา</h1>
+              <p className="page-subtitle">บันทึกและตรวจสอบคำสั่งจ่ายยา คัดกรองรายการยา และตัดสต็อกยา</p>
+            </div>
+          </div>
 
-      {/* Executive Pharmacy Stat Cards (Image 2 Format) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+          {/* Executive Pharmacy Stat Cards (Image 2 Format) */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div 
           className={`stat-card-box ${statFilter === 'all' ? 'active-stat' : ''}`}
           onClick={() => setStatFilter('all')}
@@ -764,6 +742,7 @@ export default function DetailPage({
               style={{ 
                 overflowX: 'auto', 
                 overflowY: 'auto', 
+                overscrollBehavior: 'auto',
                 maxHeight: '340px', 
                 border: '1px solid #E2E8F0', 
                 borderRadius: '10px' 
@@ -1438,38 +1417,29 @@ export default function DetailPage({
 
       {/* Medication Details Modal Popup */}
       {selectedMedInfo && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '20px'
-          }}
-          onClick={() => setSelectedMedInfo(null)}
-        >
+        <ClinicModalPortal isOpen={true} onClose={() => setSelectedMedInfo(null)} className="detail-page-container">
           <div 
             style={{
               background: '#FFFFFF',
-              borderRadius: '16px',
-              maxWidth: '520px',
-              width: '100%',
-              padding: '28px',
-              boxShadow: '0 20px 25px -5px rgba(0,0,0,0.3)',
-              border: '1px solid #E2E8F0'
+              borderRadius: '18px',
+              maxWidth: '540px',
+              width: '92%',
+              maxHeight: '88vh',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '24px 26px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #E2E8F0',
+              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              boxSizing: 'border-box'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                
                 <div>
                   <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748B' }}>{selectedMedInfo.medId}</span>
-                  <h3 style={{ margin: 0, fontSize: '18px', color: '#0F172A', fontWeight: 'bold' }}>{selectedMedInfo.name}</h3>
+                  <h3 style={{ margin: 0, fontSize: '18px', color: '#0F172A', fontWeight: '700', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>{selectedMedInfo.name}</h3>
                 </div>
               </div>
               <button 
@@ -1484,16 +1454,18 @@ export default function DetailPage({
               </button>
             </div>
 
-            <div style={{ background: '#F0F9FF', padding: '18px 20px', borderRadius: '12px', border: '1.5px solid #BAE6FD', marginBottom: '22px' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0284C7', fontWeight: '800' }}>
-                สรรพคุณและข้อมูลยา (Medication Properties & Indications):
-              </h4>
-              <p style={{ margin: 0, fontSize: '15px', color: '#0F172A', lineHeight: '1.65', fontWeight: '500' }}>
-                {selectedMedInfo.properties || 'ยารักษาโรคทั่วไปตามคำสั่งแพทย์ ควรรับประทานยาตามวิธีใช้ที่ระบุบนฉลากยาอย่างเคร่งครัด'}
-              </p>
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+              <div style={{ background: '#F0F9FF', padding: '18px 20px', borderRadius: '12px', border: '1.5px solid #BAE6FD', marginBottom: '16px' }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0284C7', fontWeight: '800' }}>
+                  สรรพคุณและข้อมูลยา (Medication Properties & Indications):
+                </h4>
+                <p style={{ margin: 0, fontSize: '15px', color: '#0F172A', lineHeight: '1.65', fontWeight: '500' }}>
+                  {selectedMedInfo.properties || 'ยารักษาโรคทั่วไปตามคำสั่งแพทย์ ควรรับประทานยาตามวิธีใช้ที่ระบุบนฉลากยาอย่างเคร่งครัด'}
+                </p>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', flexShrink: 0, marginTop: '12px' }}>
               <button 
                 onClick={() => setSelectedMedInfo(null)}
                 style={{
@@ -1511,7 +1483,7 @@ export default function DetailPage({
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
     </div>
   );

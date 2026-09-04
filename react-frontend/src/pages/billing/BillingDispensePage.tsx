@@ -3,6 +3,8 @@ import './BillingDispensePage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
+import { BillingDispenseSkeleton } from '../../components/Common/ClinicSkeleton';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface ToastState {
   message: string;
@@ -82,13 +84,10 @@ export default function BillingDispensePage({
     }
   }, [localPatientId]);
   const [isSearchExpanded, setIsSearchExpanded] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   
-  // คิวเริ่มต้น - ดึงจาก Stored / Config ก่อนเพื่อไม่ให้หน้าว่างเปล่า
-  const [queueList, setQueueList] = useState<PatientConfig[]>(() => {
-    const stored = getStoredDispensedPatients();
-    if (stored && stored.length > 0) return stored;
-    return CLINIC_CONFIG.patients || [];
-  });
+  // คิวเริ่มต้น - เริ่มเป็น [] จนกว่าจะดึงข้อมูลจาก DB ได้
+  const [queueList, setQueueList] = useState<PatientConfig[]>([]);
 
   // Current active patient object
   const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0];
@@ -234,12 +233,13 @@ export default function BillingDispensePage({
 
   // Real-time Queue & Billing Listener (ดึงทั้งคิวรอชำระเงิน และประวัติที่ชำระเงินเสร็จสิ้นแล้ว ซิงค์ตรงกับระบบจัดการยา 100%)
   useEffect(() => {
-    const fetchInitialQueue = async () => {
+    const fetchInitialQueue = async (isFirst = false) => {
+      const startTime = Date.now();
       try {
         const token = localStorage.getItem('token');
         const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
         
-        // ดึงทั้งคิวห้องยา/การเงิน และประวัติชำระเงิน (Billing History) แบบ Parallel เพื่อให้เลขคิว Qxxxx ตรงกันเป๊ะ 100%
+        // 1. ดึงทั้งคิวห้องยา, คิวการเงิน, และประวัติการเงิน (Billing History) แบบ Parallel เพื่อความเร็วสูงสุดและ Sync ตรงกัน 100%
         const [pRes, bRes, histRes] = await Promise.all([
           fetch('/api/pharmacy/queues', { headers }).then(r => r.ok ? r : fetch('/api/system/pharmacy/queues')).catch(() => null),
           fetch('/api/billing/queues', { headers }).then(r => r.ok ? r : fetch('/api/system/billing/queues')).catch(() => null),
@@ -264,56 +264,67 @@ export default function BillingDispensePage({
 
         let mappedQueues: PatientConfig[] = [];
 
-        // 1. ดึงคิวจาก /api/pharmacy/queues เพื่อให้ลำดับคิวและเลขคิว (Qxxxx) ตรงกับหน้าจัดการยาเป๊ะๆ
+        // 1. นำข้อมูลจาก Pharmacy Queues เป็นแหล่งข้อมูลหลัก (เพื่อให้เลขคิว QE... และคนไข้ตรงกับระบบยาทุกประการ 100%)
         if (pData && pData.status === 'success' && Array.isArray(pData.queues)) {
-          mappedQueues = pData.queues.map((pq: any) => {
-            const cleanHN = (pq.hn || pq.patient?.hn || '').replace(/[-]/g, '');
-            let rawMeds = pq.medications || [];
-            if (typeof rawMeds === 'string') {
-              try { rawMeds = JSON.parse(rawMeds); } catch { rawMeds = []; }
+          pData.queues.forEach((pq: any) => {
+            const cleanHN = (pq.hn || (pq.patient && pq.patient.hn) || '').replace(/[-]/g, '');
+            let parsedMeds: any[] = [];
+            if (pq.medications && pq.medications !== 'null') {
+              try {
+                const rawMeds = typeof pq.medications === 'string' ? JSON.parse(pq.medications) : pq.medications;
+                if (Array.isArray(rawMeds)) {
+                  parsedMeds = rawMeds.map((m: any) => parseDispensedMed(m, masterMedicines));
+                }
+              } catch {}
             }
-            const parsedMeds = Array.isArray(rawMeds) ? rawMeds.map((m: any) => parseDispensedMed(m, masterMedicines)) : [];
 
-            const matchedBh = completedHistories.find((bh: any) => {
+            // ตรวจสอบว่าชำระเงินเสร็จสิ้นแล้วหรือไม่ (จากประวัติการเงิน completedHistories)
+            const isPaid = completedHistories.some((bh: any) => {
               const bhHN = (bh.hn || '').replace(/[-]/g, '');
+              const bhQ = bh.queue_number || bh.queueNumber;
               return (bh.visit_id && pq.visit_id && bh.visit_id === pq.visit_id) ||
+                     (bhQ && (bhQ === pq.queue_number || bhQ === pq.ticket)) ||
                      (bhHN && cleanHN && bhHN === cleanHN && bhHN !== 'HN0001');
             });
-            const isPaid = !!matchedBh;
+
             const isCompleted = pq.status === 'completed' || pq.status === 'เสร็จสิ้น' || isPaid;
 
-            return {
+            mappedQueues.push({
               id: String(pq.id),
               visitId: pq.visit_id || 1,
               hn: cleanHN || `HN0001`,
               nationalId: pq.national_id || '-',
               queueNumber: pq.queue_number || 'Q0001',
               ticket: pq.queue_number || 'Q0001',
-              receiptNumber: matchedBh?.receipt_number || (isCompleted ? `REC-${String(pq.id || '').padStart(4, '0')}` : undefined),
               name: pq.patient_name || 'ผู้ป่วย',
               shortName: pq.patient_name || 'ผู้ป่วย',
-              gender: pq.gender || 'ชาย',
+              gender: pq.gender || 'หญิง',
               age: pq.age || 35,
-              treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+              treatmentRights: pq.scheme_type || 'บัตรทอง (สปสช.)',
               patientType: 'ผู้ป่วยนอก (OPD)' as const,
               allergies: pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา'],
               chronicDiseases: pq.chronic_diseases || 'ไม่มี',
               vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-              visitStatus: isCompleted ? 'ชำระเงินแล้ว / เสร็จสิ้น' : 'รอรับยา / ชำระเงิน',
+              visitStatus: isCompleted ? 'ชำระเงินแล้ว / เสร็จสิ้น' : (pq.status === 'dispensed' ? 'รอชำระเงิน' : 'รอชำระเงิน'),
               status: isCompleted ? ('completed' as const) : ('pending' as const),
               visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
               visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
               doctorAdvice: pq.doctor_advice || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
               medications: parsedMeds
-            };
+            });
           });
         }
 
-        // 1.2 เสริมด้วยคิวเฉพาะจาก /api/billing/queues ถ้ายังไม่มี
+        // 2. ดึงคิวจาก /api/billing/queues มาเสริม (กรณีมีคิวที่สร้างเฉพาะการเงินหรือยังไม่มีใน pharmacy)
         if (bData && bData.status === 'success' && Array.isArray(bData.queues)) {
           bData.queues.forEach((bq: any) => {
             const cleanHN = (bq.hn || '').replace(/[-]/g, '');
-            const exists = mappedQueues.some(q => (cleanHN && (q.hn || '').replace(/[-]/g, '') === cleanHN && cleanHN !== 'HN0001') || (bq.visit_id && q.visitId === bq.visit_id));
+            const exists = mappedQueues.some(q => 
+              q.id === String(bq.id) ||
+              (cleanHN && (q.hn || '').replace(/[-]/g, '') === cleanHN && cleanHN !== 'HN0001') || 
+              (bq.visit_id && q.visitId === bq.visit_id) ||
+              (bq.queue_number && (q.queueNumber === bq.queue_number || q.ticket === bq.queue_number))
+            );
             if (!exists) {
               let parsedMeds: any[] = [];
               if (bq.medications && bq.medications !== 'null') {
@@ -340,7 +351,7 @@ export default function BillingDispensePage({
                 allergies: ['ไม่มีประวัติแพ้ยา'],
                 chronicDiseases: 'ไม่มี',
                 vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-                visitStatus: 'รอรับยา / ชำระเงิน',
+                visitStatus: 'รอชำระเงิน',
                 status: 'pending' as const,
                 visitDate: new Date(bq.created_at || Date.now()).toLocaleDateString('th-TH'),
                 visitTime: new Date(bq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
@@ -351,7 +362,7 @@ export default function BillingDispensePage({
           });
         }
 
-        // 2. ดึงประวัติที่ชำระเงินเสร็จสิ้นแล้วจาก Database (Completed History)
+        // 3. ดึงประวัติที่ชำระเงินเสร็จสิ้นแล้วจาก Database (Completed History)
         if (Array.isArray(completedHistories) && completedHistories.length > 0) {
           completedHistories.forEach((bh: any) => {
             const bhHN = (bh.hn || '').replace(/[-]/g, '');
@@ -359,12 +370,13 @@ export default function BillingDispensePage({
             const receiptNum = bh.receipt_number || `REC-${String(bh.id || '').padStart(4, '0')}`;
 
             // ตรวจสอบว่าคิวนี้มีอยู่ใน mappedQueues หรือไม่
-            const existingIdx = mappedQueues.findIndex(q => 
-              q.id === `BH-${bh.id}` || 
-              q.receiptNumber === receiptNum ||
-              (bh.visit_id && q.visitId === bh.visit_id) ||
-              (bhHN && (q.hn || '').replace(/[-]/g, '') === bhHN && bhHN !== 'HN0001')
-            );
+            const existingIdx = mappedQueues.findIndex(q => {
+              const qHN = (q.hn || '').replace(/[-]/g, '');
+              return q.id === `BH-${bh.id}` || 
+                     (bh.visit_id && q.visitId === bh.visit_id) ||
+                     (bh.queue_number && (q.queueNumber === bh.queue_number || q.ticket === bh.queue_number)) ||
+                     (bhHN && qHN && qHN === bhHN && bhHN !== 'HN0001');
+            });
 
             if (existingIdx >= 0) {
               // อัปเดตให้เป็นชำระเงินแล้วแน่นอน
@@ -412,61 +424,34 @@ export default function BillingDispensePage({
           });
         }
 
-        // 3. ผสานข้อมูลคิวที่ส่งมาจากห้องยา (Pharmacy Dispensed Log)
+        // 4. ผสานข้อมูลจาก localStorage (dispensed patients)
         const storedDispensed = getStoredDispensedPatients();
         storedDispensed.forEach(storedP => {
           const cleanStoredHN = (storedP.hn || '').replace(/[-]/g, '');
-          const existingIdx = mappedQueues.findIndex(q => q.id === storedP.id || (cleanStoredHN && (q.hn || '').replace(/[-]/g, '') === cleanStoredHN && q.queueNumber === storedP.queueNumber && cleanStoredHN !== 'HN0001'));
+          const existingIdx = mappedQueues.findIndex(q => 
+            q.id === storedP.id || 
+            (q.hn.replace(/[-]/g, '') === cleanStoredHN && (q.queueNumber === storedP.queueNumber || q.ticket === storedP.ticket))
+          );
           if (existingIdx >= 0) {
             if (mappedQueues[existingIdx].status !== 'completed') {
               mappedQueues[existingIdx] = {
                 ...mappedQueues[existingIdx],
-                status: 'pending',
-                visitStatus: 'รอรับยา / ชำระเงิน',
-                medications: mappedQueues[existingIdx].medications?.length ? mappedQueues[existingIdx].medications : storedP.medications
+                visitStatus: 'รอชำระเงิน',
+                dispensedAt: storedP.dispensedAt || mappedQueues[existingIdx].dispensedAt
               };
             }
-          } else {
-            mappedQueues.push({
-              ...storedP,
-              status: 'pending',
-              visitStatus: 'รอรับยา / ชำระเงิน'
-            });
           }
         });
 
-        // 3.5 ผสานข้อมูลที่เพิ่งชำระเงินจาก LocalStorage
-        const storedCompleted = getStoredCompletedBillings();
-        storedCompleted.forEach(storedP => {
-          const cleanStoredHN = (storedP.hn || '').replace(/[-]/g, '');
-          const existingIdx = mappedQueues.findIndex(q => q.id === storedP.id || (cleanStoredHN && (q.hn || '').replace(/[-]/g, '') === cleanStoredHN && q.queueNumber === storedP.queueNumber && cleanStoredHN !== 'HN0001'));
-          if (existingIdx >= 0) {
-            mappedQueues[existingIdx] = {
-              ...mappedQueues[existingIdx],
-              status: 'completed',
-              visitStatus: 'ชำระเงินแล้ว / เสร็จสิ้น'
-            };
-          } else {
-            mappedQueues.push(storedP);
-          }
-        });
-
-        // 4. จัดเรียง: ผู้ป่วยที่รอชำระเงินอยู่บนสุด (pending) -> ชำระเงินแล้วอยู่ถัดมา (completed)
+        // 5. จัดเรียง: ผู้ป่วยที่รอชำระเงินอยู่บนสุด (pending) -> ชำระเงินแล้วอยู่ถัดมา (completed)
         mappedQueues.sort((a, b) => {
           const aComp = a.status === 'completed' || a.visitStatus?.includes('เสร็จสิ้น') || a.visitStatus?.includes('ชำระเงินแล้ว');
           const bComp = b.status === 'completed' || b.visitStatus?.includes('เสร็จสิ้น') || b.visitStatus?.includes('ชำระเงินแล้ว');
-          return Number(aComp) - Number(bComp);
+          if (aComp !== bComp) return Number(aComp) - Number(bComp);
+          return (b.visitId || 0) - (a.visitId || 0);
         });
 
-        // Fallback: ถ้ายังไม่มีคิวในฐานข้อมูล ให้ใช้ข้อมูลผู้ป่วยตัวอย่างเพื่อไม่ให้ตารางว่างเปล่า
-        if (mappedQueues.length === 0 && CLINIC_CONFIG.patients && CLINIC_CONFIG.patients.length > 0) {
-          mappedQueues = CLINIC_CONFIG.patients.map(p => ({
-            ...p,
-            status: 'pending' as const,
-            visitStatus: 'รอรับยา / ชำระเงิน'
-          }));
-        }
-
+        // ถ้าไม่มีคิวจาก DB จะแสดง 0 รายการ (ไม่มี fallback mock)
         setQueueList(mappedQueues);
 
         setLocalPatientId(prev => {
@@ -481,27 +466,25 @@ export default function BillingDispensePage({
         });
       } catch (err) {
         console.error('Failed to fetch initial billing queue:', err);
-        setQueueList(prev => {
-          if (prev.length === 0 && CLINIC_CONFIG.patients) {
-            return CLINIC_CONFIG.patients.map(p => ({
-              ...p,
-              status: 'pending' as const,
-              visitStatus: 'รอรับยา / ชำระเงิน'
-            }));
-          }
-          return prev;
-        });
+      } finally {
+        if (isFirst) {
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+          setTimeout(() => {
+            setIsInitialLoading(false);
+          }, remaining);
+        }
       }
     };
     
-    fetchInitialQueue();
+    fetchInitialQueue(true);
 
-    // Smart Background Polling ทุกๆ 2.5 วินาที เพื่อดึงคิวการเงินล่าสุดอย่างต่อเนื่อง
+    // Smart Background Polling ทุกๆ 12 วินาที เพื่อดึงคิวการเงินล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket เรียลไทม์)
     const pollInterval = setInterval(() => {
       if (!document.hidden) {
         fetchInitialQueue();
       }
-    }, 2500);
+    }, 12000);
 
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
       fetchInitialQueue();
@@ -710,15 +693,19 @@ export default function BillingDispensePage({
     ? activePatient.medications.reduce((sum, m: any) => sum + ((Number(m?.price || m?.unit_price) || 0) * (Number(m?.quantity) || 1)), 0) 
     : 0;
 
+  if (isInitialLoading) {
+    return <BillingDispenseSkeleton />;
+  }
+
   return (
     <div className="billing-dispense-container">
       {/* Page Header */}
       <div className="page-header" style={{ marginBottom: '32px' }}>
         <div className="header-titles">
-          <h1 className="page-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
+          <h1 className="page-title">
             คิดเงินและออกบิลชำระเงิน
           </h1>
-          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '1.1rem' }}>
+          <p className="page-subtitle">
             สรุปรายการค่ายา ค่าบริการทางการแพทย์ คำนวณส่วนลดสิทธิ์ และรับชำระเงิน
           </p>
         </div>
