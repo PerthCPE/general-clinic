@@ -17,6 +17,7 @@ import (
 type CreateDocumentReq struct {
 	ExternalDocRef string `json:"external_doc_ref"`
 	Subject        string `json:"subject" binding:"required"`
+	Description    string `json:"description"`
 	FileURL        string `json:"file_url"`
 	FileSize       int64  `json:"file_size"`
 	DocType        string `json:"doc_type"`
@@ -121,6 +122,7 @@ func CreateDocument(c *gin.Context) {
 	newDoc := models.Document{
 		ExternalDocRef: docRef,
 		Subject:        req.Subject,
+		Description:    req.Description,
 		FileURL:        req.FileURL,
 		FileSize:       req.FileSize,
 		DocType:        docType,

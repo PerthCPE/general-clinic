@@ -6,6 +6,7 @@ type Document struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	ExternalDocRef string    `json:"external_doc_ref"`
 	Subject        string    `gorm:"not null" json:"subject"`
+	Description    string    `json:"description"`
 	FileURL        string    `json:"file_url"`
 	FileSize       int64     `gorm:"default:0" json:"file_size"`
 	Status         string    `gorm:"default:'reviewing'" json:"status"` // reviewing, approved, draft

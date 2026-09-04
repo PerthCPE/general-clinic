@@ -11,6 +11,7 @@ interface DocumentItem {
   modifiedDate: string;
   status: 'approved' | 'reviewing' | 'draft';
   subject?: string;
+  description?: string;
   externalRef?: string;
   fileUrl?: string;
   creatorName?: string;
@@ -29,6 +30,7 @@ export const CLINIC_DOCUMENT_TYPES = [
   'สัญญาจ้างและเอกสารบุคลากร (Staff Contract & HR Agreement)',
   'นโยบายและแนวทางมาตรฐานการปฏิบัติงาน (SOP & Policy)',
   'บันทึกข้อความภายในและเอกสารทั่วไป (General Internal Memo)',
+  'อื่นๆ (โปรดระบุ)',
 ] as const;
 
 const formatBytes = (bytes?: number) => {
@@ -50,7 +52,7 @@ const generateMockDocs = (): DocumentItem[] => {
   const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
   for (let i = 1; i <= 12; i++) {
-    const type = CLINIC_DOCUMENT_TYPES[(i - 1) % CLINIC_DOCUMENT_TYPES.length];
+    const type = CLINIC_DOCUMENT_TYPES[(i - 1) % (CLINIC_DOCUMENT_TYPES.length - 1)];
     const status: 'approved' | 'reviewing' | 'draft' = i <= 4 ? 'reviewing' : 'approved';
     const baseName = baseNames[Math.floor(Math.random() * baseNames.length)];
     const ext = exts[Math.floor(Math.random() * exts.length)];
@@ -66,6 +68,7 @@ const generateMockDocs = (): DocumentItem[] => {
       modifiedDate: `${day} ${month} ${buddhistYear}`,
       status: status,
       subject: `หัวข้อเอกสารที่ ${i}: ${baseName}`,
+      description: `เอกสารบันทึกข้อมูลสำคัญของคลินิก หมวดหมู่ ${type}`,
       externalRef: `สธ ${String(i).padStart(4, '0')}/2569`,
       fileUrl: `https://example.com/docs/${baseName}_${i}${ext}`,
       creatorName: 'เจ้าหน้าที่ธุรการ',
@@ -94,6 +97,8 @@ export const DocumentManagementPage: React.FC = () => {
     subject: '',
     externalRef: '',
     docType: CLINIC_DOCUMENT_TYPES[0] as string,
+    customDocType: '',
+    description: '',
   });
 
   const fetchStorageStats = () => {
@@ -129,6 +134,7 @@ export const DocumentManagementPage: React.FC = () => {
               modifiedDate: formattedDate,
               status: status,
               subject: d.subject,
+              description: d.description,
               externalRef: d.external_doc_ref,
               fileUrl: d.file_url,
               creatorName: d.creator?.full_name || 'เจ้าหน้าที่ธุรการ',
@@ -182,6 +188,8 @@ export const DocumentManagementPage: React.FC = () => {
         subject: defaultSubject,
         externalRef: '',
         docType: detectedType,
+        customDocType: '',
+        description: '',
       });
       setActiveModal('upload');
     }
@@ -195,16 +203,20 @@ export const DocumentManagementPage: React.FC = () => {
     setUploading(true);
     setActiveModal(null);
 
-    const docType = uploadForm.docType || CLINIC_DOCUMENT_TYPES[0];
+    const finalDocType =
+      uploadForm.docType === 'อื่นๆ (โปรดระบุ)'
+        ? (uploadForm.customDocType.trim() || 'เอกสารอื่นๆ')
+        : (uploadForm.docType || CLINIC_DOCUMENT_TYPES[0]);
     const fileSize = selectedFile.size || 1048576;
 
     try {
       const res = await dmsApi.createDocument({
         external_doc_ref: uploadForm.externalRef || `DOC-2569-${Date.now().toString().slice(-4)}`,
         subject: uploadForm.subject || selectedFile.name,
+        description: uploadForm.description || '',
         file_url: 'https://example.com/docs/' + selectedFile.name,
         file_size: fileSize,
-        doc_type: docType,
+        doc_type: finalDocType,
         status: 'reviewing',
       });
 
@@ -216,11 +228,12 @@ export const DocumentManagementPage: React.FC = () => {
       const newDoc: DocumentItem = {
         id: String(res.document.id || docs.length + 1),
         name: res.document.subject || selectedFile.name,
-        type: res.document.doc_type || docType,
+        type: res.document.doc_type || finalDocType,
         fileSize: res.document.file_size || fileSize,
         modifiedDate: formattedDate,
         status: (res.document.status as 'approved' | 'reviewing' | 'draft') || 'reviewing',
         subject: res.document.subject,
+        description: res.document.description || uploadForm.description,
         externalRef: res.document.external_doc_ref,
         fileUrl: res.document.file_url,
         creatorName: res.document.creator?.full_name || 'เจ้าหน้าที่ธุรการ',
@@ -231,7 +244,7 @@ export const DocumentManagementPage: React.FC = () => {
       setDocs([newDoc, ...docs]);
       setSelectedFile(null);
       setUploading(false);
-      setUploadForm({ subject: '', externalRef: '', docType: CLINIC_DOCUMENT_TYPES[0] });
+      setUploadForm({ subject: '', externalRef: '', docType: CLINIC_DOCUMENT_TYPES[0], customDocType: '', description: '' });
       fetchStorageStats();
       toast.success('บันทึกและอัปโหลดเอกสารลง Database เรียบร้อยแล้ว (สถานะ: รอตรวจสอบ)');
     } catch {
@@ -243,11 +256,12 @@ export const DocumentManagementPage: React.FC = () => {
       const newDoc: DocumentItem = {
         id: String(docs.length + 1),
         name: selectedFile.name,
-        type: docType,
+        type: finalDocType,
         fileSize: fileSize,
         modifiedDate: formattedDate,
         status: 'reviewing',
         subject: uploadForm.subject,
+        description: uploadForm.description,
         externalRef: uploadForm.externalRef || `DOC-2569-${Date.now().toString().slice(-4)}`,
         fileUrl: 'https://example.com/docs/' + selectedFile.name,
         creatorName: 'เจ้าหน้าที่ธุรการ',
@@ -256,7 +270,7 @@ export const DocumentManagementPage: React.FC = () => {
       setDocs([newDoc, ...docs]);
       setSelectedFile(null);
       setUploading(false);
-      setUploadForm({ subject: '', externalRef: '', docType: CLINIC_DOCUMENT_TYPES[0] });
+      setUploadForm({ subject: '', externalRef: '', docType: CLINIC_DOCUMENT_TYPES[0], customDocType: '', description: '' });
       fetchStorageStats();
       toast.success('อัปโหลดไฟล์และบันทึกข้อมูลเอกสารเรียบร้อยแล้ว (สถานะ: รอตรวจสอบ)');
     }
@@ -372,6 +386,22 @@ export const DocumentManagementPage: React.FC = () => {
                     ))}
                   </select>
                 </div>
+
+                {uploadForm.docType === 'อื่นๆ (โปรดระบุ)' && (
+                  <div className="dms-form-group">
+                    <label className="dms-form-label">
+                      ระบุประเภทเอกสารเพิ่มเติม <span className="text-required">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className="dms-form-input"
+                      required
+                      value={uploadForm.customDocType}
+                      onChange={e => setUploadForm({ ...uploadForm, customDocType: e.target.value })}
+                      placeholder="เช่น เอกสารรับรองมาตรฐานเครื่องมือแพทย์ หรือ แบบประเมินคุณภาพ"
+                    />
+                  </div>
+                )}
                 
                 <div className="dms-form-group">
                   <label className="dms-form-label">
@@ -397,6 +427,19 @@ export const DocumentManagementPage: React.FC = () => {
                     value={uploadForm.externalRef}
                     onChange={e => setUploadForm({...uploadForm, externalRef: e.target.value})} 
                     placeholder="เช่น สธ 0201/2569 (หากเว้นว่างระบบจะสร้างอัตโนมัติ)"
+                  />
+                </div>
+
+                <div className="dms-form-group">
+                  <label className="dms-form-label">
+                    รายละเอียด / หมายเหตุเกี่ยวกับเอกสาร
+                  </label>
+                  <textarea
+                    className="dms-form-textarea"
+                    rows={3}
+                    value={uploadForm.description}
+                    onChange={e => setUploadForm({ ...uploadForm, description: e.target.value })}
+                    placeholder="กรอกรายละเอียด สรุปเนื้อหาสำคัญ หรือหมายเหตุเพิ่มเติมเกี่ยวกับเอกสารฉบับนี้..."
                   />
                 </div>
               </div>
@@ -517,6 +560,14 @@ export const DocumentManagementPage: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Document Description Section */}
+              {selectedDoc.description && (
+                <div className="dms-detail-desc-box">
+                  <span className="dms-detail-label">รายละเอียด / หมายเหตุเกี่ยวกับเอกสาร:</span>
+                  <p className="dms-detail-desc-text">{selectedDoc.description}</p>
+                </div>
+              )}
 
               {/* Pending Review Notice Box */}
               {selectedDoc.status === 'reviewing' && (

@@ -366,6 +366,7 @@ export interface BackendDocument {
   id: number;
   external_doc_ref: string;
   subject: string;
+  description?: string;
   file_url: string;
   file_size?: number;
   status?: 'reviewing' | 'approved' | 'draft' | string;
@@ -396,6 +397,7 @@ export const dmsApi = {
   createDocument: (payload: {
     external_doc_ref?: string;
     subject: string;
+    description?: string;
     file_url?: string;
     file_size?: number;
     doc_type?: string;
