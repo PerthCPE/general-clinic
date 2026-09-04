@@ -462,9 +462,19 @@ func SaveExamination(c *gin.Context) {
 
 		for _, p := range req.Prescriptions {
 			// ค้นหายาและราคาต่อหน่วยจริงจากตาราง medicines
-			med := FindMedicineByNameOrCode(p.MedicineCode, p.MedicineName)
-			if med.ID == 0 && p.MedicineID > 0 {
+			//
+			// ลำดับการค้นสำคัญมาก
+			// ถ้าหน้าจอแพทย์ส่ง medicine_id มาด้วย แปลว่าแพทย์ "เลือกจากรายการยาจริงในคลัง"
+			// ไม่ได้พิมพ์ชื่อขึ้นมาเอง จึงต้องเชื่อ id ก่อนเสมอ
+			// เพราะการค้นด้วยชื่อมีขั้นที่จับแบบขึ้นต้นเหมือนกัน ซึ่งอาจไปตรงกับยาคนละตัว
+			// (เช่น "Amoxicillin 500mg" กับ "Amoxicillin 500mg cap")
+			// โค้ดเดิมค้นด้วยชื่อก่อนแล้วค่อยใช้ id เป็นตัวสำรอง จึงมีโอกาสจ่ายยาผิดตัว
+			var med models.Medicine
+			if p.MedicineID > 0 {
 				config.DB.First(&med, p.MedicineID)
+			}
+			if med.ID == 0 {
+				med = FindMedicineByNameOrCode(p.MedicineCode, p.MedicineName)
 			}
 
 			// ยาที่หาไม่เจอในคลัง ต้องข้าม ห้ามเดา

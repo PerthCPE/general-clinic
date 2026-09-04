@@ -611,6 +611,20 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
   const [medicinesList, setMedicinesList] = useState<any[]>(MEDICINE_DATABASE);
 
+  /**
+   * โหลดรายการยาจริงจากคลังของห้องยาสำเร็จแล้วหรือยัง
+   *
+   * ตัวแปรนี้เป็นสวิตช์ของกฎ "ห้ามสั่งยาที่ไม่มีในคลัง"
+   * ถ้าโหลดสำเร็จ = บังคับให้แพทย์เลือกยาจากรายการเท่านั้น
+   * ถ้าโหลดไม่สำเร็จ (backend ล่ม / ไม่มีสิทธิ์) = ปล่อยให้พิมพ์เองได้เหมือนเดิม
+   *
+   * ทำไมต้องมีเงื่อนไขนี้: ค่าเริ่มต้นของ medicinesList คือ MEDICINE_DATABASE
+   * ซึ่งเป็นรายการฮาร์ดโค้ดในไฟล์ ไม่มีเลข id ของคลังจริง
+   * ถ้าบังคับกฎโดยไม่ดูว่าโหลดสำเร็จหรือยัง เวลา backend ล่ม
+   * แพทย์จะสั่งยาไม่ได้เลยสักตัว ซึ่งอันตรายกว่าปัญหาที่กำลังแก้อยู่
+   */
+  const [medicinesLoaded, setMedicinesLoaded] = useState(false);
+
   useEffect(() => {
     // Fetch live medicines database from backend
     const fetchMeds = async () => {
@@ -657,6 +671,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               };
             });
             setMedicinesList(mapped);
+            setMedicinesLoaded(true);
           }
         }
       } catch (err) {
@@ -680,6 +695,25 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   }, [medSearch, medicinesList]);
 
   const [newMedName, setNewMedName] = useState('');
+
+  /**
+   * รหัสของยาที่แพทย์เพิ่งเลือกจากรายการ (มาจากตาราง medicines ของห้องยาโดยตรง)
+   *
+   * ทำไมต้องเก็บ: เดิมตอนกดเลือกยา โค้ดเก็บแค่ "ชื่อ" ไปใส่ในใบสั่งยา
+   * แล้วปล่อยให้ backend ไปค้นหายาในคลังจากชื่อนั้นอีกทีตอนบันทึก
+   * ซึ่งเสี่ยงมาก เพราะการค้นด้วยชื่อมีขั้นที่จับแบบขึ้นต้นเหมือนกัน
+   * ยาคนละตัวที่ชื่อขึ้นต้นเหมือนกันจึงสลับกันได้ (เช่น Amoxicillin 500mg / 500mg cap)
+   *
+   * พอเก็บ id ตั้งแต่ตอนเลือก backend ก็ไม่ต้องเดาอีกเลย ใช้ id ตรงๆ
+   * เป็น null เมื่อแพทย์พิมพ์ชื่อยาเองโดยไม่ได้เลือกจากรายการ
+   * (กรณีนั้น backend จะค้นจากชื่อตามเดิม และเตือนกลับมาถ้าหาไม่เจอ)
+   */
+  const [selectedMedicine, setSelectedMedicine] = useState<{
+    id?: number;
+    code?: string;
+    price?: number;
+  } | null>(null);
+
   const [newMedDosage, setNewMedDosage] = useState('');
   const [newMedFreq, setNewMedFreq] = useState('');
   const [newMedDuration, setNewMedDuration] = useState('');
@@ -1098,6 +1132,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     setNewMedName(nameVal);
     setMedSearch(nameVal);
     if (!nameVal.trim()) {
+      setSelectedMedicine(null);
       setNewMedDosage('');
       setNewMedFreq('');
       setNewMedDuration('');
@@ -1111,6 +1146,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       m => (m.name || '').toLowerCase() === nameVal.trim().toLowerCase() ||
            (m.code && m.code.toLowerCase() === nameVal.trim().toLowerCase())
     );
+
+    // จำรหัสยาจริงไว้ ถ้าหาไม่เจอแปลว่าแพทย์พิมพ์ชื่อเอง ต้องล้างของเดิมทิ้ง
+    // ไม่งั้นรหัสของยาตัวก่อนหน้าจะติดไปกับยาตัวใหม่
+    setSelectedMedicine(found ? { id: found.id, code: found.code, price: found.price } : null);
+
     if (found) {
       const isTh = language === 'th';
       if (found.defaultDosage) {
@@ -1153,12 +1193,38 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     }
   };
 
+  /**
+   * ==========================================================================
+   * กฎความปลอดภัย: สั่งได้เฉพาะยาที่มีอยู่จริงในคลังของห้องยา
+   * ==========================================================================
+   * ช่องเลือกยาเป็นช่องเดียวที่ทำทั้งค้นหาและกรอกชื่อ แพทย์จึงพิมพ์ชื่อค้างไว้
+   * แบบไม่ครบแล้วกดเพิ่มรายการเลยได้ (เช่นพิมพ์ "Paracetamol" แต่ในคลังชื่อ
+   * "Paracetamol 500mg") ใบสั่งยาจะมีแต่ชื่อลอยๆ ไม่มีรหัสยา
+   * แล้วไปจบที่ backend ต้องเดายาจากชื่ออีกที ซึ่งอาจได้ยาคนละตัว
+   * หรือหาไม่เจอแล้วยาหายไปจากใบสั่งเลยโดยแพทย์ไม่ทันสังเกตคำเตือน
+   *
+   * ตัดปัญหาที่ต้นทาง: ถ้ายังไม่ได้เลือกยาจากรายการจริง จะกดเพิ่มไม่ได้
+   * บังคับเฉพาะตอนที่โหลดคลังยาสำเร็จเท่านั้น (ดูคำอธิบาย medicinesLoaded)
+   */
+  const requireStockMedicine = medicinesLoaded;
+  const hasStockMedicine = !!selectedMedicine?.id;
+  const canAddPrescription =
+    !!newMedName.trim() && (!requireStockMedicine || hasStockMedicine);
+
   // Add Prescription
   const handleAddPrescription = () => {
+    if (!canAddPrescription) return;
     if (!newMedName.trim()) return;
     const parsedQty = typeof newMedQty === 'number' ? newMedQty : parseInt(String(newMedQty), 10);
     const newItem: PrescriptionItem = {
       id: `rx-${Date.now()}`,
+
+      // แนบรหัสยาจากคลังไปด้วย (ถ้าแพทย์เลือกจากรายการ)
+      // ค่านี้จะถูกส่งไปกับ payload ตอนบันทึก แล้ว backend ใช้มันตรงๆ ไม่ต้องค้นจากชื่อ
+      medicineId: selectedMedicine?.id,
+      medicineCode: selectedMedicine?.code,
+      unitPrice: selectedMedicine?.price,
+
       medicineName: newMedName,
       dosage: newMedDosage || '1 tablet',
       frequency: newMedFreq || '3 times a day',
@@ -1170,6 +1236,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     };
     setPrescriptions([...prescriptions, newItem]);
     setNewMedName('');
+    setSelectedMedicine(null);
     setMedSearch('');
     setNewMedDosage('');
     setNewMedFreq('');
@@ -2451,21 +2518,51 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                           {language === 'th'
                             ? `ไม่พบยาที่ตรงกับ "${medSearch}" ในระบบคลังยา`
                             : `No medicine matching "${medSearch}" found`}
-                          <div className="mt-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsMedDropdownOpen(false);
-                              }}
-                              className="text-xs text-blue-600 hover:underline font-semibold"
-                            >
-                              {language === 'th' ? `ใช้ชื่อยา "${medSearch}" ตามที่พิมพ์` : `Use "${medSearch}" as custom drug name`}
-                            </button>
-                          </div>
+                          {/* ปุ่ม "ใช้ชื่อตามที่พิมพ์" ใช้ได้เฉพาะตอนที่โหลดคลังยาไม่สำเร็จ
+                              ถ้าคลังยาโหลดได้แล้วแต่ไม่พบยาตัวนี้ แปลว่าห้องยาไม่มียานี้จริงๆ
+                              การปล่อยให้สั่งต่อไปคือการสั่งยาที่จ่ายไม่ได้ ต้องบอกให้ไปคุยกับห้องยาแทน */}
+                          {requireStockMedicine ? (
+                            <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+                              {language === 'th'
+                                ? 'สั่งได้เฉพาะยาที่มีอยู่ในคลังของห้องยา หากต้องใช้ยาตัวนี้จริง ให้แจ้งห้องยาเพิ่มเข้าคลังก่อน'
+                                : 'Only medicines available in the pharmacy stock can be prescribed. Ask the pharmacy to add this medicine first.'}
+                            </div>
+                          ) : (
+                            <div className="mt-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsMedDropdownOpen(false);
+                                }}
+                                className="text-xs text-blue-600 hover:underline font-semibold"
+                              >
+                                {language === 'th' ? `ใช้ชื่อยา "${medSearch}" ตามที่พิมพ์` : `Use "${medSearch}" as custom drug name`}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
+
+                  {/* สถานะการจับคู่ยากับคลัง
+                      บอกให้เห็นทันทีว่าสิ่งที่อยู่ในช่องตอนนี้ตรงกับยาในคลังแล้วหรือยัง
+                      ไม่ต้องรอไปเจอตอนกดปุ่มแล้วกดไม่ได้โดยไม่รู้สาเหตุ */}
+                  {hasStockMedicine ? (
+                    <p className="mt-1.5 text-[11px] text-emerald-700 flex items-center gap-1.5">
+                      <Check className="w-3 h-3 shrink-0" />
+                      <span>
+                        {language === 'th' ? 'ตรงกับยาในคลัง' : 'Matched to pharmacy stock'}
+                        {selectedMedicine?.code ? ` (${selectedMedicine.code})` : ''}
+                      </span>
+                    </p>
+                  ) : requireStockMedicine && newMedName.trim() ? (
+                    <p className="mt-1.5 text-[11px] text-amber-700">
+                      {language === 'th'
+                        ? 'ยังไม่ได้เลือกยาจากคลัง คลิกเลือกจากรายการด้านบนก่อนจึงจะเพิ่มได้'
+                        : 'Not selected from stock yet. Pick one from the list above to continue.'}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div>
@@ -2637,10 +2734,24 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 </div>
 
                 <div className="flex items-end">
+                  {/* ปุ่มถูกล็อกไว้จนกว่าจะเลือกยาจากคลังจริง (ดู canAddPrescription)
+                      title บอกเหตุผลตอนเอาเมาส์ไปชี้ เพราะปุ่มที่กดไม่ได้เฉยๆ ทำให้งง */}
                   <button
                     type="button"
                     onClick={handleAddPrescription}
-                    className="w-full py-2 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+                    disabled={!canAddPrescription}
+                    title={
+                      canAddPrescription
+                        ? undefined
+                        : language === 'th'
+                          ? 'ต้องเลือกยาจากรายการในคลังก่อน'
+                          : 'Select a medicine from the stock list first'
+                    }
+                    className={`w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 whitespace-nowrap transition-all ${
+                      canAddPrescription
+                        ? 'bg-[#2563eb] hover:bg-blue-700 text-white shadow-xs hover:shadow-md active:scale-95 cursor-pointer'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
                   >
                     <Plus className="w-4 h-4 shrink-0" />
                     <span>{language === 'th' ? 'เพิ่มรายการสั่งยา' : 'Add to Order'}</span>

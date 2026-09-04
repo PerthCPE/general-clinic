@@ -257,6 +257,14 @@ export function applyExaminationDetail(base: Patient, detail: BackendExamination
   if (detail.prescriptions && detail.prescriptions.length > 0) {
     merged.prescriptions = detail.prescriptions.map((item, index) => ({
       id: item.id || `rx-${index + 1}`,
+
+      // รหัสยาจริงที่ backend อ่านกลับมาจากตาราง dispensings
+      // ต้องคืนเข้าไปด้วย ไม่งั้นพอแพทย์เปิดเคสเดิมมาแก้แล้วกดบันทึกซ้ำ
+      // รายการยาจะกลายเป็นมีแต่ชื่อ แล้วต้องกลับไปเดาจากชื่อใหม่อีกรอบ
+      medicineId: item.medicineId,
+      medicineCode: item.medicineCode,
+      unitPrice: item.unitPrice,
+
       medicineName: item.medicineName || '',
       dosage: item.dosage || '',
       frequency: item.frequency || '',
@@ -389,6 +397,16 @@ export function buildExaminationRequest(
     },
     prescriptions: (patient.prescriptions || []).map((p: PrescriptionItem) => ({
       id: p.id,
+
+      // ส่งรหัสยาจริงจากคลังไปด้วย เพื่อไม่ให้ backend ต้องเดายาจากชื่อ
+      // ชื่อยาสองฝั่งสะกดไม่เหมือนกันได้ ("Paracetamol 500mg tab" กับ "Paracetamol 500mg")
+      // ถ้าเดาแล้วไปตรงกับยาคนละตัว ผู้ป่วยจะได้ยาผิดโดยไม่มีใครรู้
+      // รายการที่แพทย์พิมพ์ชื่อเอง จะไม่มีค่านี้ backend จะค้นจากชื่อตามเดิม
+      // และเตือนกลับมาทาง unmatched_medicines ถ้าหาไม่เจอ
+      medicineId: p.medicineId,
+      medicineCode: p.medicineCode,
+      unitPrice: p.unitPrice,
+
       medicineName: p.medicineName,
       dosage: p.dosage,
       frequency: p.frequency,
