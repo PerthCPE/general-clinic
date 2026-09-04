@@ -616,7 +616,8 @@ export default function BillingInvoicePage({
 
   return (
     <div className="billing-invoice-container">
-      <div className="page-header-row">
+      {/* Top Header */}
+      <div className="page-header-row" style={{ marginBottom: '16px' }}>
         <div className="header-titles">
           <h1 className="page-title">
             รายการบิล (Billing & Invoice)
@@ -625,32 +626,47 @@ export default function BillingInvoicePage({
             สรุปค่าบริการ ค่ายา และสร้าง QR Code สำหรับชำระเงิน
           </p>
         </div>
-
-        {queueList.length > 0 && (
-          <div className="invoice-patient-switcher-container">
-            <span className="switcher-label">เลือกคิวผู้ป่วย:</span>
-            <div className="invoice-patient-switcher">
-              {queueList.map((p) => {
-                const qNum = p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : (p.ticket || p.id);
-                return (
-                  <button
-                    key={p.id}
-                    className={`patient-switch-btn ${p.id === activePatient.id ? 'active' : ''}`}
-                    onClick={() => {
-                      if (onSelectPatientId) onSelectPatientId(p.id);
-                      localStorage.setItem('billing_active_patient', p.id);
-                    }}
-                    title={`${qNum} - ${p.name}`}
-                  >
-                    <span className="pill-queue-code">{qNum}</span>
-                    <span className="pill-patient-name">{p.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Standalone Queue Navigation Bar */}
+      {queueList.length > 0 && (
+        <div className="invoice-queue-bar-wrapper" style={{ marginBottom: '16px', maxWidth: '100%' }}>
+          <div className="queue-bar-header">
+            <span className="queue-bar-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+              ลำดับคิวรอชำระเงินทั้งหมด ({queueList.length} คิว)
+            </span>
+            <span className="queue-bar-hint">เลื่อนซ้าย-ขวาเพื่อเลือกคิวผู้ป่วย</span>
+          </div>
+          
+          <div className="invoice-queue-strip">
+            {queueList.map((p, idx) => {
+              const qNum = p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : (p.ticket || p.id);
+              const isActive = p.id === activePatient.id;
+              return (
+                <button
+                  key={p.id}
+                  className={`queue-strip-item ${isActive ? 'active' : ''}`}
+                  onClick={() => {
+                    if (onSelectPatientId) onSelectPatientId(p.id);
+                    localStorage.setItem('billing_active_patient', p.id);
+                  }}
+                  title={`ลำดับที่ ${idx + 1}: ${qNum} - ${p.name}`}
+                >
+                  <span className="queue-item-seq">{idx + 1}</span>
+                  <span className="queue-item-code">{qNum}</span>
+                  <span className="queue-item-name">{p.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Modern Patient & Billing Header Card */}
       <div className="card billing-patient-card" style={{ marginBottom: '20px', padding: '24px' }}>
@@ -722,8 +738,24 @@ export default function BillingInvoicePage({
               <label style={{ fontSize: '12px', fontWeight: '700', color: '#64748B' }}>สิทธิการรักษาพยาบาล</label>
               <select
                 className="banner-rights-select"
-                value={currentRights}
-                onChange={(e) => onUpdatePatientRights && onUpdatePatientRights(activePatient.id, e.target.value)}
+                value={(() => {
+                  const r = currentRights || activePatient?.treatmentRights || '';
+                  if (r.includes('30') || r.includes('บัตรทอง') || r.includes('สปสช')) return 'สิทธิ 30 บาท (บัตรทอง / สปสช.)';
+                  if (r.includes('ประกันสังคม')) return 'สิทธิประกันสังคม (Social Security)';
+                  if (r.includes('ข้าราชการ') || r.includes('กรมบัญชีกลาง')) return 'สิทธิข้าราชการ / จ่ายตรงกรมบัญชีกลาง';
+                  if (r.includes('ประกันสุขภาพ') || r.includes('เอกชน')) return 'ประกันสุขภาพเอกชน (Private Insurance)';
+                  if (r.includes('ชำระเงินเอง') || r.includes('เงินสด') || r.includes('จ่ายตรง')) return 'จ่ายตรง / เงินสด (Self Pay / Cash)';
+                  return r || 'สิทธิ 30 บาท (บัตรทอง / สปสช.)';
+                })()}
+                onChange={(e) => {
+                  const newRights = e.target.value;
+                  if (activePatient) {
+                    if (onUpdatePatientRights) {
+                      onUpdatePatientRights(activePatient.id, newRights);
+                    }
+                    setQueueList(prev => prev.map(q => q.id === activePatient.id ? { ...q, treatmentRights: newRights } : q));
+                  }
+                }}
                 style={{
                   background: '#F8FAFC',
                   color: '#0F172A',

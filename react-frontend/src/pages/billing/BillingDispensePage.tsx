@@ -1485,8 +1485,25 @@ export default function BillingDispensePage({
               <label className="summary-rights-label">สิทธิการรักษา:</label>
               <select 
                 className="summary-rights-select"
-                value={currentRights}
-                onChange={(e) => onUpdatePatientRights && activePatient && onUpdatePatientRights(activePatient.id, e.target.value)}
+                value={(() => {
+                  const r = currentRights || activePatient?.treatmentRights || '';
+                  if (r.includes('30') || r.includes('บัตรทอง') || r.includes('สปสช')) return 'สิทธิ 30 บาท (บัตรทอง / สปสช.)';
+                  if (r.includes('ประกันสังคม')) return 'สิทธิประกันสังคม (Social Security)';
+                  if (r.includes('ข้าราชการ') || r.includes('กรมบัญชีกลาง')) return 'สิทธิข้าราชการ / จ่ายตรงกรมบัญชีกลาง';
+                  if (r.includes('ประกันสุขภาพ') || r.includes('เอกชน')) return 'ประกันสุขภาพเอกชน (Private Insurance)';
+                  if (r.includes('ชำระเงินเอง') || r.includes('เงินสด') || r.includes('จ่ายตรง')) return 'จ่ายตรง / เงินสด (Self Pay / Cash)';
+                  return r || 'สิทธิ 30 บาท (บัตรทอง / สปสช.)';
+                })()}
+                onChange={(e) => {
+                  const newRights = e.target.value;
+                  if (activePatient) {
+                    if (onUpdatePatientRights) {
+                      onUpdatePatientRights(activePatient.id, newRights);
+                    }
+                    // อัปเดตข้อมูลใน queueList ท้องถิ่นทันที
+                    setQueueList(prev => prev.map(q => q.id === activePatient.id ? { ...q, treatmentRights: newRights } : q));
+                  }
+                }}
               >
                 <option value="สิทธิ 30 บาท (บัตรทอง / สปสช.)">สิทธิ 30 บาท (บัตรทอง / สปสช.)</option>
                 <option value="สิทธิประกันสังคม (Social Security)">สิทธิประกันสังคม (Social Security)</option>
