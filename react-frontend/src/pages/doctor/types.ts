@@ -8,6 +8,16 @@ export type QueueStatus =
 
 export interface PrescriptionItem {
   id: string;
+
+  // รหัสยาจริงจากตาราง medicines ของห้องยา
+  // เก็บไว้ตั้งแต่ตอนที่แพทย์เลือกยาจากรายการ จะได้ไม่ต้องให้ backend เดาจากชื่ออีก
+  // (ชื่อยาสองฝั่งสะกดไม่เหมือนกันได้ เช่น "Paracetamol 500mg tab" กับ "Paracetamol 500mg"
+  //  ถ้าเดาจากชื่อแล้วพลาด ผู้ป่วยอาจได้ยาผิดตัวโดยไม่มีใครรู้)
+  // เป็น optional เพราะรายการยาเก่าที่บันทึกไว้ก่อนหน้านี้ยังไม่มีรหัส
+  medicineId?: number;
+  medicineCode?: string;
+  unitPrice?: number;
+
   medicineName: string;
   dosage: string;
   frequency: string;

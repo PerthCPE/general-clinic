@@ -340,7 +340,68 @@ export const vitalsApi = {
 };
 
 // ==============================================================================
-// 6. Doctor API - คิวตรวจของแพทย์, รายละเอียดเคส, เปลี่ยนสถานะการตรวจ
+// 6. Officer DMS (Document Management & Forwarding) API
+// ==============================================================================
+export interface BackendUser {
+  id: number;
+  username: string;
+  fullname?: string;
+  role: string;
+  phone?: string;
+}
+
+export interface BackendDocument {
+  id: number;
+  external_doc_ref: string;
+  subject: string;
+  file_url: string;
+  created_by: number;
+  created_at: string;
+  updated_at: string;
+  creator?: BackendUser;
+}
+
+export interface BackendDocumentForward {
+  id: number;
+  doc_id: number;
+  forwarded_to: number;
+  status: 'Pending' | 'Acknowledged';
+  acknowledged_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  document?: BackendDocument;
+  recipient?: BackendUser;
+}
+
+export const dmsApi = {
+  getDocuments: () => request<BackendDocument[]>('/api/officer/documents'),
+  createDocument: (payload: {
+    external_doc_ref?: string;
+    subject: string;
+    file_url?: string;
+  }) =>
+    request<{ message: string; document: BackendDocument }>('/api/officer/documents', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getForwards: () => request<BackendDocumentForward[]>('/api/officer/documents/forwards'),
+  forwardDocument: (payload: {
+    doc_id: number;
+    forwarded_to: number;
+  }) =>
+    request<{ message: string; forward: BackendDocumentForward }>('/api/officer/documents/forward', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  acknowledgeForward: (id: number | string) =>
+    request<{ message: string; forward: BackendDocumentForward }>(`/api/officer/documents/forwards/${id}/ack`, {
+      method: 'PUT',
+    }),
+  getRecipients: () => request<BackendUser[]>('/api/officer/recipients'),
+};
+
+// ==============================================================================
+// 7. Doctor API - คิวตรวจของแพทย์, รายละเอียดเคส, เปลี่ยนสถานะการตรวจ
 // ==============================================================================
 // รูปแบบที่ backend ส่งมาถูกจัดให้ตรงกับ types.ts ของโมดูลแพทย์แล้ว
 // (status เป็นชุด QueueStatus, id เป็น string, bp เป็น "120/80",
@@ -379,6 +440,15 @@ export interface BackendDoctorScreening {
   heart_rate: number;
   respiratory_rate: number;
   spo2: number;
+
+  // คอลัมน์ที่จุดคัดกรองเพิ่งเพิ่มให้ ค่าเป็น 0 หรือสตริงว่างได้ถ้าพยาบาลไม่ได้กรอก
+  pain_score: number;
+  blood_sugar: number;
+  food_allergies: string;
+  current_medications: string;
+  smoking_history: string;
+  alcohol_history: string;
+
   screened_by_name: string;
   screened_at: string;
 }
@@ -585,6 +655,9 @@ export interface BackendExaminationDetail {
   primaryDiagnosis: BackendDiagnosisItem | null;
   secondaryDiagnoses: BackendDiagnosisItem[] | null;
 
+  // ใบสั่งยาที่บันทึกไว้ อ่านกลับจากตาราง dispensings
+  prescriptions: BackendPrescriptionItem[] | null;
+
   patient: BackendDoctorPatient;
   screening: BackendDoctorScreening | null;
   patientHistory: BackendPatientHistory | null;
@@ -637,6 +710,12 @@ export interface SaveExaminationResult {
   status: string;
   visit_status: string;
   diagnosis_count: number;
+
+  // จำนวนยาที่ส่งต่อห้องยาได้จริง
+  prescription_count?: number;
+
+  // ชื่อยาที่ไม่มีในคลังของห้องยา จึงส่งต่อไม่ได้ ต้องเตือนแพทย์
+  unmatched_medicines?: string[];
 }
 
 export interface BackendPastVisit {

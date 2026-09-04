@@ -120,6 +120,18 @@ func SetUpRoutes(r *gin.Engine) {
 		billingRoutes.POST("/confirm", controllers.ConfirmPayment)
 	}
 
+	// ===== ระบบย่อยที่ 3: จัดการเอกสารและตารางงานแพทย์ (Officer / DMS) =====
+	officerRoutes := api.Group("/officer")
+	officerRoutes.Use(middleware.RoleRequired("officer", "registrar", "doctor", "nurse", "nurse_assistant", "pharmacist", "cashier"))
+	{
+		officerRoutes.GET("/documents", controllers.GetDocuments)
+		officerRoutes.POST("/documents", controllers.CreateDocument)
+		officerRoutes.GET("/documents/forwards", controllers.GetDocumentForwards)
+		officerRoutes.POST("/documents/forward", controllers.ForwardDocument)
+		officerRoutes.PUT("/documents/forwards/:id/ack", controllers.AcknowledgeDocumentForward)
+		officerRoutes.GET("/recipients", controllers.GetRecipients)
+	}
+
 	// ===== 5. System Utilities (Reset Database for Testing) =====
 	// Expose without auth so tests don't fail with 401 Unauthorized
 	systemRoutes := r.Group("/api/system")

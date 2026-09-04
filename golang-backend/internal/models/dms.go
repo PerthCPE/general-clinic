@@ -5,7 +5,6 @@ import "time"
 type Document struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	ExternalDocRef string    `json:"external_doc_ref"`
-	SenderName     string    `json:"sender_name"`
 	Subject        string    `gorm:"not null" json:"subject"`
 	FileURL        string    `json:"file_url"`
 	CreatedBy      uint      `json:"created_by"`

@@ -421,6 +421,26 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     setNotifications(prev => prev.map(n => ({ ...n, isUnread: false })));
   };
 
+  const getSearchPlaceholder = () => {
+    switch (currentUser?.role) {
+      case 'doctor':
+        return 'ค้นหาผู้ป่วย ชื่อ, HN, VN...';
+      case 'officer':
+        return 'ค้นหาเอกสาร, ตารางงานแพทย์...';
+      case 'registrar':
+        return 'ค้นหาผู้ป่วย, HN, คิว...';
+      case 'nurse':
+      case 'nurse_assistant':
+        return 'ค้นหาผู้ป่วย, คิว, คัดกรอง...';
+      case 'pharmacist':
+        return 'ค้นหาชื่อยา, รหัสยา...';
+      case 'cashier':
+        return 'ค้นหาใบแจ้งหนี้, คิวชำระเงิน...';
+      default:
+        return 'ค้นหาในระบบคลินิก...';
+    }
+  };
+
   return (
     <header className={`top-nav-header ${isSidebarOpen ? 'topbar-with-sidebar' : 'topbar-full'}`}>
 
@@ -434,22 +454,19 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
       )}
 
       {/* Search Bar */}
-      {/* คลาส search-container-interactive ใส่เฉพาะ role แพทย์ ซึ่งเป็น role เดียว
-          ที่ช่องค้นหานี้ทำงานจริง จึงให้มีสถานะ focus (กรอบฟ้า) ตอบสนองการคลิก
-          role อื่นช่องค้นหายังไม่ได้ต่อข้อมูล จึงคงหน้าตาเดิมไว้ */}
       <div
-        className={`search-container${isDoctor ? ' search-container-interactive' : ''}`}
+        className="search-container search-container-interactive"
         ref={searchRef}
       >
         <div className="search-icon">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
             <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
         <input
           className="search-input"
           type="text"
-          placeholder={isDoctor ? 'ค้นหาผู้ป่วย ชื่อ, HN, VN...' : 'Search'}
+          placeholder={getSearchPlaceholder()}
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value);
@@ -459,6 +476,21 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             if (searchQuery.trim()) setIsSearchDropdownOpen(true);
           }}
         />
+        {searchQuery && (
+          <button
+            type="button"
+            className="search-topbar-clear-btn"
+            onClick={() => {
+              setSearchQuery('');
+              setIsSearchDropdownOpen(false);
+            }}
+            aria-label="Clear Search"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
 
         {/* Live Search Results Dropdown (เฉพาะ role หมอ) */}
         {isDoctor && isSearchDropdownOpen && searchQuery.trim() !== '' && (

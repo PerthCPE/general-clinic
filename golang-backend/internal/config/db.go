@@ -167,6 +167,7 @@ func seedDatabase() {
 
 	// 1. Seed Users & Doctors
 	users := []models.User{
+		{Username: "officer1", Password: passStr, Role: "officer", FullName: "คุณสมจิต ดีใจ", Phone: "081-555-0001"},
 		{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
 		{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
 		{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
@@ -206,5 +207,76 @@ func seedDatabase() {
 			DB.Create(&medicines[i])
 		}
 		log.Println("Medicines seeded successfully with full metadata.")
+	}
+	// 8. Seed Documents & Document Forwards (Officer Module - Independent check)
+	var docCount int64
+	DB.Model(&models.Document{}).Count(&docCount)
+	if docCount == 0 {
+		var officerUser models.User
+		if err := DB.Where("username = ?", "officer1").First(&officerUser).Error; err != nil {
+			officerUser = users[0]
+		}
+
+		docs := []models.Document{
+			{ExternalDocRef: "สธ 0201/2569", Subject: "แนวทางการควบคุมโรคติดต่อทางเดินหายใจ ประจำปี 2569", FileURL: "https://example.com/docs/guidelines_2569.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "สปสช. 1102/2569", Subject: "ประกาศปรับปรุงอัตราค่าชดเชยค่าบริการทางการแพทย์ใหม่", FileURL: "https://example.com/docs/nhso_rates.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "อย. 4405/2569", Subject: "แจ้งเตือนการเฝ้าระวังยาควบคุมพิเศษกลุ่มต้านการอักเสบ", FileURL: "https://example.com/docs/fda_alert.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "รพ. 8812/2569", Subject: "หนังสือประสานงานแนวทางการส่งต่อผู้ป่วยฉุกเฉิน (Referral System)", FileURL: "https://example.com/docs/referral_network.pdf", CreatedBy: officerUser.ID},
+		}
+		for i := range docs {
+			DB.Create(&docs[i])
+		}
+		log.Println("Documents seeded successfully into Database.")
+
+		var doctorUser, nurseUser, cashierUser, pharmacistUser models.User
+		DB.Where("username = ?", "doctor1").First(&doctorUser)
+		DB.Where("username = ?", "nurse1").First(&nurseUser)
+		DB.Where("username = ?", "cashier1").First(&cashierUser)
+		DB.Where("username = ?", "pharmacist1").First(&pharmacistUser)
+
+		forwards := []models.DocumentForward{
+			{DocID: docs[0].ID, ForwardedTo: doctorUser.ID, Status: "Acknowledged"},
+			{DocID: docs[0].ID, ForwardedTo: nurseUser.ID, Status: "Pending"},
+			{DocID: docs[1].ID, ForwardedTo: cashierUser.ID, Status: "Pending"},
+			{DocID: docs[2].ID, ForwardedTo: pharmacistUser.ID, Status: "Acknowledged"},
+		}
+		for i := range forwards {
+			if forwards[i].ForwardedTo > 0 {
+				DB.Create(&forwards[i])
+			}
+		}
+		log.Println("Document Forwards seeded successfully into Database.")
+	}
+
+	// 9. Seed Doctor Schedules (Officer Module - Independent check)
+	var schCount int64
+	DB.Model(&models.DoctorSchedule{}).Count(&schCount)
+	if schCount == 0 {
+		var doctors []models.User
+		DB.Where("role = ?", "doctor").Order("id asc").Find(&doctors)
+		if len(doctors) > 0 {
+			var officerUser models.User
+			DB.Where("username = ?", "officer1").First(&officerUser)
+
+			now := time.Now()
+			for d := 0; d < 7; d++ {
+				workDate := now.AddDate(0, 0, d)
+				for i, doc := range doctors {
+					shiftType := "Morning"
+					if (i+d)%2 == 1 {
+						shiftType = "Afternoon"
+					}
+					sch := models.DoctorSchedule{
+						DoctorID:  doc.ID,
+						WorkDate:  workDate,
+						ShiftType: shiftType,
+						Status:    "Published",
+						CreatedBy: officerUser.ID,
+					}
+					DB.Create(&sch)
+				}
+			}
+			log.Println("Doctor Schedules seeded successfully into Database.")
+		}
 	}
 }

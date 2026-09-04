@@ -57,6 +57,17 @@ type ScreeningBrief struct {
 	RespiratoryRate int     `json:"respiratory_rate"`
 	SpO2            int     `json:"spo2"`
 
+	// ค่าที่จุดคัดกรองเพิ่งเพิ่มคอลัมน์ให้ (2 ก.ย. 2569)
+	// ก่อนหน้านี้หน้าจอแพทย์ต้องใส่ค่าสมมุติไปก่อนเพราะไม่มีที่เก็บ
+	PainScore  int `json:"pain_score"`  // 0-10 สัญญาณชีพตัวที่ห้า
+	BloodSugar int `json:"blood_sugar"` // DTX หน่วย mg/dL
+
+	// ประวัติที่พยาบาลซักตอนคัดกรอง เก็บเป็นข้อความอิสระทั้งหมด
+	FoodAllergies      string `json:"food_allergies"`
+	CurrentMedications string `json:"current_medications"` // ยาที่ผู้ป่วยใช้อยู่ ใช้เช็คยาตีกัน
+	SmokingHistory     string `json:"smoking_history"`
+	AlcoholHistory     string `json:"alcohol_history"`
+
 	ScreenedByName string    `json:"screened_by_name"`
 	ScreenedAt     time.Time `json:"screened_at"`
 }

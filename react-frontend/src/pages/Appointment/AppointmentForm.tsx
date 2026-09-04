@@ -109,8 +109,8 @@ export default function AppointmentForm() {
               key={autocompleteKey} // ใช้ key นี้บังคับล้างค่าช่องค้นหา
               disablePortal
               options={mockPatients}
-              getOptionLabel={(option) => option.label}
-              onChange={(_event, newValue: PatientOption | null) => {
+              getOptionLabel={(option: PatientOption) => option.label}
+              onChange={(_event: unknown, newValue: PatientOption | null) => {
                 setSelectedPatient(newValue ? newValue.name : '');
               }}
               renderInput={(params) => (

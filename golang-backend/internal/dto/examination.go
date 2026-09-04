@@ -96,6 +96,9 @@ type ExaminationDetail struct {
 	PrimaryDiagnosis   *DiagnosisItemDTO  `json:"primaryDiagnosis"`
 	SecondaryDiagnoses []DiagnosisItemDTO `json:"secondaryDiagnoses"`
 
+	// ใบสั่งยาที่บันทึกไว้ อ่านกลับจากตาราง dispensings
+	Prescriptions []PrescriptionItemDTO `json:"prescriptions"`
+
 	// ข้อมูลประกอบที่ดึงมาแสดงคู่กัน
 	Patient        PatientBrief       `json:"patient"`
 	Screening      *ScreeningBrief    `json:"screening"`
@@ -155,4 +158,11 @@ type SaveExaminationResponse struct {
 	Status         string `json:"status"`
 	VisitStatus    string `json:"visit_status"`
 	DiagnosisCount int    `json:"diagnosis_count"`
+
+	// จำนวนยาที่ส่งต่อห้องยาได้จริง
+	PrescriptionCount int `json:"prescription_count"`
+
+	// ชื่อยาที่หาไม่เจอในตาราง medicines จึงส่งต่อห้องยาไม่ได้
+	// หน้าจอต้องเตือนแพทย์ ไม่งั้นจะเข้าใจว่าสั่งยาสำเร็จทั้งที่ห้องยาไม่เห็น
+	UnmatchedMedicines []string `json:"unmatched_medicines,omitempty"`
 }

@@ -134,7 +134,28 @@ func GetExamination(c *gin.Context) {
 		DoctorName:         visit.Doctor.FullName,
 		Patient:            toPatientBrief(visit.Patient),
 		SecondaryDiagnoses: []dto.DiagnosisItemDTO{},
+		Prescriptions:      []dto.PrescriptionItemDTO{},
 		Editable:           true,
+	}
+
+	// ใบสั่งยาที่บันทึกไว้ อ่านกลับจากตาราง dispensings
+	// เพื่อให้แพทย์เปิดเคสเดิมกลับมาแล้วยังเห็นยาที่สั่งไว้ ไม่ต้องพิมพ์ใหม่
+	var saved []models.Dispensing
+	if err := config.DB.Preload("Medicine").
+		Where("visit_id = ?", visit.ID).
+		Order("id asc").
+		Find(&saved).Error; err == nil {
+		for _, d := range saved {
+			detail.Prescriptions = append(detail.Prescriptions, dto.PrescriptionItemDTO{
+				MedicineID:   d.MedicineID,
+				MedicineCode: d.Medicine.MedicineCode,
+				MedicineName: d.Medicine.Name,
+				Dosage:       d.Dosage,
+				Quantity:     d.Quantity,
+				UnitPrice:    d.Medicine.UnitPrice,
+				Instructions: d.Instructions,
+			})
+		}
 	}
 
 	// บันทึกการตรวจของ visit นี้ (ถ้าเคยบันทึกไว้แล้ว)
@@ -232,6 +253,10 @@ func SaveExamination(c *gin.Context) {
 	}
 
 	signing := strings.EqualFold(strings.TrimSpace(req.Action), "sign")
+
+	// ผลของการส่งใบสั่งยาต่อห้องยา เติมค่าในทรานแซกชันด้านล่าง
+	prescriptionCount := 0
+	unmatchedMedicines := []string{}
 
 	var visit models.VisitRecord
 	if err := config.DB.First(&visit, uint(visitID)).Error; err != nil {
@@ -437,14 +462,31 @@ func SaveExamination(c *gin.Context) {
 
 		for _, p := range req.Prescriptions {
 			// ค้นหายาและราคาต่อหน่วยจริงจากตาราง medicines
-			med := FindMedicineByNameOrCode(p.MedicineCode, p.MedicineName)
-			if med.ID == 0 && p.MedicineID > 0 {
+			//
+			// ลำดับการค้นสำคัญมาก
+			// ถ้าหน้าจอแพทย์ส่ง medicine_id มาด้วย แปลว่าแพทย์ "เลือกจากรายการยาจริงในคลัง"
+			// ไม่ได้พิมพ์ชื่อขึ้นมาเอง จึงต้องเชื่อ id ก่อนเสมอ
+			// เพราะการค้นด้วยชื่อมีขั้นที่จับแบบขึ้นต้นเหมือนกัน ซึ่งอาจไปตรงกับยาคนละตัว
+			// (เช่น "Amoxicillin 500mg" กับ "Amoxicillin 500mg cap")
+			// โค้ดเดิมค้นด้วยชื่อก่อนแล้วค่อยใช้ id เป็นตัวสำรอง จึงมีโอกาสจ่ายยาผิดตัว
+			var med models.Medicine
+			if p.MedicineID > 0 {
 				config.DB.First(&med, p.MedicineID)
 			}
+			if med.ID == 0 {
+				med = FindMedicineByNameOrCode(p.MedicineCode, p.MedicineName)
+			}
 
+			// ยาที่หาไม่เจอในคลัง ต้องข้าม ห้ามเดา
+			//
+			// โค้ดเดิมตรงนี้ใส่ medID = 1 เมื่อหาไม่เจอ ซึ่งแปลว่าผู้ป่วยจะได้รับ
+			// "ยาแถวแรกของตาราง medicines" แทนยาที่แพทย์สั่งจริง โดยไม่มีใครรู้
+			// เป็นความผิดพลาดที่ถึงตัวผู้ป่วยโดยตรง จึงเปลี่ยนเป็นข้ามรายการนั้น
+			// แล้วส่งชื่อกลับไปเตือนแพทย์ผ่าน unmatched_medicines
 			medID := med.ID
 			if medID == 0 {
-				medID = 1
+				unmatchedMedicines = append(unmatchedMedicines, p.MedicineName)
+				continue
 			}
 			unitPrice := med.UnitPrice
 			if unitPrice <= 0 && p.UnitPrice > 0 {
@@ -467,6 +509,7 @@ func SaveExamination(c *gin.Context) {
 				Instructions: p.Instructions,
 			}
 			config.DB.Create(&disp)
+			prescriptionCount++
 
 			medName := p.MedicineName
 			if medName == "" && med.Name != "" {
@@ -659,6 +702,9 @@ func SaveExamination(c *gin.Context) {
 		Status:         exam.Status,
 		VisitStatus:    visitStatus,
 		DiagnosisCount: diagCount,
+
+		PrescriptionCount:  prescriptionCount,
+		UnmatchedMedicines: unmatchedMedicines,
 	})
 }
 

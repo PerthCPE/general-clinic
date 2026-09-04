@@ -282,8 +282,16 @@ func toScreeningBrief(s models.Screening) dto.ScreeningBrief {
 		HeartRate:       s.HeartRate,
 		RespiratoryRate: s.RespiratoryRate,
 		SpO2:            s.SpO2,
-		ScreenedByName:  s.ScreenedBy.FullName,
-		ScreenedAt:      s.CreatedAt,
+
+		PainScore:          s.PainScore,
+		BloodSugar:         s.BloodSugar,
+		FoodAllergies:      s.FoodAllergies,
+		CurrentMedications: s.CurrentMedications,
+		SmokingHistory:     s.SmokingHistory,
+		AlcoholHistory:     s.AlcoholHistory,
+
+		ScreenedByName: s.ScreenedBy.FullName,
+		ScreenedAt:     s.CreatedAt,
 	}
 }
 

@@ -110,7 +110,9 @@ const EXAM_ANCHOR = {
 interface ExaminationViewProps {
   patient: Patient;
   onBackToQueue: () => void;
-  onSavePatient: (updatedPatient: Patient) => void;
+  /** บันทึกลงฐานข้อมูล คืน false ถ้า backend ปฏิเสธ
+   *  ต้องรอผลก่อนขึ้นกล่อง "บันทึกสำเร็จ" ไม่งั้นจะบอกว่าสำเร็จทั้งที่ยังไม่ได้บันทึก */
+  onSavePatient: (updatedPatient: Patient) => void | boolean | Promise<void | boolean>;
 }
 
 // ICD-10 Diagnoses Database with Thai & English names
@@ -371,7 +373,9 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
   // Nursing Physical Assessment State
   const [nurseGenAppearance, setNurseGenAppearance] = useState(patient.nursingAssessment?.generalAppearance || 'Good consciousness, non-toxic appearance');
-  const [nurseConsciousness, setNurseConsciousness] = useState(patient.nursingAssessment?.consciousness || 'Alert (E4V5M6)');
+  // ระดับความรู้สึกตัวยังไม่มีคอลัมน์ในตาราง screenings จุดคัดกรองจึงยังส่งมาไม่ได้
+  // เว้นว่างไว้แทนการเดาว่า "Alert" เพราะเป็นค่าที่ใช้แยกเคสฉุกเฉิน เดาผิดแล้วอันตราย
+  const [nurseConsciousness, setNurseConsciousness] = useState(patient.nursingAssessment?.consciousness || '');
   const [nurseMobility, setNurseMobility] = useState(patient.nursingAssessment?.mobility || 'Ambulatory');
   const [nurseRespiratory, setNurseRespiratory] = useState(patient.nursingAssessment?.respiratoryCondition || 'Normal breathing, room air');
   const [nurseBleeding, setNurseBleeding] = useState(patient.nursingAssessment?.bleeding || 'No active bleeding');
@@ -385,8 +389,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   const [spo2, setSpo2] = useState(patient.vitals?.spo2 || 98);
   const [weight, setWeight] = useState(patient.vitals?.weight || 68);
   const [height, setHeight] = useState(patient.vitals?.height || 170);
-  const [painScore, setPainScore] = useState(patient.vitals?.painScore || 0);
-  const [bloodSugar, setBloodSugar] = useState(patient.vitals?.bloodSugar || 100);
+  // ปล่อยเป็น undefined เมื่อจุดคัดกรองไม่ได้กรอก จะได้แสดงว่า "ไม่มีข้อมูล"
+  // แทนการเดาค่าให้ ค่าสัญญาณชีพที่ระบบแต่งขึ้นเองอันตรายกว่าช่องว่าง
+  const [painScore, setPainScore] = useState<number | undefined>(patient.vitals?.painScore);
+  const [bloodSugar, setBloodSugar] = useState<number | undefined>(patient.vitals?.bloodSugar);
 
   // Auto calculated BMI
   const bmi = React.useMemo(() => {
@@ -605,6 +611,20 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
   const [medicinesList, setMedicinesList] = useState<any[]>(MEDICINE_DATABASE);
 
+  /**
+   * โหลดรายการยาจริงจากคลังของห้องยาสำเร็จแล้วหรือยัง
+   *
+   * ตัวแปรนี้เป็นสวิตช์ของกฎ "ห้ามสั่งยาที่ไม่มีในคลัง"
+   * ถ้าโหลดสำเร็จ = บังคับให้แพทย์เลือกยาจากรายการเท่านั้น
+   * ถ้าโหลดไม่สำเร็จ (backend ล่ม / ไม่มีสิทธิ์) = ปล่อยให้พิมพ์เองได้เหมือนเดิม
+   *
+   * ทำไมต้องมีเงื่อนไขนี้: ค่าเริ่มต้นของ medicinesList คือ MEDICINE_DATABASE
+   * ซึ่งเป็นรายการฮาร์ดโค้ดในไฟล์ ไม่มีเลข id ของคลังจริง
+   * ถ้าบังคับกฎโดยไม่ดูว่าโหลดสำเร็จหรือยัง เวลา backend ล่ม
+   * แพทย์จะสั่งยาไม่ได้เลยสักตัว ซึ่งอันตรายกว่าปัญหาที่กำลังแก้อยู่
+   */
+  const [medicinesLoaded, setMedicinesLoaded] = useState(false);
+
   useEffect(() => {
     // Fetch live medicines database from backend
     const fetchMeds = async () => {
@@ -651,6 +671,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               };
             });
             setMedicinesList(mapped);
+            setMedicinesLoaded(true);
           }
         }
       } catch (err) {
@@ -674,6 +695,25 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   }, [medSearch, medicinesList]);
 
   const [newMedName, setNewMedName] = useState('');
+
+  /**
+   * รหัสของยาที่แพทย์เพิ่งเลือกจากรายการ (มาจากตาราง medicines ของห้องยาโดยตรง)
+   *
+   * ทำไมต้องเก็บ: เดิมตอนกดเลือกยา โค้ดเก็บแค่ "ชื่อ" ไปใส่ในใบสั่งยา
+   * แล้วปล่อยให้ backend ไปค้นหายาในคลังจากชื่อนั้นอีกทีตอนบันทึก
+   * ซึ่งเสี่ยงมาก เพราะการค้นด้วยชื่อมีขั้นที่จับแบบขึ้นต้นเหมือนกัน
+   * ยาคนละตัวที่ชื่อขึ้นต้นเหมือนกันจึงสลับกันได้ (เช่น Amoxicillin 500mg / 500mg cap)
+   *
+   * พอเก็บ id ตั้งแต่ตอนเลือก backend ก็ไม่ต้องเดาอีกเลย ใช้ id ตรงๆ
+   * เป็น null เมื่อแพทย์พิมพ์ชื่อยาเองโดยไม่ได้เลือกจากรายการ
+   * (กรณีนั้น backend จะค้นจากชื่อตามเดิม และเตือนกลับมาถ้าหาไม่เจอ)
+   */
+  const [selectedMedicine, setSelectedMedicine] = useState<{
+    id?: number;
+    code?: string;
+    price?: number;
+  } | null>(null);
+
   const [newMedDosage, setNewMedDosage] = useState('');
   const [newMedFreq, setNewMedFreq] = useState('');
   const [newMedDuration, setNewMedDuration] = useState('');
@@ -733,7 +773,12 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   const [successNotice, setSuccessNotice] = useState<{
     isOpen: boolean;
     title: string;
+    /** ประโยคเดียวสั้นๆ บอกว่าเกิดอะไรขึ้น */
     message: string;
+    /** ข้อมูลผู้ป่วย แยกออกมาเป็นการ์ดของตัวเอง อ่านง่ายกว่าปนอยู่ในประโยค */
+    patient?: { name: string; hn: string; vn?: string };
+    /** สิ่งที่ต้องทำต่อ หรือผลข้างเคียงที่ควรรู้ แสดงเป็นกล่องแยกด้านล่าง */
+    note?: string;
     onConfirm?: () => void;
   } | null>(null);
 
@@ -743,7 +788,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   const [confirmDialog, setConfirmDialog] = useState<{
     tone: 'danger' | 'primary';
     title: string;
+    /** ประโยคเดียวสั้นๆ บอกว่ากดยืนยันแล้วจะเกิดอะไร */
     message: string;
+    /** ข้อมูลผู้ป่วย แยกเป็นการ์ดของตัวเอง ไม่ยัดไว้ในวงเล็บกลางประโยค */
+    patient?: { name: string; hn: string; vn?: string };
+    /** ข้อควรรู้เพิ่มเติม แสดงเป็นกล่องมีไอคอนด้านล่าง */
     hint?: string;
     confirmLabel: string;
     onConfirm: () => void;
@@ -856,8 +905,8 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         weight: Number(weight),
         height: Number(height),
         bmi,
-        painScore: Number(painScore),
-        bloodSugar: Number(bloodSugar)
+        painScore: painScore !== undefined ? Number(painScore) : undefined,
+        bloodSugar: bloodSugar !== undefined ? Number(bloodSugar) : undefined
       },
       physicalExam: {
         generalAppearance,
@@ -908,17 +957,30 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   };
 
   // Save Draft — งานจริง (เรียกหลังผู้ใช้กดยืนยันในโมดัล)
-  const runSaveDraft = () => {
+  const runSaveDraft = async () => {
     const activeDiags = [...(primaryDiag ? [primaryDiag] : []), ...secondaryDiags];
     saveToRecentDiagnoses(activeDiags);
     const updated = buildUpdatedPatient('Examining');
-    onSavePatient(updated);
+
+    // รอผลจริงจากฐานข้อมูลก่อน ถ้าบันทึกไม่ผ่านจะไม่ขึ้นกล่อง "บันทึกแล้ว"
+    // เหตุผลที่ล้มเหลวจะแสดงเป็นแถบสีแดงด้านบนของหน้า
+    const saved = await onSavePatient(updated);
+    if (saved === false) return;
+
     setSuccessNotice({
       isOpen: true,
       title: language === 'th' ? 'บันทึกฉบับร่างแล้ว' : 'Draft Saved',
       message: language === 'th'
-        ? `เก็บข้อมูลการตรวจของ ${patient.name} (HN: ${patient.hn}) ไว้เรียบร้อย สถานะยังเป็น "กำลังตรวจ" กดปุ่ม "ตรวจต่อ" ในหน้าคิวผู้ป่วยเพื่อกลับมาทำต่อได้ทุกเมื่อ`
-        : `Examination data for ${patient.name} (HN: ${patient.hn}) has been saved. The visit remains "Examining" — use the "Continue Exam" button in the patient queue to resume.`,
+        ? 'เก็บข้อมูลการตรวจไว้เรียบร้อยแล้ว'
+        : 'The examination data has been saved.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
+      note: language === 'th'
+        ? 'สถานะยังเป็น "กำลังตรวจ" กดปุ่ม "ตรวจต่อ" ในหน้าคิวผู้ป่วยเพื่อกลับมาทำต่อได้ทุกเมื่อ'
+        : 'The visit remains "Examining". Use the "Continue Exam" button in the patient queue to resume.',
       // กลับไปหน้าคิวผู้ป่วยเหมือนตอนกดบันทึกผลการตรวจ
       // เพื่อให้แพทย์เรียกคิวถัดไปได้ทันที แล้วค่อยกด "ตรวจต่อ" กลับมาทีหลัง
       onConfirm: () => {
@@ -933,8 +995,13 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       tone: 'primary',
       title: language === 'th' ? 'บันทึกฉบับร่าง?' : 'Save Draft?',
       message: language === 'th'
-        ? 'ระบบจะเก็บข้อมูลที่กรอกไว้ทั้งหมด แต่ยังไม่ปิดการตรวจ ผู้ป่วยจะยังอยู่ในสถานะ "กำลังตรวจ"'
-        : 'All entered data will be saved without closing the visit. The patient stays in "Examining" status.',
+        ? 'เก็บข้อมูลที่กรอกไว้ทั้งหมด แต่ยังไม่ปิดการตรวจ'
+        : 'Saves everything you have entered without closing the visit.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
       hint: language === 'th'
         ? 'ยังไม่ส่งรายการสั่งยาไปห้องยา จนกว่าจะกด "บันทึกและเสร็จสิ้นการตรวจ"'
         : 'Prescriptions are not sent to the pharmacy until you use "Save & Complete Visit".',
@@ -949,8 +1016,13 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       tone: 'danger',
       title: language === 'th' ? 'ยกเลิกการตรวจรับบริการ?' : 'Cancel Visit Session?',
       message: language === 'th'
-        ? 'ระบบจะกลับไปหน้าคิวผู้ป่วย ข้อมูลการตรวจที่กรอกไว้แต่ยังไม่ได้บันทึกจะหายทั้งหมด'
-        : 'You will return to the patient queue. Any examination data not yet saved will be lost.',
+        ? 'กลับไปหน้าคิวผู้ป่วย ข้อมูลที่กรอกไว้แต่ยังไม่ได้บันทึกจะหายทั้งหมด'
+        : 'Returns to the patient queue. Anything not yet saved will be lost.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
       hint: language === 'th'
         ? 'หากยังต้องการเก็บข้อมูลไว้ ให้กด "บันทึกฉบับร่าง" แทน'
         : 'To keep your work, use "Save Draft" instead.',
@@ -993,8 +1065,13 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       tone: 'primary',
       title: language === 'th' ? 'บันทึกและเสร็จสิ้นการตรวจ?' : 'Save & Complete Visit?',
       message: language === 'th'
-        ? `ปิดการตรวจของ ${patient.name} (HN: ${patient.hn}) และเปลี่ยนสถานะเป็น "ตรวจเสร็จสิ้น"`
-        : `This will close the visit for ${patient.name} (HN: ${patient.hn}) and set the status to "Completed".`,
+        ? 'ปิดการตรวจและเปลี่ยนสถานะเป็น "ตรวจเสร็จสิ้น" แก้ไขย้อนหลังไม่ได้'
+        : 'This closes the visit and sets the status to "Completed". It cannot be edited afterwards.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
       hint: [
         prescriptions.length > 0
           ? (language === 'th'
@@ -1016,20 +1093,34 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   };
 
   // Complete Visit — งานจริง (เรียกหลังผู้ใช้กดยืนยันในโมดัล)
-  const runCompleteVisit = () => {
+  const runCompleteVisit = async () => {
     const activeDiags = [...(primaryDiag ? [primaryDiag] : []), ...secondaryDiags];
     saveToRecentDiagnoses(activeDiags);
     const updated = buildUpdatedPatient('Completed');
-    onSavePatient(updated);
-    const rxNotice = prescriptions.length > 0 
-      ? (language === 'th' ? `\n(ระบบส่งรายการสั่งยา ${prescriptions.length} รายการไปยังห้องยาโดยอัตโนมัติ)` : `\n(${prescriptions.length} prescription item(s) automatically synced to pharmacy queue)`)
-      : '';
+
+    // ปิดเคสเป็นการเซ็นรับรองผลการตรวจ ยิ่งต้องรอให้ฐานข้อมูลยืนยันก่อน
+    // ถ้าขึ้นว่าสำเร็จแล้วแต่จริงๆ ไม่ได้บันทึก แพทย์จะเดินไปเรียกคิวถัดไปโดยไม่รู้ตัว
+    const saved = await onSavePatient(updated);
+    if (saved === false) return;
+
     setSuccessNotice({
       isOpen: true,
-      title: language === 'th' ? 'บันทึกสำเร็จ!' : 'Success!',
+      title: language === 'th' ? 'ปิดการตรวจเรียบร้อย' : 'Visit Completed',
       message: language === 'th'
-        ? `บันทึกและเสร็จสิ้นการตรวจเรียบร้อยแล้วสำหรับผู้ป่วย ${patient.name} (HN: ${patient.hn}, VN: ${displayVN(patient.vn)})${rxNotice}`
-        : `Examination completed successfully for patient ${patient.name} (HN: ${patient.hn}, VN: ${displayVN(patient.vn)})${rxNotice}`,
+        ? 'บันทึกผลการตรวจและเปลี่ยนสถานะเป็น "ตรวจเสร็จสิ้น" แล้ว'
+        : 'The examination has been signed and marked as completed.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
+      note: prescriptions.length > 0
+        ? (language === 'th'
+            ? `ส่งใบสั่งยา ${prescriptions.length} รายการไปยังห้องยาแล้ว`
+            : `${prescriptions.length} prescription item(s) sent to the pharmacy queue.`)
+        : (language === 'th'
+            ? 'การตรวจครั้งนี้ไม่มีรายการสั่งยา ผู้ป่วยไปชำระเงินได้เลย'
+            : 'No medication was prescribed for this visit.'),
       onConfirm: () => {
         onBackToQueue();
       }
@@ -1041,6 +1132,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     setNewMedName(nameVal);
     setMedSearch(nameVal);
     if (!nameVal.trim()) {
+      setSelectedMedicine(null);
       setNewMedDosage('');
       setNewMedFreq('');
       setNewMedDuration('');
@@ -1054,6 +1146,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       m => (m.name || '').toLowerCase() === nameVal.trim().toLowerCase() ||
            (m.code && m.code.toLowerCase() === nameVal.trim().toLowerCase())
     );
+
+    // จำรหัสยาจริงไว้ ถ้าหาไม่เจอแปลว่าแพทย์พิมพ์ชื่อเอง ต้องล้างของเดิมทิ้ง
+    // ไม่งั้นรหัสของยาตัวก่อนหน้าจะติดไปกับยาตัวใหม่
+    setSelectedMedicine(found ? { id: found.id, code: found.code, price: found.price } : null);
+
     if (found) {
       const isTh = language === 'th';
       if (found.defaultDosage) {
@@ -1096,12 +1193,38 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     }
   };
 
+  /**
+   * ==========================================================================
+   * กฎความปลอดภัย: สั่งได้เฉพาะยาที่มีอยู่จริงในคลังของห้องยา
+   * ==========================================================================
+   * ช่องเลือกยาเป็นช่องเดียวที่ทำทั้งค้นหาและกรอกชื่อ แพทย์จึงพิมพ์ชื่อค้างไว้
+   * แบบไม่ครบแล้วกดเพิ่มรายการเลยได้ (เช่นพิมพ์ "Paracetamol" แต่ในคลังชื่อ
+   * "Paracetamol 500mg") ใบสั่งยาจะมีแต่ชื่อลอยๆ ไม่มีรหัสยา
+   * แล้วไปจบที่ backend ต้องเดายาจากชื่ออีกที ซึ่งอาจได้ยาคนละตัว
+   * หรือหาไม่เจอแล้วยาหายไปจากใบสั่งเลยโดยแพทย์ไม่ทันสังเกตคำเตือน
+   *
+   * ตัดปัญหาที่ต้นทาง: ถ้ายังไม่ได้เลือกยาจากรายการจริง จะกดเพิ่มไม่ได้
+   * บังคับเฉพาะตอนที่โหลดคลังยาสำเร็จเท่านั้น (ดูคำอธิบาย medicinesLoaded)
+   */
+  const requireStockMedicine = medicinesLoaded;
+  const hasStockMedicine = !!selectedMedicine?.id;
+  const canAddPrescription =
+    !!newMedName.trim() && (!requireStockMedicine || hasStockMedicine);
+
   // Add Prescription
   const handleAddPrescription = () => {
+    if (!canAddPrescription) return;
     if (!newMedName.trim()) return;
     const parsedQty = typeof newMedQty === 'number' ? newMedQty : parseInt(String(newMedQty), 10);
     const newItem: PrescriptionItem = {
       id: `rx-${Date.now()}`,
+
+      // แนบรหัสยาจากคลังไปด้วย (ถ้าแพทย์เลือกจากรายการ)
+      // ค่านี้จะถูกส่งไปกับ payload ตอนบันทึก แล้ว backend ใช้มันตรงๆ ไม่ต้องค้นจากชื่อ
+      medicineId: selectedMedicine?.id,
+      medicineCode: selectedMedicine?.code,
+      unitPrice: selectedMedicine?.price,
+
       medicineName: newMedName,
       dosage: newMedDosage || '1 tablet',
       frequency: newMedFreq || '3 times a day',
@@ -1113,6 +1236,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     };
     setPrescriptions([...prescriptions, newItem]);
     setNewMedName('');
+    setSelectedMedicine(null);
     setMedSearch('');
     setNewMedDosage('');
     setNewMedFreq('');
@@ -1561,7 +1685,9 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'ระดับความเจ็บปวด' : 'Pain Score (0-10)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {painScore !== undefined ? `${painScore}/10` : '4/10'}
+                    {painScore !== undefined
+                      ? `${painScore}/10`
+                      : <span className="text-slate-400 font-normal">- ไม่ได้ประเมิน -</span>}
                   </div>
                 </div>
 
@@ -1570,7 +1696,9 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'ระดับน้ำตาลในเลือด' : 'Blood Sugar (mg/dL)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {bloodSugar ? `${bloodSugar} mg/dL` : '105 mg/dL'}
+                    {bloodSugar !== undefined
+                      ? `${bloodSugar} mg/dL`
+                      : <span className="text-slate-400 font-normal">- ไม่ได้ตรวจ -</span>}
                   </div>
                 </div>
               </div>
@@ -2390,21 +2518,51 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                           {language === 'th'
                             ? `ไม่พบยาที่ตรงกับ "${medSearch}" ในระบบคลังยา`
                             : `No medicine matching "${medSearch}" found`}
-                          <div className="mt-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setIsMedDropdownOpen(false);
-                              }}
-                              className="text-xs text-blue-600 hover:underline font-semibold"
-                            >
-                              {language === 'th' ? `ใช้ชื่อยา "${medSearch}" ตามที่พิมพ์` : `Use "${medSearch}" as custom drug name`}
-                            </button>
-                          </div>
+                          {/* ปุ่ม "ใช้ชื่อตามที่พิมพ์" ใช้ได้เฉพาะตอนที่โหลดคลังยาไม่สำเร็จ
+                              ถ้าคลังยาโหลดได้แล้วแต่ไม่พบยาตัวนี้ แปลว่าห้องยาไม่มียานี้จริงๆ
+                              การปล่อยให้สั่งต่อไปคือการสั่งยาที่จ่ายไม่ได้ ต้องบอกให้ไปคุยกับห้องยาแทน */}
+                          {requireStockMedicine ? (
+                            <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+                              {language === 'th'
+                                ? 'สั่งได้เฉพาะยาที่มีอยู่ในคลังของห้องยา หากต้องใช้ยาตัวนี้จริง ให้แจ้งห้องยาเพิ่มเข้าคลังก่อน'
+                                : 'Only medicines available in the pharmacy stock can be prescribed. Ask the pharmacy to add this medicine first.'}
+                            </div>
+                          ) : (
+                            <div className="mt-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsMedDropdownOpen(false);
+                                }}
+                                className="text-xs text-blue-600 hover:underline font-semibold"
+                              >
+                                {language === 'th' ? `ใช้ชื่อยา "${medSearch}" ตามที่พิมพ์` : `Use "${medSearch}" as custom drug name`}
+                              </button>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
                   )}
+
+                  {/* สถานะการจับคู่ยากับคลัง
+                      บอกให้เห็นทันทีว่าสิ่งที่อยู่ในช่องตอนนี้ตรงกับยาในคลังแล้วหรือยัง
+                      ไม่ต้องรอไปเจอตอนกดปุ่มแล้วกดไม่ได้โดยไม่รู้สาเหตุ */}
+                  {hasStockMedicine ? (
+                    <p className="mt-1.5 text-[11px] text-emerald-700 flex items-center gap-1.5">
+                      <Check className="w-3 h-3 shrink-0" />
+                      <span>
+                        {language === 'th' ? 'ตรงกับยาในคลัง' : 'Matched to pharmacy stock'}
+                        {selectedMedicine?.code ? ` (${selectedMedicine.code})` : ''}
+                      </span>
+                    </p>
+                  ) : requireStockMedicine && newMedName.trim() ? (
+                    <p className="mt-1.5 text-[11px] text-amber-700">
+                      {language === 'th'
+                        ? 'ยังไม่ได้เลือกยาจากคลัง คลิกเลือกจากรายการด้านบนก่อนจึงจะเพิ่มได้'
+                        : 'Not selected from stock yet. Pick one from the list above to continue.'}
+                    </p>
+                  ) : null}
                 </div>
 
                 <div>
@@ -2576,10 +2734,24 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 </div>
 
                 <div className="flex items-end">
+                  {/* ปุ่มถูกล็อกไว้จนกว่าจะเลือกยาจากคลังจริง (ดู canAddPrescription)
+                      title บอกเหตุผลตอนเอาเมาส์ไปชี้ เพราะปุ่มที่กดไม่ได้เฉยๆ ทำให้งง */}
                   <button
                     type="button"
                     onClick={handleAddPrescription}
-                    className="w-full py-2 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
+                    disabled={!canAddPrescription}
+                    title={
+                      canAddPrescription
+                        ? undefined
+                        : language === 'th'
+                          ? 'ต้องเลือกยาจากรายการในคลังก่อน'
+                          : 'Select a medicine from the stock list first'
+                    }
+                    className={`w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 whitespace-nowrap transition-all ${
+                      canAddPrescription
+                        ? 'bg-[#2563eb] hover:bg-blue-700 text-white shadow-xs hover:shadow-md active:scale-95 cursor-pointer'
+                        : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    }`}
                   >
                     <Plus className="w-4 h-4 shrink-0" />
                     <span>{language === 'th' ? 'เพิ่มรายการสั่งยา' : 'Add to Order'}</span>
@@ -2904,7 +3076,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           onClick={() => setConfirmDialog(null)}
         >
           <div
-            className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border border-slate-100"
+            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <div
@@ -2921,31 +3093,46 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               )}
             </div>
 
-            <div className="space-y-1.5">
+            {/* หัวข้อกับประโยคสรุปสั้นๆ จัดกึ่งกลางได้เพราะไม่เกินสองบรรทัด */}
+            <div className="space-y-1.5 text-center">
               <h3 className="text-2xl font-black text-slate-900 tracking-tight">
                 {confirmDialog.title}
               </h3>
-              <p className="text-sm font-medium text-slate-600 leading-relaxed px-2">
+              <p className="text-sm font-medium text-slate-600 leading-relaxed">
                 {confirmDialog.message}
               </p>
             </div>
 
+            {/* ข้อมูลผู้ป่วยแยกเป็นการ์ด ใช้รูปแบบเดียวกับกล่องแจ้งผลสำเร็จ
+                เพื่อให้แพทย์ยืนยันตัวคนไข้ได้ก่อนกด โดยไม่ต้องอ่านทั้งประโยค */}
+            {confirmDialog.patient && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-sm font-bold text-slate-900">
+                  {confirmDialog.patient.name}
+                </p>
+                <p className="text-xs font-mono text-slate-500 mt-1">
+                  HN {confirmDialog.patient.hn}
+                  {confirmDialog.patient.vn ? `  ·  VN ${confirmDialog.patient.vn}` : ''}
+                </p>
+              </div>
+            )}
+
             {confirmDialog.hint && (
               <div
-                className={`rounded-xl px-3 py-2 flex items-start gap-2 text-left border ${
+                className={`rounded-2xl px-4 py-3 flex items-start gap-2.5 text-left border ${
                   confirmDialog.tone === 'danger'
-                    ? 'bg-red-50/70 border-red-100'
-                    : 'bg-blue-50/70 border-blue-100'
+                    ? 'bg-red-50 border-red-100'
+                    : 'bg-blue-50 border-blue-100'
                 }`}
               >
                 <Info
                   className={`w-4 h-4 shrink-0 mt-0.5 ${
-                    confirmDialog.tone === 'danger' ? 'text-red-500' : 'text-blue-500'
+                    confirmDialog.tone === 'danger' ? 'text-red-600' : 'text-blue-600'
                   }`}
                 />
                 <span
-                  className={`text-[12px] leading-relaxed whitespace-pre-line ${
-                    confirmDialog.tone === 'danger' ? 'text-red-800' : 'text-blue-800'
+                  className={`text-xs font-medium leading-relaxed whitespace-pre-line ${
+                    confirmDialog.tone === 'danger' ? 'text-red-900' : 'text-blue-900'
                   }`}
                 >
                   {confirmDialog.hint}
@@ -2989,20 +3176,47 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       {/* Success Feedback Modal */}
       {successNotice && successNotice.isOpen && (
         <div className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border border-slate-100 transform transition-all scale-100">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-slate-100 transform transition-all scale-100">
             {/* Green Checkmark Icon Container */}
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto ring-8 ring-emerald-50 shadow-inner">
               <CheckCircle className="w-10 h-10 stroke-[2.5]" />
             </div>
 
-            <div className="space-y-1.5">
+            {/* หัวข้อกับประโยคสรุปสั้นๆ จัดกึ่งกลางได้เพราะข้อความสั้น */}
+            <div className="space-y-1.5 text-center">
               <h3 className="text-2xl font-black text-slate-900 tracking-tight">
                 {successNotice.title}
               </h3>
-              <p className="text-sm font-medium text-slate-600 leading-relaxed px-2">
+              <p className="text-sm font-medium text-slate-600 leading-relaxed">
                 {successNotice.message}
               </p>
             </div>
+
+            {/* ข้อมูลผู้ป่วยแยกเป็นการ์ดของตัวเอง
+                เดิมยัดชื่อ HN VN ไว้ในวงเล็บกลางประโยคยาวๆ ที่จัดกึ่งกลาง
+                อ่านยากมากเพราะบรรทัดตัดคำไม่ตรงกับความหมาย
+                แยกออกมาแล้วกวาดตาหาเลข HN เจอทันทีโดยไม่ต้องอ่านทั้งประโยค */}
+            {successNotice.patient && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-sm font-bold text-slate-900">
+                  {successNotice.patient.name}
+                </p>
+                <p className="text-xs font-mono text-slate-500 mt-1">
+                  HN {successNotice.patient.hn}
+                  {successNotice.patient.vn ? `  ·  VN ${successNotice.patient.vn}` : ''}
+                </p>
+              </div>
+            )}
+
+            {/* สิ่งที่ต้องทำต่อ แยกกล่องให้ชัดว่าเป็นคนละเรื่องกับผลการบันทึก */}
+            {successNotice.note && (
+              <div className="rounded-2xl bg-blue-50 border border-blue-100 px-4 py-3 flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <p className="text-xs font-medium text-blue-900 leading-relaxed">
+                  {successNotice.note}
+                </p>
+              </div>
+            )}
 
             <div className="pt-2">
               <button

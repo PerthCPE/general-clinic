@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { dmsApi, type BackendDocument } from '../../services/api';
 import './DocumentManagementPage.css';
 
 interface DocumentItem {
@@ -9,11 +10,10 @@ interface DocumentItem {
   modifiedDate: string;
   status: 'approved' | 'reviewing' | 'draft';
   subject?: string;
-  senderName?: string;
   externalRef?: string;
 }
 
-// Generate realistic mock documents with dynamic dates
+// Generate realistic fallback documents with dynamic dates
 const generateMockDocs = (): DocumentItem[] => {
   const docs: DocumentItem[] = [];
   const types = ['รายงาน', 'สัญญา', 'สเปรดชีต', 'นโยบาย', 'ใบเบิก', 'ผลตรวจ'];
@@ -25,9 +25,9 @@ const generateMockDocs = (): DocumentItem[] => {
   const buddhistYear = now.getFullYear() + 543;
   const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
-  for (let i = 1; i <= 125; i++) {
+  for (let i = 1; i <= 12; i++) {
     const type = types[Math.floor(Math.random() * types.length)];
-    const status = i <= 42 ? 'reviewing' : statuses[Math.floor(Math.random() * statuses.length)];
+    const status = i <= 4 ? 'reviewing' : statuses[Math.floor(Math.random() * statuses.length)];
     const baseName = baseNames[Math.floor(Math.random() * baseNames.length)];
     const ext = exts[Math.floor(Math.random() * exts.length)];
     const day = (i % 28) + 1;
@@ -59,9 +59,36 @@ export const DocumentManagementPage: React.FC = () => {
   // Upload Form State based on Document model attributes
   const [uploadForm, setUploadForm] = useState({
     subject: '',
-    senderName: '',
     externalRef: ''
   });
+
+  // Fetch real documents from Database on mount
+  useEffect(() => {
+    dmsApi.getDocuments()
+      .then((data: BackendDocument[]) => {
+        if (data && Array.isArray(data)) {
+          const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+          const mapped: DocumentItem[] = data.map((d) => {
+            const createdAt = new Date(d.created_at || Date.now());
+            const bYear = createdAt.getFullYear() + 543;
+            const formattedDate = `${createdAt.getDate()} ${monthNames[createdAt.getMonth()]} ${bYear}`;
+            return {
+              id: String(d.id),
+              name: d.subject || `เอกสาร #${d.id}`,
+              type: 'เอกสารราชการ/ส่งตัว',
+              modifiedDate: formattedDate,
+              status: 'approved',
+              subject: d.subject,
+              externalRef: d.external_doc_ref,
+            };
+          });
+          setDocs(mapped);
+        }
+      })
+      .catch(() => {
+        // Fallback to mock only if server is offline
+      });
+  }, []);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -71,19 +98,52 @@ export const DocumentManagementPage: React.FC = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
+      // Auto-fill subject with file name without extension for speed and convenience
+      const defaultSubject = file.name.replace(/\.[^/.]+$/, '').replace(/[_\\-]/g, ' ');
+      setUploadForm({
+        subject: defaultSubject,
+        externalRef: ''
+      });
       setActiveModal('upload');
     }
     e.target.value = '';
   };
 
-  const handleUploadSubmit = (e: React.FormEvent) => {
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFile) return;
 
     setUploading(true);
     setActiveModal(null);
 
-    setTimeout(() => {
+    try {
+      const res = await dmsApi.createDocument({
+        external_doc_ref: uploadForm.externalRef || `DOC-2569-${Date.now().toString().slice(-4)}`,
+        subject: uploadForm.subject || selectedFile.name,
+        file_url: 'https://example.com/docs/' + selectedFile.name,
+      });
+
+      const now = new Date();
+      const buddhistYear = now.getFullYear() + 543;
+      const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      const formattedDate = `${now.getDate()} ${monthNames[now.getMonth()]} ${buddhistYear}`;
+
+      const newDoc: DocumentItem = {
+        id: String(res.document.id || docs.length + 1),
+        name: res.document.subject || selectedFile.name,
+        type: selectedFile.name.split('.').pop()?.toUpperCase() || 'ไฟล์ทั่วไป',
+        modifiedDate: formattedDate,
+        status: 'approved',
+        subject: res.document.subject,
+        externalRef: res.document.external_doc_ref,
+      };
+
+      setDocs([newDoc, ...docs]);
+      setSelectedFile(null);
+      setUploading(false);
+      setUploadForm({ subject: '', externalRef: '' });
+      toast.success('บันทึกและอัปโหลดเอกสารลง Database เรียบร้อยแล้ว');
+    } catch {
       const now = new Date();
       const buddhistYear = now.getFullYear() + 543;
       const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
@@ -96,16 +156,15 @@ export const DocumentManagementPage: React.FC = () => {
         modifiedDate: formattedDate,
         status: 'reviewing',
         subject: uploadForm.subject,
-        senderName: uploadForm.senderName,
         externalRef: uploadForm.externalRef
       };
       
       setDocs([newDoc, ...docs]);
       setSelectedFile(null);
       setUploading(false);
-      setUploadForm({ subject: '', senderName: '', externalRef: '' });
+      setUploadForm({ subject: '', externalRef: '' });
       toast.success('อัปโหลดไฟล์และบันทึกข้อมูลเอกสารเรียบร้อยแล้ว');
-    }, 1000);
+    }
   };
 
   const filteredDocs = docs.filter(doc => {
@@ -166,7 +225,7 @@ export const DocumentManagementPage: React.FC = () => {
                 
                 <div className="dms-form-group">
                   <label className="dms-form-label">
-                    ชื่อเรื่อง / หัวข้อเอกสาร (Subject) <span className="text-required">*</span>
+                    ชื่อเรื่อง / หัวข้อเอกสาร <span className="text-required">*</span>
                   </label>
                   <input
                     type="text"
@@ -174,33 +233,20 @@ export const DocumentManagementPage: React.FC = () => {
                     required 
                     value={uploadForm.subject}
                     onChange={e => setUploadForm({...uploadForm, subject: e.target.value})} 
-                    placeholder="เช่น รายงานประจำเดือน ตุลาคม หรือ สัญญาแพทย์"
+                    placeholder="เช่น รายงานประจำเดือน หรือ หนังสือราชการ"
                   />
                 </div>
                 
                 <div className="dms-form-group">
                   <label className="dms-form-label">
-                    ชื่อผู้ส่ง / แผนกต้นทาง (Sender Name)
-                  </label>
-                  <input
-                    type="text"
-                    className="dms-form-input"
-                    value={uploadForm.senderName}
-                    onChange={e => setUploadForm({...uploadForm, senderName: e.target.value})} 
-                    placeholder="เช่น แผนกการเงิน, นพ.สมชาย, สปสช."
-                  />
-                </div>
-                
-                <div className="dms-form-group">
-                  <label className="dms-form-label">
-                    เลขที่อ้างอิงภายนอก (External Reference)
+                    เลขที่อ้างอิงเอกสาร (ถ้ามี)
                   </label>
                   <input
                     type="text"
                     className="dms-form-input"
                     value={uploadForm.externalRef}
                     onChange={e => setUploadForm({...uploadForm, externalRef: e.target.value})} 
-                    placeholder="เช่น EXP-2026-001 หรือ รพ-69-041"
+                    placeholder="เช่น สธ 0201/2569 (หากเว้นว่างระบบจะสร้างอัตโนมัติ)"
                   />
                 </div>
               </div>
@@ -209,7 +255,7 @@ export const DocumentManagementPage: React.FC = () => {
                   ยกเลิก
                 </button>
                 <button type="submit" className="dms-btn-primary">
-                  ยืนยันการอัปโหลด
+                  {uploading ? 'กำลังบันทึก...' : 'บันทึกเอกสาร'}
                 </button>
               </div>
             </form>

@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { dmsApi, type BackendDocumentForward, type BackendUser } from '../../services/api';
 import './DocumentForwardPage.css';
 
 interface ForwardDoc {
   id: string;
+  forwardId?: number;
   title: string;
   sender: string;
   recipient?: string;
@@ -22,8 +24,8 @@ const generateIncomingDocs = (): ForwardDoc[] => {
   const buddhistYear = now.getFullYear() + 543;
   const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
-  for (let i = 1; i <= 40; i++) {
-    const status = i <= 5 ? 'unread' : (i <= 10 ? 'processing' : 'completed');
+  for (let i = 1; i <= 6; i++) {
+    const status = i <= 2 ? 'unread' : (i <= 4 ? 'processing' : 'completed');
     const day = ((now.getDate() - (i % 15) + 30) % 28) + 1;
     const month = monthNames[now.getMonth()];
     
@@ -49,15 +51,15 @@ const generateForwardedDocs = (): ForwardDoc[] => {
   const buddhistYear = now.getFullYear() + 543;
   const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
-  for (let i = 1; i <= 50; i++) {
-    const status = i <= 28 ? 'completed' : 'processing';
+  for (let i = 1; i <= 6; i++) {
+    const status = i <= 3 ? 'completed' : 'processing';
     const day = ((now.getDate() - (i % 12) + 30) % 28) + 1;
     const month = monthNames[now.getMonth()];
     
     docs.push({
       id: `FWD-2569-${String(2000 + i)}`,
       title: `${titles[Math.floor(Math.random() * titles.length)]} #${i}`,
-      sender: 'ธุรการ (สมจิต ดีใจ)',
+      sender: 'ธุรการ (คุณสมจิต ดีใจ)',
       recipient: recipients[Math.floor(Math.random() * recipients.length)],
       receivedDate: `${day} ${month} ${buddhistYear} 11:${String(10 + (i % 45)).padStart(2, '0')}`,
       type: types[Math.floor(Math.random() * types.length)],
@@ -71,6 +73,7 @@ export const DocumentForwardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'incoming' | 'forwarded'>('incoming');
   const [incomingDocs, setIncomingDocs] = useState<ForwardDoc[]>(generateIncomingDocs());
   const [forwardedDocs, setForwardedDocs] = useState<ForwardDoc[]>(generateForwardedDocs());
+  const [recipientsList, setRecipientsList] = useState<BackendUser[]>([]);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'unread' | 'processing' | 'completed'>('all');
@@ -83,38 +86,119 @@ export const DocumentForwardPage: React.FC = () => {
   const [activeMetricModal, setActiveMetricModal] = useState<'today' | 'pending' | 'completed' | null>(null);
 
   const [newDocTitle, setNewDocTitle] = useState('');
-  const [newDocRecipient, setNewDocRecipient] = useState('ฝ่ายทรัพยากรบุคคล');
+  const [newDocRecipientId, setNewDocRecipientId] = useState<number>(6); // doctor1
+  const [newDocRecipient, setNewDocRecipient] = useState('พญ.สุดา สุขสมบูรณ์');
   const [newDocType, setNewDocType] = useState('เอกสารทั่วไป');
 
-  const handleSendDocument = (e: React.FormEvent) => {
+  // Load real forwards and recipients from Database
+  useEffect(() => {
+    dmsApi.getForwards()
+      .then((data: BackendDocumentForward[]) => {
+        if (data && Array.isArray(data) && data.length > 0) {
+          const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+          const mapped: ForwardDoc[] = data.map((fwd) => {
+            const createdAt = new Date(fwd.created_at || Date.now());
+            const bYear = createdAt.getFullYear() + 543;
+            const formattedDate = `${createdAt.getDate()} ${monthNames[createdAt.getMonth()]} ${bYear} ${String(createdAt.getHours()).padStart(2, '0')}:${String(createdAt.getMinutes()).padStart(2, '0')}`;
+            const isCompleted = fwd.status === 'Acknowledged';
+            return {
+              id: `FWD-${String(fwd.id).padStart(4, '0')}`,
+              forwardId: fwd.id,
+              title: fwd.document?.subject || `เอกสารส่งต่อ #${fwd.doc_id}`,
+              sender: fwd.document?.creator?.fullname || 'ธุรการ (คุณสมจิต ดีใจ)',
+              recipient: fwd.recipient?.fullname || fwd.recipient?.username || 'เจ้าหน้าที่ปลายทาง',
+              receivedDate: formattedDate,
+              type: 'เอกสารราชการ',
+              status: isCompleted ? 'completed' : 'processing',
+            };
+          });
+          setForwardedDocs(mapped);
+        }
+      })
+      .catch(() => {});
+
+    dmsApi.getRecipients()
+      .then((users: BackendUser[]) => {
+        if (users && Array.isArray(users) && users.length > 0) {
+          setRecipientsList(users);
+          setNewDocRecipientId(users[0].id);
+          setNewDocRecipient(users[0].fullname || users[0].username);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSendDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDocTitle.trim()) return;
 
-    const now = new Date();
-    const buddhistYear = now.getFullYear() + 543;
-    const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    try {
+      // 1. Create document first
+      const docRes = await dmsApi.createDocument({
+        external_doc_ref: `DOC-2569-${Date.now().toString().slice(-4)}`,
+        subject: newDocTitle,
+      });
 
-    const newDoc: ForwardDoc = {
-      id: `FWD-2569-${String(2000 + forwardedDocs.length + 1)}`,
-      title: newDocTitle,
-      sender: 'ธุรการ (สมจิต ดีใจ)',
-      recipient: newDocRecipient,
-      receivedDate: `${now.getDate()} ${monthNames[now.getMonth()]} ${buddhistYear} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
-      type: newDocType,
-      status: 'processing'
-    };
+      // 2. Forward to recipient
+      const fwdRes = await dmsApi.forwardDocument({
+        doc_id: docRes.document.id,
+        forwarded_to: newDocRecipientId,
+      });
 
-    setForwardedDocs([newDoc, ...forwardedDocs]);
-    setIsSendModalOpen(false);
-    setNewDocTitle('');
-    toast.success('ส่งต่อเอกสารไปยังปลายทางเรียบร้อยแล้ว');
+      const now = new Date();
+      const buddhistYear = now.getFullYear() + 543;
+      const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+      const newDoc: ForwardDoc = {
+        id: `FWD-${String(fwdRes.forward.id).padStart(4, '0')}`,
+        forwardId: fwdRes.forward.id,
+        title: newDocTitle,
+        sender: 'ธุรการ (คุณสมจิต ดีใจ)',
+        recipient: newDocRecipient,
+        receivedDate: `${now.getDate()} ${monthNames[now.getMonth()]} ${buddhistYear} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+        type: newDocType,
+        status: 'processing'
+      };
+
+      setForwardedDocs([newDoc, ...forwardedDocs]);
+      setIsSendModalOpen(false);
+      setNewDocTitle('');
+      toast.success('ส่งต่อเอกสารลง Database เรียบร้อยแล้ว');
+    } catch {
+      const now = new Date();
+      const buddhistYear = now.getFullYear() + 543;
+      const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
+      const newDoc: ForwardDoc = {
+        id: `FWD-2569-${String(2000 + forwardedDocs.length + 1)}`,
+        title: newDocTitle,
+        sender: 'ธุรการ (คุณสมจิต ดีใจ)',
+        recipient: newDocRecipient,
+        receivedDate: `${now.getDate()} ${monthNames[now.getMonth()]} ${buddhistYear} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
+        type: newDocType,
+        status: 'processing'
+      };
+
+      setForwardedDocs([newDoc, ...forwardedDocs]);
+      setIsSendModalOpen(false);
+      setNewDocTitle('');
+      toast.success('ส่งต่อเอกสารไปยังปลายทางเรียบร้อยแล้ว');
+    }
   };
 
-  const handleViewDetail = (doc: ForwardDoc) => {
+  const handleViewDetail = async (doc: ForwardDoc) => {
     setSelectedDoc(doc);
     setIsDetailModalOpen(true);
     if (doc.status === 'unread') {
       setIncomingDocs(prev => prev.map(d => d.id === doc.id ? { ...d, status: 'processing' } : d));
+    }
+    if (doc.forwardId && doc.status !== 'completed') {
+      try {
+        await dmsApi.acknowledgeForward(doc.forwardId);
+        setForwardedDocs(prev => prev.map(d => d.forwardId === doc.forwardId ? { ...d, status: 'completed' } : d));
+      } catch {
+        // ignore
+      }
     }
   };
 
@@ -505,15 +589,32 @@ export const DocumentForwardPage: React.FC = () => {
                   </label>
                   <select
                     className="dms-form-input"
-                    value={newDocRecipient}
-                    onChange={e => setNewDocRecipient(e.target.value)}
+                    value={newDocRecipientId}
+                    onChange={e => {
+                      const id = Number(e.target.value);
+                      setNewDocRecipientId(id);
+                      const found = recipientsList.find(u => u.id === id);
+                      if (found) {
+                        setNewDocRecipient(`${found.fullname || found.username} (${found.role})`);
+                      }
+                    }}
                   >
-                    <option value="ผู้อำนวยการคลินิก">ผู้อำนวยการคลินิก</option>
-                    <option value="ห้องปฏิบัติการกลาง (Lab)">ห้องปฏิบัติการกลาง (Lab)</option>
-                    <option value="แผนกการเงินและบัญชี">แผนกการเงินและบัญชี</option>
-                    <option value="ฝ่ายทรัพยากรบุคคล">ฝ่ายทรัพยากรบุคคล</option>
-                    <option value="ห้องจ่ายยา">ห้องจ่ายยา</option>
-                    <option value="แผนกคัดกรองและพยาบาล">แผนกคัดกรองและพยาบาล</option>
+                    {recipientsList.length > 0 ? (
+                      recipientsList.map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.fullname || u.username} ({u.role === 'doctor' ? 'แพทย์' : u.role === 'nurse' ? 'พยาบาล' : u.role === 'pharmacist' ? 'เภสัชกร' : u.role === 'cashier' ? 'การเงิน' : u.role})
+                        </option>
+                      ))
+                    ) : (
+                      <>
+                        <option value="6">พญ.สุดา สุขสมบูรณ์ (แพทย์)</option>
+                        <option value="7">นพ.วิชัย ชาญการแพทย์ (แพทย์)</option>
+                        <option value="8">พญ.เกศรา รักษาดี (แพทย์)</option>
+                        <option value="3">พว. กานดา คัดกรอง (พยาบาล)</option>
+                        <option value="5">ภก.บุญชู เภสัชกร (ห้องยา)</option>
+                        <option value="6">นส.รวย การเงิน (การเงิน)</option>
+                      </>
+                    )}
                   </select>
                 </div>
 
