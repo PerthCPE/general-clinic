@@ -1,11 +1,21 @@
 import React from 'react';
+import { ClinicActionLoadingModal } from './ClinicModalPortal';
 
 interface SkeletonProps {
   rows?: number;
   type?: 'table' | 'cards' | 'detail' | 'billing';
+  showLoadingPopup?: boolean;
+  popupTitle?: string;
+  popupSubtitle?: string;
 }
 
-export const ClinicSkeleton: React.FC<SkeletonProps> = ({ rows = 5, type = 'table' }) => {
+export const ClinicSkeleton: React.FC<SkeletonProps> = ({ 
+  rows = 5, 
+  type = 'table',
+  showLoadingPopup = true,
+  popupTitle = 'กำลังโหลดข้อมูล',
+  popupSubtitle = 'กรุณารอสักครู่ ระบบกำลังดึงข้อมูลจากฐานข้อมูล...'
+}) => {
   return (
     <div className="clinic-skeleton-container" style={{ width: '100%', padding: '16px 0', animation: 'fadeIn 0.3s ease-out' }}>
       <style>{`
@@ -25,11 +35,14 @@ export const ClinicSkeleton: React.FC<SkeletonProps> = ({ rows = 5, type = 'tabl
         }
       `}</style>
 
-      {/* Top Status Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '10px 16px', background: '#EFF6FF', borderRadius: '10px', border: '1px solid #BFDBFE' }}>
-        <div style={{ width: '14px', height: '14px', border: '2px solid #2563EB', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }}></div>
-        <span style={{ fontSize: '13px', fontWeight: '600', color: '#1E40AF' }}>กำลังโหลดข้อมูลจากฐานข้อมูล... กรุณารอสักครู่</span>
-      </div>
+      {/* ป๊อกอัพโหลดข้อมูลตรงกลางจอพร้อมฉากหลังเบลอสวยงาม และล็อก Scroll */}
+      {showLoadingPopup && (
+        <ClinicActionLoadingModal
+          isOpen={true}
+          title={popupTitle}
+          subtitle={popupSubtitle}
+        />
+      )}
 
       {type === 'cards' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '24px' }}>
@@ -66,9 +79,58 @@ export const ClinicSkeleton: React.FC<SkeletonProps> = ({ rows = 5, type = 'tabl
   );
 };
 
-export const PharmacyMedicineSkeleton: React.FC = () => <ClinicSkeleton type="cards" rows={5} />;
-export const PharmacyDetailSkeleton: React.FC = () => <ClinicSkeleton type="table" rows={4} />;
-export const BillingDashboardSkeleton: React.FC = () => <ClinicSkeleton type="cards" rows={6} />;
-export const BillingInvoiceSkeleton: React.FC = () => <ClinicSkeleton type="table" rows={4} />;
+export const PharmacyMedicineSkeleton: React.FC = () => (
+  <ClinicSkeleton 
+    type="cards" 
+    rows={5} 
+    popupTitle="กำลังโหลดข้อมูลคลังยา"
+    popupSubtitle="กรุณารอสักครู่ ระบบกำลังดึงรายการยาและจำนวนสต็อกจากฐานข้อมูล..." 
+  />
+);
+
+export const PharmacyDetailSkeleton: React.FC = () => (
+  <ClinicSkeleton 
+    type="table" 
+    rows={4} 
+    popupTitle="กำลังโหลดคิวจ่ายยา"
+    popupSubtitle="กรุณารอสักครู่ ระบบกำลังดึงรายการสั่งยาและประวัติผู้ป่วย..." 
+  />
+);
+
+export const PharmacyHistorySkeleton: React.FC = () => (
+  <ClinicSkeleton 
+    type="table" 
+    rows={6} 
+    popupTitle="กำลังโหลดประวัติการรับยา"
+    popupSubtitle="กรุณารอสักครู่ ระบบกำลังดึงข้อมูลประวัติการจ่ายยาย้อนหลัง..." 
+  />
+);
+
+export const BillingDashboardSkeleton: React.FC = () => (
+  <ClinicSkeleton 
+    type="cards" 
+    rows={6} 
+    popupTitle="กำลังโหลดแดชบอร์ดการเงิน"
+    popupSubtitle="กรุณารอสักครู่ ระบบกำลังคำนวณยอดรายรับและประวัติการชำระเงิน..." 
+  />
+);
+
+export const BillingInvoiceSkeleton: React.FC = () => (
+  <ClinicSkeleton 
+    type="table" 
+    rows={4} 
+    popupTitle="กำลังโหลดข้อมูลใบแจ้งหนี้"
+    popupSubtitle="กรุณารอสักครู่ ระบบกำลังเตรียมรายละเอียดการชำระเงิน..." 
+  />
+);
+
+export const BillingDispenseSkeleton: React.FC = () => (
+  <ClinicSkeleton 
+    type="table" 
+    rows={5} 
+    popupTitle="กำลังโหลดคิวชำระเงิน"
+    popupSubtitle="กรุณารอสักครู่ ระบบกำลังดึงข้อมูลผู้ป่วยรอชำระเงิน..." 
+  />
+);
 
 export default ClinicSkeleton;

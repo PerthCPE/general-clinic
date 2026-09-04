@@ -467,38 +467,52 @@ body.dark-mode .billing-invoice-container .grand-price {
 }
 
 /* QR Modal */
-.billing-invoice-container .modal-overlay {
+.billing-invoice-container .modal-overlay,
+.clinic-modal-portal-backdrop .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  z-index: 3000;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(12px) saturate(180%);
+  -webkit-backdrop-filter: blur(12px) saturate(180%);
+  z-index: 999999;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: 16px;
   animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-.billing-invoice-container .qr-modal-card {
+.billing-invoice-container .qr-modal-card,
+.clinic-modal-portal-backdrop .qr-modal-card {
   background: white;
   border-radius: 18px;
   max-width: 580px;
   width: 100%;
   padding: 24px;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
-  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+  animation: clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-body.dark-mode .billing-invoice-container .qr-modal-card {
+body.dark-mode .billing-invoice-container .qr-modal-card,
+body.dark-mode .clinic-modal-portal-backdrop .qr-modal-card {
   background: #1E1E1E;
-  border: 1px solid #2D2D2D;
+  border: 1px solid #334155;
+}
+
+.qr-modal-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .billing-invoice-container .qr-modal-header {

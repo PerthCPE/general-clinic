@@ -3,6 +3,7 @@ import { useWebSocket } from '../../context/WebSocketContext';
 import './PatientHistoryPage.css';
 import CopyableText from '../../components/Common/CopyableText';
 import ClinicSkeleton from '../../components/Common/ClinicSkeleton';
+import { ClinicModalPortal } from '../../components/Common/ClinicModalPortal';
 
 interface Patient {
   id: string;
@@ -856,8 +857,8 @@ export default function PatientHistoryPage() {
 
       {/* Patient Full History Pop-up Modal (Images 1 & 2 Pattern) */}
       {selectedPatientModal && (
-        <div className="modal-overlay" onClick={() => setSelectedPatientModal(null)}>
-          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', width: '92%', borderRadius: '18px', overflow: 'hidden', border: 'none' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setSelectedPatientModal(null)} className="patient-history-container">
+          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', width: '92%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden', border: 'none' }}>
             {/* Modal Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
@@ -1046,13 +1047,13 @@ export default function PatientHistoryPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Edit Patient History Modal */}
       {editPatientModal && (
-        <div className="modal-overlay" onClick={() => setEditPatientModal(null)}>
-          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', width: '92%', borderRadius: '18px', overflow: 'hidden', border: 'none', background: '#FFFFFF', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setEditPatientModal(null)} className="patient-history-container">
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', width: '92%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden', border: 'none', background: '#FFFFFF', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -1212,12 +1213,12 @@ export default function PatientHistoryPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Delete Patient Confirmation Modal */}
       {deleteConfirmPatient && (
-        <div className="modal-overlay" onClick={() => setDeleteConfirmPatient(null)}>
+        <ClinicModalPortal isOpen={true} onClose={() => setDeleteConfirmPatient(null)} className="patient-history-container">
           <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '92%', borderRadius: '18px', overflow: 'hidden', border: 'none', background: '#FFFFFF', textAlign: 'center', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -1256,7 +1257,7 @@ export default function PatientHistoryPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
     </div>
   );

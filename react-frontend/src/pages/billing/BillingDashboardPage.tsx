@@ -3,6 +3,7 @@ import './BillingDashboardPage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
 import { BillingDashboardSkeleton } from '../../components/Common/ClinicSkeleton';
+import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface PaymentRecord {
@@ -340,72 +341,11 @@ export default function BillingDashboardPage() {
   return (
     <div className="billing-dashboard-container">
       {/* Submitting Modal for Edit / Delete */}
-      {isSubmitting && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            backgroundColor: 'rgba(15, 23, 42, 0.6)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px'
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '24px',
-              padding: '36px 32px',
-              textAlign: 'center',
-              maxWidth: '380px',
-              width: '90%',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '16px',
-              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
-            }}
-          >
-            <div
-              style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                backgroundColor: '#EFF6FF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <span
-                style={{
-                  display: 'block',
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  border: '4px solid #BFDBFE',
-                  borderTopColor: '#2563EB',
-                  animation: 'clinicSpinGPU 0.85s linear infinite'
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0F172A', margin: 0 }}>
-                {submitTitle}
-              </h3>
-              <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
-                {submitSubtitle}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <ClinicActionLoadingModal
+        isOpen={isSubmitting}
+        title={submitTitle}
+        subtitle={submitSubtitle}
+      />
 
       {/* Page Header */}
       <div className="dashboard-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
@@ -834,8 +774,8 @@ export default function BillingDashboardPage() {
 
       {/* Patient Detail System Modal */}
       {selectedDetail && (
-        <div className="modal-overlay" onClick={() => setSelectedDetail(null)}>
-          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', width: '92%', borderRadius: '18px', overflow: 'hidden' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setSelectedDetail(null)} className="billing-dashboard-container">
+          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', width: '92%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden' }}>
             <div className="dash-modal-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
               <div>
                 <h2 className="dash-modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
@@ -965,12 +905,12 @@ export default function BillingDashboardPage() {
               </div>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Edit Record Modal on Dashboard */}
       {editingRecord && (
-        <div className="modal-overlay" onClick={() => setEditingRecord(null)}>
+        <ClinicModalPortal isOpen={true} onClose={() => setEditingRecord(null)} className="billing-dashboard-container">
           <div className="modal-card edit-patient-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px', width: '92%', borderRadius: '18px', background: '#FFFFFF', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #E2E8F0', paddingBottom: '14px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -1062,12 +1002,12 @@ export default function BillingDashboardPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Delete Record Confirmation Modal on Dashboard */}
       {deleteRecord && (
-        <div className="modal-overlay" onClick={() => setDeleteRecord(null)}>
+        <ClinicModalPortal isOpen={true} onClose={() => setDeleteRecord(null)} className="billing-dashboard-container">
           <div className="modal-card delete-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '92%', borderRadius: '18px', background: '#FFFFFF', padding: '24px', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -1098,7 +1038,7 @@ export default function BillingDashboardPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
     </div>
   );

@@ -3,6 +3,8 @@ import './BillingDispensePage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
+import { BillingDispenseSkeleton } from '../../components/Common/ClinicSkeleton';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface ToastState {
   message: string;
@@ -82,6 +84,7 @@ export default function BillingDispensePage({
     }
   }, [localPatientId]);
   const [isSearchExpanded, setIsSearchExpanded] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   
   // คิวเริ่มต้น - เริ่มเป็น [] จนกว่าจะดึงข้อมูลจาก DB ได้
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
@@ -230,7 +233,8 @@ export default function BillingDispensePage({
 
   // Real-time Queue & Billing Listener (ดึงทั้งคิวรอชำระเงิน และประวัติที่ชำระเงินเสร็จสิ้นแล้ว ซิงค์ตรงกับระบบจัดการยา 100%)
   useEffect(() => {
-    const fetchInitialQueue = async () => {
+    const fetchInitialQueue = async (isFirst = false) => {
+      const startTime = Date.now();
       try {
         const token = localStorage.getItem('token');
         const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -462,10 +466,18 @@ export default function BillingDispensePage({
         });
       } catch (err) {
         console.error('Failed to fetch initial billing queue:', err);
+      } finally {
+        if (isFirst) {
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+          setTimeout(() => {
+            setIsInitialLoading(false);
+          }, remaining);
+        }
       }
     };
     
-    fetchInitialQueue();
+    fetchInitialQueue(true);
 
     // Smart Background Polling ทุกๆ 12 วินาที เพื่อดึงคิวการเงินล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket เรียลไทม์)
     const pollInterval = setInterval(() => {
@@ -680,6 +692,10 @@ export default function BillingDispensePage({
   const medTotal = activePatient && Array.isArray(activePatient.medications) 
     ? activePatient.medications.reduce((sum, m: any) => sum + ((Number(m?.price || m?.unit_price) || 0) * (Number(m?.quantity) || 1)), 0) 
     : 0;
+
+  if (isInitialLoading) {
+    return <BillingDispenseSkeleton />;
+  }
 
   return (
     <div className="billing-dispense-container">

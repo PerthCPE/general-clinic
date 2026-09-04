@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import generatePayload from 'promptpay-qr';
 import html2pdf from 'html2pdf.js';
 import { BillingInvoiceSkeleton } from '../../components/Common/ClinicSkeleton';
+import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface BillingInvoicePageProps {
@@ -612,72 +613,11 @@ export default function BillingInvoicePage({
   return (
     <div className="billing-invoice-container">
       {/* Modal Popup แสดงอนิเมะชันตอนบันทึกการชำระเงินลงฐานข้อมูล (ตรงตามรูปภาพ 2) */}
-      {isSubmitting && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 9999,
-            backgroundColor: 'rgba(15, 23, 42, 0.6)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '16px'
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#ffffff',
-              borderRadius: '24px',
-              padding: '36px 32px',
-              textAlign: 'center',
-              maxWidth: '380px',
-              width: '90%',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '16px',
-              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
-            }}
-          >
-            <div
-              style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '50%',
-                backgroundColor: '#EFF6FF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <span
-                style={{
-                  display: 'block',
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '50%',
-                  border: '4px solid #BFDBFE',
-                  borderTopColor: '#2563EB',
-                  animation: 'clinicSpinGPU 0.85s linear infinite'
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0F172A', margin: 0 }}>
-                กำลังบันทึกลงฐานข้อมูล
-              </h3>
-              <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
-                กรุณารอสักครู่ ระบบกำลังบันทึกการชำระเงินและออกใบเสร็จ
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <ClinicActionLoadingModal
+        isOpen={isSubmitting}
+        title="กำลังบันทึกลงฐานข้อมูล"
+        subtitle="กรุณารอสักครู่ ระบบกำลังบันทึกการชำระเงินและออกใบเสร็จ..."
+      />
 
       {/* Top Header */}
       <div className="page-header-row" style={{ marginBottom: '16px' }}>
@@ -928,7 +868,7 @@ export default function BillingInvoicePage({
 
       {/* Payment Modal */}
       {showQrModal && (
-        <div className="modal-overlay" onClick={() => setShowQrModal(false)}>
+        <ClinicModalPortal isOpen={true} onClose={() => setShowQrModal(false)} className="billing-invoice-container">
           <div className="qr-modal-card modern-checkout-modal" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="qr-modal-header">
@@ -1296,23 +1236,12 @@ export default function BillingInvoicePage({
               </div>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Modern Receipt Preview & Print Modal */}
       {showReceiptPreview && activePatient && (
-        <div 
-          className="modal-overlay" 
-          onClick={() => setShowReceiptPreview(false)}
-          style={{
-            position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(15, 23, 42, 0.75)',
-            backdropFilter: 'blur(6px)',
-            WebkitBackdropFilter: 'blur(6px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 99999, padding: '20px', overflowY: 'auto'
-          }}
-        >
+        <ClinicModalPortal isOpen={true} onClose={() => setShowReceiptPreview(false)} className="billing-invoice-container">
           <div 
             className="receipt-preview-dialog" 
             onClick={(e) => e.stopPropagation()}
@@ -1641,7 +1570,7 @@ export default function BillingInvoicePage({
               </div>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
     </div>
   );

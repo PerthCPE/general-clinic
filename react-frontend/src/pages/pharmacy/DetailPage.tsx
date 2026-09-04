@@ -5,6 +5,7 @@ import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
 import { Check, Plus, Minus, Loader2 } from 'lucide-react';
 import { PharmacyDetailSkeleton } from '../../components/Common/ClinicSkeleton';
+import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface ToastState {
@@ -546,79 +547,12 @@ export default function DetailPage({
   return (
     <div className="detail-page-container">
 
-      {/* 1. Modal Popup แสดงอนิเมะชันตอนกด submit ส่งข้อมูลไปการเงิน (ตรงตามรูปภาพ 2) */}
       {/* 1. Modal Popup แสดงอนิเมะชันตอนกด submit ส่งข้อมูลไปการเงิน (ฉากหลังเบลอสวยงาม ข้อความและอนิเมะชันตรงกลาง) */}
-      {isSubmitting && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 99999,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(12px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(12px) saturate(180%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-            animation: 'fadeIn 0.2s ease-out forwards'
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '24px',
-              padding: '40px 36px',
-              textAlign: 'center',
-              maxWidth: '420px',
-              width: '92%',
-              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.8)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '20px',
-              animation: 'clinicScaleInGPU 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards'
-            }}
-          >
-            <div
-              style={{
-                width: '84px',
-                height: '84px',
-                borderRadius: '50%',
-                backgroundColor: '#EFF6FF',
-                border: '2px solid #DBEAFE',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 8px 16px -4px rgba(37, 99, 235, 0.15)'
-              }}
-            >
-              <span
-                style={{
-                  display: 'block',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  border: '4px solid #BFDBFE',
-                  borderTopColor: '#2563EB',
-                  animation: 'clinicSpinGPU 0.8s linear infinite'
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '8px', width: '100%' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#0F172A', margin: 0, fontFamily: 'var(--font-primary, "IBM Plex Sans Thai", sans-serif)', textAlign: 'center' }}>
-                กำลังบันทึกลงฐานข้อมูล
-              </h3>
-              <p style={{ fontSize: '14.5px', color: '#64748B', margin: 0, lineHeight: '1.6', textAlign: 'center', maxWidth: '300px' }}>
-                กรุณารอสักครู่ ระบบกำลังยืนยันการจ่ายยาและส่งข้อมูลไปยังห้องการเงิน
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <ClinicActionLoadingModal
+        isOpen={isSubmitting}
+        title="กำลังบันทึกลงฐานข้อมูล"
+        subtitle="กรุณารอสักครู่ ระบบกำลังยืนยันการจ่ายยาและส่งข้อมูลไปยังห้องการเงิน..."
+      />
 
       {/* Action Bar (Top) */}
       <div className="page-header" style={{ marginBottom: '24px' }}>
@@ -1482,35 +1416,25 @@ export default function DetailPage({
 
       {/* Medication Details Modal Popup */}
       {selectedMedInfo && (
-        <div 
-          style={{
-            position: 'fixed',
-            top: 0, left: 0, right: 0, bottom: 0,
-            background: 'rgba(15, 23, 42, 0.6)',
-            backdropFilter: 'blur(4px)',
-            WebkitBackdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '20px'
-          }}
-          onClick={() => setSelectedMedInfo(null)}
-        >
+        <ClinicModalPortal isOpen={true} onClose={() => setSelectedMedInfo(null)} className="detail-page-container">
           <div 
             style={{
               background: '#FFFFFF',
               borderRadius: '18px',
               maxWidth: '540px',
               width: '92%',
+              maxHeight: '88vh',
+              display: 'flex',
+              flexDirection: 'column',
               padding: '24px 26px',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
               border: '1px solid #E2E8F0',
-              animation: 'modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+              boxSizing: 'border-box'
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexShrink: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div>
                   <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748B' }}>{selectedMedInfo.medId}</span>
@@ -1529,16 +1453,18 @@ export default function DetailPage({
               </button>
             </div>
 
-            <div style={{ background: '#F0F9FF', padding: '18px 20px', borderRadius: '12px', border: '1.5px solid #BAE6FD', marginBottom: '22px' }}>
-              <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0284C7', fontWeight: '800' }}>
-                สรรพคุณและข้อมูลยา (Medication Properties & Indications):
-              </h4>
-              <p style={{ margin: 0, fontSize: '15px', color: '#0F172A', lineHeight: '1.65', fontWeight: '500' }}>
-                {selectedMedInfo.properties || 'ยารักษาโรคทั่วไปตามคำสั่งแพทย์ ควรรับประทานยาตามวิธีใช้ที่ระบุบนฉลากยาอย่างเคร่งครัด'}
-              </p>
+            <div style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+              <div style={{ background: '#F0F9FF', padding: '18px 20px', borderRadius: '12px', border: '1.5px solid #BAE6FD', marginBottom: '16px' }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0284C7', fontWeight: '800' }}>
+                  สรรพคุณและข้อมูลยา (Medication Properties & Indications):
+                </h4>
+                <p style={{ margin: 0, fontSize: '15px', color: '#0F172A', lineHeight: '1.65', fontWeight: '500' }}>
+                  {selectedMedInfo.properties || 'ยารักษาโรคทั่วไปตามคำสั่งแพทย์ ควรรับประทานยาตามวิธีใช้ที่ระบุบนฉลากยาอย่างเคร่งครัด'}
+                </p>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', flexShrink: 0, marginTop: '12px' }}>
               <button 
                 onClick={() => setSelectedMedInfo(null)}
                 style={{
@@ -1556,7 +1482,7 @@ export default function DetailPage({
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
     </div>
   );

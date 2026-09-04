@@ -546,17 +546,40 @@ body.dark-mode .billing-dashboard-container .view-detail-hint {
   background: white;
   border-radius: 18px;
   max-width: 580px;
-  width: 100%;
+  width: 92%;
   padding: 0;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-  max-height: calc(100vh - 48px);
-  overflow-y: auto;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.billing-dashboard-container .modal-card {
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 body.dark-mode .billing-dashboard-container .dash-modal-card {
   background: #1E1E1E;
   border: 1px solid #2D2D2D;
+}
+
+body.dark-mode .billing-dashboard-container .modal-card {
+  background: #1E1E1E !important;
+  border: 1px solid #2D2D2D !important;
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .billing-dashboard-container .modal-card input,
+body.dark-mode .billing-dashboard-container .modal-card select {
+  background: #262626 !important;
+  border-color: #404040 !important;
+  color: #F1F5F9 !important;
 }
 
 .billing-dashboard-container .dash-modal-header {

@@ -4,6 +4,7 @@ import './MedicinePage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
 import { PharmacyMedicineSkeleton } from '../../components/Common/ClinicSkeleton';
+import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface Medicine {
@@ -1095,77 +1096,11 @@ export default function MedicinePage() {
     <div className="medicine-page-container">
 
       {/* 1. Modal Popup แสดงอนิเมะชันตอนบันทึกลงฐานข้อมูล (ฉากหลังเบลอสวยงาม ข้อความและอนิเมะชันตรงกลาง) */}
-      {isSubmitting && (
-        <div
-          role="status"
-          aria-live="polite"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 99999,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            backdropFilter: 'blur(12px) saturate(180%)',
-            WebkitBackdropFilter: 'blur(12px) saturate(180%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '20px',
-            animation: 'fadeIn 0.2s ease-out forwards'
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: '24px',
-              padding: '40px 36px',
-              textAlign: 'center',
-              maxWidth: '420px',
-              width: '92%',
-              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.8)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '20px',
-              animation: 'clinicScaleInGPU 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards'
-            }}
-          >
-            <div
-              style={{
-                width: '84px',
-                height: '84px',
-                borderRadius: '50%',
-                backgroundColor: '#EFF6FF',
-                border: '2px solid #DBEAFE',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 8px 16px -4px rgba(37, 99, 235, 0.15)'
-              }}
-            >
-              <span
-                style={{
-                  display: 'block',
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '50%',
-                  border: '4px solid #BFDBFE',
-                  borderTopColor: '#2563EB',
-                  animation: 'clinicSpinGPU 0.8s linear infinite'
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '8px', width: '100%' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#0F172A', margin: 0, fontFamily: 'var(--font-primary, "IBM Plex Sans Thai", sans-serif)', textAlign: 'center' }}>
-                {submitTitle}
-              </h3>
-              <p style={{ fontSize: '14.5px', color: '#64748B', margin: 0, lineHeight: '1.6', textAlign: 'center', maxWidth: '300px' }}>
-                {submitSubtitle}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+      <ClinicActionLoadingModal
+        isOpen={isSubmitting}
+        title={submitTitle}
+        subtitle={submitSubtitle}
+      />
 
       <div className="page-header" style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
         <div className="header-titles" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
@@ -1593,8 +1528,8 @@ export default function MedicinePage() {
 
       {/* Stock Adjustment Modal */}
       {isModalOpen && selectedMedicine && (
-        <div className="modal-overlay">
-          <div className="modal-card card">
+        <ClinicModalPortal isOpen={true} onClose={handleCloseModal} className="medicine-page-container">
+          <div className="modal-card card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">ปรับปรุงสต็อกยา - {selectedMedicine.name}</h3>
               <button className="close-btn" onClick={handleCloseModal}>✕</button>
@@ -1665,12 +1600,12 @@ export default function MedicinePage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Medicine Info Detail Modal (รองรับทั้งดูรายละเอียด และแก้ไขลง DB ทันที) */}
       {detailModalMed && (
-        <div className="modal-overlay" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>
+        <ClinicModalPortal isOpen={true} onClose={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }} className="medicine-page-container">
           <div className="med-detail-modal-card card" style={{ maxWidth: '580px', width: '92%' }} onClick={(e) => e.stopPropagation()}>
             <div className="med-detail-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #E2E8F0', paddingBottom: '16px', marginBottom: '18px' }}>
               <div className="med-detail-title-box" style={{ flex: 1, minWidth: 0, paddingRight: '20px' }}>
@@ -2002,19 +1937,19 @@ export default function MedicinePage() {
               )}
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Add New Medicine Modal */}
       {isAddModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-card card" style={{ maxWidth: '560px' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setIsAddModalOpen(false)} className="medicine-page-container">
+          <div className="modal-card card" style={{ maxWidth: '560px', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">+ เพิ่มรายการยาใหม่เข้าคลัง</h3>
               <button className="close-btn" onClick={() => setIsAddModalOpen(false)}>✕</button>
             </div>
 
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '70vh', overflowY: 'auto' }}>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', flex: 1, minHeight: 0, paddingRight: '4px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="input-group">
                   <label style={{ fontSize: '13px', fontWeight: '600' }}>รหัสยา (Medicine Code)</label>
@@ -2113,7 +2048,7 @@ export default function MedicinePage() {
               </div>
             </div>
 
-            <div className="modal-footer" style={{ marginTop: '16px' }}>
+            <div className="modal-footer" style={{ marginTop: '16px', flexShrink: 0 }}>
               <button className="cancel-btn" onClick={() => setIsAddModalOpen(false)}>ยกเลิก</button>
               <button
                 className="save-btn"
@@ -2125,13 +2060,13 @@ export default function MedicinePage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmMed && (
-        <div className="modal-overlay">
-          <div className="modal-card card" style={{ maxWidth: '420px', textAlign: 'center' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setDeleteConfirmMed(null)} className="medicine-page-container">
+          <div className="modal-card card" style={{ maxWidth: '420px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2146,7 +2081,7 @@ export default function MedicinePage() {
                 คุณต้องการลบยา <strong style={{ color: '#0F172A' }}>{deleteConfirmMed.name}</strong> ({deleteConfirmMed.medicine_code || deleteConfirmMed.id}) ออกจากฐานข้อมูลคลังยาใช่หรือไม่?
               </p>
             </div>
-            <div className="modal-footer" style={{ justifyContent: 'center', gap: '12px', background: '#F8FAFC', padding: '16px 20px', borderRadius: '0 0 12px 12px' }}>
+            <div className="modal-footer" style={{ justifyContent: 'center', gap: '12px', background: '#F8FAFC', padding: '16px 20px', borderRadius: '0 0 12px 12px', flexShrink: 0 }}>
               <button className="cancel-btn" onClick={() => setDeleteConfirmMed(null)}>ยกเลิก</button>
               <button
                 type="button"
@@ -2161,7 +2096,7 @@ export default function MedicinePage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
     </div>
   );
