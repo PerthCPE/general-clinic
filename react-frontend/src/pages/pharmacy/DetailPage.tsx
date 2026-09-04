@@ -547,6 +547,7 @@ export default function DetailPage({
     <div className="detail-page-container">
 
       {/* 1. Modal Popup แสดงอนิเมะชันตอนกด submit ส่งข้อมูลไปการเงิน (ตรงตามรูปภาพ 2) */}
+      {/* 1. Modal Popup แสดงอนิเมะชันตอนกด submit ส่งข้อมูลไปการเงิน (ฉากหลังเบลอสวยงาม ข้อความและอนิเมะชันตรงกลาง) */}
       {isSubmitting && (
         <div
           role="status"
@@ -554,60 +555,65 @@ export default function DetailPage({
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 9999,
-            backgroundColor: 'rgba(15, 23, 42, 0.6)',
-            backdropFilter: 'blur(4px)',
+            zIndex: 99999,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(12px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(12px) saturate(180%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '16px'
+            padding: '20px',
+            animation: 'fadeIn 0.2s ease-out forwards'
           }}
         >
           <div
             style={{
-              backgroundColor: '#ffffff',
+              backgroundColor: '#FFFFFF',
               borderRadius: '24px',
-              padding: '36px 32px',
+              padding: '40px 36px',
               textAlign: 'center',
-              maxWidth: '380px',
-              width: '90%',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              maxWidth: '420px',
+              width: '92%',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.8)',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              gap: '16px',
-              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1)'
+              justifyContent: 'center',
+              gap: '20px',
+              animation: 'clinicScaleInGPU 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards'
             }}
           >
             <div
               style={{
-                width: '80px',
-                height: '80px',
+                width: '84px',
+                height: '84px',
                 borderRadius: '50%',
                 backgroundColor: '#EFF6FF',
+                border: '2px solid #DBEAFE',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center'
+                justifyContent: 'center',
+                boxShadow: '0 8px 16px -4px rgba(37, 99, 235, 0.15)'
               }}
             >
               <span
                 style={{
                   display: 'block',
-                  width: '36px',
-                  height: '36px',
+                  width: '40px',
+                  height: '40px',
                   borderRadius: '50%',
                   border: '4px solid #BFDBFE',
                   borderTopColor: '#2563EB',
-                  animation: 'clinicSpinGPU 0.85s linear infinite'
+                  animation: 'clinicSpinGPU 0.8s linear infinite'
                 }}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0F172A', margin: 0 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '8px', width: '100%' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#0F172A', margin: 0, fontFamily: 'var(--font-primary, "IBM Plex Sans Thai", sans-serif)', textAlign: 'center' }}>
                 กำลังบันทึกลงฐานข้อมูล
               </h3>
-              <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
-                กรุณารอสักครู่ ระบบกำลังบันทึกและส่งต่อไปยังห้องการเงิน
+              <p style={{ fontSize: '14.5px', color: '#64748B', margin: 0, lineHeight: '1.6', textAlign: 'center', maxWidth: '300px' }}>
+                กรุณารอสักครู่ ระบบกำลังยืนยันการจ่ายยาและส่งข้อมูลไปยังห้องการเงิน
               </p>
             </div>
           </div>

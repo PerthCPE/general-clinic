@@ -495,6 +495,79 @@ export default function PatientHistoryPage() {
 
   return (
     <div className="patient-history-container">
+      {/* Modal Popup แสดงอนิเมะชันตอนบันทึก/ลบข้อมูลประวัติผู้ป่วย (ฉากหลังเบลอสวยงาม ข้อความและอนิเมะชันตรงกลาง) */}
+      {(isSavingPatient || isDeletingPatient) && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 99999,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            backdropFilter: 'blur(12px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(12px) saturate(180%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'fadeIn 0.2s ease-out forwards'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '24px',
+              padding: '40px 36px',
+              textAlign: 'center',
+              maxWidth: '420px',
+              width: '92%',
+              boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.8)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '20px',
+              animation: 'clinicScaleInGPU 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards'
+            }}
+          >
+            <div
+              style={{
+                width: '84px',
+                height: '84px',
+                borderRadius: '50%',
+                backgroundColor: '#EFF6FF',
+                border: '2px solid #DBEAFE',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 8px 16px -4px rgba(37, 99, 235, 0.15)'
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  border: '4px solid #BFDBFE',
+                  borderTopColor: '#2563EB',
+                  animation: 'clinicSpinGPU 0.8s linear infinite'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', gap: '8px', width: '100%' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#0F172A', margin: 0, fontFamily: 'var(--font-primary, "IBM Plex Sans Thai", sans-serif)', textAlign: 'center' }}>
+                {isDeletingPatient ? 'กำลังลบข้อมูลประวัติ' : 'กำลังบันทึกลงฐานข้อมูล'}
+              </h3>
+              <p style={{ fontSize: '14.5px', color: '#64748B', margin: 0, lineHeight: '1.6', textAlign: 'center', maxWidth: '300px' }}>
+                {isDeletingPatient ? 'กรุณารอสักครู่ ระบบกำลังนำข้อมูลออกจากฐานข้อมูล' : 'กรุณารอสักครู่ ระบบกำลังบันทึกข้อมูลประวัติผู้ป่วยลงฐานข้อมูล'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="list-view-container">
         <div className="page-header" style={{ marginBottom: '24px' }}>
           <div className="header-titles">
