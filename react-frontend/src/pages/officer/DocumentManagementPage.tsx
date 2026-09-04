@@ -631,16 +631,17 @@ export const DocumentManagementPage: React.FC = () => {
                         <button
                           type="button"
                           className="dms-action-view-btn"
+                          title="ดูรายละเอียดเอกสาร"
+                          aria-label="ดูรายละเอียดเอกสาร"
                           onClick={(e) => {
                             e.stopPropagation();
                             openDocDetail(doc);
                           }}
                         >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
                             <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
                             <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
-                          ดูรายละเอียด
                         </button>
                       </td>
                     </tr>
@@ -857,16 +858,17 @@ export const DocumentManagementPage: React.FC = () => {
                       <button
                         type="button"
                         className="dms-action-view-btn"
+                        title="ดูรายละเอียดเอกสาร"
+                        aria-label="ดูรายละเอียดเอกสาร"
                         onClick={(e) => {
                           e.stopPropagation();
                           openDocDetail(doc);
                         }}
                       >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
                           <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
                           <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
-                        ดูรายละเอียด
                       </button>
                     </td>
                   </tr>

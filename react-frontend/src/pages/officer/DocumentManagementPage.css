@@ -1073,14 +1073,14 @@ body.dark-mode .dms-modal-card .dms-clickable-row:hover {
 .dms-action-view-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
   border-radius: 8px;
   background: #EFF6FF;
   color: #2563EB;
   border: 1px solid #BFDBFE;
-  font-size: 13px;
-  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -1095,6 +1095,7 @@ body.dark-mode .dms-action-view-btn {
   background: #2563EB;
   color: #FFFFFF;
   border-color: #2563EB;
+  transform: translateY(-1px);
 }
 
 body.dark-mode .dms-action-view-btn:hover {
