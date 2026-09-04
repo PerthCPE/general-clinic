@@ -110,7 +110,9 @@ const EXAM_ANCHOR = {
 interface ExaminationViewProps {
   patient: Patient;
   onBackToQueue: () => void;
-  onSavePatient: (updatedPatient: Patient) => void;
+  /** บันทึกลงฐานข้อมูล คืน false ถ้า backend ปฏิเสธ
+   *  ต้องรอผลก่อนขึ้นกล่อง "บันทึกสำเร็จ" ไม่งั้นจะบอกว่าสำเร็จทั้งที่ยังไม่ได้บันทึก */
+  onSavePatient: (updatedPatient: Patient) => void | boolean | Promise<void | boolean>;
 }
 
 // ICD-10 Diagnoses Database with Thai & English names
@@ -737,7 +739,12 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   const [successNotice, setSuccessNotice] = useState<{
     isOpen: boolean;
     title: string;
+    /** ประโยคเดียวสั้นๆ บอกว่าเกิดอะไรขึ้น */
     message: string;
+    /** ข้อมูลผู้ป่วย แยกออกมาเป็นการ์ดของตัวเอง อ่านง่ายกว่าปนอยู่ในประโยค */
+    patient?: { name: string; hn: string; vn?: string };
+    /** สิ่งที่ต้องทำต่อ หรือผลข้างเคียงที่ควรรู้ แสดงเป็นกล่องแยกด้านล่าง */
+    note?: string;
     onConfirm?: () => void;
   } | null>(null);
 
@@ -747,7 +754,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   const [confirmDialog, setConfirmDialog] = useState<{
     tone: 'danger' | 'primary';
     title: string;
+    /** ประโยคเดียวสั้นๆ บอกว่ากดยืนยันแล้วจะเกิดอะไร */
     message: string;
+    /** ข้อมูลผู้ป่วย แยกเป็นการ์ดของตัวเอง ไม่ยัดไว้ในวงเล็บกลางประโยค */
+    patient?: { name: string; hn: string; vn?: string };
+    /** ข้อควรรู้เพิ่มเติม แสดงเป็นกล่องมีไอคอนด้านล่าง */
     hint?: string;
     confirmLabel: string;
     onConfirm: () => void;
@@ -912,17 +923,30 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   };
 
   // Save Draft — งานจริง (เรียกหลังผู้ใช้กดยืนยันในโมดัล)
-  const runSaveDraft = () => {
+  const runSaveDraft = async () => {
     const activeDiags = [...(primaryDiag ? [primaryDiag] : []), ...secondaryDiags];
     saveToRecentDiagnoses(activeDiags);
     const updated = buildUpdatedPatient('Examining');
-    onSavePatient(updated);
+
+    // รอผลจริงจากฐานข้อมูลก่อน ถ้าบันทึกไม่ผ่านจะไม่ขึ้นกล่อง "บันทึกแล้ว"
+    // เหตุผลที่ล้มเหลวจะแสดงเป็นแถบสีแดงด้านบนของหน้า
+    const saved = await onSavePatient(updated);
+    if (saved === false) return;
+
     setSuccessNotice({
       isOpen: true,
       title: language === 'th' ? 'บันทึกฉบับร่างแล้ว' : 'Draft Saved',
       message: language === 'th'
-        ? `เก็บข้อมูลการตรวจของ ${patient.name} (HN: ${patient.hn}) ไว้เรียบร้อย สถานะยังเป็น "กำลังตรวจ" กดปุ่ม "ตรวจต่อ" ในหน้าคิวผู้ป่วยเพื่อกลับมาทำต่อได้ทุกเมื่อ`
-        : `Examination data for ${patient.name} (HN: ${patient.hn}) has been saved. The visit remains "Examining" — use the "Continue Exam" button in the patient queue to resume.`,
+        ? 'เก็บข้อมูลการตรวจไว้เรียบร้อยแล้ว'
+        : 'The examination data has been saved.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
+      note: language === 'th'
+        ? 'สถานะยังเป็น "กำลังตรวจ" กดปุ่ม "ตรวจต่อ" ในหน้าคิวผู้ป่วยเพื่อกลับมาทำต่อได้ทุกเมื่อ'
+        : 'The visit remains "Examining". Use the "Continue Exam" button in the patient queue to resume.',
       // กลับไปหน้าคิวผู้ป่วยเหมือนตอนกดบันทึกผลการตรวจ
       // เพื่อให้แพทย์เรียกคิวถัดไปได้ทันที แล้วค่อยกด "ตรวจต่อ" กลับมาทีหลัง
       onConfirm: () => {
@@ -937,8 +961,13 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       tone: 'primary',
       title: language === 'th' ? 'บันทึกฉบับร่าง?' : 'Save Draft?',
       message: language === 'th'
-        ? 'ระบบจะเก็บข้อมูลที่กรอกไว้ทั้งหมด แต่ยังไม่ปิดการตรวจ ผู้ป่วยจะยังอยู่ในสถานะ "กำลังตรวจ"'
-        : 'All entered data will be saved without closing the visit. The patient stays in "Examining" status.',
+        ? 'เก็บข้อมูลที่กรอกไว้ทั้งหมด แต่ยังไม่ปิดการตรวจ'
+        : 'Saves everything you have entered without closing the visit.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
       hint: language === 'th'
         ? 'ยังไม่ส่งรายการสั่งยาไปห้องยา จนกว่าจะกด "บันทึกและเสร็จสิ้นการตรวจ"'
         : 'Prescriptions are not sent to the pharmacy until you use "Save & Complete Visit".',
@@ -953,8 +982,13 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       tone: 'danger',
       title: language === 'th' ? 'ยกเลิกการตรวจรับบริการ?' : 'Cancel Visit Session?',
       message: language === 'th'
-        ? 'ระบบจะกลับไปหน้าคิวผู้ป่วย ข้อมูลการตรวจที่กรอกไว้แต่ยังไม่ได้บันทึกจะหายทั้งหมด'
-        : 'You will return to the patient queue. Any examination data not yet saved will be lost.',
+        ? 'กลับไปหน้าคิวผู้ป่วย ข้อมูลที่กรอกไว้แต่ยังไม่ได้บันทึกจะหายทั้งหมด'
+        : 'Returns to the patient queue. Anything not yet saved will be lost.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
       hint: language === 'th'
         ? 'หากยังต้องการเก็บข้อมูลไว้ ให้กด "บันทึกฉบับร่าง" แทน'
         : 'To keep your work, use "Save Draft" instead.',
@@ -997,8 +1031,13 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       tone: 'primary',
       title: language === 'th' ? 'บันทึกและเสร็จสิ้นการตรวจ?' : 'Save & Complete Visit?',
       message: language === 'th'
-        ? `ปิดการตรวจของ ${patient.name} (HN: ${patient.hn}) และเปลี่ยนสถานะเป็น "ตรวจเสร็จสิ้น"`
-        : `This will close the visit for ${patient.name} (HN: ${patient.hn}) and set the status to "Completed".`,
+        ? 'ปิดการตรวจและเปลี่ยนสถานะเป็น "ตรวจเสร็จสิ้น" แก้ไขย้อนหลังไม่ได้'
+        : 'This closes the visit and sets the status to "Completed". It cannot be edited afterwards.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
       hint: [
         prescriptions.length > 0
           ? (language === 'th'
@@ -1020,20 +1059,34 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   };
 
   // Complete Visit — งานจริง (เรียกหลังผู้ใช้กดยืนยันในโมดัล)
-  const runCompleteVisit = () => {
+  const runCompleteVisit = async () => {
     const activeDiags = [...(primaryDiag ? [primaryDiag] : []), ...secondaryDiags];
     saveToRecentDiagnoses(activeDiags);
     const updated = buildUpdatedPatient('Completed');
-    onSavePatient(updated);
-    const rxNotice = prescriptions.length > 0 
-      ? (language === 'th' ? `\n(ระบบส่งรายการสั่งยา ${prescriptions.length} รายการไปยังห้องยาโดยอัตโนมัติ)` : `\n(${prescriptions.length} prescription item(s) automatically synced to pharmacy queue)`)
-      : '';
+
+    // ปิดเคสเป็นการเซ็นรับรองผลการตรวจ ยิ่งต้องรอให้ฐานข้อมูลยืนยันก่อน
+    // ถ้าขึ้นว่าสำเร็จแล้วแต่จริงๆ ไม่ได้บันทึก แพทย์จะเดินไปเรียกคิวถัดไปโดยไม่รู้ตัว
+    const saved = await onSavePatient(updated);
+    if (saved === false) return;
+
     setSuccessNotice({
       isOpen: true,
-      title: language === 'th' ? 'บันทึกสำเร็จ!' : 'Success!',
+      title: language === 'th' ? 'ปิดการตรวจเรียบร้อย' : 'Visit Completed',
       message: language === 'th'
-        ? `บันทึกและเสร็จสิ้นการตรวจเรียบร้อยแล้วสำหรับผู้ป่วย ${patient.name} (HN: ${patient.hn}, VN: ${displayVN(patient.vn)})${rxNotice}`
-        : `Examination completed successfully for patient ${patient.name} (HN: ${patient.hn}, VN: ${displayVN(patient.vn)})${rxNotice}`,
+        ? 'บันทึกผลการตรวจและเปลี่ยนสถานะเป็น "ตรวจเสร็จสิ้น" แล้ว'
+        : 'The examination has been signed and marked as completed.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
+      note: prescriptions.length > 0
+        ? (language === 'th'
+            ? `ส่งใบสั่งยา ${prescriptions.length} รายการไปยังห้องยาแล้ว`
+            : `${prescriptions.length} prescription item(s) sent to the pharmacy queue.`)
+        : (language === 'th'
+            ? 'การตรวจครั้งนี้ไม่มีรายการสั่งยา ผู้ป่วยไปชำระเงินได้เลย'
+            : 'No medication was prescribed for this visit.'),
       onConfirm: () => {
         onBackToQueue();
       }
@@ -2912,7 +2965,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           onClick={() => setConfirmDialog(null)}
         >
           <div
-            className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border border-slate-100"
+            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <div
@@ -2929,31 +2982,46 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               )}
             </div>
 
-            <div className="space-y-1.5">
+            {/* หัวข้อกับประโยคสรุปสั้นๆ จัดกึ่งกลางได้เพราะไม่เกินสองบรรทัด */}
+            <div className="space-y-1.5 text-center">
               <h3 className="text-2xl font-black text-slate-900 tracking-tight">
                 {confirmDialog.title}
               </h3>
-              <p className="text-sm font-medium text-slate-600 leading-relaxed px-2">
+              <p className="text-sm font-medium text-slate-600 leading-relaxed">
                 {confirmDialog.message}
               </p>
             </div>
 
+            {/* ข้อมูลผู้ป่วยแยกเป็นการ์ด ใช้รูปแบบเดียวกับกล่องแจ้งผลสำเร็จ
+                เพื่อให้แพทย์ยืนยันตัวคนไข้ได้ก่อนกด โดยไม่ต้องอ่านทั้งประโยค */}
+            {confirmDialog.patient && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-sm font-bold text-slate-900">
+                  {confirmDialog.patient.name}
+                </p>
+                <p className="text-xs font-mono text-slate-500 mt-1">
+                  HN {confirmDialog.patient.hn}
+                  {confirmDialog.patient.vn ? `  ·  VN ${confirmDialog.patient.vn}` : ''}
+                </p>
+              </div>
+            )}
+
             {confirmDialog.hint && (
               <div
-                className={`rounded-xl px-3 py-2 flex items-start gap-2 text-left border ${
+                className={`rounded-2xl px-4 py-3 flex items-start gap-2.5 text-left border ${
                   confirmDialog.tone === 'danger'
-                    ? 'bg-red-50/70 border-red-100'
-                    : 'bg-blue-50/70 border-blue-100'
+                    ? 'bg-red-50 border-red-100'
+                    : 'bg-blue-50 border-blue-100'
                 }`}
               >
                 <Info
                   className={`w-4 h-4 shrink-0 mt-0.5 ${
-                    confirmDialog.tone === 'danger' ? 'text-red-500' : 'text-blue-500'
+                    confirmDialog.tone === 'danger' ? 'text-red-600' : 'text-blue-600'
                   }`}
                 />
                 <span
-                  className={`text-[12px] leading-relaxed whitespace-pre-line ${
-                    confirmDialog.tone === 'danger' ? 'text-red-800' : 'text-blue-800'
+                  className={`text-xs font-medium leading-relaxed whitespace-pre-line ${
+                    confirmDialog.tone === 'danger' ? 'text-red-900' : 'text-blue-900'
                   }`}
                 >
                   {confirmDialog.hint}
@@ -2997,20 +3065,47 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       {/* Success Feedback Modal */}
       {successNotice && successNotice.isOpen && (
         <div className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border border-slate-100 transform transition-all scale-100">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-slate-100 transform transition-all scale-100">
             {/* Green Checkmark Icon Container */}
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto ring-8 ring-emerald-50 shadow-inner">
               <CheckCircle className="w-10 h-10 stroke-[2.5]" />
             </div>
 
-            <div className="space-y-1.5">
+            {/* หัวข้อกับประโยคสรุปสั้นๆ จัดกึ่งกลางได้เพราะข้อความสั้น */}
+            <div className="space-y-1.5 text-center">
               <h3 className="text-2xl font-black text-slate-900 tracking-tight">
                 {successNotice.title}
               </h3>
-              <p className="text-sm font-medium text-slate-600 leading-relaxed px-2">
+              <p className="text-sm font-medium text-slate-600 leading-relaxed">
                 {successNotice.message}
               </p>
             </div>
+
+            {/* ข้อมูลผู้ป่วยแยกเป็นการ์ดของตัวเอง
+                เดิมยัดชื่อ HN VN ไว้ในวงเล็บกลางประโยคยาวๆ ที่จัดกึ่งกลาง
+                อ่านยากมากเพราะบรรทัดตัดคำไม่ตรงกับความหมาย
+                แยกออกมาแล้วกวาดตาหาเลข HN เจอทันทีโดยไม่ต้องอ่านทั้งประโยค */}
+            {successNotice.patient && (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p className="text-sm font-bold text-slate-900">
+                  {successNotice.patient.name}
+                </p>
+                <p className="text-xs font-mono text-slate-500 mt-1">
+                  HN {successNotice.patient.hn}
+                  {successNotice.patient.vn ? `  ·  VN ${successNotice.patient.vn}` : ''}
+                </p>
+              </div>
+            )}
+
+            {/* สิ่งที่ต้องทำต่อ แยกกล่องให้ชัดว่าเป็นคนละเรื่องกับผลการบันทึก */}
+            {successNotice.note && (
+              <div className="rounded-2xl bg-blue-50 border border-blue-100 px-4 py-3 flex items-start gap-2.5">
+                <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                <p className="text-xs font-medium text-blue-900 leading-relaxed">
+                  {successNotice.note}
+                </p>
+              </div>
+            )}
 
             <div className="pt-2">
               <button

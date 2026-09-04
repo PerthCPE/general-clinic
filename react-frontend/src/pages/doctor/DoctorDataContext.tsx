@@ -1,4 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+// สีโหมดมืดของหน้าจอแพทย์ นำเข้าที่นี่เพราะไฟล์นี้ถูกโหลดทุกครั้งที่เข้าหน้าแพทย์
+// และไม่ถูกโหลดเลยเมื่ออยู่ role อื่น จึงไม่มีทางไปกวนหน้าของเพื่อน
+import './doctor-dark.css';
 import { LanguageProvider } from './context/LanguageContext';
 import type { Patient, QueueStatus } from './types';
 import {
@@ -36,7 +39,9 @@ interface DoctorDataContextType {
   setSelectedRecordPatient: React.Dispatch<React.SetStateAction<Patient | null>>;
   statusFilter: string;
   setStatusFilter: React.Dispatch<React.SetStateAction<string>>;
-  handleSavePatient: (updatedPatient: Patient) => void;
+  /** คืน true เมื่อ backend บันทึกสำเร็จจริง, false เมื่อล้มเหลว
+   *  หน้าจอต้องรอค่านี้ก่อนขึ้นกล่อง "บันทึกสำเร็จ" */
+  handleSavePatient: (updatedPatient: Patient) => Promise<boolean>;
   handleUpdateStatus: (patientId: string, newStatus: QueueStatus) => void;
 
   /**
@@ -81,7 +86,10 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [saveError, setSaveError] = useState<string | null>(null);
   const [activeExamPatient, setActiveExamPatient] = useState<Patient | null>(null);
   const [selectedRecordPatient, setSelectedRecordPatient] = useState<Patient | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('All');
+  // เปิดหน้ามาให้เห็น "รอตรวจ" ก่อน เพราะเป็นกลุ่มเดียวที่แพทย์ต้องลงมือทำต่อ
+  // ถ้าตั้งเป็น "ทั้งหมด" คิวที่ตรวจจบไปแล้วจะปนอยู่ในรายการตั้งแต่แรก
+  // ทำให้ต้องกวาดตาหาคนถัดไปเองทุกครั้งที่เปิดหน้า
+  const [statusFilter, setStatusFilter] = useState<string>('Waiting');
 
   const [summary, setSummary] = useState<BackendDoctorQueueSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -269,13 +277,13 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
    * ถ้า backend ปฏิเสธ (เช่น ยังไม่ได้ระบุการวินิจฉัยหลักตอนปิดเคส)
    * จะแสดงข้อความผิดพลาด แล้วดึงข้อมูลจริงกลับมาทับ
    */
-  const handleSavePatient = (updatedPatient: Patient) => {
+  const handleSavePatient = async (updatedPatient: Patient): Promise<boolean> => {
     setPatients((prev) => prev.map((p) => (p.id === updatedPatient.id ? updatedPatient : p)));
     setActiveExamPatient((prev) => (prev?.id === updatedPatient.id ? updatedPatient : prev));
 
     if (!updatedPatient.visitId) {
       setSaveError('ผู้ป่วยรายนี้ยังไม่มีข้อมูลการเข้ารับบริการ จึงบันทึกผลตรวจไม่ได้');
-      return;
+      return false;
     }
 
     const action: 'draft' | 'sign' = updatedPatient.status === 'Completed' ? 'sign' : 'draft';
@@ -283,7 +291,7 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const previousStatus = patients.find((p) => p.id === updatedPatient.id)?.status;
 
     setIsSaving(true);
-    void examinationApi
+    return examinationApi
       .save(visitId, buildExaminationRequest(updatedPatient, action))
       .then((result) => {
         // ยาที่จับคู่กับคลังของห้องยาไม่ได้ จะไม่ถูกส่งต่อไปห้องยา
@@ -295,7 +303,7 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             : null
         );
         // ดึงผลตรวจที่เพิ่งบันทึกกลับมาทับ เพื่อให้หน้าจอตรงกับฐานข้อมูลจริง
-        return Promise.all([refresh(), hydrateExamination(visitId)]);
+        return Promise.all([refresh(), hydrateExamination(visitId)]).then(() => true);
       })
       .catch((err: unknown) => {
         setSaveError(err instanceof Error ? err.message : 'ไม่สามารถบันทึกผลการตรวจได้');
@@ -305,7 +313,7 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             prev?.id === updatedPatient.id ? { ...prev, status: previousStatus } : prev
           );
         }
-        return refresh();
+        return refresh().then(() => false);
       })
       .finally(() => {
         setIsSaving(false);
