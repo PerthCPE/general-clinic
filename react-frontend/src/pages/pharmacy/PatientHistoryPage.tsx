@@ -579,7 +579,7 @@ export default function PatientHistoryPage() {
           </div>
         </div>
 
-        <div className="patient-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
+        <div className="patient-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', borderRadius: '14px' }}>
           <div 
             className="collapsible-card-header"
             onClick={() => setIsPatientListExpanded(!isPatientListExpanded)}
@@ -614,7 +614,7 @@ export default function PatientHistoryPage() {
               </div>
             ) : (
               <>
-                <div className="table-wrapper" style={{ overflowX: 'hidden', width: '100%' }}>
+                <div className="table-wrapper" style={{ width: '100%', overscrollBehavior: 'auto' }}>
                   <table className="patient-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                     <thead>
                     <tr>

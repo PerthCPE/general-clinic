@@ -32,6 +32,7 @@ export interface PatientConfig {
     name: string;
     dosage: string;
     instructions: string;
+    expiry_date?: string;
     stock: number;
     stockStatus: 'in-stock' | 'low-stock' | 'out-stock';
     quantity?: number;

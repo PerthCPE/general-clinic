@@ -46,7 +46,7 @@ export const ClinicModalPortal: React.FC<ClinicModalPortalProps> = ({
 
   return createPortal(
     <div
-      className={`clinic-modal-portal-backdrop ${className}`}
+      className="clinic-modal-portal-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget && closeOnBackdropClick && onClose) {
           onClose();
@@ -54,20 +54,40 @@ export const ClinicModalPortal: React.FC<ClinicModalPortalProps> = ({
       }}
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100vw',
+        height: '100vh',
+        maxWidth: '100vw',
+        margin: 0,
+        padding: '16px',
+        boxSizing: 'border-box',
         zIndex,
-        backgroundColor: 'rgba(15, 23, 42, 0.55)',
-        backdropFilter: 'blur(4px)',
-        WebkitBackdropFilter: 'blur(4px)',
+        backgroundColor: 'rgba(15, 23, 42, 0.45)',
+        backdropFilter: 'blur(3px)',
+        WebkitBackdropFilter: 'blur(3px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '16px',
-        boxSizing: 'border-box',
         animation: 'clinicPortalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards'
       }}
     >
       <style>{`
+        .clinic-modal-portal-backdrop {
+          position: fixed !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          bottom: 0 !important;
+          width: 100vw !important;
+          height: 100vh !important;
+          max-width: 100vw !important;
+          margin: 0 !important;
+          padding: 16px !important;
+          box-sizing: border-box !important;
+        }
         @keyframes clinicPortalFadeIn {
           from { opacity: 0; }
           to { opacity: 1; }
@@ -97,7 +117,9 @@ export const ClinicModalPortal: React.FC<ClinicModalPortalProps> = ({
           background-color: #1E3A5F !important;
         }
       `}</style>
-      {children}
+      <div className={`clinic-modal-portal-content-scope ${className}`} style={{ display: 'contents' }}>
+        {children}
+      </div>
     </div>,
     document.body
   );
