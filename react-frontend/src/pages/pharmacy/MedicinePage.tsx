@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
 import './MedicinePage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
@@ -535,6 +536,13 @@ export default function MedicinePage() {
   const [successBadgeText, setSuccessBadgeText] = useState('✓ อัปเดตคลังยาเรียบร้อยแล้ว');
   const [isStockTableExpanded, setIsStockTableExpanded] = useState(true);
 
+  // สถานะการโหลดข้อมูลเริ่มต้นจากฐานข้อมูล (แสดงอนิเมะชันโหลดข้อมูล)
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  // สถานะกำลังบันทึกข้อมูลยาลงฐานข้อมูล (แสดงอนิเมะชัน Modal)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitTitle, setSubmitTitle] = useState('กำลังบันทึกลงฐานข้อมูล');
+  const [submitSubtitle, setSubmitSubtitle] = useState('กรุณารอสักครู่ ระบบกำลังบันทึกข้อมูลยาลงฐานข้อมูล');
+
   const triggerSuccessBadge = (msg: string) => {
     setSuccessBadgeText(msg);
     setShowSuccessBadge(true);
@@ -542,10 +550,19 @@ export default function MedicinePage() {
   };
 
   // Sync with Backend API
-  const fetchMedicines = useCallback(() => {
+  const fetchMedicines = useCallback((isInitial = false) => {
+    const startTime = Date.now();
     const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const finishLoading = () => {
+      if (isInitial) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 500 - elapsed);
+        setTimeout(() => setIsInitialLoading(false), remaining);
+      }
+    };
 
     const processMedicinesData = (data: any) => {
       if (data?.medicines && Array.isArray(data.medicines) && data.medicines.length > 0) {
@@ -574,6 +591,7 @@ export default function MedicinePage() {
           };
         });
         setMedicines(formatted);
+        finishLoading();
         return true;
       }
       return false;
@@ -589,21 +607,33 @@ export default function MedicinePage() {
           // Fallback to system endpoint
           fetch('/api/system/medicines')
             .then(res => res.json())
-            .then(sysData => processMedicinesData(sysData))
-            .catch(err => console.error('Fallback fetch medicines failed:', err));
+            .then(sysData => {
+              processMedicinesData(sysData);
+              finishLoading();
+            })
+            .catch(err => {
+              console.error('Fallback fetch medicines failed:', err);
+              finishLoading();
+            });
         }
       })
       .catch(() => {
         // Fallback to system endpoint on 401 or network error
         fetch('/api/system/medicines')
           .then(res => res.json())
-          .then(sysData => processMedicinesData(sysData))
-          .catch(err => console.error('Fallback fetch medicines failed:', err));
+          .then(sysData => {
+            processMedicinesData(sysData);
+            finishLoading();
+          })
+          .catch(err => {
+            console.error('Fallback fetch medicines failed:', err);
+            finishLoading();
+          });
       });
   }, []);
 
   useEffect(() => {
-    fetchMedicines();
+    fetchMedicines(true);
 
     // Real-time WebSocket Listeners
     const unsubStock = subscribe('MEDICINE_STOCK_UPDATED', () => {
@@ -824,6 +854,11 @@ export default function MedicinePage() {
   const handleAddMedicineSubmit = () => {
     if (!addMedName.trim()) return;
 
+    setSubmitTitle('กำลังบันทึกลงฐานข้อมูล');
+    setSubmitSubtitle('กรุณารอสักครู่ ระบบกำลังบันทึกข้อมูลยาใหม่ลงฐานข้อมูล');
+    setIsSubmitting(true);
+    const start = Date.now();
+
     const payload = {
       medicine_code: addMedCode.trim() || undefined,
       name: addMedName.trim(),
@@ -840,6 +875,26 @@ export default function MedicinePage() {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
+    const completeSubmit = () => {
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, 800 - elapsed);
+      setTimeout(() => {
+        setIsSubmitting(false);
+        setIsAddModalOpen(false);
+        setAddMedCode('');
+        setAddMedName('');
+        setAddGenericName('');
+        setAddCategory('ยารักษาโรคทั่วไป');
+        setAddProperties('');
+        setAddDosage('');
+        setAddManufacturer('');
+        setAddStock(100);
+        setAddUnitPrice(20);
+        setShowSuccessBadge(true);
+        setTimeout(() => setShowSuccessBadge(false), 3000);
+      }, remaining);
+    };
+
     fetch('/api/pharmacy/medicines', {
       method: 'POST',
       headers,
@@ -851,8 +906,7 @@ export default function MedicinePage() {
     })
     .then(() => {
       fetchMedicines();
-      setShowSuccessBadge(true);
-      setTimeout(() => setShowSuccessBadge(false), 3000);
+      completeSubmit();
     })
     .catch(() => {
       // Fallback to system endpoint
@@ -863,21 +917,12 @@ export default function MedicinePage() {
       })
       .then(() => {
         fetchMedicines();
-        setShowSuccessBadge(true);
-        setTimeout(() => setShowSuccessBadge(false), 3000);
+        completeSubmit();
+      })
+      .catch(() => {
+        completeSubmit();
       });
     });
-
-    setIsAddModalOpen(false);
-    setAddMedCode('');
-    setAddMedName('');
-    setAddGenericName('');
-    setAddCategory('ยารักษาโรคทั่วไป');
-    setAddProperties('');
-    setAddDosage('');
-    setAddManufacturer('');
-    setAddStock(100);
-    setAddUnitPrice(20);
   };
 
   // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ลบยาออกจากหน้าจอทันทีใน 0 ms โดยไม่ต้องรอ Supabase
@@ -920,6 +965,11 @@ export default function MedicinePage() {
     }
     
     const qty = Number(quantity);
+
+    setSubmitTitle('กำลังบันทึกลงฐานข้อมูล');
+    setSubmitSubtitle('กรุณารอสักครู่ ระบบกำลังอัปเดตสต็อกยาลงฐานข้อมูล');
+    setIsSubmitting(true);
+    const start = Date.now();
     
     setMedicines(prev => prev.map(med => {
       if (med.id === selectedMedicine.id) {
@@ -947,9 +997,14 @@ export default function MedicinePage() {
       })
     }).catch(() => {});
 
-    handleCloseModal();
-    setShowSuccessBadge(true);
-    setTimeout(() => setShowSuccessBadge(false), 3000);
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, 800 - elapsed);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      handleCloseModal();
+      setShowSuccessBadge(true);
+      setTimeout(() => setShowSuccessBadge(false), 3000);
+    }, remaining);
   };
 
   const filteredMedicines = medicines.filter(med => {
@@ -1032,7 +1087,127 @@ export default function MedicinePage() {
 
   return (
     <div className="medicine-page-container">
-      <div className="page-header" style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
+
+      {/* 1. Modal Popup แสดงอนิเมะชันตอนบันทึกลงฐานข้อมูล (ตรงตามรูปภาพ 2) */}
+      {isSubmitting && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              padding: '36px 32px',
+              textAlign: 'center',
+              maxWidth: '380px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              animation: 'scaleIn 0.2s ease-out'
+            }}
+          >
+            <div
+              style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                backgroundColor: '#EFF6FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '4px solid #BFDBFE',
+                  borderTopColor: '#2563EB',
+                  animation: 'spin 1s linear infinite'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0F172A', margin: 0 }}>
+                {submitTitle}
+              </h3>
+              <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                {submitSubtitle}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. หน้าจอแสดงอนิเมะชันตอนโหลดข้อมูลเริ่มต้นจากฐานข้อมูล (ตรงตามรูปภาพ 1) */}
+      {isInitialLoading ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            minHeight: 'calc(100vh - 180px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: 'translateY(-30px)',
+            gap: '16px',
+            textAlign: 'center',
+            padding: '24px'
+          }}
+        >
+          <div style={{ position: 'relative', width: '56px', height: '56px', marginBottom: '8px' }}>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                border: '4px solid #E2E8F0',
+                boxSizing: 'border-box'
+              }}
+            />
+            <Loader2
+              style={{
+                width: '56px',
+                height: '56px',
+                color: '#2563EB',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                animation: 'spin 1s linear infinite'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#1E293B', margin: 0 }}>
+              กำลังโหลดข้อมูลจากฐานข้อมูล
+            </p>
+            <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
+              กรุณารอสักครู่
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="page-header" style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
         <div className="header-titles" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <h1 className="page-title" style={{ margin: 0, fontSize: '28px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', letterSpacing: '-0.5px' }}>
@@ -2027,6 +2202,8 @@ export default function MedicinePage() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

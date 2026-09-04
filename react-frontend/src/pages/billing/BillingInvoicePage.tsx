@@ -49,6 +49,7 @@ export default function BillingInvoicePage({
   const [showQrModal, setShowQrModal] = useState(false);
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [receiptSent, setReceiptSent] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('qr');
   const [cashReceived, setCashReceived] = useState<string>('');
@@ -462,9 +463,10 @@ export default function BillingInvoicePage({
   // [บุญให้เพิ่มเทคนิคนี้] (Supabase + Optimistic UI + WebSocket) - กดยืนยันรับชำระเงินแล้วอัปเดตหน้าจอทันที 0 ms และส่งขึ้น Supabase เบื้องหลัง
   const handleConfirmPayment = async () => {
     if (!activePatient) return;
+    setIsSubmitting(true);
+    const submitStart = Date.now();
 
     // 1. Optimistic UI: อัปเดตสถานะสำเร็จบนหน้าจอทันทีใน 0 ms
-    setIsPaymentConfirmed(true);
     setQueueList(prev => prev.map(p => p.id === activePatient.id ? { ...p, visitStatus: 'ชำระเงินเรียบร้อยแล้ว' } : p));
 
     // 2. ส่งข้อมูลขึ้น Supabase Cloud เบื้องหลัง (Background Sync)
@@ -501,6 +503,14 @@ export default function BillingInvoicePage({
       }
     } catch (err) {
       console.error('Failed to confirm payment:', err);
+    } finally {
+      // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลอย่างน้อย 850ms
+      const elapsed = Date.now() - submitStart;
+      const remaining = Math.max(0, 850 - elapsed);
+      setTimeout(() => {
+        setIsSubmitting(false);
+        setIsPaymentConfirmed(true);
+      }, remaining);
     }
   };
 
@@ -537,10 +547,52 @@ export default function BillingInvoicePage({
 
   if (loading) {
     return (
-      <div className="billing-invoice-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '350px' }}>
-        <div style={{ textAlign: 'center', color: '#64748B' }}>
-          <div className="animate-spin" style={{ width: '40px', height: '40px', border: '3px solid #E2E8F0', borderTopColor: '#0EA5E9', borderRadius: '50%', margin: '0 auto 16px' }}></div>
-          <p style={{ fontSize: '1.1rem', fontWeight: '500' }}>กำลังโหลดข้อมูลบิล...</p>
+      <div
+        className="billing-invoice-container"
+        style={{
+          minHeight: 'calc(100vh - 134px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: 'translateY(-48px)',
+          gap: '16px',
+          textAlign: 'center',
+          padding: '24px'
+        }}
+      >
+        <div style={{ position: 'relative', width: '56px', height: '56px', marginBottom: '8px' }}>
+          <div
+            style={{
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              border: '4px solid #E2E8F0',
+              boxSizing: 'border-box'
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              border: '4px solid transparent',
+              borderTopColor: '#2563EB',
+              animation: 'spin 1s linear infinite'
+            }}
+          />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#1E293B', margin: 0 }}>
+            กำลังโหลดข้อมูลจากฐานข้อมูล
+          </p>
+          <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
+            กรุณารอสักครู่
+          </p>
         </div>
       </div>
     );
@@ -604,6 +656,74 @@ export default function BillingInvoicePage({
 
   return (
     <div className="billing-invoice-container">
+      {/* Modal Popup แสดงอนิเมะชันตอนบันทึกการชำระเงินลงฐานข้อมูล (ตรงตามรูปภาพ 2) */}
+      {isSubmitting && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              padding: '36px 32px',
+              textAlign: 'center',
+              maxWidth: '380px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              animation: 'scaleIn 0.2s ease-out'
+            }}
+          >
+            <div
+              style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                backgroundColor: '#EFF6FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '4px solid #BFDBFE',
+                  borderTopColor: '#2563EB',
+                  animation: 'spin 1s linear infinite'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0F172A', margin: 0 }}>
+                กำลังบันทึกลงฐานข้อมูล
+              </h3>
+              <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                กรุณารอสักครู่ ระบบกำลังบันทึกการชำระเงินและออกใบเสร็จ
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Header */}
       <div className="page-header-row" style={{ marginBottom: '16px' }}>
         <div className="header-titles">

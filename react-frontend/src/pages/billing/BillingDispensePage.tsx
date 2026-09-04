@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Loader2 } from 'lucide-react';
 import './BillingDispensePage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
@@ -85,6 +86,12 @@ export default function BillingDispensePage({
   
   // คิวเริ่มต้น - เริ่มเป็น [] จนกว่าจะดึงข้อมูลจาก DB ได้
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
+
+  // สถานะการโหลดข้อมูลเริ่มต้นจากฐานข้อมูล (แสดงอนิเมะชันโหลดข้อมูล)
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+
+  // สถานะกำลังประมวลผลส่งต่อไปยังหน้าการเงิน
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Current active patient object
   const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0];
@@ -230,7 +237,9 @@ export default function BillingDispensePage({
 
   // Real-time Queue & Billing Listener (ดึงทั้งคิวรอชำระเงิน และประวัติที่ชำระเงินเสร็จสิ้นแล้ว ซิงค์ตรงกับระบบจัดการยา 100%)
   useEffect(() => {
-    const fetchInitialQueue = async () => {
+    let isMounted = true;
+    const loadStartTime = Date.now();
+    const fetchInitialQueue = async (isInitial = false) => {
       try {
         const token = localStorage.getItem('token');
         const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -462,15 +471,23 @@ export default function BillingDispensePage({
         });
       } catch (err) {
         console.error('Failed to fetch initial billing queue:', err);
+      } finally {
+        if (isInitial && isMounted) {
+          const elapsed = Date.now() - loadStartTime;
+          const remaining = Math.max(0, 600 - elapsed);
+          setTimeout(() => {
+            if (isMounted) setIsInitialLoading(false);
+          }, remaining);
+        }
       }
     };
     
-    fetchInitialQueue();
+    fetchInitialQueue(true);
 
     // Smart Background Polling ทุกๆ 12 วินาที เพื่อดึงคิวการเงินล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket เรียลไทม์)
     const pollInterval = setInterval(() => {
       if (!document.hidden) {
-        fetchInitialQueue();
+        fetchInitialQueue(false);
       }
     }, 12000);
 
@@ -526,6 +543,7 @@ export default function BillingDispensePage({
     });
 
     return () => {
+      isMounted = false;
       clearInterval(pollInterval);
       unsubBill();
       unsubExam();
@@ -667,14 +685,18 @@ export default function BillingDispensePage({
 
   const handleProceedToInvoice = () => {
     if (!activePatient) return;
-    if (onSelectPatientId) {
-      onSelectPatientId(activePatient.id);
-    }
-    localStorage.setItem('billing_active_patient', activePatient.id);
-    localStorage.setItem('billing_active_patient_data', JSON.stringify(activePatient));
-    if (onNavigateToBilling) {
-      onNavigateToBilling();
-    }
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      if (onSelectPatientId) {
+        onSelectPatientId(activePatient.id);
+      }
+      localStorage.setItem('billing_active_patient', activePatient.id);
+      localStorage.setItem('billing_active_patient_data', JSON.stringify(activePatient));
+      if (onNavigateToBilling) {
+        onNavigateToBilling();
+      }
+    }, 600);
   };
 
   const medTotal = activePatient && Array.isArray(activePatient.medications) 
@@ -683,20 +705,140 @@ export default function BillingDispensePage({
 
   return (
     <div className="billing-dispense-container">
-      {/* Page Header */}
-      <div className="page-header" style={{ marginBottom: '32px' }}>
-        <div className="header-titles">
-          <h1 className="page-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
-            คิดเงินและออกบิลชำระเงิน
-          </h1>
-          <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '1.1rem' }}>
-            สรุปรายการค่ายา ค่าบริการทางการแพทย์ คำนวณส่วนลดสิทธิ์ และรับชำระเงิน
-          </p>
-        </div>
-      </div>
 
-      {/* Executive Billing Stat Cards (Pharmacy Format) */}
-      <div className="stat-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+      {/* 1. Modal Popup แสดงอนิเมะชันตอนส่งต่อไปหน้าการเงิน (ตรงตามรูปภาพ 2) */}
+      {isSubmitting && (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '24px',
+              padding: '36px 32px',
+              textAlign: 'center',
+              maxWidth: '380px',
+              width: '90%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '16px',
+              animation: 'scaleIn 0.2s ease-out'
+            }}
+          >
+            <div
+              style={{
+                width: '80px',
+                height: '80px',
+                borderRadius: '50%',
+                backgroundColor: '#EFF6FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <span
+                style={{
+                  display: 'block',
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  border: '4px solid #BFDBFE',
+                  borderTopColor: '#2563EB',
+                  animation: 'spin 1s linear infinite'
+                }}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#0F172A', margin: 0 }}>
+                กำลังบันทึกลงฐานข้อมูล
+              </h3>
+              <p style={{ fontSize: '14px', color: '#64748B', margin: 0, lineHeight: 1.5 }}>
+                กรุณารอสักครู่ ระบบกำลังจัดเตรียมข้อมูลและส่งต่อไปยังห้องการเงิน
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. หน้าจอแสดงอนิเมะชันตอนโหลดข้อมูลเริ่มต้นจากฐานข้อมูล (ตรงตามรูปภาพ 1) */}
+      {isInitialLoading ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            minHeight: 'calc(100vh - 180px)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: 'translateY(-30px)',
+            gap: '16px',
+            textAlign: 'center',
+            padding: '24px'
+          }}
+        >
+          <div style={{ position: 'relative', width: '56px', height: '56px', marginBottom: '8px' }}>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '50%',
+                border: '4px solid #E2E8F0',
+                boxSizing: 'border-box'
+              }}
+            />
+            <Loader2
+              style={{
+                width: '56px',
+                height: '56px',
+                color: '#2563EB',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                animation: 'spin 1s linear infinite'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <p style={{ fontSize: '18px', fontWeight: 'bold', color: '#1E293B', margin: 0 }}>
+              กำลังโหลดข้อมูลจากฐานข้อมูล
+            </p>
+            <p style={{ fontSize: '13px', color: '#64748B', margin: 0 }}>
+              กรุณารอสักครู่
+            </p>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Page Header */}
+          <div className="page-header" style={{ marginBottom: '32px' }}>
+            <div className="header-titles">
+              <h1 className="page-title" style={{ fontSize: '2.5rem', fontWeight: '800', color: 'var(--text-primary)', margin: '0 0 8px 0', letterSpacing: '-0.5px' }}>
+                คิดเงินและออกบิลชำระเงิน
+              </h1>
+              <p className="page-subtitle" style={{ color: 'var(--text-secondary)', margin: '0', fontSize: '1.1rem' }}>
+                สรุปรายการค่ายา ค่าบริการทางการแพทย์ คำนวณส่วนลดสิทธิ์ และรับชำระเงิน
+              </p>
+            </div>
+          </div>
+
+          {/* Executive Billing Stat Cards (Pharmacy Format) */}
+          <div className="stat-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <div 
           className={`stat-card-box ${statFilter === 'all' ? 'active-stat' : ''}`}
           onClick={() => setStatFilter('all')}
@@ -1551,6 +1693,8 @@ export default function BillingDispensePage({
           <h3>ยังไม่ได้เลือกผู้ป่วยในคิว</h3>
           <p>กรุณาเลือกลำดับคิวจาก Dropdown หรือกดปุ่มคิวผู้ป่วยด้านบนเพื่อดำเนินการต่อ</p>
         </div>
+      )}
+        </>
       )}
 
       {/* Toast Notification */}
