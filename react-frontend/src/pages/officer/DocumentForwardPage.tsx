@@ -71,7 +71,7 @@ const generateInitialIncomingDocs = (): ForwardDoc[] => {
     description: string;
   }> = [
     {
-      title: 'ผลการตรวจเลือด Complete Blood Count (CBC) - เคสฉุกเฉิน',
+      title: 'ผลการตรวจเลือด CBC (ฉุกเฉิน)',
       sender: 'ห้องปฏิบัติการกลาง (Lab)',
       senderRole: 'นักเทคนิคการแพทย์',
       type: 'ผลตรวจ',
@@ -81,17 +81,17 @@ const generateInitialIncomingDocs = (): ForwardDoc[] => {
       description: 'พบค่าเม็ดเลือดขาวสูงผิดปกติ โปรดแพทย์เจ้าของไข้ตรวจสอบด่วน',
     },
     {
-      title: 'ใบส่งตัวผู้ป่วยส่งต่อรับการผ่าตัด (Referral Slip)',
+      title: 'ใบส่งตัวผู้ป่วยส่งต่อรับการผ่าตัด',
       sender: 'แผนกอายุรกรรม',
       senderRole: 'พยาบาลวิชาชีพ',
-      type: 'เอกสารส่งตัว',
+      type: 'ใบส่งตัว',
       priority: 'urgent',
       status: 'unread',
       hoursAgo: 1.5,
       description: 'ส่งตัวผู้ป่วยนายสมบัติ มีสุข เพื่อประเมินสิทธิการรักษาและเตียงผ่าตัด',
     },
     {
-      title: 'ใบเบิกเวชภัณฑ์และอุปกรณ์ทำแผลปลอดเชื้อ ประจำสัปดาห์',
+      title: 'ใบเบิกเวชภัณฑ์และอุปกรณ์ทำแผล',
       sender: 'แผนกฉุกเฉินและอุบัติเหตุ (ER)',
       senderRole: 'พยาบาลหัวหน้าเวร',
       type: 'ใบเบิก',
@@ -101,7 +101,7 @@ const generateInitialIncomingDocs = (): ForwardDoc[] => {
       description: 'ขอเบิกสำลี, ผ้าก๊อซปลอดเชื้อ, และน้ำเกลือล้างแผล (NSS 0.9%)',
     },
     {
-      title: 'รายงานผลเอกซเรย์ปอด Chest X-Ray ดิจิทัล',
+      title: 'รายงานผลเอกซเรย์ทรวงอก (Chest X-Ray)',
       sender: 'แผนกรังสีวินิจฉัย (X-Ray)',
       senderRole: 'นักรังสีการแพทย์',
       type: 'รายงาน',
@@ -111,7 +111,7 @@ const generateInitialIncomingDocs = (): ForwardDoc[] => {
       description: 'ภาพถ่ายรังสีทรวงอกระบบดิจิทัล ส่งมอบให้แพทย์อายุรกรรม',
     },
     {
-      title: 'บันทึกข้อความสรุปการประชุมคณะกรรมการบริหารคลินิก',
+      title: 'บันทึกข้อความสรุปการประชุมคลินิก',
       sender: 'สำนักงานผู้อำนวยการ',
       senderRole: 'ธุรการกลาง',
       type: 'บันทึกข้อความ',
@@ -121,7 +121,7 @@ const generateInitialIncomingDocs = (): ForwardDoc[] => {
       description: 'มติที่ประชุมเรื่องการปรับปรุงระบบคัดกรองผู้ป่วยรอบเดือนกันยายน',
     },
     {
-      title: 'ใบแจ้งยอดค่ารักษาพยาบาลค้างจ่ายและประกันสังคม',
+      title: 'ใบแจ้งยอดค่ารักษาพยาบาลและประกันสังคม',
       sender: 'ฝ่ายการเงินและบัญชี',
       senderRole: 'เจ้าหน้าที่การเงิน',
       type: 'การเงิน',
@@ -164,7 +164,7 @@ const generateInitialForwardedDocs = (): ForwardDoc[] => {
     description: string;
   }> = [
     {
-      title: 'รายงานสรุปยอดผู้ป่วยและสถิติการรักษาประจำเดือน',
+      title: 'รายงานสรุปยอดผู้ป่วยประจำเดือน',
       recipient: 'ผู้อำนวยการคลินิก',
       recipientRole: 'ผู้บริหาร',
       type: 'รายงาน',
@@ -174,17 +174,17 @@ const generateInitialForwardedDocs = (): ForwardDoc[] => {
       description: 'สถิติยอดผู้ป่วยนอก (OPD) ยอดผู้ป่วยฉุกเฉิน และรายได้รวมประจำเดือน',
     },
     {
-      title: 'ใบส่งตัวผู้ป่วยส่งโรงพยาบาลศูนย์ (Case ฉุกเฉิน)',
+      title: 'ใบส่งตัวผู้ป่วยส่งโรงพยาบาลศูนย์',
       recipient: 'พญ.สุดา สุขสมบูรณ์',
       recipientRole: 'สูตินรีแพทย์',
-      type: 'เอกสารส่งตัว',
+      type: 'ใบส่งตัว',
       priority: 'emergency',
       status: 'completed',
       hoursAgo: 4,
       description: 'ส่งตัวเคสฝากครรภ์เสี่ยงสูงเพื่อรับคำปรึกษาและตรวจวินิจฉัยเฉพาะทาง',
     },
     {
-      title: 'ใบเบิกจ่ายงบประมาณจัดซื้อเวชภัณฑ์ยาต้านไวรัส',
+      title: 'ใบเบิกจ่ายงบประมาณจัดซื้อเวชภัณฑ์ยา',
       recipient: 'ฝ่ายการเงินและบัญชี',
       recipientRole: 'การเงิน',
       type: 'การเงิน',
@@ -194,7 +194,7 @@ const generateInitialForwardedDocs = (): ForwardDoc[] => {
       description: 'ขออนุมัติจัดซื้อยาจำเป็นเร่งด่วนสำหรับห้องยาคลินิก',
     },
     {
-      title: 'เอกสารประเมินประสิทธิภาพบุคลากรทางการแพทย์ ประจำไตรมาส',
+      title: 'เอกสารประเมินประสิทธิภาพบุคลากร',
       recipient: 'ฝ่ายทรัพยากรบุคคล (HR)',
       recipientRole: 'บุคคล',
       type: 'เอกสารทั่วไป',
@@ -204,7 +204,7 @@ const generateInitialForwardedDocs = (): ForwardDoc[] => {
       description: 'สรุปผลการประเมินการปฏิบัติงานแพทย์และพยาบาล',
     },
     {
-      title: 'ผลการตรวจเชื้อเพาะเพาะเชื้อทางจุลชีววิทยา (Culture Test)',
+      title: 'ผลการตรวจเพาะเชื้อทางจุลชีววิทยา',
       recipient: 'นพ.วิชัย ชาญการแพทย์',
       recipientRole: 'อายุรแพทย์',
       type: 'ผลตรวจ',
@@ -1027,14 +1027,14 @@ export const DocumentForwardPage: React.FC = () => {
           <table className="dms-master-table">
             <thead>
               <tr>
-                <th style={{ width: '130px' }}>รหัสเอกสาร</th>
-                <th>ชื่อเรื่อง / หัวข้อเอกสาร</th>
-                <th>{activeTab === 'incoming' ? 'ส่งมาจาก (ต้นทาง)' : 'ส่งถึง (ปลายทาง)'}</th>
-                <th style={{ width: '180px' }}>วันที่และเวลา</th>
-                <th style={{ width: '130px' }}>ประเภท</th>
-                <th style={{ width: '110px' }}>ความเร่งด่วน</th>
-                <th style={{ width: '150px' }}>สถานะ</th>
-                <th style={{ width: '110px', textAlign: 'center' }}>จัดการ</th>
+                <th style={{ width: '140px' }}>รหัสเอกสาร</th>
+                <th>ชื่อเรื่องเอกสาร</th>
+                <th style={{ width: '220px' }}>{activeTab === 'incoming' ? 'ส่งมาจาก (ต้นทาง)' : 'ส่งถึง (ปลายทาง)'}</th>
+                <th style={{ width: '170px' }}>วันที่และเวลา</th>
+                <th style={{ width: '120px' }}>ประเภท</th>
+                <th style={{ width: '100px' }}>ความเร่งด่วน</th>
+                <th style={{ width: '140px' }}>สถานะ</th>
+                <th style={{ width: '90px', textAlign: 'center' }}>จัดการ</th>
               </tr>
             </thead>
             <tbody>
@@ -1049,32 +1049,17 @@ export const DocumentForwardPage: React.FC = () => {
                     <span className="code-pill">{doc.id}</span>
                   </td>
 
-                  {/* Document Title & Description */}
+                  {/* Document Title (Clean, NO heavy description block) */}
                   <td>
                     <div className="doc-title-wrapper">
-                      <div className="doc-title-line">
-                        <span className="doc-name-text">{doc.title}</span>
-                        {doc.status === 'unread' && <span className="new-pulse-badge">ใหม่</span>}
-                      </div>
-                      {doc.description && (
-                        <span className="doc-subject-text">{doc.description}</span>
-                      )}
+                      <span className="doc-name-text">{doc.title}</span>
+                      {doc.status === 'unread' && <span className="new-pulse-badge">ใหม่</span>}
                     </div>
                   </td>
 
-                  {/* Sender / Recipient */}
+                  {/* Sender / Recipient (Clean concise department/person name) */}
                   <td>
-                    <div className="doc-person-cell">
-                      <div className="person-avatar-mini">
-                        {(activeTab === 'incoming' ? doc.sender : (doc.recipient || 'U')).slice(0, 1)}
-                      </div>
-                      <div className="person-text-group">
-                        <span className="doc-dept-text">{activeTab === 'incoming' ? doc.sender : doc.recipient}</span>
-                        <span className="doc-role-sub">
-                          {activeTab === 'incoming' ? (doc.senderRole || 'เจ้าหน้าที่') : (doc.recipientRole || 'ผู้รับ')}
-                        </span>
-                      </div>
-                    </div>
+                    <span className="doc-dept-text">{activeTab === 'incoming' ? doc.sender : doc.recipient}</span>
                   </td>
 
                   {/* Date & Time */}
@@ -1130,20 +1115,6 @@ export const DocumentForwardPage: React.FC = () => {
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
                             <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"></polyline>
-                          </svg>
-                        </button>
-                      )}
-
-                      {activeTab === 'incoming' && (
-                        <button
-                          type="button"
-                          className="dms-action-icon-btn archive-btn"
-                          onClick={(e) => handleArchive(doc.id, e)}
-                          title="จัดเก็บเข้าแฟ้ม"
-                          aria-label="จัดเก็บเข้าแฟ้ม"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                            <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </button>
                       )}
