@@ -110,10 +110,20 @@ func ConnectDB() {
 	// ⚡ Database Indexes สำหรับเร่งความเร็วการ Query คิว, คนไข้, ประวัติการเงิน บน Supabase
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_created_at ON queues(created_at)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_status ON queues(status)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_status_dept ON queues(status, department)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_visit_id ON queues(visit_id)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_medicine_queues_status_visit ON medicine_queues(status, visit_id)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_medicine_queues_hn ON medicine_queues(hn)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_billing_queues_status ON billing_queues(status)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_billing_queues_status_visit ON billing_queues(status, visit_id)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_billings_visit_status ON billings(visit_id, payment_status)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_billing_histories_created_at ON billing_histories(created_at)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_billing_histories_visit_hn ON billing_histories(visit_id, hn)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_dispensings_visit_id ON dispensings(visit_id)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_patient_medicines_hn ON patient_medicines(hn)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_patients_hn ON patients(hn)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_medicines_code_name ON medicines(medicine_code, name)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_patient_id ON visit_records(patient_id)")
 
 	DB = database
 

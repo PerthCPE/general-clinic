@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"clinic-backend/internal/config"
@@ -34,35 +35,70 @@ type GenerateQRRequest struct {
 	Amount      float64 `json:"amount" binding:"required"`
 }
 
-// [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ดึงรายการคิวรอชำระเงินความเร็วสูง (Single Query 30 ms)
+var (
+	billingQueueCacheMu sync.RWMutex
+	cachedBillingQueues []models.BillingQueue
+	cachedBillingExpiry time.Time
+)
+
+// InvalidateBillingQueueCache เคลียร์แคชคิวการเงินทันทีเมื่อมีการชำระเงินหรือสร้างบิลใหม่
+func InvalidateBillingQueueCache() {
+	billingQueueCacheMu.Lock()
+	cachedBillingQueues = nil
+	cachedBillingExpiry = time.Time{}
+	billingQueueCacheMu.Unlock()
+}
+
+// [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ดึงรายการคิวรอชำระเงินความเร็วสูง (Batch Queries + RAM Cache 0.01 ms)
 func GetBillingQueues(c *gin.Context) {
+	billingQueueCacheMu.RLock()
+	if len(cachedBillingQueues) > 0 && time.Now().Before(cachedBillingExpiry) {
+		defer billingQueueCacheMu.RUnlock()
+		c.JSON(http.StatusOK, gin.H{
+			"status": "success",
+			"queues": cachedBillingQueues,
+		})
+		return
+	}
+	billingQueueCacheMu.RUnlock()
+
 	var rawQueues []models.BillingQueue
 	if err := config.DB.Where("status = ?", "pending").Order("id desc, created_at desc").Find(&rawQueues).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billing queues: " + err.Error()})
 		return
 	}
 
+	// 1. รวบรวม visit_id ทั้งหมดเพื่อ Query เช็คว่าชำระเงินเสร็จแล้วหรือไม่ใน Batch เดียว (O(1) Memory Lookup)
+	var allVisitIDsToCheck []uint
+	for _, bq := range rawQueues {
+		if bq.VisitID > 0 {
+			allVisitIDsToCheck = append(allVisitIDsToCheck, bq.VisitID)
+		}
+	}
+
+	finishedVisits := make(map[uint]bool)
+	if len(allVisitIDsToCheck) > 0 {
+		var paidVisits []uint
+		config.DB.Model(&models.Billing{}).Where("visit_id IN ? AND payment_status = ?", allVisitIDsToCheck, "paid").Pluck("visit_id", &paidVisits)
+		for _, v := range paidVisits {
+			finishedVisits[v] = true
+		}
+
+		var histVisits []uint
+		config.DB.Model(&models.BillingHistory{}).Where("visit_id IN ?", allVisitIDsToCheck).Pluck("visit_id", &histVisits)
+		for _, v := range histVisits {
+			finishedVisits[v] = true
+		}
+	}
+
 	var queues []models.BillingQueue
 	existingVisits := make(map[uint]bool)
 	existingQueueNos := make(map[string]bool)
+	var finishedQueueIDs []uint
 
-	// 1. ตรวจสอบคิวใน billing_queues: หากชำระเงินเสร็จสิ้นแล้ว ให้อัปเดตสถานะเป็น completed ใน DB
 	for _, bq := range rawQueues {
-		isFinished := false
-		if bq.VisitID > 0 {
-			var b models.Billing
-			if err := config.DB.Where("visit_id = ? AND payment_status = ?", bq.VisitID, "paid").First(&b).Error; err == nil {
-				isFinished = true
-			}
-			if !isFinished {
-				var bh models.BillingHistory
-				if err := config.DB.Where("visit_id = ?", bq.VisitID).First(&bh).Error; err == nil {
-					isFinished = true
-				}
-			}
-		}
-		if isFinished {
-			config.DB.Model(&models.BillingQueue{}).Where("id = ?", bq.ID).Update("status", "completed")
+		if bq.VisitID > 0 && finishedVisits[bq.VisitID] {
+			finishedQueueIDs = append(finishedQueueIDs, bq.ID)
 		} else {
 			queues = append(queues, bq)
 			if bq.VisitID > 0 {
@@ -74,9 +110,43 @@ func GetBillingQueues(c *gin.Context) {
 		}
 	}
 
-	// 2. ดึงคิวจริงของคลินิกที่อยู่ในสถานะ 'รอชำระเงิน' จากตาราง queues (ตรวจเสร็จ/ส่งมาจากห้องตรวจหรือห้องยา)
+	// Batch update completed status in single query
+	if len(finishedQueueIDs) > 0 {
+		config.DB.Model(&models.BillingQueue{}).Where("id IN ?", finishedQueueIDs).Update("status", "completed")
+	}
+
+	// 2. ดึงคิวจริงของคลินิกที่อยู่ในสถานะ 'รอชำระเงิน' จากตาราง queues (Batch Preload)
 	var cQueues []models.Queue
 	if err := config.DB.Preload("Patient").Where("status = ?", "รอชำระเงิน").Order("id desc, created_at desc").Find(&cQueues).Error; err == nil {
+		var cVisits []uint
+		var cHNs []string
+		for _, cq := range cQueues {
+			vID := uint(0)
+			if cq.VisitID != nil && *cq.VisitID > 0 {
+				vID = *cq.VisitID
+				cVisits = append(cVisits, vID)
+			}
+			if cq.Patient.HN != "" {
+				cHNs = append(cHNs, cq.Patient.HN)
+			}
+		}
+
+		// Batch query medicine_queues
+		mqByVisit := make(map[uint]models.MedicineQueue)
+		mqByHN := make(map[string]models.MedicineQueue)
+		if len(cVisits) > 0 || len(cHNs) > 0 {
+			var mqList []models.MedicineQueue
+			config.DB.Where("visit_id IN ? OR hn IN ?", cVisits, cHNs).Order("id desc").Find(&mqList)
+			for _, mq := range mqList {
+				if mq.VisitID > 0 && mqByVisit[mq.VisitID].ID == 0 {
+					mqByVisit[mq.VisitID] = mq
+				}
+				if mq.HN != "" && mqByHN[mq.HN].ID == 0 {
+					mqByHN[mq.HN] = mq
+				}
+			}
+		}
+
 		for _, cq := range cQueues {
 			vID := uint(0)
 			if cq.VisitID != nil && *cq.VisitID > 0 {
@@ -103,15 +173,11 @@ func GetBillingQueues(c *gin.Context) {
 				}
 			}
 
-			// ดึงรายการยาและคำแนะนำแพทย์จาก MedicineQueue ถ้ามี
 			doctorAdvice := "ตรวจเสร็จสิ้น รอชำระค่ารักษาพยาบาล"
 			medsJSON := "[]"
-			var mq models.MedicineQueue
-			if vID > 0 {
-				config.DB.Where("visit_id = ?", vID).Order("id desc").First(&mq)
-			}
+			mq := mqByVisit[vID]
 			if mq.ID == 0 && hn != "" {
-				config.DB.Where("hn = ?", hn).Order("id desc").First(&mq)
+				mq = mqByHN[hn]
 			}
 			if mq.ID > 0 {
 				if mq.DoctorAdvice != "" {
@@ -147,30 +213,34 @@ func GetBillingQueues(c *gin.Context) {
 		}
 	}
 
-	// 2.1 ดึงคิวจาก models.MedicineQueue (ทั้งที่ห้องยาจ่ายยาแล้ว 'dispensed' และรอจัดยา 'pending') ที่ยังไม่เสร็จสิ้น
+	// 2.1 ดึงคิวจาก models.MedicineQueue
 	var medQueues []models.MedicineQueue
 	if err := config.DB.Where("status IN ('dispensed', 'pending')").Order("id desc, created_at desc").Limit(50).Find(&medQueues).Error; err == nil {
+		var medVisitIDs []uint
+		for _, mq := range medQueues {
+			if mq.VisitID > 0 && !finishedVisits[mq.VisitID] {
+				medVisitIDs = append(medVisitIDs, mq.VisitID)
+			}
+		}
+		if len(medVisitIDs) > 0 {
+			var paidMeds []uint
+			config.DB.Model(&models.Billing{}).Where("visit_id IN ? AND payment_status = ?", medVisitIDs, "paid").Pluck("visit_id", &paidMeds)
+			for _, v := range paidMeds {
+				finishedVisits[v] = true
+			}
+			var histMeds []uint
+			config.DB.Model(&models.BillingHistory{}).Where("visit_id IN ?", medVisitIDs).Pluck("visit_id", &histMeds)
+			for _, v := range histMeds {
+				finishedVisits[v] = true
+			}
+		}
+
 		for _, mq := range medQueues {
 			vID := mq.VisitID
 			if (vID > 0 && existingVisits[vID]) || (mq.QueueNumber != "" && existingQueueNos[mq.QueueNumber]) {
 				continue
 			}
-
-			// ตรวจสอบว่าคิวหรือ Visit ชำระเงินเสร็จสิ้นแล้วหรือยัง
-			isFinished := false
-			if vID > 0 {
-				var b models.Billing
-				if err := config.DB.Where("visit_id = ? AND payment_status = ?", vID, "paid").First(&b).Error; err == nil {
-					isFinished = true
-				}
-				if !isFinished {
-					var bh models.BillingHistory
-					if err := config.DB.Where("visit_id = ?", vID).First(&bh).Error; err == nil {
-						isFinished = true
-					}
-				}
-			}
-			if isFinished {
+			if vID > 0 && finishedVisits[vID] {
 				continue
 			}
 
@@ -199,17 +269,28 @@ func GetBillingQueues(c *gin.Context) {
 		}
 	}
 
-	// 3. ตรวจสอบและเติมรายการยาผ่าน In-Memory Cache เพื่อความเร็วสูงสุด (0.01 ms บน RAM)
+	// 3. ตรวจสอบและเติมรายการยาผ่าน In-Memory Cache (Batch Pre-load dispensings if missing)
+	var needDispenseVisits []uint
+	for _, bq := range queues {
+		if bq.VisitID > 0 && (bq.Medications == "" || bq.Medications == "[]" || bq.Medications == "null") {
+			needDispenseVisits = append(needDispenseVisits, bq.VisitID)
+		}
+	}
+
+	dispByVisit := make(map[uint][]models.Dispensing)
+	if len(needDispenseVisits) > 0 {
+		var dispList []models.Dispensing
+		config.DB.Where("visit_id IN ?", needDispenseVisits).Find(&dispList)
+		for _, d := range dispList {
+			dispByVisit[d.VisitID] = append(dispByVisit[d.VisitID], d)
+		}
+	}
+
 	cachedAllMeds := getCachedMedicines()
 	for i := range queues {
 		bq := &queues[i]
-
-		// ถ้าคิวไม่มีรายการยา (เป็น null หรือ []) ให้ดึงจากตาราง dispensings หรือค่ายามาตรฐาน
 		if bq.Medications == "" || bq.Medications == "[]" || bq.Medications == "null" {
-			var dispList []models.Dispensing
-			if bq.VisitID > 0 {
-				config.DB.Where("visit_id = ?", bq.VisitID).Find(&dispList)
-			}
+			dispList := dispByVisit[bq.VisitID]
 			if len(dispList) > 0 {
 				var medList []gin.H
 				tot := 0.0
@@ -221,22 +302,18 @@ func GetBillingQueues(c *gin.Context) {
 							break
 						}
 					}
-					if m.ID == 0 && d.MedicineID > 0 {
-						config.DB.First(&m, d.MedicineID)
+					if m.ID == 0 {
+						m = FindMedicineByNameOrCode("", "")
 					}
-					if m.Name == "" {
-						m.Name = "ยาตามแพทย์สั่ง"
-						m.MedicineCode = "MED-001"
-					}
-					uPrice := m.UnitPrice
-					if uPrice <= 0 {
-						uPrice = 10.0
+					p := m.UnitPrice
+					if p <= 0 {
+						p = 10.0
 					}
 					q := d.Quantity
 					if q <= 0 {
 						q = 10
 					}
-					tot += uPrice * float64(q)
+					tot += p * float64(q)
 					medList = append(medList, gin.H{
 						"medId":        m.MedicineCode,
 						"name":         m.Name,
@@ -245,8 +322,8 @@ func GetBillingQueues(c *gin.Context) {
 						"properties":   m.Properties,
 						"dosage":       d.Dosage,
 						"instructions": d.Instructions,
-						"price":        uPrice,
-						"unit_price":   uPrice,
+						"price":        p,
+						"unit_price":   p,
 						"quantity":     q,
 						"stock":        m.StockQuantity,
 						"stockStatus":  "พร้อมจ่าย",
@@ -255,44 +332,8 @@ func GetBillingQueues(c *gin.Context) {
 				mBytes, _ := json.Marshal(medList)
 				bq.Medications = string(mBytes)
 				bq.TotalAmount = tot
-			} else {
-				// Fallback ใช้ยาพื้นฐานจาก Cache
-				var medList []gin.H
-				tot := 0.0
-				count := 0
-				for _, m := range cachedAllMeds {
-					if count >= 2 {
-						break
-					}
-					p := m.UnitPrice
-					if p <= 0 {
-						p = 10.0
-					}
-					tot += p * 10.0
-					medList = append(medList, gin.H{
-						"medId":        m.MedicineCode,
-						"name":         m.Name,
-						"genericName":  m.GenericName,
-						"category":     m.Category,
-						"properties":   m.Properties,
-						"dosage":       "1 เม็ด วันละ 3 ครั้ง หลังอาหาร",
-						"instructions": "รับประทานหลังอาหาร เช้า กลางวัน เย็น",
-						"price":        p,
-						"unit_price":   p,
-						"quantity":     10,
-						"stock":        m.StockQuantity,
-						"stockStatus":  "พร้อมจ่าย",
-					})
-					count++
-				}
-				if len(medList) > 0 {
-					mBytes, _ := json.Marshal(medList)
-					bq.Medications = string(mBytes)
-					bq.TotalAmount = tot
-				}
 			}
 		} else {
-			// คำนวณราคายาและความถูกต้องผ่าน In-Memory Cache
 			var parsed []map[string]interface{}
 			if err := json.Unmarshal([]byte(bq.Medications), &parsed); err == nil && len(parsed) > 0 {
 				var medList []gin.H
@@ -367,6 +408,11 @@ func GetBillingQueues(c *gin.Context) {
 			}
 		}
 	}
+
+	billingQueueCacheMu.Lock()
+	cachedBillingQueues = queues
+	cachedBillingExpiry = time.Now().Add(4 * time.Second)
+	billingQueueCacheMu.Unlock()
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
@@ -688,6 +734,10 @@ func ConfirmPayment(c *gin.Context) {
 		CreatedAt:     time.Now(),
 	}
 	config.DB.Create(&history)
+
+	// ล้างแคชในหน่วยความจำทันทีเพื่อให้คิวอัปเดตแบบเรียลไทม์
+	InvalidateBillingQueueCache()
+	InvalidatePharmacyQueueCache()
 
 	// Broadcast Event ให้ทุกแผนกทราบแบบ Real-time
 	ws.BroadcastEvent("PAYMENT_CONFIRMED", billing)

@@ -274,12 +274,12 @@ export default function DetailPage({
 
     fetchQueues();
 
-    // Smart Background Polling ทุกๆ 3 วินาที เพื่อดึงคิวล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket)
+    // Smart Background Polling ทุกๆ 12 วินาที เพื่อดึงคิวล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket เรียลไทม์)
     const pollInterval = setInterval(() => {
       if (!document.hidden) {
         fetchQueues();
       }
-    }, 3000);
+    }, 12000);
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
       if (data && data.action === 'db_reset') {

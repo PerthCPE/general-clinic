@@ -272,12 +272,12 @@ export default function BillingInvoicePage({
   useEffect(() => {
     fetchQueues();
 
-    // Smart Background Polling ทุกๆ 4 วินาที เพื่อดึงคิวใบแจ้งหนี้ล่าสุด
+    // Smart Background Polling ทุกๆ 12 วินาที เพื่อดึงคิวใบแจ้งหนี้ล่าสุด (Fallback คู่กับ WebSocket เรียลไทม์)
     const pollInterval = setInterval(() => {
       if (!document.hidden && !showQrModal) {
         fetchQueues();
       }
-    }, 4000);
+    }, 12000);
 
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
       if (data) {
@@ -465,6 +465,7 @@ export default function BillingInvoicePage({
 
     // 1. Optimistic UI: อัปเดตสถานะสำเร็จบนหน้าจอทันทีใน 0 ms
     setIsPaymentConfirmed(true);
+    setQueueList(prev => prev.map(p => p.id === activePatient.id ? { ...p, visitStatus: 'ชำระเงินเรียบร้อยแล้ว' } : p));
 
     // 2. ส่งข้อมูลขึ้น Supabase Cloud เบื้องหลัง (Background Sync)
     try {

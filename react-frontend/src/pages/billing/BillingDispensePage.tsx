@@ -467,12 +467,12 @@ export default function BillingDispensePage({
     
     fetchInitialQueue();
 
-    // Smart Background Polling ทุกๆ 2.5 วินาที เพื่อดึงคิวการเงินล่าสุดอย่างต่อเนื่อง
+    // Smart Background Polling ทุกๆ 12 วินาที เพื่อดึงคิวการเงินล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket เรียลไทม์)
     const pollInterval = setInterval(() => {
       if (!document.hidden) {
         fetchInitialQueue();
       }
-    }, 2500);
+    }, 12000);
 
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
       fetchInitialQueue();
