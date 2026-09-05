@@ -812,9 +812,47 @@ func GetPatientMedicines(c *gin.Context) {
 		}
 	}
 
+	var results []gin.H
+	for i := range records {
+		var latestVisit models.VisitRecord
+		var latestQueue models.Queue
+		
+		vn := "-"
+		qNo := "-"
+
+		var pt models.Patient
+		if config.DB.Where("hn = ?", records[i].HN).First(&pt).Error == nil {
+			if config.DB.Where("patient_id = ?", pt.ID).Order("created_at desc").First(&latestVisit).Error == nil {
+				vn = latestVisit.VN
+			}
+			if config.DB.Where("patient_id = ?", pt.ID).Order("created_at desc").First(&latestQueue).Error == nil {
+				qNo = latestQueue.QueueNumber
+			}
+		}
+
+		results = append(results, gin.H{
+			"id":               records[i].ID,
+			"hn":               records[i].HN,
+			"national_id":      records[i].NationalID,
+			"fullname":         records[i].FullName,
+			"gender":           records[i].Gender,
+			"age":              records[i].Age,
+			"blood_type":       records[i].BloodType,
+			"scheme_type":      records[i].SchemeType,
+			"allergies":        records[i].Allergies,
+			"chronic_diseases": records[i].ChronicDiseases,
+			"visit_count":      records[i].VisitCount,
+			"phone_number":     records[i].PhoneNumber,
+			"created_at":       records[i].CreatedAt,
+			"updated_at":       records[i].UpdatedAt,
+			"vn":               vn,
+			"queue_number":     qNo,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":            "success",
-		"patient_medicines": records,
+		"patient_medicines": results,
 	})
 }
 
@@ -1307,6 +1345,7 @@ type PharmacyQueueItem struct {
 	DoctorAdvice    string    `json:"doctor_advice"`
 	Medications     []gin.H   `json:"medications"`
 	Status          string    `json:"status"`
+	VN              string    `json:"vn"`
 	CreatedAt       time.Time `json:"created_at"`
 }
 
@@ -1377,11 +1416,13 @@ func GetPharmacyQueues(c *gin.Context) {
 	}
 
 	patientByVisitID := make(map[uint]models.Patient)
+	vnByVisitID := make(map[uint]string)
 	if len(visitIDs) > 0 {
 		var vrs []models.VisitRecord
 		config.DB.Preload("Patient").Where("id IN ?", visitIDs).Find(&vrs)
 		for _, v := range vrs {
 			patientByVisitID[v.ID] = v.Patient
+			vnByVisitID[v.ID] = v.VN
 		}
 	}
 
@@ -1474,6 +1515,7 @@ func GetPharmacyQueues(c *gin.Context) {
 			DoctorAdvice:    advice,
 			Medications:     medList,
 			Status:          mq.Status,
+			VN:              vnByVisitID[mq.VisitID],
 			CreatedAt:       mq.CreatedAt,
 		})
 	}

@@ -115,9 +115,7 @@ const cleanPatientName = (name?: string, hn?: string): string => {
     if (cleanDigits && defaultNameMap[cleanDigits]) {
       return defaultNameMap[cleanDigits];
     }
-    if (pName.includes('?')) {
-      return 'ผู้ป่วยทั่วไป';
-    }
+    return 'ผู้ป่วยทั่วไป';
   }
   return pName || 'ผู้ป่วย';
 };

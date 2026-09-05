@@ -379,7 +379,7 @@ body.dark-mode .medicine-page-container .page-arrow:disabled {
 }
 
 .medicine-page-container .status-badge {
-  padding: 6px 14px;
+  padding: 3px 8px;
   border-radius: 9999px;
   font-size: 13px;
   font-weight: 700;

@@ -9,6 +9,7 @@ export interface PatientConfig {
   queueNumber: string;
   ticket: string;
   receiptNumber?: string;
+  vn?: string;
   name: string;
   shortName: string;
   age: number;

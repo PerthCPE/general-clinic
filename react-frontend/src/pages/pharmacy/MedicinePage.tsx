@@ -1168,6 +1168,7 @@ export default function MedicinePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all');
+  const [sortOrder, setSortOrder] = useState<'latest' | 'code'>('latest');
   
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
   const [successBadgeText, setSuccessBadgeText] = useState('✓ อัปเดตคลังยาเรียบร้อยแล้ว');
@@ -1490,6 +1491,68 @@ export default function MedicinePage() {
   const [addStock, setAddStock] = useState<number | ''>(100);
   const [addUnitPrice, setAddUnitPrice] = useState<number | ''>(20);
 
+  const [hasDraft, setHasDraft] = useState(false);
+
+  // ตรวจสอบแบบร่างเมื่อเปิด Modal
+  useEffect(() => {
+    if (isAddModalOpen) {
+      const draft = localStorage.getItem('medicine_draft');
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft);
+          if (parsed.name || parsed.generic_name || parsed.medicine_code) {
+            setHasDraft(true);
+          }
+        } catch {}
+      }
+    }
+  }, [isAddModalOpen]);
+
+  // บันทึกแบบร่างอัตโนมัติ
+  useEffect(() => {
+    if (isAddModalOpen && (addMedName || addGenericName || addMedCode)) {
+      const draftData = {
+        medicine_code: addMedCode,
+        name: addMedName,
+        generic_name: addGenericName,
+        category: addCategory,
+        properties: addProperties,
+        dosage: addDosage,
+        usage_method: addUsageMethod,
+        instructions: addInstructions,
+        expiry_date: addExpiryDate,
+        manufacturer: addManufacturer,
+        stock_quantity: addStock,
+        unit_price: addUnitPrice
+      };
+      localStorage.setItem('medicine_draft', JSON.stringify(draftData));
+    }
+  }, [addMedCode, addMedName, addGenericName, addCategory, addProperties, addDosage, addUsageMethod, addInstructions, addExpiryDate, addManufacturer, addStock, addUnitPrice, isAddModalOpen]);
+
+  const handleRestoreDraft = () => {
+    try {
+      const draft = localStorage.getItem('medicine_draft');
+      if (draft) {
+        const parsed = JSON.parse(draft);
+        setAddMedCode(parsed.medicine_code || '');
+        setAddMedName(parsed.name || '');
+        setAddGenericName(parsed.generic_name || '');
+        setAddCategory(parsed.category || 'ยารักษาโรคทั่วไป');
+        setAddProperties(parsed.properties || '');
+        setAddDosage(parsed.dosage || '');
+        setAddUsageMethod(parsed.usage_method || 'รับประทาน (กิน)');
+        setAddInstructions(parsed.instructions || '');
+        setAddExpiryDate(parsed.expiry_date || '');
+        setAddManufacturer(parsed.manufacturer || '');
+        setAddStock(parsed.stock_quantity !== undefined ? parsed.stock_quantity : 100);
+        setAddUnitPrice(parsed.unit_price !== undefined ? parsed.unit_price : 20);
+        setHasDraft(false);
+      }
+    } catch (err) {
+      console.error('Failed to restore draft', err);
+    }
+  };
+
   // Delete Confirmation state
   const [deleteConfirmMed, setDeleteConfirmMed] = useState<Medicine | null>(null);
 
@@ -1543,6 +1606,8 @@ export default function MedicinePage() {
       setTimeout(() => {
         setIsSubmitting(false);
         setIsAddModalOpen(false);
+        localStorage.removeItem('medicine_draft');
+        setHasDraft(false);
         setAddMedCode('');
         setAddMedName('');
         setAddGenericName('');
@@ -1711,6 +1776,18 @@ export default function MedicinePage() {
     else if (stockStatusFilter === 'out-of-stock') matchStatus = med.status === 'Out of Stock';
 
     return matchSearch && matchCategory && matchStatus;
+  }).sort((a, b) => {
+    if (sortOrder === 'latest') {
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return timeB - timeA;
+    } else {
+      const codeA = (a.medicine_code || a.id).toLowerCase();
+      const codeB = (b.medicine_code || b.id).toLowerCase();
+      if (codeA < codeB) return -1;
+      if (codeA > codeB) return 1;
+      return 0;
+    }
   });
 
   const ITEMS_PER_PAGE = 10;
@@ -1904,6 +1981,22 @@ export default function MedicinePage() {
               {allAvailableCategories.map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
               ))}
+            </select>
+          </div>
+          <div className="input-group">
+            <label>การจัดเรียง (Sort)</label>
+            <select
+              className="filter-select"
+              value={sortOrder}
+              onChange={(e: any) => setSortOrder(e.target.value)}
+              style={{
+                padding: '10px 14px', borderRadius: '8px',
+                border: '1px solid #CBD5E1', background: 'var(--bg-card, #F8FAFC)',
+                color: 'var(--text-primary, #0F172A)', fontSize: '14px'
+              }}
+            >
+              <option value="latest">อัปเดตล่าสุด</option>
+              <option value="code">ตามรหัสยา</option>
             </select>
           </div>
         </div>
@@ -2720,9 +2813,32 @@ export default function MedicinePage() {
       {isAddModalOpen && (
         <ClinicModalPortal isOpen={true} onClose={() => setIsAddModalOpen(false)} className="medicine-page-container">
           <div className="modal-card card" style={{ maxWidth: '650px', width: '94%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overscrollBehavior: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
+            <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h3 className="modal-title">+ เพิ่มรายการยาใหม่เข้าคลัง</h3>
-              <button className="close-btn" onClick={() => setIsAddModalOpen(false)}>✕</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {hasDraft && (
+                  <button 
+                    onClick={handleRestoreDraft}
+                    style={{
+                      background: '#FFFBEB',
+                      border: '1px solid #FCD34D',
+                      color: '#B45309',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                    กู้คืนแบบร่าง
+                  </button>
+                )}
+                <button className="close-btn" onClick={() => setIsAddModalOpen(false)}>✕</button>
+              </div>
             </div>
 
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', flex: 1, minHeight: 0, paddingRight: '4px', overscrollBehaviorY: 'auto' }}>

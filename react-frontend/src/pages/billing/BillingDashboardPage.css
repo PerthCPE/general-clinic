@@ -725,7 +725,7 @@ body.dark-mode .billing-dashboard-container .dash-med-item {
 }
 
 .billing-dashboard-container .dash-med-name {
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 500;
   color: #0F172A;
   display: block;
@@ -736,7 +736,7 @@ body.dark-mode .billing-dashboard-container .dash-med-name {
 }
 
 .billing-dashboard-container .dash-med-dosage {
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   color: #64748B;
   display: block;
   margin-top: 2px;
@@ -745,7 +745,7 @@ body.dark-mode .billing-dashboard-container .dash-med-name {
 .billing-dashboard-container .dash-med-price {
   font-weight: 600;
   color: #2563EB;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
 }
 
 .billing-dashboard-container .finance-block {
@@ -761,7 +761,7 @@ body.dark-mode .billing-dashboard-container .finance-block {
 .billing-dashboard-container .fee-row-item {
   display: flex;
   justify-content: space-between;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   color: #475569;
   margin-bottom: 8px;
 }

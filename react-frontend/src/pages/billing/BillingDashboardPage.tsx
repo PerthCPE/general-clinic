@@ -9,6 +9,7 @@ import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 interface PaymentRecord {
   id: string;
   hn: string;
+  vn?: string;
   patientName: string;
   date: string;
   time: string;
@@ -119,6 +120,7 @@ export default function BillingDashboardPage() {
             return {
               id: h.receipt_number || `REC-${String(h.id).padStart(4, '0')}`,
               hn: displayHN,
+              vn: h.vn || '-',
               patientName: displayPatientName,
               date: h.created_at ? new Date(h.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
               time: h.created_at ? new Date(h.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.' : '10:00 น.',
@@ -190,6 +192,7 @@ export default function BillingDashboardPage() {
         const newRec: PaymentRecord = {
           id: data.receipt_number || `REC-${String(data.id).padStart(4, '0')}`,
           hn: displayHN,
+          vn: data.vn || '-',
           patientName: displayPatientName,
           date: data.created_at ? new Date(data.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
           time: data.created_at ? new Date(data.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.' : '10:00 น.',
@@ -331,6 +334,7 @@ export default function BillingDashboardPage() {
       const matchSearch = !query || 
                           record.id.toLowerCase().includes(query) || 
                           record.hn.toLowerCase().includes(query) || 
+                          (record.vn || '').toLowerCase().includes(query) ||
                           record.patientName.toLowerCase().includes(query);
       const matchStatus = statusFilter === 'all' || record.status === statusFilter;
       const matchMethod = methodFilter === 'all' || 
@@ -628,6 +632,7 @@ export default function BillingDashboardPage() {
             <thead>
               <tr>
                 <th style={{ textAlign: 'center', width: '160px', padding: '12px 6px' }}>เลขที่ใบเสร็จ</th>
+                <th style={{ textAlign: 'center', width: '120px', padding: '12px 6px' }}>เลข VN</th>
                 <th style={{ textAlign: 'left', width: '220px', padding: '12px 14px 12px 28px' }}>HN & ชื่อผู้ป่วย</th>
                 <th style={{ textAlign: 'center', width: '14%', padding: '12px 4px' }}>เวลาที่ชำระเงิน</th>
                 <th style={{ textAlign: 'right', width: '12%', padding: '12px 14px' }}>จำนวนเงินสุทธิ</th>
@@ -676,6 +681,11 @@ export default function BillingDashboardPage() {
                         </span>
                         <CopyableText value={record.id} displayValue="" style={{ display: 'inline-flex' }} />
                       </div>
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '13px', color: '#334155' }}>
+                        <CopyableText value={record.vn || '-'} />
+                      </span>
                     </td>
                     <td 
                       className="patient-name-cell clickable-patient"
@@ -839,13 +849,13 @@ export default function BillingDashboardPage() {
       {/* Patient Detail System Modal */}
       {selectedDetail && (
         <ClinicModalPortal isOpen={true} onClose={() => setSelectedDetail(null)} className="billing-dashboard-container">
-          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', width: '92%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden' }}>
+          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', width: '92%', maxHeight: '94vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden' }}>
             <div className="dash-modal-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
               <div>
-                <h2 className="dash-modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+                <h2 className="dash-modal-title" style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>
                   รายละเอียดประวัติใบเสร็จ & การรักษา
                 </h2>
-                <p className="dash-modal-sub" style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748B' }}>
+                <p className="dash-modal-sub" style={{ margin: '4px 0 0 0', fontSize: '15px', color: '#64748B' }}>
                   เลขที่: <strong style={{ color: '#2563EB' }}>{selectedDetail.id}</strong> • ผู้ป่วย: <strong style={{ color: '#0F172A' }}>{selectedDetail.patientName}</strong> (HN: {selectedDetail.hn})
                 </p>
               </div>

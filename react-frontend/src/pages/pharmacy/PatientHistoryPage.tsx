@@ -9,6 +9,9 @@ import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 interface Patient {
   id: string;
   hn: string;
+  vn?: string;
+  queueNumber?: string;
+  nationalId?: string;
   name: string;
   age: number;
   bloodType: string;
@@ -207,6 +210,7 @@ export default function PatientHistoryPage() {
   const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'emergency' | 'urgent' | 'normal'>('all');
   const [riskFilter, setRiskFilter] = useState<'all' | 'hypertension' | 'fever' | 'allergies'>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   const [copiedHn, setCopiedHn] = useState<string | null>(null);
 
@@ -397,11 +401,12 @@ export default function PatientHistoryPage() {
             const cleanDigits = cleanHN.replace(/\D/g, '').padStart(4, '0');
             let pName = pm.fullname || pm.full_name || '';
             if (!pName || pName.includes('?') || pName.trim() === '' || pName === 'ผู้ป่วย') {
-              pName = defaultNameMap[cleanDigits] || pName || 'ผู้ป่วย';
+              pName = defaultNameMap[cleanDigits] || 'ผู้ป่วยทั่วไป';
             }
             return {
               id: `PT-${pm.id || pm.hn}`,
               hn: cleanHN,
+              nationalId: pm.national_id || '',
               name: pName,
               age: pm.age || 35,
               bloodType: pm.blood_type || 'O+',
@@ -411,12 +416,14 @@ export default function PatientHistoryPage() {
               visitCount: pm.visit_count || 1,
               allergies: pm.allergies || 'ปฏิเสธการแพ้ยา',
               phone: pm.phone_number,
+              vn: pm.vn,
+              queueNumber: pm.queue_number,
               createdAt: pm.created_at || pm.CreatedAt,
               updatedAt: pm.updated_at || pm.UpdatedAt
             };
           });
 
-          // คนล่าสุดอยู่บนตารางเสมอ (Sort latest on top)
+          // เรียงค่าเริ่มต้น: ล่าสุดอยู่บน
           mapped.sort((a, b) => {
             const aDate = new Date(a.updatedAt || a.createdAt || 0).getTime();
             const bDate = new Date(b.updatedAt || b.createdAt || 0).getTime();
@@ -551,12 +558,18 @@ export default function PatientHistoryPage() {
       (patient?.hn || '').toLowerCase().includes(q) ||
       (queryDigits !== '' && hnDigits.includes(queryDigits));
 
+    // Check National ID match
+    const matchNationalId = patient?.nationalId ? patient.nationalId.includes(queryDigits) : false;
+
     // Multi-word name search
     const searchTerms = q.split(/\s+/).filter(Boolean);
     const nameStr = (patient?.name || '').toLowerCase();
     const matchName = searchTerms.length > 0 && searchTerms.every(term => nameStr.includes(term));
 
-    const matchSearch = q === '' || matchHn || matchName;
+    const matchVn = (patient?.vn || '').toLowerCase().includes(q);
+    const matchQueue = (patient?.queueNumber || '').toLowerCase().includes(q);
+
+    const matchSearch = q === '' || matchHn || matchName || (queryDigits !== '' && matchNationalId) || matchVn || matchQueue;
 
     let matchRisk = true;
     if (riskFilter === 'hypertension') {
@@ -568,12 +581,16 @@ export default function PatientHistoryPage() {
     }
 
     return matchSearch && matchRisk;
+  }).sort((a, b) => {
+    const aDate = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const bDate = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return sortOrder === 'desc' ? bDate - aDate : aDate - bDate;
   });
 
   const ITEMS_PER_PAGE = 10;
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, timeRange, urgencyFilter, riskFilter]);
+  }, [searchQuery, timeRange, urgencyFilter, riskFilter, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPatients.length / ITEMS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -667,6 +684,28 @@ export default function PatientHistoryPage() {
                 );
               })}
             </div>
+
+            {/* Row 3: การจัดเรียง */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span className="filter-row-label" style={{ fontSize: '13.5px', fontWeight: '700', minWidth: '120px' }}>การจัดเรียง:</span>
+              {(['desc', 'asc'] as const).map((key) => {
+                const labels = { desc: 'ล่าสุด (ใหม่ไปเก่า)', asc: 'เก่าสุด (เก่าไปใหม่)' };
+                const active = sortOrder === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSortOrder(key)}
+                    className={`filter-pill-btn ${active ? 'active' : ''}`}
+                    style={{
+                      padding: '6px 16px', borderRadius: '8px',
+                      fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                  >
+                    {labels[key]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -705,6 +744,7 @@ export default function PatientHistoryPage() {
                     <thead>
                     <tr>
                       <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>ID (HN)</th>
+                      <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>เลข VN</th>
                       <th style={{ textAlign: 'left', width: '18%', padding: '12px 14px' }}>ชื่อผู้ป่วย</th>
                       <th style={{ textAlign: 'center', width: '7%', padding: '12px 4px' }}>อายุ</th>
                       <th style={{ textAlign: 'center', width: '7%', padding: '12px 4px' }}>กรุ๊ปเลือด</th>
@@ -721,6 +761,11 @@ export default function PatientHistoryPage() {
                         <tr key={patient.id}>
                           <td className="hn-cell" style={{ textAlign: 'center' }}>
                             <CopyableText value={patient.hn.replace(/[-]/g, '')} color="#2563EB" />
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '13px', color: '#334155' }}>
+                              <CopyableText value={patient.vn || '-'} />
+                            </span>
                           </td>
                           <td 
                             className="patient-name-cell clickable-patient-history"
@@ -879,7 +924,7 @@ export default function PatientHistoryPage() {
       {/* Patient Full History Pop-up Modal (Images 1 & 2 Pattern) */}
       {selectedPatientModal && (
         <ClinicModalPortal isOpen={true} onClose={() => setSelectedPatientModal(null)} className="patient-history-container">
-          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', width: '92%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden', border: 'none' }}>
+          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '750px', width: '92%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden', border: 'none' }}>
             {/* Modal Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>

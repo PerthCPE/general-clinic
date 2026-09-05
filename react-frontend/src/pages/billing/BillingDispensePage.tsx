@@ -146,6 +146,8 @@ export default function BillingDispensePage({
     return (
       (p.id || '').toLowerCase().includes(q) ||
       (p.hn || '').toLowerCase().includes(q) ||
+      (p.vn || '').toLowerCase().includes(q) ||
+      (p.queueNumber || '').toLowerCase().includes(q) ||
       cleanNationalId.includes(cleanQ) ||
       (p.name || '').toLowerCase().includes(q) ||
       (p.shortName || '').toLowerCase().includes(q)
@@ -329,7 +331,7 @@ export default function BillingDispensePage({
             };
             let pName = pq.patient_name || '';
             if (!pName || pName.includes('?') || pName.trim() === '' || pName === 'ผู้ป่วย') {
-              pName = defaultNameMap[cleanDigits] || pName || 'ผู้ป่วย';
+              pName = defaultNameMap[cleanDigits] || 'ผู้ป่วยทั่วไป';
             }
 
             let parsedMeds: any[] = [];
@@ -360,6 +362,7 @@ export default function BillingDispensePage({
               nationalId: pq.national_id || '-',
               queueNumber: pq.queue_number || 'Q0001',
               ticket: pq.queue_number || 'Q0001',
+              vn: pq.vn || '-',
               name: pName,
               shortName: pName,
               gender: pq.gender || 'หญิง',
@@ -406,6 +409,7 @@ export default function BillingDispensePage({
                 nationalId: bq.national_id || '-',
                 queueNumber: bq.queue_number || 'Q0001',
                 ticket: bq.queue_number || 'Q0001',
+                vn: bq.vn || '-',
                 name: bq.patient_name || 'ผู้ป่วย',
                 shortName: bq.patient_name || 'ผู้ป่วย',
                 gender: bq.gender || 'หญิง',
@@ -432,6 +436,7 @@ export default function BillingDispensePage({
             const bhHN = (bh.hn || '').replace(/[-]/g, '');
             const queueNo = bh.queue_number || (bh.queueNumber && bh.queueNumber.startsWith('Q') ? bh.queueNumber : '') || `Q${String(bh.id || '').padStart(4, '0')}`;
             const receiptNum = bh.receipt_number || `REC-${String(bh.id || '').padStart(4, '0')}`;
+            const vnNum = bh.vn || '-';
 
             // ตรวจสอบว่าคิวนี้มีอยู่ใน mappedQueues หรือไม่
             const existingIdx = mappedQueues.findIndex(q => {
@@ -468,6 +473,7 @@ export default function BillingDispensePage({
                 queueNumber: queueNo,
                 ticket: queueNo,
                 receiptNumber: receiptNum,
+                vn: vnNum,
                 name: bh.patient_name || 'ผู้ป่วย',
                 shortName: bh.patient_name || 'ผู้ป่วย',
                 gender: 'ชาย',
@@ -1024,7 +1030,8 @@ export default function BillingDispensePage({
                   <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '46px', whiteSpace: 'nowrap' }}>
                     <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '90px' }}>ลำดับคิว</th>
                     <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '110px' }}>HN</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '13.5px', textAlign: 'left', minWidth: '190px' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '110px' }}>เลข VN</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', minWidth: '190px' }}>ชื่อ-นามสกุล คนไข้</th>
                     <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '150px' }}>เลขบัตรประชาชน</th>
                     <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '125px' }}>สถานะคิว</th>
                     <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '160px' }}>สิทธิการรักษา</th>
@@ -1062,8 +1069,13 @@ export default function BillingDispensePage({
                           <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                             <CopyableText value={(p.hn || '').replace(/[-]/g, '')} color={isCompleted ? '#64748B' : '#2563EB'} />
                           </td>
-                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', textAlign: 'left' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                            <span style={{ color: isCompleted ? '#64748B' : '#0F172A', fontWeight: '600', fontFamily: 'monospace' }}>
+                              <CopyableText value={p.vn || '-'} color={isCompleted ? '#64748B' : '#0F172A'} />
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isCompleted ? '#64748B' : '#2563EB'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                                 <circle cx="12" cy="7" r="4"/>
