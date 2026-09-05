@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import './BillingDashboardPage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
 import { BillingDashboardSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
+import html2pdf from 'html2pdf.js';
 
 interface PaymentRecord {
   id: string;
@@ -72,6 +73,20 @@ export default function BillingDashboardPage() {
   const [searchDate, setSearchDate] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const printableReceiptRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadPdf = () => {
+    const targetEl = printableReceiptRef.current;
+    if (!targetEl) return;
+    const opt = {
+      margin: 10,
+      filename: `Receipt-${selectedDetail?.hn || 'HN'}-${Date.now()}.pdf`,
+      image: { type: 'jpeg' as const, quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const }
+    };
+    html2pdf().set(opt).from(targetEl).save();
+  };
   const pageSize = 10;
 
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -1182,6 +1197,28 @@ export default function BillingDashboardPage() {
 
                 <button
                   type="button"
+                  onClick={handleDownloadPdf}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 18px', borderRadius: '8px',
+                    background: '#2563EB', color: '#FFFFFF',
+                    border: 'none', fontSize: '13.5px',
+                    fontWeight: '700', cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="บันทึกเอกสารเป็นไฟล์ PDF"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  บันทึกเป็น PDF (Save PDF)
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setShowPrintPreview(false)}
                   style={{
                     width: '34px', height: '34px', borderRadius: '8px',
@@ -1201,6 +1238,8 @@ export default function BillingDashboardPage() {
             {/* Scrollable Printable Paper Sheet */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px', background: '#F1F5F9' }}>
               <div 
+                ref={printableReceiptRef}
+                className="receipt-paper"
                 style={{
                   background: '#FFFFFF',
                   borderRadius: '12px',
