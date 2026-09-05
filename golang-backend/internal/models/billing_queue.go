@@ -13,6 +13,7 @@ type BillingQueue struct {
 	Age          int       `json:"age"`
 	SchemeType   string    `json:"scheme_type"` // สิทธิการรักษา
 	VisitID      uint      `gorm:"not null" json:"visit_id"`
+	VN           string    `gorm:"-" json:"vn"` // ไม่บันทึกลง DB แต่ใช้สำหรับ Response
 	TotalAmount  float64   `gorm:"not null;default:0" json:"total_amount"`
 	Status       string    `gorm:"not null;default:'pending'" json:"status"` // pending, paid, cancelled
 	DoctorAdvice string    `json:"doctor_advice"`

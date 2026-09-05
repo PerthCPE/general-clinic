@@ -410,6 +410,40 @@ func GetBillingQueues(c *gin.Context) {
 		}
 	}
 
+	// [Fix] Populate VN for each queue before returning
+	var qVisitIDs []uint
+	for _, bq := range queues {
+		if bq.VisitID > 0 {
+			qVisitIDs = append(qVisitIDs, bq.VisitID)
+		}
+	}
+	
+	vnMap := make(map[uint]string)
+	if len(qVisitIDs) > 0 {
+		var vrList []models.VisitRecord
+		config.DB.Where("id IN ?", qVisitIDs).Find(&vrList)
+		for _, vr := range vrList {
+			vnMap[vr.ID] = vr.VN
+		}
+	}
+	for i := range queues {
+		if queues[i].VisitID > 0 {
+			queues[i].VN = vnMap[queues[i].VisitID]
+		}
+		if queues[i].VN == "" && queues[i].HN != "" && queues[i].HN != "HN0001" {
+			var p models.Patient
+			if config.DB.Where("hn = ?", queues[i].HN).First(&p).Error == nil {
+				var vr models.VisitRecord
+				if config.DB.Where("patient_id = ?", p.ID).Order("id desc").First(&vr).Error == nil {
+					queues[i].VN = vr.VN
+					if queues[i].VisitID == 0 {
+						queues[i].VisitID = vr.ID
+					}
+				}
+			}
+		}
+	}
+
 	billingQueueCacheMu.Lock()
 	cachedBillingQueues = queues
 	cachedBillingExpiry = time.Now().Add(4 * time.Second)

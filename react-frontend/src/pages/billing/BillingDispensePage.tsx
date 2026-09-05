@@ -1029,13 +1029,13 @@ export default function BillingDispensePage({
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F8FAFC' }}>
                   <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '46px', whiteSpace: 'nowrap' }}>
                     <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '90px' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '110px' }}>HN</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '110px' }}>เลข VN</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', minWidth: '190px' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '150px' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '125px' }}>สถานะคิว</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '160px' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 12px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '140px' }}>การดำเนินการ</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '100px' }}>HN</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '100px' }}>VN</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '140px' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', minWidth: '180px' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '110px' }}>สถานะคิว</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '140px' }}>สิทธิการรักษา</th>
+                    <th style={{ padding: '12px 12px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '130px' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1070,21 +1070,21 @@ export default function BillingDispensePage({
                             <CopyableText value={(p.hn || '').replace(/[-]/g, '')} color={isCompleted ? '#64748B' : '#2563EB'} />
                           </td>
                           <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                            <span style={{ color: isCompleted ? '#64748B' : '#0F172A', fontWeight: '600', fontFamily: 'monospace' }}>
-                              <CopyableText value={p.vn || '-'} color={isCompleted ? '#64748B' : '#0F172A'} />
+                            <span style={{ color: isCompleted ? '#94A3B8' : '#0F172A', fontWeight: '600', fontFamily: 'monospace', fontSize: '12.5px' }}>
+                              <CopyableText value={p.vn || '-'} />
                             </span>
                           </td>
-                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
+                          <td className="patient-table-sub" style={{ padding: '10px 10px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center', color: isCompleted ? '#94A3B8' : '#64748B' }}>
+                            {p.nationalId || '-'}
+                          </td>
+                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', textAlign: 'left' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isCompleted ? '#64748B' : '#2563EB'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                                 <circle cx="12" cy="7" r="4"/>
                               </svg>
                               {p.name}
                             </div>
-                          </td>
-                          <td className="patient-table-sub" style={{ padding: '10px 10px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center', color: isCompleted ? '#94A3B8' : '#64748B' }}>
-                            {p.nationalId || '-'}
                           </td>
                           <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                             <span style={{ 

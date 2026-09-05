@@ -1632,6 +1632,29 @@ func GetPharmacyQueues(c *gin.Context) {
 			qStatus = "dispensed"
 		}
 
+		vn := ""
+		if visitID > 0 {
+			if existingVN, ok := vnByVisitID[visitID]; ok {
+				vn = existingVN
+			} else {
+				var vr models.VisitRecord
+				if config.DB.First(&vr, visitID).Error == nil {
+					vn = vr.VN
+					vnByVisitID[visitID] = vn
+				}
+			}
+		}
+		
+		if vn == "" && q.PatientID > 0 {
+			var vr models.VisitRecord
+			if config.DB.Where("patient_id = ?", q.PatientID).Order("id desc").First(&vr).Error == nil {
+				vn = vr.VN
+				if visitID == 0 {
+					visitID = vr.ID
+				}
+			}
+		}
+
 		results = append(results, PharmacyQueueItem{
 			ID:              fmt.Sprintf("%d", q.ID),
 			VisitID:         visitID,
@@ -1647,6 +1670,7 @@ func GetPharmacyQueues(c *gin.Context) {
 			DoctorAdvice:    CleanDoctorAdvice(q.Note),
 			Medications:     medList,
 			Status:          qStatus,
+			VN:              vn,
 			CreatedAt:       q.CreatedAt,
 		})
 	}

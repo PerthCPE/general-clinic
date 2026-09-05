@@ -40,6 +40,7 @@ export interface PatientConfig {
     price: number;
     properties: string;
   }[];
+  createdAt?: string;
 }
 
 export const CLINIC_CONFIG = {

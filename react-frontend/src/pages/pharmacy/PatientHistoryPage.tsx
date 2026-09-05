@@ -22,7 +22,6 @@ interface Patient {
   visitCount?: number;
   allergies?: string;
   phone?: string;
-  queueNumber?: string;
   visitTime?: string;
   doctorAdvice?: string;
   createdAt?: string;

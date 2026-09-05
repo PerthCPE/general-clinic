@@ -242,6 +242,7 @@ export default function DetailPage({
               id: String(pq.id),
               visitId: pq.visit_id || 1,
               hn: cleanHN || `HN0001`,
+              vn: pq.vn || '-',
               nationalId: pq.national_id || '',
               queueNumber: pq.queue_number || 'Q0001',
               ticket: pq.queue_number || 'A-01',
@@ -258,6 +259,7 @@ export default function DetailPage({
               status: (isCompleted ? 'completed' : (isDispensed ? 'dispensed' : 'pending')) as 'pending' | 'dispensed' | 'completed',
               visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
               visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+              createdAt: pq.created_at,
               doctorAdvice: cleanDoctorAdvice(pq.doctor_advice),
               medications: rawMeds.map((m: any) => ({
                 medId: m.medId || m.medicine_code || 'MED-001',
@@ -886,12 +888,13 @@ export default function DetailPage({
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F8FAFC' }}>
                   <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
                     <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '90px', textAlign: 'center' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '110px', textAlign: 'center' }}>HN</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '150px', textAlign: 'center' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', minWidth: '220px', textAlign: 'left' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '130px', textAlign: 'center' }}>สถานะคิว</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '160px', textAlign: 'center' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', width: '150px', textAlign: 'center' }}>การดำเนินการ</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '100px', textAlign: 'center' }}>HN</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '110px', textAlign: 'center' }}>VN</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '140px', textAlign: 'center' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', minWidth: '200px', textAlign: 'left' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '120px', textAlign: 'center' }}>สถานะ</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '90px', textAlign: 'center' }}>เวลารอ</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', width: '130px', textAlign: 'center' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -939,6 +942,11 @@ export default function DetailPage({
                             </div>
                           </td>
                           <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
+                            <span style={{ color: isCompleted ? '#64748B' : '#0F172A', fontWeight: '600', fontFamily: 'monospace', fontSize: '13.5px' }}>
+                              <CopyableText value={p.vn || '-'} />
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
                             {p.nationalId && p.nationalId !== '-' ? (
                               <div style={{ display: 'inline-flex', justifyContent: 'center' }}>
                                 <CopyableText value={p.nationalId} color="#475569" />
@@ -976,73 +984,16 @@ export default function DetailPage({
                               {isCompleted ? '✓ เสร็จสิ้น/รับยา' : (isDispensed ? '✓ จ่ายยาแล้ว' : 'รอจัดยา')}
                             </span>
                           </td>
-                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
-                            {(() => {
-                              const rights = p.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
-                              const is30 = rights.includes('30') || rights.includes('สปสช') || rights.includes('บัตรทอง');
-                              const isSSO = rights.includes('ประกันสังคม');
-                              const isGov = rights.includes('ข้าราชการ') || rights.includes('รัฐวิสาหกิจ');
-                              const isPriv = rights.includes('ประกันสุขภาพ') || rights.includes('เอกชน');
-                              const isSelf = rights.includes('ชำระเงินเอง') || rights.includes('เงินสด');
-
-                              let bg = '#F1F5F9';
-                              let color = '#475569';
-                              let border = '#CBD5E1';
-                              let label = rights;
-
-                              if (is30) {
-                                bg = '#FEF9C3';
-                                color = '#92400E';
-                                border = '#FDE68A';
-                                label = 'สิทธิ 30 บาท';
-                              } else if (isSSO) {
-                                bg = '#E0F2FE';
-                                color = '#075985';
-                                border = '#BAE6FD';
-                                label = 'ประกันสังคม';
-                              } else if (isGov) {
-                                bg = '#F3E8FF';
-                                color = '#6D28D9';
-                                border = '#DDD6FE';
-                                label = 'สิทธิ์ข้าราชการ';
-                              } else if (isPriv) {
-                                bg = '#F3E8FF';
-                                color = '#7C3AED';
-                                border = '#DDD6FE';
-                                label = 'ประกันสุขภาพเอกชน';
-                              } else if (isSelf) {
-                                bg = '#F1F5F9';
-                                color = '#334155';
-                                border = '#CBD5E1';
-                                label = 'ชำระเงินเอง';
-                              }
-
-                              return (
-                                <span 
-                                  title={rights}
-                                  style={{ 
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    width: '135px',
-                                    height: '28px',
-                                    boxSizing: 'border-box',
-                                    borderRadius: '9999px',
-                                    fontSize: '12px',
-                                    fontWeight: '600',
-                                    background: bg,
-                                    color: color,
-                                    border: `1.5px solid ${border}`,
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    padding: '0 8px'
-                                  }}
-                                >
-                                  {label}
-                                </span>
-                              );
-                            })()}
+                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
+                            <span style={{ color: isCompleted ? '#94A3B8' : '#EF4444', fontWeight: '600', fontSize: '13px' }}>
+                              {(() => {
+                                if (isCompleted) return '-';
+                                // Simple fallback for wait time calculation
+                                if (!p.createdAt) return '-';
+                                const minutes = Math.floor((Date.now() - new Date(p.createdAt).getTime()) / 60000);
+                                return minutes >= 0 ? `${minutes} นาที` : '0 นาที';
+                              })()}
+                            </span>
                           </td>
                           <td style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                             {isDispensed ? (

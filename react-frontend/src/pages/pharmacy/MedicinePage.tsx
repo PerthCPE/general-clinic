@@ -26,6 +26,10 @@ interface Medicine {
   stock_quantity: number;
   status: 'In Stock' | 'Low Stock' | 'Out of Stock';
   dispensedToday: number;
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // Modern Interactive Dosage Input Builder with Pattern Slot Locking & Balanced 3-Column Grid
