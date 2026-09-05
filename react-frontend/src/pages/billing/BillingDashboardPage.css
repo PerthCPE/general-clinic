@@ -1186,5 +1186,5 @@ body.dark-mode .billing-dashboard-container .stat-card-box.active-stat {
   .receipt-preview-dialog { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: 100% !important; box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; }
   .receipt-preview-dialog > div:first-child { display: none !important; }
   .receipt-preview-dialog > div:last-child { padding: 0 !important; background: transparent !important; display: block !important; overflow: visible !important; }
-  .billing-dashboard-container { display: none !important; }
+  div.billing-dashboard-container:not(.clinic-modal-portal-content-scope) { display: none !important; }
 }

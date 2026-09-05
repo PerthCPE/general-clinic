@@ -417,7 +417,7 @@ func GetBillingQueues(c *gin.Context) {
 			qVisitIDs = append(qVisitIDs, bq.VisitID)
 		}
 	}
-	
+
 	vnMap := make(map[uint]string)
 	if len(qVisitIDs) > 0 {
 		var vrList []models.VisitRecord
@@ -469,7 +469,7 @@ func GetAllBillings(c *gin.Context) {
 	})
 }
 
-// [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ดึงประวัติการชำระเงิน Single Query (30 ms) ตัด loop queries ออก 100%
+// [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ดึงประวัติการชำระเงิน Single Query (30 ms) ตัด loop queries ออก
 func GetBillingHistories(c *gin.Context) {
 	var histories []models.BillingHistory
 	if err := config.DB.Order("id desc, created_at desc").Find(&histories).Error; err != nil {
@@ -497,7 +497,7 @@ func GetBillingHistories(c *gin.Context) {
 		models.BillingHistory
 		VN string `json:"vn"`
 	}
-	
+
 	var result []HistoryWithVN
 
 	for i := range histories {
