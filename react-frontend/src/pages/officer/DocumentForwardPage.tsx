@@ -607,6 +607,7 @@ export const DocumentForwardPage: React.FC = () => {
                       ))
                     ) : (
                       <>
+                      {/* ปรับชื่อ */}
                         <option value="6">พญ.สุดา สุขสมบูรณ์ (แพทย์)</option>
                         <option value="7">นพ.วิชัย ชาญการแพทย์ (แพทย์)</option>
                         <option value="8">พญ.เกศรา รักษาดี (แพทย์)</option>
