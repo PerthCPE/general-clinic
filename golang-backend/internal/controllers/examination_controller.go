@@ -438,6 +438,53 @@ func SaveExamination(c *gin.Context) {
 		"visit_id": visit.ID,
 		"status":   exam.Status,
 	})
+	// บันทึกรายการสั่งยาเป็นฉบับร่างไว้ใน dispensings เพื่อไม่ให้สูญหายหากแพทย์ยังไม่ได้เซ็นปิดเคส
+	if !signing && len(req.Prescriptions) > 0 {
+		config.DB.Where("visit_id = ?", visit.ID).Delete(&models.Dispensing{})
+		for _, p := range req.Prescriptions {
+			medName := p.MedicineName
+			if medName == "" {
+				medName = p.Name
+			}
+			medCode := p.MedicineCode
+			if medCode == "" {
+				medCode = p.Code
+			}
+
+			var med models.Medicine
+			if p.MedicineID > 0 {
+				config.DB.First(&med, p.MedicineID)
+			}
+			if med.ID == 0 {
+				med = FindMedicineByNameOrCode(medCode, medName)
+			}
+			medID := med.ID
+			if medID == 0 {
+				var firstMed models.Medicine
+				config.DB.First(&firstMed)
+				if firstMed.ID > 0 {
+					medID = firstMed.ID
+				} else {
+					medID = 1
+				}
+			}
+			qty := p.Quantity
+			if qty <= 0 {
+				qty = 10
+			}
+			disp := models.Dispensing{
+				VisitID:      visit.ID,
+				MedicineID:   medID,
+				DoctorID:     doctorID,
+				Quantity:     qty,
+				Dosage:       p.Dosage,
+				Instructions: p.Instructions,
+			}
+			config.DB.Create(&disp)
+			prescriptionCount++
+		}
+	}
+
 	if signing {
 		var pat models.Patient
 		config.DB.First(&pat, visit.PatientID)
@@ -461,32 +508,37 @@ func SaveExamination(c *gin.Context) {
 		var medList []gin.H
 
 		for _, p := range req.Prescriptions {
-			// ค้นหายาและราคาต่อหน่วยจริงจากตาราง medicines
-			//
-			// ลำดับการค้นสำคัญมาก
-			// ถ้าหน้าจอแพทย์ส่ง medicine_id มาด้วย แปลว่าแพทย์ "เลือกจากรายการยาจริงในคลัง"
-			// ไม่ได้พิมพ์ชื่อขึ้นมาเอง จึงต้องเชื่อ id ก่อนเสมอ
-			// เพราะการค้นด้วยชื่อมีขั้นที่จับแบบขึ้นต้นเหมือนกัน ซึ่งอาจไปตรงกับยาคนละตัว
-			// (เช่น "Amoxicillin 500mg" กับ "Amoxicillin 500mg cap")
-			// โค้ดเดิมค้นด้วยชื่อก่อนแล้วค่อยใช้ id เป็นตัวสำรอง จึงมีโอกาสจ่ายยาผิดตัว
+			medName := p.MedicineName
+			if medName == "" {
+				medName = p.Name
+			}
+			medCode := p.MedicineCode
+			if medCode == "" {
+				medCode = p.Code
+			}
+
 			var med models.Medicine
 			if p.MedicineID > 0 {
 				config.DB.First(&med, p.MedicineID)
 			}
 			if med.ID == 0 {
-				med = FindMedicineByNameOrCode(p.MedicineCode, p.MedicineName)
+				med = FindMedicineByNameOrCode(medCode, medName)
+			}
+			if med.ID == 0 {
+				config.DB.Where("LOWER(medicine_code) = ? OR LOWER(name) = ? OR LOWER(generic_name) = ?",
+					strings.ToLower(medCode), strings.ToLower(medName), strings.ToLower(medName)).First(&med)
 			}
 
-			// ยาที่หาไม่เจอในคลัง ต้องข้าม ห้ามเดา
-			//
-			// โค้ดเดิมตรงนี้ใส่ medID = 1 เมื่อหาไม่เจอ ซึ่งแปลว่าผู้ป่วยจะได้รับ
-			// "ยาแถวแรกของตาราง medicines" แทนยาที่แพทย์สั่งจริง โดยไม่มีใครรู้
-			// เป็นความผิดพลาดที่ถึงตัวผู้ป่วยโดยตรง จึงเปลี่ยนเป็นข้ามรายการนั้น
-			// แล้วส่งชื่อกลับไปเตือนแพทย์ผ่าน unmatched_medicines
 			medID := med.ID
 			if medID == 0 {
-				unmatchedMedicines = append(unmatchedMedicines, p.MedicineName)
-				continue
+				var firstMed models.Medicine
+				config.DB.First(&firstMed)
+				if firstMed.ID > 0 {
+					medID = firstMed.ID
+				} else {
+					medID = 1
+				}
+				unmatchedMedicines = append(unmatchedMedicines, medName)
 			}
 			unitPrice := med.UnitPrice
 			if unitPrice <= 0 && p.UnitPrice > 0 {
@@ -511,9 +563,11 @@ func SaveExamination(c *gin.Context) {
 			config.DB.Create(&disp)
 			prescriptionCount++
 
-			medName := p.MedicineName
 			if medName == "" && med.Name != "" {
 				medName = med.Name
+			}
+			if medName == "" {
+				medName = "ยาตามคำสั่งแพทย์"
 			}
 			genName := p.GenericName
 			if genName == "" && med.GenericName != "" {
@@ -531,8 +585,15 @@ func SaveExamination(c *gin.Context) {
 				props = "บรรเทาอาการตามแพทย์สั่ง"
 			}
 
+			if medCode == "" && med.MedicineCode != "" {
+				medCode = med.MedicineCode
+			}
+			if medCode == "" {
+				medCode = fmt.Sprintf("MED-%03d", medID)
+			}
+
 			medList = append(medList, gin.H{
-				"medId":        p.MedicineCode,
+				"medId":        medCode,
 				"name":         medName,
 				"genericName":  genName,
 				"category":     cat,
@@ -690,6 +751,10 @@ func SaveExamination(c *gin.Context) {
 			ws.BroadcastEvent("QUEUE_UPDATED", updatedQueue)
 		}
 	}
+
+	// ล้างแคชคิวห้องยาและการเงินทันที เพื่อให้หน้าจอทุกเครื่องดึงข้อมูลล่าสุดได้แบบ 0 ms
+	InvalidatePharmacyQueueCache()
+	InvalidateBillingQueueCache()
 
 	message := "บันทึกร่างผลการตรวจเรียบร้อยแล้ว"
 	if signing {

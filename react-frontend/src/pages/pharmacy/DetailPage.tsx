@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import './DetailPage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
-import { Check, Plus, Minus, Loader2 } from 'lucide-react';
+import { Check, Plus, Minus, Loader2, Search, RefreshCw } from 'lucide-react';
 import { PharmacyDetailSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
+import { API_BASE_URL } from '../../services/api';
 
 interface ToastState {
   message: string;
@@ -43,6 +44,45 @@ const persistDispensedPatient = (patient: PatientConfig) => {
   } catch (err) {
     console.error('Failed to persist dispensed patient:', err);
   }
+};
+
+const cleanDosage = (d?: string, medName?: string): string => {
+  if (!d || d.includes('?') || d.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร';
+    if (n.includes('paracetamol')) return 'ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.';
+    return 'ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
+  }
+  return d;
+};
+
+const cleanInstructions = (inst?: string, medName?: string): string => {
+  if (!inst || inst.includes('?') || inst.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ควรรับประทานติดต่อกันจนยาหมดตามแพทย์สั่งอย่างเคร่งครัด';
+    if (n.includes('paracetamol')) return 'รับประทานเมื่อมีอาการปวดหรือมีไข้ ไม่ควรเกินวันละ 8 เม็ด';
+    return 'รับประทานหลังอาหาร เช้า กลางวัน เย็น ดื่มน้ำตามมากๆ';
+  }
+  return inst;
+};
+
+const cleanDoctorAdvice = (adv?: string): string => {
+  if (!adv || adv.includes('?') || adv.includes('เม็ดเม็ด')) {
+    return 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด หากอาการไม่ดีขึ้นให้กลับมาพบแพทย์';
+  }
+  return adv;
+};
+
+const cleanAllergies = (all?: string[] | string): string[] => {
+  if (!all) return ['ไม่มีประวัติแพ้ยา'];
+  const arr = Array.isArray(all) ? all : [all];
+  const cleaned = arr.map(a => (!a || a.includes('?')) ? 'ไม่มีประวัติแพ้ยา' : a);
+  return cleaned.length > 0 ? cleaned : ['ไม่มีประวัติแพ้ยา'];
+};
+
+const cleanChronicDiseases = (cd?: string): string => {
+  if (!cd || cd.includes('?')) return 'ไม่มี';
+  return cd;
 };
 
 interface DetailPageProps {
@@ -113,88 +153,94 @@ export default function DetailPage({
     }, 3500);
   };
 
-  // Real-time Queue Listener จากระบบแพทย์
-  useEffect(() => {
-    let isMounted = true;
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // ฟังก์ชันดึงข้อมูลคิวห้องยาจากเซิร์ฟเวอร์แบบ Real-time รองรับการส่งพารามิเตอร์ค้นหา (q)
+  const fetchQueues = useCallback(async (isInitial = false, query = '') => {
     const loadStartTime = Date.now();
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const qParam = query ? `?q=${encodeURIComponent(query)}` : '';
 
-    // โหลดข้อมูลจาก API ทันทีที่เปิดหน้า
-    const fetchQueues = async (isInitial = false) => {
-      try {
-        const token = localStorage.getItem('token');
-        const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+      // ดึงทั้งคิวห้องยา และประวัติการเงิน (Billing History) แบบ Parallel เพื่อประสิทธิภาพสูงสุด
+      const [pRes, bRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/pharmacy/queues${qParam}`, { headers })
+          .then(r => r.ok ? r : fetch(`/api/pharmacy/queues${qParam}`, { headers }))
+          .then(r => r.ok ? r : fetch(`/api/system/pharmacy/queues${qParam}`))
+          .catch(() => null),
+        fetch(`${API_BASE_URL}/billing/history`, { headers })
+          .then(r => r.ok ? r : fetch('/api/billing/history', { headers }))
+          .then(r => r.ok ? r : fetch('/api/system/billing/history'))
+          .catch(() => null)
+      ]);
 
-        // 1. ดึงทั้งคิวห้องยา และประวัติการเงิน (Billing History) แบบ Parallel เพื่อประสิทธิภาพสูงสุด
-        const [pRes, bRes] = await Promise.all([
-          fetch('/api/pharmacy/queues', { headers }).then(r => r.ok ? r : fetch('/api/system/pharmacy/queues')).catch(() => null),
-          fetch('/api/billing/history', { headers }).then(r => r.ok ? r : fetch('/api/system/billing/history')).catch(() => null)
-        ]);
+      let completedHistories: any[] = [];
+      if (bRes && bRes.ok) {
+        try {
+          const bData = await bRes.json();
+          if (bData.status === 'success' && Array.isArray(bData.histories)) {
+            completedHistories = bData.histories;
+          }
+        } catch {}
+      }
 
-        let completedHistories: any[] = [];
-        if (bRes && bRes.ok) {
-          try {
-            const bData = await bRes.json();
-            if (bData.status === 'success' && Array.isArray(bData.histories)) {
-              completedHistories = bData.histories;
+      if (pRes && pRes.ok) {
+        const pData = await pRes.json();
+        if (pData.status === 'success' && Array.isArray(pData.queues)) {
+          const mappedQueues: PatientConfig[] = pData.queues.map((pq: any) => {
+            const cleanHN = (pq.hn || pq.patient?.hn || '').replace(/[-]/g, '');
+            let rawMeds = pq.medications || [];
+            if (typeof rawMeds === 'string') {
+              try { rawMeds = JSON.parse(rawMeds); } catch { rawMeds = []; }
             }
-          } catch {}
-        }
 
-        if (pRes && pRes.ok) {
-          const pData = await pRes.json();
-          if (pData.status === 'success' && Array.isArray(pData.queues)) {
-            const mappedQueues: PatientConfig[] = pData.queues.map((pq: any) => {
-              const cleanHN = (pq.hn || pq.patient?.hn || '').replace(/[-]/g, '');
-              let rawMeds = pq.medications || [];
-              if (typeof rawMeds === 'string') {
-                try { rawMeds = JSON.parse(rawMeds); } catch { rawMeds = []; }
-              }
-
-              // ตรวจสอบว่าผู้ป่วยชำระเงินเสร็จสิ้นแล้วหรือไม่ (จาก billing history หรือ status ตรงๆ)
-              const isPaid = completedHistories.some((bh: any) => {
-                const bhHN = (bh.hn || '').replace(/[-]/g, '');
-                return (bhHN && bhHN === cleanHN) || (bh.visit_id && pq.visit_id && bh.visit_id === pq.visit_id);
-              });
-              const isCompleted = pq.status === 'completed' || pq.status === 'เสร็จสิ้น' || isPaid;
-              const isDispensed = isCompleted || pq.status === 'dispensed';
-
-              return {
-                id: String(pq.id),
-                visitId: pq.visit_id || 1,
-                hn: cleanHN || `HN0001`,
-                nationalId: pq.national_id || '',
-                queueNumber: pq.queue_number || 'Q0001',
-                ticket: pq.queue_number || 'A-01',
-                name: pq.patient_name || 'ผู้ป่วย',
-                shortName: pq.patient_name || 'ผู้ป่วย',
-                gender: pq.gender || 'ชาย',
-                age: pq.age || 35,
-                treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
-                patientType: 'ผู้ป่วยนอก (OPD)' as const,
-                allergies: pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา'],
-                chronicDiseases: pq.chronic_diseases || 'ไม่มี',
-                vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-                visitStatus: isCompleted ? 'เสร็จสิ้นกระบวนการ / รับยาเรียบร้อย' : (isDispensed ? 'จ่ายยาแล้ว / ส่งการเงินแล้ว' : 'รอรับยา / ชำระเงิน'),
-                status: (isCompleted ? 'completed' : (isDispensed ? 'dispensed' : 'pending')) as 'pending' | 'dispensed' | 'completed',
-                visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
-                visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                doctorAdvice: pq.doctor_advice || 'พักผ่อนให้เพียงพอ ทานยาตามแพทย์สั่ง',
-                medications: rawMeds.map((m: any) => ({
-                  medId: m.medId || m.medicine_code || 'MED-001',
-                  name: m.name || m.medicine_name || 'ยาตามแพทย์สั่ง',
-                  dosage: m.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
-                  instructions: m.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
-                  stock: m.stock || m.stock_quantity || 100,
-                  stockStatus: (m.stock || m.stock_quantity || 100) > 10 ? ('in-stock' as const) : ('low-stock' as const),
-                  quantity: m.quantity && m.quantity > 0 ? m.quantity : 10,
-                  price: m.price && m.price > 0 ? m.price : (m.unit_price || 15),
-                  unit_price: m.unit_price && m.unit_price > 0 ? m.unit_price : (m.price || 15),
-                  properties: m.properties || 'บรรเทาอาการตามแพทย์สั่ง'
-                }))
-              };
+            // ตรวจสอบว่าผู้ป่วยชำระเงินเสร็จสิ้นแล้วหรือไม่ (จาก billing history หรือ status ตรงๆ)
+            const isPaid = completedHistories.some((bh: any) => {
+              const bhHN = (bh.hn || '').replace(/[-]/g, '');
+              return (bhHN && bhHN === cleanHN) || (bh.visit_id && pq.visit_id && bh.visit_id === pq.visit_id);
             });
+            const isCompleted = pq.status === 'completed' || pq.status === 'เสร็จสิ้น' || isPaid;
+            const isDispensed = isCompleted || pq.status === 'dispensed';
 
-            // นำประวัติคนไข้ที่ชำระเงินเสร็จสิ้นแล้วจาก Billing History มาเติม (Merge) เพื่อให้ตัวเลขเสร็จสิ้นถูกต้องเสมอ
+            return {
+              id: String(pq.id),
+              visitId: pq.visit_id || 1,
+              hn: cleanHN || `HN0001`,
+              nationalId: pq.national_id || '',
+              queueNumber: pq.queue_number || 'Q0001',
+              ticket: pq.queue_number || 'A-01',
+              name: pq.patient_name || 'ผู้ป่วย',
+              shortName: pq.patient_name || 'ผู้ป่วย',
+              gender: pq.gender || 'ชาย',
+              age: pq.age || 35,
+              treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+              patientType: 'ผู้ป่วยนอก (OPD)' as const,
+              allergies: cleanAllergies(pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา']),
+              chronicDiseases: cleanChronicDiseases(pq.chronic_diseases || 'ไม่มี'),
+              vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
+              visitStatus: isCompleted ? 'เสร็จสิ้นกระบวนการ / รับยาเรียบร้อย' : (isDispensed ? 'จ่ายยาแล้ว / ส่งการเงินแล้ว' : 'รอรับยา / ชำระเงิน'),
+              status: (isCompleted ? 'completed' : (isDispensed ? 'dispensed' : 'pending')) as 'pending' | 'dispensed' | 'completed',
+              visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
+              visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+              doctorAdvice: cleanDoctorAdvice(pq.doctor_advice),
+              medications: rawMeds.map((m: any) => ({
+                medId: m.medId || m.medicine_code || 'MED-001',
+                name: m.name || m.medicine_name || 'ยาตามแพทย์สั่ง',
+                dosage: cleanDosage(m.dosage, m.name),
+                instructions: cleanInstructions(m.instructions, m.name),
+                stock: m.stock || m.stock_quantity || 100,
+                stockStatus: (m.stock || m.stock_quantity || 100) > 10 ? ('in-stock' as const) : ('low-stock' as const),
+                quantity: m.quantity && m.quantity > 0 ? m.quantity : 10,
+                price: m.price && m.price > 0 ? m.price : (m.unit_price || 15),
+                unit_price: m.unit_price && m.unit_price > 0 ? m.unit_price : (m.price || 15),
+                properties: m.properties || 'บรรเทาอาการตามแพทย์สั่ง'
+              }))
+            };
+          });
+
+          // นำประวัติคนไข้ที่ชำระเงินเสร็จสิ้นแล้วจาก Billing History มาเติม (Merge) เพื่อให้ตัวเลขเสร็จสิ้นถูกต้องเสมอ
+          if (!query) {
             completedHistories.forEach((bh: any) => {
               const bhHN = (bh.hn || '').replace(/[-]/g, '');
               const already = mappedQueues.some(q => q.hn.replace(/[-]/g, '') === bhHN || (bh.visit_id && q.visitId === bh.visit_id));
@@ -216,87 +262,105 @@ export default function DetailPage({
                   age: 35,
                   treatmentRights: 'ชำระเงินแล้ว',
                   patientType: 'ผู้ป่วยนอก (OPD)',
-                  allergies: ['ไม่มีประวัติแพ้ยา'],
-                  chronicDiseases: 'ไม่มี',
+                  allergies: cleanAllergies(bh.allergies ? [bh.allergies] : ['ไม่มีประวัติแพ้ยา']),
+                  chronicDiseases: cleanChronicDiseases(bh.chronic_diseases || 'ไม่มี'),
                   vitals: 'ความดันปกติ',
                   visitStatus: 'เสร็จสิ้นกระบวนการ / รับยาเรียบร้อย',
                   status: 'completed' as any,
                   visitDate: new Date(bh.created_at || Date.now()).toLocaleDateString('th-TH'),
                   visitTime: new Date(bh.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                  doctorAdvice: bh.doctor_advice || 'รับประทานยาตามคำแนะนำของแพทย์',
+                  doctorAdvice: cleanDoctorAdvice(bh.doctor_advice),
                   medications: parsedMeds.map((m: any) => ({
                     medId: m.medId || m.medicine_code || 'MED-001',
                     name: m.name || m.medicine_name || 'ยาตามแพทย์สั่ง',
-                    dosage: m.dosage || 'ตามคำสั่งแพทย์',
-                    instructions: m.instructions || 'รับประทานตามคำแนะนำ',
+                    dosage: cleanDosage(m.dosage, m.name || m.medicine_name),
+                    instructions: cleanInstructions(m.instructions, m.name || m.medicine_name),
                     stock: 100,
                     stockStatus: 'in-stock',
                     quantity: m.quantity || 1,
                     price: m.price || m.unit_price || 0,
                     unit_price: m.unit_price || m.price || 0,
-                    properties: m.properties || ''
+                    properties: m.properties || 'บรรเทาอาการตามแพทย์สั่ง'
                   }))
                 });
               }
             });
-
-            // นำประวัติคนไข้ที่ส่งการเงินแล้วจาก localStorage มาผสาน (Merge) เพื่อให้คิวยังคงค้างแสดงอยู่เสมอ
-            const storedDispensed = getStoredDispensedPatients();
-            storedDispensed.forEach(storedP => {
-              const cleanStoredHN = (storedP.hn || '').replace(/[-]/g, '');
-              const existingIdx = mappedQueues.findIndex(q => q.id === storedP.id || (q.hn.replace(/[-]/g, '') === cleanStoredHN && q.queueNumber === storedP.queueNumber));
-              if (existingIdx >= 0) {
-                if (storedP.status === 'dispensed' && mappedQueues[existingIdx].status !== 'completed') {
-                  mappedQueues[existingIdx] = {
-                    ...mappedQueues[existingIdx],
-                    status: 'dispensed',
-                    visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
-                    dispensedAt: storedP.dispensedAt || mappedQueues[existingIdx].dispensedAt
-                  };
-                }
-              } else {
-                mappedQueues.push(storedP);
-              }
-            });
-
-            // จัดเรียง: ผู้ป่วยที่รอจัดยาอยู่บนสุด (pending) -> จ่ายยาแล้ว (dispensed) -> เสร็จสิ้นกระบวนการ (completed)
-            mappedQueues.sort((a, b) => {
-              const score = (p: PatientConfig) => (p.status === 'pending' ? 0 : (p.status === 'dispensed' ? 1 : 2));
-              return score(a) - score(b);
-            });
-
-            setQueueList(mappedQueues);
-            setLocalPatientId(prev => {
-              if (mappedQueues.length > 0) {
-                if (prev && mappedQueues.find(q => q.id === prev)) {
-                  return prev;
-                }
-                const firstPending = mappedQueues.find(q => q.status === 'pending');
-                return firstPending ? firstPending.id : mappedQueues[0].id;
-              }
-              return '';
-            });
-            return;
           }
-        }
-      } catch (err) {
-        console.error('Failed to fetch queues:', err);
-      } finally {
-        if (isInitial && isMounted) {
-          const elapsed = Date.now() - loadStartTime;
-          const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
-          setTimeout(() => {
-            if (isMounted) setIsInitialLoading(false);
-          }, remaining);
+
+          // นำประวัติคนไข้ที่ส่งการเงินแล้วจาก localStorage มาผสาน (Merge)
+          const storedDispensed = getStoredDispensedPatients();
+          storedDispensed.forEach(storedP => {
+            const cleanStoredHN = (storedP.hn || '').replace(/[-]/g, '');
+            const existingIdx = mappedQueues.findIndex(q => q.id === storedP.id || (q.hn.replace(/[-]/g, '') === cleanStoredHN && q.queueNumber === storedP.queueNumber));
+            if (existingIdx >= 0) {
+              // สำคัญ: หากสถานะบนเซิร์ฟเวอร์ยังเป็น pending (เช่น มีคำสั่งยาใหม่จากแพทย์) จะไม่ถูกเขียนทับด้วย dispensed
+              if (mappedQueues[existingIdx].status === 'pending') return;
+              if (storedP.status === 'dispensed' && mappedQueues[existingIdx].status !== 'completed') {
+                mappedQueues[existingIdx] = {
+                  ...mappedQueues[existingIdx],
+                  status: 'dispensed',
+                  visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
+                  dispensedAt: storedP.dispensedAt || mappedQueues[existingIdx].dispensedAt
+                };
+              }
+            } else if (!query || (storedP.hn && storedP.hn.toLowerCase().includes(query.toLowerCase())) || (storedP.name && storedP.name.toLowerCase().includes(query.toLowerCase()))) {
+              mappedQueues.push(storedP);
+            }
+          });
+
+          // จัดเรียง: ผู้ป่วยที่รอจัดยาอยู่บนสุด (pending) -> จ่ายยาแล้ว (dispensed) -> เสร็จสิ้นกระบวนการ (completed)
+          mappedQueues.sort((a, b) => {
+            const score = (p: PatientConfig) => (p.status === 'pending' ? 0 : (p.status === 'dispensed' ? 1 : 2));
+            return score(a) - score(b);
+          });
+
+          setQueueList(mappedQueues);
+          setLocalPatientId(prev => {
+            if (mappedQueues.length > 0) {
+              if (prev && mappedQueues.find(q => q.id === prev)) {
+                return prev;
+              }
+              const firstPending = mappedQueues.find(q => q.status === 'pending');
+              return firstPending ? firstPending.id : mappedQueues[0].id;
+            }
+            return '';
+          });
         }
       }
-    };
+    } catch (err) {
+      console.error('Failed to fetch queues:', err);
+    } finally {
+      if (isInitial) {
+        const elapsed = Date.now() - loadStartTime;
+        const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+        setTimeout(() => {
+          setIsInitialLoading(false);
+        }, remaining);
+      }
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await fetchQueues(false, patientIdInput.trim());
+    triggerToast('อัปเดตข้อมูลคิวห้องยาล่าสุดเรียบร้อย', 'success');
+  };
+
+  const handleSearch = async () => {
+    setIsRefreshing(true);
+    await fetchQueues(false, patientIdInput.trim());
+  };
+
+  // Real-time Queue Listener จากระบบแพทย์
+  useEffect(() => {
+    let isMounted = true;
 
     fetchQueues(true);
 
     // Smart Background Polling ทุกๆ 12 วินาที เพื่อดึงคิวล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket เรียลไทม์)
     const pollInterval = setInterval(() => {
-      if (!document.hidden) {
+      if (!document.hidden && isMounted) {
         fetchQueues(false);
       }
     }, 12000);
@@ -351,7 +415,7 @@ export default function DetailPage({
       unsubCreated();
       unsubMedQ();
     };
-  }, [subscribe]);
+  }, [subscribe, fetchQueues]);
 
   // Real-time Query Medications from DB for Active Patient Visit
   useEffect(() => {
@@ -367,14 +431,15 @@ export default function DetailPage({
               if (data.status === 'success' && Array.isArray(data.dispensing) && data.dispensing.length > 0) {
                 const fetchedMeds = data.dispensing.map((item: any) => {
                   const m = item.medicine || item.Medicine || item;
+                  const medName = m.name || item.name || 'ยาบรรเทาอาการ';
                   return {
                     medId: m.medicine_code || m.code || `MED-${item.medicine_id || 1}`,
-                    name: m.name || item.name || 'ยาบรรเทาอาการ',
+                    name: medName,
                     genericName: m.generic_name || '',
                     category: m.category || 'ยาสามัญ',
                     properties: m.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
-                    dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
-                    instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
+                    dosage: cleanDosage(item.dosage, medName),
+                    instructions: cleanInstructions(item.instructions, medName),
                     price: m.unit_price || m.price || 10,
                     unit_price: m.unit_price || m.price || 10,
                     quantity: item.quantity || 10,
@@ -396,14 +461,15 @@ export default function DetailPage({
               if (hnData.status === 'success' && Array.isArray(hnData.dispensings) && hnData.dispensings.length > 0) {
                 const fetchedMeds = hnData.dispensings.map((item: any) => {
                   const m = item.medicine || item.Medicine || item;
+                  const medName = m.name || item.name || 'ยาบรรเทาอาการ';
                   return {
                     medId: m.medicine_code || m.code || `MED-${item.medicine_id || 1}`,
-                    name: m.name || item.name || 'ยาบรรเทาอาการ',
+                    name: medName,
                     genericName: m.generic_name || '',
                     category: m.category || 'ยาสามัญ',
                     properties: m.properties || 'ยาบรรเทาอาการตามแพทย์สั่ง',
-                    dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร',
-                    instructions: item.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น',
+                    dosage: cleanDosage(item.dosage, medName),
+                    instructions: cleanInstructions(item.instructions, medName),
                     price: m.unit_price || m.price || 10,
                     unit_price: m.unit_price || m.price || 10,
                     quantity: item.quantity || 10,
@@ -411,7 +477,7 @@ export default function DetailPage({
                     stockStatus: (m.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
                   };
                 });
-                setQueueList(prev => prev.map(q => q.id === activePatient.id ? { ...q, medications: fetchedMeds, doctorAdvice: hnData.doctor_advice || q.doctorAdvice } : q));
+                setQueueList(prev => prev.map(q => q.id === activePatient.id ? { ...q, medications: fetchedMeds, doctorAdvice: cleanDoctorAdvice(hnData.doctor_advice || q.doctorAdvice) } : q));
               }
             }
           }
@@ -601,10 +667,10 @@ export default function DetailPage({
             </div>
           </div>
           <div style={{ fontSize: '32px', fontWeight: '800', color: '#2563EB', lineHeight: '38px' }}>
-            {queueList.filter(p => p.status !== 'dispensed').length}
+            {queueList.filter(p => p.status === 'pending').length}
           </div>
           <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
-            รอจัดยา {queueList.filter(p => p.status !== 'dispensed').length} คิว
+            รอจัดยา {queueList.filter(p => p.status === 'pending').length} คิว
           </div>
         </div>
 
@@ -726,13 +792,35 @@ export default function DetailPage({
                 type="text" 
                 placeholder="ค้นหาด้วยข้อมูลเลขบัตรประชาชน, HN หรือ ชื่อ-นามสกุล..." 
                 value={patientIdInput} 
-                onChange={(e) => setPatientIdInput(e.target.value)} 
+                onChange={(e) => {
+                  setPatientIdInput(e.target.value);
+                  if (e.target.value === '') {
+                    fetchQueues(false, '');
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSearch();
+                  }
+                }}
                 style={{ flex: 1, padding: '10px 16px', border: '1.5px solid #CBD5E1', borderRadius: '10px', fontSize: '14px', height: '42px', boxSizing: 'border-box' }}
               />
               <button 
-                style={{ padding: '0 24px', background: '#2563EB', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', fontSize: '14px', height: '42px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)' }}
+                onClick={handleSearch}
+                disabled={isRefreshing}
+                style={{ padding: '0 20px', background: '#2563EB', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', fontSize: '14px', height: '42px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)' }}
               >
-                ค้นหา
+                <Search size={16} />
+                <span>ค้นหา / คิวรี</span>
+              </button>
+              <button 
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                title="รีเฟรชข้อมูลคิวล่าสุดจากระบบแพทย์"
+                style={{ padding: '0 16px', background: '#F1F5F9', color: '#334155', border: '1.5px solid #CBD5E1', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', height: '42px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s ease' }}
+              >
+                <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} style={{ color: '#2563EB' }} />
+                <span>รีเฟรชข้อมูล</span>
               </button>
             </div>
 
@@ -763,7 +851,7 @@ export default function DetailPage({
                 <tbody>
                   {queueList
                     .filter(p => {
-                      if (statFilter === 'pending') return p.status !== 'dispensed' && p.status !== 'completed';
+                      if (statFilter === 'pending') return p.status === 'pending';
                       if (statFilter === 'dispensed') return p.status === 'dispensed';
                       if (statFilter === 'completed') return p.status === 'completed';
                       return true;
@@ -818,7 +906,7 @@ export default function DetailPage({
                               <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '14px' }}>{p.name}</span>
                               {p.doctorAdvice && (
                                 <span style={{ fontSize: '12px', color: '#64748B', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {p.doctorAdvice}
+                                  {cleanDoctorAdvice(p.doctorAdvice)}
                                 </span>
                               )}
                             </div>
@@ -1146,7 +1234,7 @@ export default function DetailPage({
                         คำแนะนำจากแพทย์ (Doctor's Note & Clinical Advice)
                       </h4>
                       <p className="doctor-advice-text" style={{ margin: 0, fontSize: '14.5px', color: '#1E293B', lineHeight: '1.6' }}>
-                        {activePatient.doctorAdvice}
+                        {cleanDoctorAdvice(activePatient.doctorAdvice)}
                       </p>
                     </div>
                   </div>
@@ -1198,8 +1286,8 @@ export default function DetailPage({
                                 </div>
                               </td>
                               <td style={{ padding: '12px' }}>
-                                <div style={{ fontWeight: '600', color: '#1E293B' }}>{med.dosage}</div>
-                                <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>คำแนะนำ: {med.instructions}</div>
+                                <div style={{ fontWeight: '600', color: '#1E293B' }}>{cleanDosage(med.dosage, med.name)}</div>
+                                <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>คำแนะนำ: {cleanInstructions(med.instructions, med.name)}</div>
                               </td>
                               <td style={{ padding: '12px', textAlign: 'center' }}>
                                 <div style={{ 

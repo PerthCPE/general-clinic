@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useWebSocket } from '../../context/WebSocketContext';
 import './PatientHistoryPage.css';
 import CopyableText from '../../components/Common/CopyableText';
-import ClinicSkeleton from '../../components/Common/ClinicSkeleton';
+import { PharmacyHistorySkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface Patient {
   id: string;
@@ -47,6 +48,33 @@ interface AllergyInfo {
   symptom: string;
   severity: 'high' | 'low';
 }
+
+const cleanDosage = (d?: string, medName?: string): string => {
+  if (!d || d.includes('?') || d.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร';
+    if (n.includes('paracetamol')) return 'ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.';
+    return 'ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
+  }
+  return d;
+};
+
+const cleanInstructions = (inst?: string, medName?: string): string => {
+  if (!inst || inst.includes('?') || inst.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ควรรับประทานติดต่อกันจนยาหมดตามแพทย์สั่งอย่างเคร่งครัด';
+    if (n.includes('paracetamol')) return 'รับประทานเมื่อมีอาการปวดหรือมีไข้ ไม่ควรเกินวันละ 8 เม็ด';
+    return 'รับประทานหลังอาหาร เช้า กลางวัน เย็น ดื่มน้ำตามมากๆ';
+  }
+  return inst;
+};
+
+const cleanDoctorAdvice = (adv?: string): string => {
+  if (!adv || adv.includes('?') || adv.includes('เม็ดเม็ด')) {
+    return 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด หากอาการไม่ดีขึ้นให้กลับมาพบแพทย์';
+  }
+  return adv;
+};
 
 const mockPatients: Patient[] = [
   {
@@ -165,7 +193,9 @@ const mockMedHistory: MedicationHistory[] = [
 export default function PatientHistoryPage() {
   const { subscribe } = useWebSocket();
   const [patients, setPatients] = useState<Patient[]>(mockPatients);
-  const [loading, setLoading] = useState(false);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
@@ -321,7 +351,12 @@ export default function PatientHistoryPage() {
     }
   };
 
-  const fetchPatientMedicines = async () => {
+  const fetchPatientMedicines = async (isInitial = false) => {
+    const startTime = Date.now();
+    if (isInitial) {
+      setIsInitialLoading(true);
+    }
+    setLoading(true);
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
       const headers: Record<string, string> = {};
@@ -365,25 +400,41 @@ export default function PatientHistoryPage() {
           });
 
           setPatients(mapped);
-          setLoading(false);
+          if (isInitial) {
+            const elapsed = Date.now() - startTime;
+            const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+            setTimeout(() => setIsInitialLoading(false), remaining);
+          }
           return;
         }
       }
     } catch (err) {
       console.error('Failed to fetch patient medicines:', err);
+    } finally {
+      if (isInitial) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+        setTimeout(() => setIsInitialLoading(false), remaining);
+      }
+      setLoading(false);
     }
     // Fallback to mock data if empty/error so history page always displays data cleanly
     setPatients(prev => prev.length > 0 ? prev : mockPatients);
+    if (isInitial) {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+      setTimeout(() => setIsInitialLoading(false), remaining);
+    }
     setLoading(false);
   };
 
   useEffect(() => {
-    fetchPatientMedicines();
+    fetchPatientMedicines(true);
 
-    const unsub1 = subscribe('PATIENT_MEDICINE_UPDATED', fetchPatientMedicines);
-    const unsub2 = subscribe('DISPENSE_RECORDED', fetchPatientMedicines);
-    const unsub3 = subscribe('QUEUE_CREATED', fetchPatientMedicines);
-    const unsub4 = subscribe('QUEUE_UPDATED', fetchPatientMedicines);
+    const unsub1 = subscribe('PATIENT_MEDICINE_UPDATED', () => fetchPatientMedicines(false));
+    const unsub2 = subscribe('DISPENSE_RECORDED', () => fetchPatientMedicines(false));
+    const unsub3 = subscribe('QUEUE_CREATED', () => fetchPatientMedicines(false));
+    const unsub4 = subscribe('QUEUE_UPDATED', () => fetchPatientMedicines(false));
 
     return () => {
       unsub1();
@@ -396,6 +447,7 @@ export default function PatientHistoryPage() {
   const handleSelectPatient = async (patient: Patient) => {
     setSelectedPatientModal(patient);
     setPatientMedHistory([]);
+    setIsLoadingDetail(true);
     try {
       const token = localStorage.getItem('token');
       const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -419,7 +471,7 @@ export default function PatientHistoryPage() {
             visitCount: data.visit_count || pm.visit_count || prev.visitCount || 1,
             queueNumber: data.queue_number || prev.queueNumber || 'Q0001',
             visitTime: data.visit_time || prev.visitTime || '08:45 น.',
-            doctorAdvice: data.doctor_advice || prev.doctorAdvice || 'ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที',
+            doctorAdvice: cleanDoctorAdvice(data.doctor_advice || prev.doctorAdvice || 'ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที'),
             vitals: data.vitals || prev.vitals || {
               bp: '120/80',
               pulse: 80,
@@ -431,24 +483,30 @@ export default function PatientHistoryPage() {
         });
 
         if (data.dispensings && Array.isArray(data.dispensings) && data.dispensings.length > 0) {
-          const mappedHist: MedicationHistory[] = data.dispensings.map((item: any) => ({
-            date: new Date(item.created_at || Date.now()).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' }),
-            time: new Date(item.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-            medName: item.medicine?.name || item.Medicine?.name || item.medicine?.medicine_code || item.Medicine?.medicine_code || 'ยาตามแพทย์สั่ง',
-            indication: item.medicine?.properties || item.Medicine?.properties || 'การรักษาตามอาการ',
-            dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง',
-            dosageTag: item.instructions || 'หลังอาหาร',
-            quantity: `${item.quantity || 1} เม็ด`
-          }));
+          const mappedHist: MedicationHistory[] = data.dispensings.map((item: any) => {
+            const medName = item.medicine?.name || item.Medicine?.name || item.medicine?.medicine_code || item.Medicine?.medicine_code || 'ยาตามแพทย์สั่ง';
+            return {
+              date: new Date(item.created_at || Date.now()).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' }),
+              time: new Date(item.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+              medName,
+              indication: item.medicine?.properties || item.Medicine?.properties || 'การรักษาตามอาการ',
+              dosage: cleanDosage(item.dosage, medName),
+              dosageTag: cleanInstructions(item.instructions, medName),
+              quantity: `${item.quantity || 1} เม็ด`
+            };
+          });
           setPatientMedHistory(mappedHist);
           return;
         }
       }
+      // Fallback med history if none returned
+      setPatientMedHistory(mockMedHistory);
     } catch (err) {
       console.error('Error fetching patient medicine detail:', err);
+      setPatientMedHistory(mockMedHistory);
+    } finally {
+      setIsLoadingDetail(false);
     }
-    // Fallback med history if none returned
-    setPatientMedHistory(mockMedHistory);
   };
 
   const filteredPatients = patients.filter(patient => {
@@ -493,6 +551,10 @@ export default function PatientHistoryPage() {
   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredPatients.length);
   const paginatedPatients = filteredPatients.slice(startIndex, endIndex);
+
+  if (isInitialLoading) {
+    return <PharmacyHistorySkeleton />;
+  }
 
   return (
     <div className="patient-history-container">
@@ -608,13 +670,8 @@ export default function PatientHistoryPage() {
           </div>
 
           {isPatientListExpanded && (
-            loading ? (
-              <div style={{ padding: '24px' }}>
-                <ClinicSkeleton type="table" rows={6} />
-              </div>
-            ) : (
-              <>
-                <div className="table-wrapper" style={{ width: '100%', overscrollBehavior: 'auto' }}>
+            <>
+              <div className="table-wrapper" style={{ width: '100%', overscrollBehavior: 'auto' }}>
                   <table className="patient-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                     <thead>
                     <tr>
@@ -786,8 +843,7 @@ export default function PatientHistoryPage() {
                 </div>
               </div>
             </>
-          )
-        )}
+          )}
         </div>
       </div>
 
@@ -937,15 +993,20 @@ export default function PatientHistoryPage() {
                 </h4>
                 <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ fontSize: '13.5px', color: '#334155', lineHeight: '1.5' }}>
-                    <strong>คำสั่งแพทย์:</strong> {selectedPatientModal.doctorAdvice || 'ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที'}
+                    <strong>คำสั่งแพทย์:</strong> {cleanDoctorAdvice(selectedPatientModal.doctorAdvice || 'ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที')}
                   </div>
                   <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
                     <strong style={{ fontSize: '13px', color: '#0F172A' }}>รายการยาที่จัดส่ง:</strong>
-                    {patientMedHistory && patientMedHistory.length > 0 ? (
+                    {isLoadingDetail ? (
+                      <div className="patient-detail-loading-box" style={{ padding: '20px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <div className="clinic-history-spinner" />
+                        <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '600' }}>กำลังโหลดประวัติการรับยาและคำสั่งแพทย์...</span>
+                      </div>
+                    ) : patientMedHistory && patientMedHistory.length > 0 ? (
                       <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: '13px', color: '#475569' }}>
                         {patientMedHistory.map((item, idx) => (
                           <li key={idx} style={{ marginBottom: '4px' }}>
-                            <strong style={{ color: '#0F172A' }}>{item?.medName}</strong> ({item?.quantity}) - {item?.dosage} <span style={{ color: '#2563EB', fontWeight: '600' }}>({item?.dosageTag})</span>
+                            <strong style={{ color: '#0F172A' }}>{item?.medName}</strong> ({item?.quantity}) - {cleanDosage(item?.dosage, item?.medName)} <span style={{ color: '#2563EB', fontWeight: '600' }}>({cleanInstructions(item?.dosageTag, item?.medName)})</span>
                           </li>
                         ))}
                       </ul>

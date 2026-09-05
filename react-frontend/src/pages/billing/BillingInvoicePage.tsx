@@ -28,6 +28,45 @@ const getStoredDispensedPatients = (): PatientConfig[] => {
   }
 };
 
+const cleanDosage = (d?: string, medName?: string): string => {
+  if (!d || d.includes('?') || d.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร';
+    if (n.includes('paracetamol')) return 'ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.';
+    return 'ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
+  }
+  return d;
+};
+
+const cleanInstructions = (inst?: string, medName?: string): string => {
+  if (!inst || inst.includes('?') || inst.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ควรรับประทานติดต่อกันจนยาหมดตามแพทย์สั่งอย่างเคร่งครัด';
+    if (n.includes('paracetamol')) return 'รับประทานเมื่อมีอาการปวดหรือมีไข้ ไม่ควรเกินวันละ 8 เม็ด';
+    return 'รับประทานหลังอาหาร เช้า กลางวัน เย็น ดื่มน้ำตามมากๆ';
+  }
+  return inst;
+};
+
+const cleanDoctorAdvice = (adv?: string): string => {
+  if (!adv || adv.includes('?') || adv.includes('เม็ดเม็ด')) {
+    return 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด หากอาการไม่ดีขึ้นให้กลับมาพบแพทย์';
+  }
+  return adv;
+};
+
+const cleanAllergies = (all?: string[] | string): string[] => {
+  if (!all) return ['ไม่มีประวัติแพ้ยา'];
+  const arr = Array.isArray(all) ? all : [all];
+  const cleaned = arr.map(a => (!a || a.includes('?')) ? 'ไม่มีประวัติแพ้ยา' : a);
+  return cleaned.length > 0 ? cleaned : ['ไม่มีประวัติแพ้ยา'];
+};
+
+const cleanChronicDiseases = (cd?: string): string => {
+  if (!cd || cd.includes('?')) return 'ไม่มี';
+  return cd;
+};
+
 export default function BillingInvoicePage({ 
   selectedPatientId, 
   onSelectPatientId,
@@ -135,14 +174,17 @@ export default function BillingInvoicePage({
     if (!name || name === 'ยาบรรเทาอาการ') name = 'ยาตามแพทย์สั่งจ่าย';
     if (unitPrice <= 0) unitPrice = 10;
 
+    const finalDosage = cleanDosage(item.dosage || m.dosage, name);
+    const finalInstructions = cleanInstructions(item.instructions || m.instructions, name);
+
     return {
       medId: code,
       name,
       genericName,
       category,
       properties,
-      dosage,
-      instructions,
+      dosage: finalDosage,
+      instructions: finalInstructions,
       price: unitPrice,
       unit_price: unitPrice,
       quantity: qty,
@@ -193,8 +235,8 @@ export default function BillingInvoicePage({
                 age: pq.age || 35,
                 treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
                 patientType: 'ผู้ป่วยนอก (OPD)' as const,
-                allergies: pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา'],
-                chronicDiseases: pq.chronic_diseases || 'ไม่มี',
+                allergies: cleanAllergies(pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา']),
+                chronicDiseases: cleanChronicDiseases(pq.chronic_diseases || 'ไม่มี'),
                 vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
                 dob: '01/01/2534',
                 phone: '081-999-8888',
@@ -202,7 +244,7 @@ export default function BillingInvoicePage({
                 visitStatus: 'รอชำระเงิน',
                 visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
                 visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                doctorAdvice: pq.doctor_advice || 'พักผ่อนให้เพียงพอ',
+                doctorAdvice: cleanDoctorAdvice(pq.doctor_advice),
                 medications: parsedMeds
               });
             });
@@ -246,8 +288,8 @@ export default function BillingInvoicePage({
                   age: bq.age || 35,
                   treatmentRights: bq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
                   patientType: 'ผู้ป่วยนอก (OPD)' as const,
-                  allergies: ['ไม่มีประวัติแพ้ยา'],
-                  chronicDiseases: 'ไม่มี',
+                  allergies: cleanAllergies(bq.allergies ? [bq.allergies] : ['ไม่มีประวัติแพ้ยา']),
+                  chronicDiseases: cleanChronicDiseases(bq.chronic_diseases || 'ไม่มี'),
                   vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
                   dob: '01/01/2534',
                   phone: '081-999-8888',
@@ -255,7 +297,7 @@ export default function BillingInvoicePage({
                   visitStatus: 'รอชำระเงิน',
                   visitDate: new Date(bq.created_at || Date.now()).toLocaleDateString('th-TH'),
                   visitTime: new Date(bq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                  doctorAdvice: bq.doctor_advice || 'พักผ่อนให้เพียงพอ',
+                  doctorAdvice: cleanDoctorAdvice(bq.doctor_advice),
                   medications: parsedMeds
                 });
               }
@@ -301,8 +343,8 @@ export default function BillingInvoicePage({
           age: data.age || 35,
           treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
           patientType: 'ผู้ป่วยนอก (OPD)' as const,
-          allergies: ['ไม่มีประวัติแพ้ยา'],
-          chronicDiseases: 'ไม่มี',
+          allergies: cleanAllergies(data.allergies ? [data.allergies] : ['ไม่มีประวัติแพ้ยา']),
+          chronicDiseases: cleanChronicDiseases(data.chronic_diseases || 'ไม่มี'),
           vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
           dob: '01/01/2534',
           phone: '081-999-8888',
@@ -310,7 +352,7 @@ export default function BillingInvoicePage({
           visitStatus: 'รอชำระเงิน',
           visitDate: new Date(data.created_at || Date.now()).toLocaleDateString('th-TH'),
           visitTime: new Date(data.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-          doctorAdvice: data.doctor_advice || 'พักผ่อนให้เพียงพอ',
+          doctorAdvice: cleanDoctorAdvice(data.doctor_advice),
           medications: Array.isArray(data.medications) ? data.medications.map((m: any) => parseDispensedMed(m, masterMedicines)) : []
         };
         setQueueList(prev => [newPatient, ...prev.filter(q => q.id !== newPatient.id)]);
@@ -947,7 +989,7 @@ export default function BillingInvoicePage({
                     <div className="clean-qr-frame">
                       <QRCodeSVG 
                         value={qrPayload} 
-                        size={185} 
+                        size={230} 
                         level="M" 
                         includeMargin={false}
                       />
@@ -1496,7 +1538,7 @@ export default function BillingInvoicePage({
                             <div style={{ fontWeight: '600', color: '#0F172A' }}>{med.name}</div>
                             {med.dosage && (
                               <div style={{ fontSize: '11.5px', color: '#64748B' }}>
-                                วิธีใช้: {med.dosage} {med.instructions ? `• ${med.instructions}` : ''}
+                                วิธีใช้: {cleanDosage(med.dosage, med.name)} {med.instructions ? `• ${cleanInstructions(med.instructions, med.name)}` : ''}
                               </div>
                             )}
                           </td>

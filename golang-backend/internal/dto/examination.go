@@ -110,7 +110,9 @@ type PrescriptionItemDTO struct {
 	ID           string  `json:"id"`
 	MedicineID   uint    `json:"medicineId"`
 	MedicineCode string  `json:"medicineCode"`
+	Code         string  `json:"code"`
 	MedicineName string  `json:"medicineName"`
+	Name         string  `json:"name"`
 	GenericName  string  `json:"genericName"`
 	Category     string  `json:"category"`
 	Dosage       string  `json:"dosage"`

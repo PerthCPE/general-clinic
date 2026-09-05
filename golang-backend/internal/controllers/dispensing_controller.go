@@ -422,8 +422,8 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 				"genericName":  med.GenericName,
 				"category":     med.Category,
 				"properties":   med.Properties,
-				"dosage":       d.Dosage,
-				"instructions": d.Instructions,
+				"dosage":       CleanDosage(d.Dosage, med.Name),
+				"instructions": CleanInstructions(d.Instructions, med.Name),
 				"price":        price,
 				"unit_price":   price,
 				"quantity":     d.Quantity,
@@ -530,8 +530,8 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 						"genericName":  med.GenericName,
 						"category":     med.Category,
 						"properties":   med.Properties,
-						"dosage":       dosage,
-						"instructions": inst,
+						"dosage":       CleanDosage(dosage, med.Name),
+						"instructions": CleanInstructions(inst, med.Name),
 						"price":        price,
 						"unit_price":   price,
 						"quantity":     qty,
@@ -1290,22 +1290,35 @@ func InvalidatePharmacyQueueCache() {
 
 // GET /api/pharmacy/queues - ดึงรายการคิวรอจ่ายยา (⚡ Batch Queries + RAM Cache 0.01 ms)
 func GetPharmacyQueues(c *gin.Context) {
-	pharmacyQueueCacheMu.RLock()
-	if len(cachedPharmacyQueues) > 0 && time.Now().Before(cachedPharmacyExpiry) {
-		defer pharmacyQueueCacheMu.RUnlock()
-		c.JSON(http.StatusOK, gin.H{
-			"status": "success",
-			"queues": cachedPharmacyQueues,
-		})
-		return
+	qParam := strings.TrimSpace(c.Query("q"))
+	hnParam := strings.TrimSpace(c.Query("hn"))
+	isSearch := qParam != "" || hnParam != ""
+
+	if !isSearch {
+		pharmacyQueueCacheMu.RLock()
+		if len(cachedPharmacyQueues) > 0 && time.Now().Before(cachedPharmacyExpiry) {
+			defer pharmacyQueueCacheMu.RUnlock()
+			c.JSON(http.StatusOK, gin.H{
+				"status": "success",
+				"queues": cachedPharmacyQueues,
+			})
+			return
+		}
+		pharmacyQueueCacheMu.RUnlock()
 	}
-	pharmacyQueueCacheMu.RUnlock()
 
 	var results []PharmacyQueueItem
 
 	// 1. ดึงจากตารางคิวห้องยาเฉพาะ models.MedicineQueue (Batch Preload)
 	var medQueues []models.MedicineQueue
-	config.DB.Where("status IN ('pending', 'dispensed')").Order("id desc, created_at desc").Limit(30).Find(&medQueues)
+	mqQuery := config.DB.Where("status IN ('pending', 'dispensed')")
+	if hnParam != "" {
+		mqQuery = mqQuery.Where("LOWER(hn) = ?", strings.ToLower(hnParam))
+	} else if qParam != "" {
+		likeQ := "%" + strings.ToLower(qParam) + "%"
+		mqQuery = mqQuery.Where("LOWER(hn) LIKE ? OR LOWER(patient_name) LIKE ? OR national_id LIKE ? OR queue_number ILIKE ?", likeQ, likeQ, likeQ, likeQ)
+	}
+	mqQuery.Order("id desc, created_at desc").Limit(50).Find(&medQueues)
 
 	var hns []string
 	var visitIDs []uint
@@ -1344,8 +1357,44 @@ func GetPharmacyQueues(c *gin.Context) {
 				medList = parsed
 			}
 		}
+		if len(medList) == 0 && mq.VisitID > 0 {
+			// Fallback: ดึงรายการยาจากตาราง dispensings กรณีคิวบันทึกก่อนหรือสตริง JSON ว่าง
+			var disps []models.Dispensing
+			config.DB.Preload("Medicine").Where("visit_id = ?", mq.VisitID).Find(&disps)
+			for _, d := range disps {
+				mCode := d.Medicine.MedicineCode
+				if mCode == "" {
+					mCode = fmt.Sprintf("MED-%03d", d.MedicineID)
+				}
+				mName := d.Medicine.Name
+				if mName == "" {
+					mName = "ยาตามคำสั่งแพทย์"
+				}
+				medList = append(medList, gin.H{
+					"medId":        mCode,
+					"name":         mName,
+					"genericName":  d.Medicine.GenericName,
+					"category":     d.Medicine.Category,
+					"properties":   d.Medicine.Properties,
+					"dosage":       CleanDosage(d.Dosage, mName),
+					"instructions": CleanInstructions(d.Instructions, mName),
+					"price":        d.Medicine.UnitPrice,
+					"quantity":     d.Quantity,
+					"stock":        d.Medicine.StockQuantity,
+					"stockStatus":  "พร้อมจ่าย",
+				})
+			}
+		}
 		if medList == nil {
 			medList = []gin.H{}
+		}
+
+		for idx := range medList {
+			mName, _ := medList[idx]["name"].(string)
+			dosage, _ := medList[idx]["dosage"].(string)
+			inst, _ := medList[idx]["instructions"].(string)
+			medList[idx]["dosage"] = CleanDosage(dosage, mName)
+			medList[idx]["instructions"] = CleanInstructions(inst, mName)
 		}
 
 		pat := patientByHN[mq.HN]
@@ -1353,14 +1402,26 @@ func GetPharmacyQueues(c *gin.Context) {
 			pat = patientByVisitID[mq.VisitID]
 		}
 
-		allergies := pat.Allergies
-		if allergies == "" {
-			allergies = "ไม่มีประวัติแพ้ยา"
+		allergies := CleanAllergies(pat.Allergies)
+		chronic := CleanChronicDiseases(pat.ChronicDiseases)
+
+		advice := mq.DoctorAdvice
+		if advice == "" && mq.VisitID > 0 {
+			var exam models.Examination
+			if config.DB.Where("visit_id = ?", mq.VisitID).First(&exam).Error == nil {
+				parts := []string{}
+				if exam.AdviceMedication != "" {
+					parts = append(parts, "คำแนะนำการใช้ยา: "+exam.AdviceMedication)
+				}
+				if exam.TreatmentPlan != "" {
+					parts = append(parts, "แผนการรักษา: "+exam.TreatmentPlan)
+				}
+				if len(parts) > 0 {
+					advice = strings.Join(parts, " | ")
+				}
+			}
 		}
-		chronic := pat.ChronicDiseases
-		if chronic == "" {
-			chronic = "ไม่มี"
-		}
+		advice = CleanDoctorAdvice(advice)
 
 		results = append(results, PharmacyQueueItem{
 			ID:              fmt.Sprintf("MQ-%d", mq.ID),
@@ -1374,7 +1435,7 @@ func GetPharmacyQueues(c *gin.Context) {
 			SchemeType:      mq.SchemeType,
 			Allergies:       allergies,
 			ChronicDiseases: chronic,
-			DoctorAdvice:    mq.DoctorAdvice,
+			DoctorAdvice:    advice,
 			Medications:     medList,
 			Status:          mq.Status,
 			CreatedAt:       mq.CreatedAt,
@@ -1383,11 +1444,18 @@ func GetPharmacyQueues(c *gin.Context) {
 
 	// 2. ดึงจากคิวตรวจแพทย์ models.Queue (Batch Preload)
 	var queues []models.Queue
-	config.DB.Preload("Patient").
-		Where("status IN ?", []string{"รอรับยา", "pharmacy_waiting", "Pending Pharmacy", "รอชำระเงิน", "เสร็จสิ้น"}).
-		Order("id desc").
-		Limit(20).
-		Find(&queues)
+	qQuery := config.DB.Preload("Patient").
+		Where("status IN ?", []string{"รอรับยา", "pharmacy_waiting", "Pending Pharmacy", "รอชำระเงิน", "เสร็จสิ้น"})
+	if hnParam != "" {
+		var pt models.Patient
+		if config.DB.Where("LOWER(hn) = ?", strings.ToLower(hnParam)).First(&pt).Error == nil {
+			qQuery = qQuery.Where("patient_id = ?", pt.ID)
+		}
+	} else if qParam != "" {
+		likeQ := "%" + strings.ToLower(qParam) + "%"
+		qQuery = qQuery.Where("queue_number ILIKE ? OR patient_id IN (SELECT id FROM patients WHERE LOWER(hn) LIKE ? OR LOWER(full_name) LIKE ? OR national_id LIKE ?)", likeQ, likeQ, likeQ, likeQ)
+	}
+	qQuery.Order("id desc").Limit(30).Find(&queues)
 
 	existingVisits := make(map[uint]bool)
 	for _, r := range results {
@@ -1455,8 +1523,8 @@ func GetPharmacyQueues(c *gin.Context) {
 				"genericName":  d.Medicine.GenericName,
 				"category":     d.Medicine.Category,
 				"properties":   d.Medicine.Properties,
-				"dosage":       d.Dosage,
-				"instructions": d.Instructions,
+				"dosage":       CleanDosage(d.Dosage, d.Medicine.Name),
+				"instructions": CleanInstructions(d.Instructions, d.Medicine.Name),
 				"price":        d.Medicine.UnitPrice,
 				"quantity":     d.Quantity,
 				"stock":        d.Medicine.StockQuantity,
@@ -1496,19 +1564,21 @@ func GetPharmacyQueues(c *gin.Context) {
 			Gender:          q.Patient.Gender,
 			Age:             age,
 			SchemeType:      q.Patient.SchemeType,
-			Allergies:       q.Patient.Allergies,
-			ChronicDiseases: q.Patient.ChronicDiseases,
-			DoctorAdvice:    q.Note,
+			Allergies:       CleanAllergies(q.Patient.Allergies),
+			ChronicDiseases: CleanChronicDiseases(q.Patient.ChronicDiseases),
+			DoctorAdvice:    CleanDoctorAdvice(q.Note),
 			Medications:     medList,
 			Status:          qStatus,
 			CreatedAt:       q.CreatedAt,
 		})
 	}
 
-	pharmacyQueueCacheMu.Lock()
-	cachedPharmacyQueues = results
-	cachedPharmacyExpiry = time.Now().Add(4 * time.Second)
-	pharmacyQueueCacheMu.Unlock()
+	if !isSearch {
+		pharmacyQueueCacheMu.Lock()
+		cachedPharmacyQueues = results
+		cachedPharmacyExpiry = time.Now().Add(4 * time.Second)
+		pharmacyQueueCacheMu.Unlock()
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status": "success",
