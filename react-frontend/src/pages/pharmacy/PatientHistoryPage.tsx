@@ -192,7 +192,7 @@ const mockMedHistory: MedicationHistory[] = [
 
 export default function PatientHistoryPage() {
   const { subscribe } = useWebSocket();
-  const [patients, setPatients] = useState<Patient[]>(mockPatients);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -368,7 +368,18 @@ export default function PatientHistoryPage() {
       }
       if (res.ok) {
         const data = await res.json();
-        if (data.patient_medicines && Array.isArray(data.patient_medicines) && data.patient_medicines.length > 0) {
+        if (data.patient_medicines && Array.isArray(data.patient_medicines)) {
+          if (data.patient_medicines.length === 0) {
+            setPatients([]);
+            if (isInitial) {
+              const elapsed = Date.now() - startTime;
+              const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+              setTimeout(() => setIsInitialLoading(false), remaining);
+            }
+            setLoading(false);
+            return;
+          }
+
           const mapped: Patient[] = data.patient_medicines.map((pm: any) => {
             const rawDiseases = pm.chronic_diseases ? pm.chronic_diseases.split(',').map((d: string) => d.trim()).filter(Boolean) : [];
             const cleanHN = (pm.hn || '').replace(/[-]/g, '');
@@ -418,14 +429,6 @@ export default function PatientHistoryPage() {
       }
       setLoading(false);
     }
-    // Fallback to mock data if empty/error so history page always displays data cleanly
-    setPatients(prev => prev.length > 0 ? prev : mockPatients);
-    if (isInitial) {
-      const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
-      setTimeout(() => setIsInitialLoading(false), remaining);
-    }
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -434,13 +437,23 @@ export default function PatientHistoryPage() {
     const unsub1 = subscribe('PATIENT_MEDICINE_UPDATED', () => fetchPatientMedicines(false));
     const unsub2 = subscribe('DISPENSE_RECORDED', () => fetchPatientMedicines(false));
     const unsub3 = subscribe('QUEUE_CREATED', () => fetchPatientMedicines(false));
-    const unsub4 = subscribe('QUEUE_UPDATED', () => fetchPatientMedicines(false));
+    const unsub4 = subscribe('QUEUE_UPDATED', (data: any) => {
+      if (data && data.action === 'db_reset') {
+        setPatients([]);
+      } else {
+        fetchPatientMedicines(false);
+      }
+    });
+    const unsub5 = subscribe('SYSTEM_RESET', () => {
+      setPatients([]);
+    });
 
     return () => {
       unsub1();
       unsub2();
       unsub3();
       unsub4();
+      unsub5();
     };
   }, [subscribe]);
 

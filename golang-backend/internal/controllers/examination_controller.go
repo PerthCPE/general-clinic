@@ -660,15 +660,26 @@ func SaveExamination(c *gin.Context) {
 				medCode = fmt.Sprintf("MED-%03d", p.MedicineID)
 			}
 
+			docIDForDisp := doctorID
+			var docProfile models.Doctor
+			if doctorID > 0 {
+				if err := config.DB.Where("user_id = ?", doctorID).First(&docProfile).Error; err == nil {
+					docIDForDisp = docProfile.ID
+				}
+			}
+
 			disp := models.Dispensing{
 				VisitID:      visit.ID,
 				MedicineID:   p.MedicineID,
-				DoctorID:     doctorID,
+				DoctorID:     docIDForDisp,
 				Quantity:     p.Quantity,
 				Dosage:       p.Dosage,
 				Instructions: p.Instructions,
 			}
-			config.DB.Create(&disp)
+			if err := config.DB.Create(&disp).Error; err != nil {
+				disp.DoctorID = 0
+				config.DB.Omit("DoctorID").Create(&disp)
+			}
 			prescriptionCount++
 
 			genName := p.GenericName
@@ -749,27 +760,6 @@ func SaveExamination(c *gin.Context) {
 			config.DB.Save(&existingMQ)
 		}
 
-		// ซิงค์ตาราง patient_medicines สำหรับห้องยา
-		var patMed models.PatientMedicine
-		if err := config.DB.Where("hn = ?", pat.HN).First(&patMed).Error; err != nil {
-			patMed = models.PatientMedicine{
-				HN:              pat.HN,
-				NationalID:      pat.NationalID,
-				FullName:        pat.FullName,
-				Gender:          pat.Gender,
-				Age:             age,
-				SchemeType:      pat.SchemeType,
-				Allergies:       pat.Allergies,
-				ChronicDiseases: pat.ChronicDiseases,
-				PhoneNumber:     pat.PhoneNumber,
-			}
-			config.DB.Create(&patMed)
-		} else {
-			patMed.Allergies = pat.Allergies
-			patMed.ChronicDiseases = pat.ChronicDiseases
-			config.DB.Save(&patMed)
-		}
-
 		ws.BroadcastEvent("VISIT_UPDATED", visit)
 		ws.BroadcastEvent("MEDICINE_QUEUE_CREATED", gin.H{
 			"visit_id":      visit.ID,
@@ -780,73 +770,14 @@ func SaveExamination(c *gin.Context) {
 			"medications":   medList,
 		})
 
-		// คำนวณราคายารวม
-		totalMedsAmount := 0.0
-		for _, m := range medList {
-			if p, ok := m["price"].(float64); ok {
-				if q, ok := m["quantity"].(int); ok {
-					totalMedsAmount += p * float64(q)
-				}
-			}
-		}
-
-		// สร้าง/อัปเดต BillingQueue ในสถานะ pending รอชำระเงินทันที
-		var bq models.BillingQueue
-		if err := config.DB.Where("visit_id = ?", visit.ID).First(&bq).Error; err != nil {
-			var bCount int64
-			config.DB.Model(&models.BillingQueue{}).Count(&bCount)
-			bQueueNo := fmt.Sprintf("B-%03d", bCount+1)
-			bq = models.BillingQueue{
-				QueueNumber:  bQueueNo,
-				HN:           pat.HN,
-				PatientName:  pat.FullName,
-				NationalID:   pat.NationalID,
-				Gender:       pat.Gender,
-				Age:          age,
-				SchemeType:   pat.SchemeType,
-				VisitID:      visit.ID,
-				TotalAmount:  totalMedsAmount,
-				Status:       "pending",
-				DoctorAdvice: fullAdvice,
-				Medications:  string(medsJSON),
-			}
-			config.DB.Create(&bq)
-		} else {
-			bq.Medications = string(medsJSON)
-			bq.DoctorAdvice = fullAdvice
-			bq.TotalAmount = totalMedsAmount
-			bq.Status = "pending"
-			config.DB.Save(&bq)
-		}
-
-		ws.BroadcastEvent("BILLING_CREATED", gin.H{
-			"id":            bq.ID,
-			"queue_id":      bq.ID,
-			"queue_number":  bq.QueueNumber,
-			"visit_id":      bq.VisitID,
-			"patient_name":  bq.PatientName,
-			"hn":            bq.HN,
-			"national_id":   bq.NationalID,
-			"gender":        bq.Gender,
-			"age":           bq.Age,
-			"scheme_type":   bq.SchemeType,
-			"total_amount":  bq.TotalAmount,
-			"net_amount":    bq.TotalAmount,
-			"status":        "pending",
-			"doctor_advice": bq.DoctorAdvice,
-			"medications":   medList,
-			"created_at":    bq.CreatedAt,
-		})
-
 		if hasQueue {
 			config.DB.Preload("Patient").First(&updatedQueue, updatedQueue.ID)
 			ws.BroadcastEvent("QUEUE_UPDATED", updatedQueue)
 		}
 	}
 
-	// ล้างแคชคิวห้องยาและการเงินทันที เพื่อให้หน้าจอทุกเครื่องดึงข้อมูลล่าสุดได้แบบ 0 ms
+	// ล้างแคชคิวห้องยาทันที เพื่อให้หน้าจอทุกเครื่องดึงข้อมูลล่าสุดได้แบบ 0 ms
 	InvalidatePharmacyQueueCache()
-	InvalidateBillingQueueCache()
 
 	message := "บันทึกร่างผลการตรวจเรียบร้อยแล้ว"
 	if signing {

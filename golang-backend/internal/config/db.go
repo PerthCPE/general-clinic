@@ -120,6 +120,8 @@ func ConnectDB() {
 	// เคยพลาดตรงนี้มาแล้ว: แก้ struct อย่างเดียวแล้วบันทึกได้ปกติ ไม่ error
 	// แต่อ่านกลับมาได้ค่าว่างตลอด เพราะคอลัมน์ไม่มีอยู่จริง
 	database.Exec("ALTER TABLE examinations ADD COLUMN IF NOT EXISTS prescription_detail text DEFAULT ''")
+	database.Exec("ALTER TABLE dispensings DROP CONSTRAINT IF EXISTS fk_dispensings_doctor")
+	database.Exec("ALTER TABLE dispensings ALTER COLUMN doctor_id DROP NOT NULL")
 
 	// ⚡ Database Indexes สำหรับเร่งความเร็วการ Query คิว, คนไข้, ประวัติการเงิน บน Supabase
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_created_at ON queues(created_at)")

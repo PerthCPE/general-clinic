@@ -213,9 +213,9 @@ func GetBillingQueues(c *gin.Context) {
 		}
 	}
 
-	// 2.1 ดึงคิวจาก models.MedicineQueue
+	// 2.1 ดึงคิวจาก models.MedicineQueue ที่ห้องยาจ่ายยาเสร็จแล้ว (dispensed)
 	var medQueues []models.MedicineQueue
-	if err := config.DB.Where("status IN ('dispensed', 'pending')").Order("id desc, created_at desc").Limit(50).Find(&medQueues).Error; err == nil {
+	if err := config.DB.Where("status = ?", "dispensed").Order("id desc, created_at desc").Limit(50).Find(&medQueues).Error; err == nil {
 		var medVisitIDs []uint
 		for _, mq := range medQueues {
 			if mq.VisitID > 0 && !finishedVisits[mq.VisitID] {

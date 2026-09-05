@@ -287,26 +287,29 @@ export default function DetailPage({
             });
           }
 
-          // นำประวัติคนไข้ที่ส่งการเงินแล้วจาก localStorage มาผสาน (Merge)
-          const storedDispensed = getStoredDispensedPatients();
-          storedDispensed.forEach(storedP => {
-            const cleanStoredHN = (storedP.hn || '').replace(/[-]/g, '');
-            const existingIdx = mappedQueues.findIndex(q => q.id === storedP.id || (q.hn.replace(/[-]/g, '') === cleanStoredHN && q.queueNumber === storedP.queueNumber));
-            if (existingIdx >= 0) {
-              // สำคัญ: หากสถานะบนเซิร์ฟเวอร์ยังเป็น pending (เช่น มีคำสั่งยาใหม่จากแพทย์) จะไม่ถูกเขียนทับด้วย dispensed
-              if (mappedQueues[existingIdx].status === 'pending') return;
-              if (storedP.status === 'dispensed' && mappedQueues[existingIdx].status !== 'completed') {
-                mappedQueues[existingIdx] = {
-                  ...mappedQueues[existingIdx],
-                  status: 'dispensed',
-                  visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
-                  dispensedAt: storedP.dispensedAt || mappedQueues[existingIdx].dispensedAt
-                };
+          // นำประวัติคนไข้ที่ส่งการเงินแล้วจาก localStorage มาผสาน (Merge) เฉพาะเมื่อมีรายการบนเซิร์ฟเวอร์
+          if (mappedQueues.length > 0) {
+            const storedDispensed = getStoredDispensedPatients();
+            storedDispensed.forEach(storedP => {
+              const cleanStoredHN = (storedP.hn || '').replace(/[-]/g, '');
+              const existingIdx = mappedQueues.findIndex(q => q.id === storedP.id || (q.hn.replace(/[-]/g, '') === cleanStoredHN && q.queueNumber === storedP.queueNumber));
+              if (existingIdx >= 0) {
+                // สำคัญ: หากสถานะบนเซิร์ฟเวอร์ยังเป็น pending (เช่น มีคำสั่งยาใหม่จากแพทย์) จะไม่ถูกเขียนทับด้วย dispensed
+                if (mappedQueues[existingIdx].status === 'pending') return;
+                if (storedP.status === 'dispensed' && mappedQueues[existingIdx].status !== 'completed') {
+                  mappedQueues[existingIdx] = {
+                    ...mappedQueues[existingIdx],
+                    status: 'dispensed',
+                    visitStatus: 'จ่ายยาแล้ว / ส่งการเงินแล้ว',
+                    dispensedAt: storedP.dispensedAt || mappedQueues[existingIdx].dispensedAt
+                  };
+                }
               }
-            } else if (!query || (storedP.hn && storedP.hn.toLowerCase().includes(query.toLowerCase())) || (storedP.name && storedP.name.toLowerCase().includes(query.toLowerCase()))) {
-              mappedQueues.push(storedP);
-            }
-          });
+            });
+          } else if (!query) {
+            // เมื่อฐานข้อมูลว่างเปล่า (เช่น หลังกดรีเซ็ตระบบ) ให้ล้างแคช LocalStorage ทันที
+            try { localStorage.removeItem(DISPENSED_LOGS_STORAGE_KEY); } catch {}
+          }
 
           // จัดเรียง: ผู้ป่วยที่รอจัดยาอยู่บนสุด (pending) -> จ่ายยาแล้ว (dispensed) -> เสร็จสิ้นกระบวนการ (completed)
           mappedQueues.sort((a, b) => {
@@ -367,10 +370,16 @@ export default function DetailPage({
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
       if (data && data.action === 'db_reset') {
+        try { localStorage.removeItem(DISPENSED_LOGS_STORAGE_KEY); } catch {}
         setQueueList([]);
       } else {
         fetchQueues();
       }
+    });
+
+    const unsubReset = subscribe('SYSTEM_RESET', () => {
+      try { localStorage.removeItem(DISPENSED_LOGS_STORAGE_KEY); } catch {}
+      setQueueList([]);
     });
 
     const unsubPay = subscribe('PAYMENT_CONFIRMED', () => {
@@ -408,6 +417,7 @@ export default function DetailPage({
       isMounted = false;
       clearInterval(pollInterval);
       unsubQueue();
+      unsubReset();
       unsubPay();
       unsubBillHist();
       unsubExam();

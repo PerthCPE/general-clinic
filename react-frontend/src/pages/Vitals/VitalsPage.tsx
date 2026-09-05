@@ -167,12 +167,21 @@ export const VitalsPage: React.FC = () => {
     const unsubUpdated = subscribe('QUEUE_UPDATED', () => {
       fetchQueues();
     });
+    const unsubReset = subscribe('SYSTEM_RESET', () => {
+      fetchQueues();
+      fetchDoctors();
+    });
+    const unsubPatient = subscribe('PATIENT_REGISTERED', () => {
+      fetchQueues();
+    });
 
     // Fallback polling ทุก 30 วินาที
     const interval = setInterval(fetchQueues, 30000);
     return () => {
       unsubCreated();
       unsubUpdated();
+      unsubReset();
+      unsubPatient();
       clearInterval(interval);
     };
   }, [fetchQueues, fetchDoctors, subscribe]);

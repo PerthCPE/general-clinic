@@ -457,14 +457,28 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 			med := FindMedicineByNameOrCode(medCode, name)
 			if med.ID > 0 {
 				if req.VisitID > 0 {
+					var docID uint
+					var vRec models.VisitRecord
+					if config.DB.First(&vRec, req.VisitID).Error == nil && vRec.DoctorID > 0 {
+						var docProfile models.Doctor
+						if config.DB.Where("user_id = ?", vRec.DoctorID).First(&docProfile).Error == nil {
+							docID = docProfile.ID
+						} else {
+							docID = vRec.DoctorID
+						}
+					}
 					dRec := models.Dispensing{
 						VisitID:      req.VisitID,
 						MedicineID:   med.ID,
+						DoctorID:     docID,
 						Quantity:     qty,
 						Dosage:       dosage,
 						Instructions: inst,
 					}
-					tx.Create(&dRec)
+					if err := tx.Create(&dRec).Error; err != nil {
+						dRec.DoctorID = 0
+						tx.Omit("DoctorID").Create(&dRec)
+					}
 				}
 
 				if med.StockQuantity >= qty {
@@ -739,42 +753,8 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 // GET /api/pharmacy/patient-medicines - ดึงประวัติผู้ป่วยและการรับยาทั้งหมดจากตาราง patient_medicines
 func GetPatientMedicines(c *gin.Context) {
-	// ดึงผู้ป่วยทั้งหมดจากตาราง patients เรียงคนล่าสุดขึ้นบนสุด
-	var patients []models.Patient
-	config.DB.Order("updated_at desc, created_at desc, id desc").Find(&patients)
-
 	var records []models.PatientMedicine
-	for _, p := range patients {
-		var pm models.PatientMedicine
-		if err := config.DB.Where("hn = ?", p.HN).First(&pm).Error; err == nil {
-			records = append(records, pm)
-		} else {
-			var visitCount int64
-			config.DB.Model(&models.VisitRecord{}).Where("patient_id = ?", p.ID).Count(&visitCount)
-			if visitCount == 0 {
-				visitCount = 1
-			}
-			age := 35
-			if p.BirthDate.Year() > 1900 {
-				age = time.Now().Year() - p.BirthDate.Year()
-			}
-			records = append(records, models.PatientMedicine{
-				ID:              p.ID,
-				HN:              p.HN,
-				NationalID:      p.NationalID,
-				FullName:        p.FullName,
-				Gender:          p.Gender,
-				Age:             age,
-				BloodType:       "O+",
-				SchemeType:      p.SchemeType,
-				Allergies:       p.Allergies,
-				ChronicDiseases: p.ChronicDiseases,
-				PhoneNumber:     p.PhoneNumber,
-				VisitCount:      int(visitCount),
-				CreatedAt:       p.CreatedAt,
-			})
-		}
-	}
+	config.DB.Order("updated_at desc, created_at desc, id desc").Find(&records)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":            "success",
