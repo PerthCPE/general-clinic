@@ -1100,12 +1100,19 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                                 แก้ไข
                               </button>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', fontSize: '12.5px', color: '#475569', borderTop: '1px dashed #E2E8F0', paddingTop: '6px', marginTop: '2px' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0px',  // 1. ความห่างระหว่าง "กลุ่มเลขบัญชี" กับ "ชื่อธนาคาร" (ปรับเพิ่ม/ลด เช่น 12px, 20px)
+                              fontSize: '12.5px', color: '#475569', borderTop: '1px dashed #E2E8F0', paddingTop: '6px', // 2. ความห่างจากเส้นประด้านบน
+                               marginTop: '2px' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' // 3. ความห่างระหว่างคำว่า "เลขที่บัญชี:" กับ "ตัวเลข"
+
+                              }}>
                                 <span>เลขที่บัญชี:</span>
-                                <strong style={{ fontFamily: 'monospace', color: '#1E293B', fontSize: '13.5px', letterSpacing: '0.5px' }}>{bankAccountNumber}</strong>
+                                <strong style={{ fontFamily: 'monospace', color: '#1E293B', fontSize: '13.5px', letterSpacing: '0.5px'   // 4. ความห่างระหว่างตัวเลขแต่ละตัว (ช่องไฟตัวเลข)
+
+                                 }}>{bankAccountNumber}</strong>
                               </span>
-                              <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', padding: '2px 8px', background: '#F1F5F9', borderRadius: '4px', flexShrink: 0 }}>ธ.ออมสิน</span>
+                              <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', padding: '2px 8px',   // 5. ระยะขอบด้านในของป้ายชื่อธนาคาร
+                                 background: '#F1F5F9', borderRadius: '4px', flexShrink: 0 }}>ธ.ออมสิน</span>
                             </div>
                           </div>
                         )}
