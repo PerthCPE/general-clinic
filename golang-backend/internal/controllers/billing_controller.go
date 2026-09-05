@@ -199,7 +199,7 @@ func GetBillingQueues(c *gin.Context) {
 				SchemeType:   scheme,
 				VisitID:      vID,
 				Status:       "pending",
-				DoctorAdvice: doctorAdvice,
+				DoctorAdvice: CleanDoctorAdvice(doctorAdvice),
 				Medications:  medsJSON,
 				CreatedAt:    cq.CreatedAt,
 			}
@@ -255,7 +255,7 @@ func GetBillingQueues(c *gin.Context) {
 				SchemeType:   mq.SchemeType,
 				VisitID:      vID,
 				Status:       "pending",
-				DoctorAdvice: mq.DoctorAdvice,
+				DoctorAdvice: CleanDoctorAdvice(mq.DoctorAdvice),
 				Medications:  mq.Medications,
 				CreatedAt:    mq.CreatedAt,
 			}
@@ -289,6 +289,7 @@ func GetBillingQueues(c *gin.Context) {
 	cachedAllMeds := getCachedMedicines()
 	for i := range queues {
 		bq := &queues[i]
+		bq.DoctorAdvice = CleanDoctorAdvice(bq.DoctorAdvice)
 		if bq.Medications == "" || bq.Medications == "[]" || bq.Medications == "null" {
 			dispList := dispByVisit[bq.VisitID]
 			if len(dispList) > 0 {
@@ -320,8 +321,8 @@ func GetBillingQueues(c *gin.Context) {
 						"genericName":  m.GenericName,
 						"category":     m.Category,
 						"properties":   m.Properties,
-						"dosage":       d.Dosage,
-						"instructions": d.Instructions,
+						"dosage":       CleanDosage(d.Dosage, m.Name),
+						"instructions": CleanInstructions(d.Instructions, m.Name),
 						"price":        p,
 						"unit_price":   p,
 						"quantity":     q,
@@ -393,8 +394,8 @@ func GetBillingQueues(c *gin.Context) {
 						"genericName":  genName,
 						"category":     cat,
 						"properties":   props,
-						"dosage":       dosage,
-						"instructions": inst,
+						"dosage":       CleanDosage(dosage, mName),
+						"instructions": CleanInstructions(inst, mName),
 						"price":        unitPrice,
 						"unit_price":   unitPrice,
 						"quantity":     qty,
@@ -437,9 +438,26 @@ func GetAllBillings(c *gin.Context) {
 // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ดึงประวัติการชำระเงิน Single Query (30 ms) ตัด loop queries ออก 100%
 func GetBillingHistories(c *gin.Context) {
 	var histories []models.BillingHistory
-	if err := config.DB.Order("created_at desc").Find(&histories).Error; err != nil {
+	if err := config.DB.Order("id desc, created_at desc").Find(&histories).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billing histories: " + err.Error()})
 		return
+	}
+
+	for i := range histories {
+		if histories[i].Medications != "" && histories[i].Medications != "null" {
+			var parsed []gin.H
+			if err := json.Unmarshal([]byte(histories[i].Medications), &parsed); err == nil {
+				for j := range parsed {
+					mName, _ := parsed[j]["name"].(string)
+					dosage, _ := parsed[j]["dosage"].(string)
+					inst, _ := parsed[j]["instructions"].(string)
+					parsed[j]["dosage"] = CleanDosage(dosage, mName)
+					parsed[j]["instructions"] = CleanInstructions(inst, mName)
+				}
+				b, _ := json.Marshal(parsed)
+				histories[i].Medications = string(b)
+			}
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{

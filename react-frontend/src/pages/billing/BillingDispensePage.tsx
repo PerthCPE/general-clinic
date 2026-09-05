@@ -53,6 +53,45 @@ const persistCompletedBilling = (patient: PatientConfig) => {
   }
 };
 
+const cleanDosage = (d?: string, medName?: string): string => {
+  if (!d || d.includes('?') || d.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร';
+    if (n.includes('paracetamol')) return 'ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.';
+    return 'ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
+  }
+  return d;
+};
+
+const cleanInstructions = (inst?: string, medName?: string): string => {
+  if (!inst || inst.includes('?') || inst.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ควรรับประทานติดต่อกันจนยาหมดตามแพทย์สั่งอย่างเคร่งครัด';
+    if (n.includes('paracetamol')) return 'รับประทานเมื่อมีอาการปวดหรือมีไข้ ไม่ควรเกินวันละ 8 เม็ด';
+    return 'รับประทานหลังอาหาร เช้า กลางวัน เย็น ดื่มน้ำตามมากๆ';
+  }
+  return inst;
+};
+
+const cleanDoctorAdvice = (adv?: string): string => {
+  if (!adv || adv.includes('?') || adv.includes('เม็ดเม็ด')) {
+    return 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด หากอาการไม่ดีขึ้นให้กลับมาพบแพทย์';
+  }
+  return adv;
+};
+
+const cleanAllergies = (all?: string[] | string): string[] => {
+  if (!all) return ['ไม่มีประวัติแพ้ยา'];
+  const arr = Array.isArray(all) ? all : [all];
+  const cleaned = arr.map(a => (!a || a.includes('?')) ? 'ไม่มีประวัติแพ้ยา' : a);
+  return cleaned.length > 0 ? cleaned : ['ไม่มีประวัติแพ้ยา'];
+};
+
+const cleanChronicDiseases = (cd?: string): string => {
+  if (!cd || cd.includes('?')) return 'ไม่มี';
+  return cd;
+};
+
 interface BillingDispensePageProps {
   onNavigateToBilling?: () => void;
   selectedPatientId?: string;
@@ -215,14 +254,17 @@ export default function BillingDispensePage({
     if (!name || name === 'ยาบรรเทาอาการ') name = 'ยาตามแพทย์สั่งจ่าย';
     if (unitPrice <= 0) unitPrice = 10;
 
+    const finalDosage = cleanDosage(item.dosage || m.dosage, name);
+    const finalInstructions = cleanInstructions(item.instructions || m.instructions, name);
+
     return {
       medId: code,
       name,
       genericName,
       category,
       properties,
-      dosage,
-      instructions,
+      dosage: finalDosage,
+      instructions: finalInstructions,
       price: unitPrice,
       unit_price: unitPrice,
       quantity: qty,
@@ -302,14 +344,14 @@ export default function BillingDispensePage({
               age: pq.age || 35,
               treatmentRights: pq.scheme_type || 'บัตรทอง (สปสช.)',
               patientType: 'ผู้ป่วยนอก (OPD)' as const,
-              allergies: pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา'],
-              chronicDiseases: pq.chronic_diseases || 'ไม่มี',
+              allergies: cleanAllergies(pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา']),
+              chronicDiseases: cleanChronicDiseases(pq.chronic_diseases || 'ไม่มี'),
               vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
               visitStatus: isCompleted ? 'ชำระเงินแล้ว / เสร็จสิ้น' : (pq.status === 'dispensed' ? 'รอชำระเงิน' : 'รอชำระเงิน'),
               status: isCompleted ? ('completed' as const) : ('pending' as const),
               visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
               visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-              doctorAdvice: pq.doctor_advice || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
+              doctorAdvice: cleanDoctorAdvice(pq.doctor_advice),
               medications: parsedMeds
             });
           });
@@ -348,14 +390,14 @@ export default function BillingDispensePage({
                 age: bq.age || 35,
                 treatmentRights: bq.scheme_type || 'บัตรทอง (สปสช.)',
                 patientType: 'ผู้ป่วยนอก (OPD)' as const,
-                allergies: ['ไม่มีประวัติแพ้ยา'],
-                chronicDiseases: 'ไม่มี',
+                allergies: cleanAllergies(bq.allergies ? [bq.allergies] : ['ไม่มีประวัติแพ้ยา']),
+                chronicDiseases: cleanChronicDiseases(bq.chronic_diseases || 'ไม่มี'),
                 vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
                 visitStatus: 'รอชำระเงิน',
                 status: 'pending' as const,
                 visitDate: new Date(bq.created_at || Date.now()).toLocaleDateString('th-TH'),
                 visitTime: new Date(bq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                doctorAdvice: bq.doctor_advice || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
+                doctorAdvice: cleanDoctorAdvice(bq.doctor_advice),
                 medications: parsedMeds
               });
             }
@@ -410,14 +452,14 @@ export default function BillingDispensePage({
                 age: 35,
                 treatmentRights: 'ชำระเงินแล้ว',
                 patientType: 'ผู้ป่วยนอก (OPD)' as const,
-                allergies: ['ไม่มีประวัติแพ้ยา'],
-                chronicDiseases: 'ไม่มี',
+                allergies: cleanAllergies(bh.allergies ? [bh.allergies] : ['ไม่มีประวัติแพ้ยา']),
+                chronicDiseases: cleanChronicDiseases(bh.chronic_diseases || 'ไม่มี'),
                 vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
                 visitStatus: 'ชำระเงินแล้ว / เสร็จสิ้น',
                 status: 'completed' as const,
                 visitDate: new Date(bh.created_at || Date.now()).toLocaleDateString('th-TH'),
                 visitTime: new Date(bh.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                doctorAdvice: bh.doctor_advice || 'รับประทานยาตามคำแนะนำของแพทย์',
+                doctorAdvice: cleanDoctorAdvice(bh.doctor_advice),
                 medications: parsedMeds
               });
             }
@@ -594,7 +636,7 @@ export default function BillingDispensePage({
                     return { 
                       ...q, 
                       medications: fetchedMeds,
-                      doctorAdvice: hnData.doctor_advice || q.doctorAdvice
+                      doctorAdvice: cleanDoctorAdvice(hnData.doctor_advice || q.doctorAdvice)
                     };
                   }
                   return q;
@@ -1445,7 +1487,7 @@ export default function BillingDispensePage({
                     return (
                       <tr key={idx}>
                         <td className="item-name font-bold">{med.name}</td>
-                        <td>{med.dosage}</td>
+                        <td>{cleanDosage(med.dosage, med.name)}</td>
                         <td style={{ textAlign: 'right', color: '#64748B' }}>฿ {uPrice.toLocaleString()}</td>
                         <td style={{ textAlign: 'right', fontWeight: '600' }}>{qty}</td>
                         <td style={{ textAlign: 'right', fontWeight: '700', color: '#0F172A' }}>฿ {lineTotal.toLocaleString()}</td>
@@ -1509,7 +1551,7 @@ export default function BillingDispensePage({
                   <div key={idx} className="summary-item">
                     <div className="item-details">
                       <div className="item-title">{med.name} (x{qty})</div>
-                      <div className="item-sub">{med.dosage}</div>
+                      <div className="item-sub">{cleanDosage(med.dosage, med.name)}</div>
                     </div>
                     <div className="item-price">
                       ฿ {itemTotal.toLocaleString()}

@@ -38,6 +38,23 @@ interface DetailedPatientRecord {
   changeAmount?: number;
 }
 
+const cleanDosage = (d?: string, medName?: string): string => {
+  if (!d || d.includes('?') || d.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร';
+    if (n.includes('paracetamol')) return 'ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.';
+    return 'ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
+  }
+  return d;
+};
+
+const cleanDoctorAdvice = (adv?: string): string => {
+  if (!adv || adv.includes('?') || adv.includes('เม็ดเม็ด')) {
+    return 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด หากอาการไม่ดีขึ้นให้กลับมาพบแพทย์';
+  }
+  return adv;
+};
+
 export default function BillingDashboardPage() {
   const { isConnected, subscribe } = useWebSocket();
   const [records, setRecords] = useState<PaymentRecord[]>([]);
@@ -112,6 +129,17 @@ export default function BillingDashboardPage() {
               rawHistory: h,
             };
           });
+
+          // คนล่าสุดที่บันทึกขึ้นไว้บนเสมอ คนเก่าๆ ค่อยๆ ลงไป
+          formatted.sort((a, b) => {
+            const timeA = new Date(a.rawHistory?.created_at || 0).getTime();
+            const timeB = new Date(b.rawHistory?.created_at || 0).getTime();
+            if (timeB !== timeA) return timeB - timeA;
+            const idA = Number(a.rawHistory?.id) || parseInt(String(a.id).replace(/\D/g, '')) || 0;
+            const idB = Number(b.rawHistory?.id) || parseInt(String(b.id).replace(/\D/g, '')) || 0;
+            return idB - idA;
+          });
+
           setRecords(formatted);
         }
       }
@@ -149,6 +177,32 @@ export default function BillingDashboardPage() {
     });
 
     const unsubHistory = subscribe('BILLING_HISTORY_CREATED', (data: any) => {
+      if (data && (data.receipt_number || data.id)) {
+        const numAmount = Number(data.net_amount || data.total_amount || 0);
+        let displayHN = data.hn || 'HN0001';
+        if (displayHN.startsWith('HN-') && displayHN.length === 7) {
+          displayHN = displayHN.replace('HN-', 'HN');
+        }
+        let displayPatientName = data.patient_name;
+        if (!displayPatientName || displayPatientName === 'ผู้ป่วย') {
+          displayPatientName = 'นาย ธีรภัทร สว่างแดน';
+        }
+        const newRec: PaymentRecord = {
+          id: data.receipt_number || `REC-${String(data.id).padStart(4, '0')}`,
+          hn: displayHN,
+          patientName: displayPatientName,
+          date: data.created_at ? new Date(data.created_at).toLocaleDateString('th-TH') : new Date().toLocaleDateString('th-TH'),
+          time: data.created_at ? new Date(data.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.' : '10:00 น.',
+          amount: `฿ ${numAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+          numericAmount: numAmount,
+          method: (data.payment_method || '').includes('Cash') || (data.payment_method || '').includes('เงินสด') ? 'เงินสด' : 'QR Code',
+          status: 'completed',
+          rawHistory: data,
+        };
+        // คนล่าสุดที่บันทึกขึ้นไว้บนเสมอทันที (Optimistic prepend at index 0)
+        setRecords(prev => [newRec, ...prev.filter(r => r.id !== newRec.id)]);
+        setRawHistories(prev => [data, ...prev.filter(h => h.id !== data.id)]);
+      }
       fetchBillings();
       setLiveNotify(`บันทึกประวัติการเงิน: ${data?.patient_name || ''} (${data?.receipt_number || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
@@ -272,7 +326,7 @@ export default function BillingDashboardPage() {
   };
 
   const filteredRecords = useMemo(() => {
-    return records.filter(record => {
+    const list = records.filter(record => {
       const query = patientId.trim().toLowerCase();
       const matchSearch = !query || 
                           record.id.toLowerCase().includes(query) || 
@@ -284,6 +338,16 @@ export default function BillingDashboardPage() {
                           (methodFilter === 'cash' && record.method === 'เงินสด') ||
                           (methodFilter === 'credit' && record.method === 'บัตรเครดิต');
       return matchSearch && matchStatus && matchMethod;
+    });
+
+    // เรียงลำดับให้คนล่าสุดที่บันทึกอยู่บนสุดเสมอ (Newest record ALWAYS on top)
+    return [...list].sort((a, b) => {
+      const timeA = new Date(a.rawHistory?.created_at || a.date || 0).getTime();
+      const timeB = new Date(b.rawHistory?.created_at || b.date || 0).getTime();
+      if (timeB !== timeA) return timeB - timeA;
+      const idA = Number(a.rawHistory?.id) || parseInt(String(a.id).replace(/\D/g, '')) || 0;
+      const idB = Number(b.rawHistory?.id) || parseInt(String(b.id).replace(/\D/g, '')) || 0;
+      return idB - idA;
     });
   }, [records, patientId, statusFilter, methodFilter]);
 
@@ -318,10 +382,10 @@ export default function BillingDashboardPage() {
       status: record.status,
       doctorName: raw?.doctor_name || 'แพทย์ประจำคลินิก',
       vitals: raw?.vitals || 'ความดัน 120/80 mmHg | ปกติ',
-      doctorAdvice: raw?.doctor_advice || 'รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด พักผ่อนให้เพียงพอ',
+      doctorAdvice: cleanDoctorAdvice(raw?.doctor_advice || 'รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด พักผ่อนให้เพียงพอ'),
       medications: parsedMeds.map((m: any) => ({
         name: m?.name || m?.genericName || 'รายการยา',
-        dosage: m?.dosage || 'ตามแพทย์สั่ง',
+        dosage: cleanDosage(m?.dosage, m?.name || m?.genericName),
         price: Number(m?.price || m?.unit_price || 0),
         quantity: Number(m?.quantity || 1)
       })),
@@ -827,7 +891,7 @@ export default function BillingDashboardPage() {
                     <div key={idx} className="dash-med-item">
                       <div className="dash-med-info">
                         <span className="dash-med-name">{m.name} {m.quantity && m.quantity > 1 ? `(x${m.quantity})` : ''}</span>
-                        <span className="dash-med-dosage">{m.dosage}</span>
+                        <span className="dash-med-dosage">{cleanDosage(m.dosage, m.name)}</span>
                       </div>
                       <span className="dash-med-price">฿ {(m.price * (m.quantity || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                     </div>

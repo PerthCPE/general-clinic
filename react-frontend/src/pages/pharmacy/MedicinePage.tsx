@@ -15,6 +15,7 @@ interface Medicine {
   category: string;
   properties: string;
   dosage: string;
+  usage_method?: string;
   instructions?: string;
   expiry_date?: string;
   precautions: string;
@@ -758,6 +759,201 @@ function ModernCategoryDropdown({
   );
 }
 
+// Modern Usage Method Combobox Dropdown (Select Preset or Type Custom, no emojis)
+function ModernUsageMethodDropdown({
+  value,
+  onChange,
+  placeholder = 'เลือกหรือพิมพ์วิธีการใช้งาน เช่น กิน ชง ดื่ม...'
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const PRESET_METHODS = [
+    { label: 'รับประทาน (กิน)', desc: 'ยารับประทาน เม็ด/แคปซูล/น้ำ' },
+    { label: 'ชงดื่ม', desc: 'ผงเกลือแร่ หรือยาผงละลายน้ำ' },
+    { label: 'ดื่ม', desc: 'ยาน้ำ/สารละลายสำหรับดื่มโดยตรง' },
+    { label: 'เคี้ยวให้ละเอียดก่อนกลืน', desc: 'ยาเม็ดเคี้ยว เช่น ยาลดกรด/ขับลม' },
+    { label: 'อมใต้ลิ้น', desc: 'ยาออกฤทธิ์เร็ว ดูดซึมผ่านใต้ลิ้น' },
+    { label: 'ทาภายนอก', desc: 'ครีม ยาหม่อง โลชั่น ขี้ผึ้ง' },
+    { label: 'หยอดตา', desc: 'ยาหยอดตาปราศจากเชื้อ' },
+    { label: 'หยอดหู', desc: 'ยาหยอดรูหู' },
+    { label: 'พ่นจมูก', desc: 'สเปรย์พ่นจมูกรักษาภูมิแพ้' },
+    { label: 'พ่นคอ', desc: 'สเปรย์พ่นช่องปากและลำคอ' },
+    { label: 'สวนทวาร', desc: 'ยาระบายหรือยาลดไข้เหน็บทวาร' },
+    { label: 'ฉีด', desc: 'ฉีดเข้ากล้ามเนื้อ หรือหลอดเลือด' }
+  ];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '100%' }}>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setIsOpen(true)}
+          placeholder={placeholder}
+          style={{
+            width: '100%',
+            padding: '9px 36px 9px 12px',
+            borderRadius: '8px',
+            border: '1.5px solid #CBD5E1',
+            fontSize: '13.5px',
+            fontWeight: '600',
+            color: '#0F172A',
+            background: '#FFFFFF',
+            outline: 'none',
+            boxSizing: 'border-box',
+            transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          style={{
+            position: 'absolute',
+            right: '8px',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#64748B'
+          }}
+          title="เปิด/ปิด รายการวิธีใช้งานที่แนะนำ"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease'
+            }}
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      </div>
+
+      {isOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            maxHeight: '230px',
+            overflowY: 'auto',
+            background: '#FFFFFF',
+            borderRadius: '10px',
+            border: '1.5px solid #CBD5E1',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+            zIndex: 1100,
+            padding: '8px',
+            boxSizing: 'border-box'
+          }}
+        >
+          <div
+            style={{
+              padding: '4px 6px 8px 6px',
+              fontSize: '11px',
+              fontWeight: '800',
+              color: '#64748B',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}
+          >
+            เลือกวิธีใช้งานที่แนะนำ หรือพิมพ์เพิ่มเติมด้านบน
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: '6px'
+            }}
+          >
+            {PRESET_METHODS.map((preset) => {
+              const isSelected = value === preset.label;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    onChange(preset.label);
+                    setIsOpen(false);
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: '7px',
+                    textAlign: 'left',
+                    border: isSelected ? '1.5px solid #2563EB' : '1px solid #E2E8F0',
+                    background: isSelected ? '#EFF6FF' : '#F8FAFC',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) e.currentTarget.style.background = '#F1F5F9';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) e.currentTarget.style.background = '#F8FAFC';
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '12.5px',
+                      fontWeight: '700',
+                      color: isSelected ? '#1D4ED8' : '#0F172A'
+                    }}
+                  >
+                    {preset.label}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '10.5px',
+                      color: '#64748B',
+                      lineHeight: '1.2'
+                    }}
+                  >
+                    {preset.desc}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Modern Dropdown to select/search medicine to edit by Code or Name
 function MedicineSelectorDropdown({
   medicines,
@@ -1021,6 +1217,7 @@ export default function MedicinePage() {
             category: m.category || 'ยารักษาโรคทั่วไป',
             properties: m.properties || 'ยารักษาโรคและบรรเทาอาการตามแพทย์สั่ง',
             dosage: m.dosage || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
+            usage_method: m.usage_method || 'รับประทาน (กิน)',
             instructions: m.instructions || '',
             expiry_date: m.expiry_date || '',
             precautions: m.precautions || 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
@@ -1144,6 +1341,7 @@ export default function MedicinePage() {
     category: '',
     properties: '',
     dosage: '',
+    usage_method: 'รับประทาน (กิน)',
     instructions: '',
     precautions: '',
     manufacturer: '',
@@ -1165,6 +1363,7 @@ export default function MedicinePage() {
       category: detailModalMed.category,
       properties: detailModalMed.properties,
       dosage: detailModalMed.dosage,
+      usage_method: detailModalMed.usage_method || 'รับประทาน (กิน)',
       instructions: detailModalMed.instructions || '',
       precautions: detailModalMed.precautions || 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
       manufacturer: detailModalMed.manufacturer,
@@ -1187,6 +1386,7 @@ export default function MedicinePage() {
       category: med.category || 'ยารักษาโรคทั่วไป',
       properties: med.properties || '',
       dosage: med.dosage || '',
+      usage_method: med.usage_method || 'รับประทาน (กิน)',
       instructions: med.instructions || '',
       precautions: med.precautions || 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
       manufacturer: med.manufacturer || 'บริษัท เภสัชกรรม จำกัด',
@@ -1207,6 +1407,7 @@ export default function MedicinePage() {
       category: detailEditForm.category.trim(),
       properties: detailEditForm.properties.trim(),
       dosage: detailEditForm.dosage.trim(),
+      usage_method: (detailEditForm.usage_method || 'รับประทาน (กิน)').trim(),
       instructions: detailEditForm.instructions.trim(),
       precautions: detailEditForm.precautions.trim(),
       manufacturer: detailEditForm.manufacturer.trim(),
@@ -1247,6 +1448,7 @@ export default function MedicinePage() {
           category: detailEditForm.category.trim(),
           properties: detailEditForm.properties.trim(),
           dosage: detailEditForm.dosage.trim(),
+          usage_method: (detailEditForm.usage_method || 'รับประทาน (กิน)').trim(),
           instructions: detailEditForm.instructions.trim(),
           precautions: detailEditForm.precautions.trim(),
           manufacturer: detailEditForm.manufacturer.trim(),
@@ -1281,6 +1483,7 @@ export default function MedicinePage() {
   const [addCategory, setAddCategory] = useState('ยารักษาโรคทั่วไป');
   const [addProperties, setAddProperties] = useState('');
   const [addDosage, setAddDosage] = useState('');
+  const [addUsageMethod, setAddUsageMethod] = useState('รับประทาน (กิน)');
   const [addInstructions, setAddInstructions] = useState('');
   const [addExpiryDate, setAddExpiryDate] = useState('');
   const [addManufacturer, setAddManufacturer] = useState('');
@@ -1322,6 +1525,7 @@ export default function MedicinePage() {
       category: addCategory.trim() || 'ยารักษาโรคทั่วไป',
       properties: addProperties.trim() || 'บรรเทาอาการตามแพทย์สั่ง',
       dosage: addDosage.trim() || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
+      usage_method: addUsageMethod.trim() || 'รับประทาน (กิน)',
       instructions: addInstructions.trim() || undefined,
       expiry_date: addExpiryDate.trim() || undefined,
       manufacturer: addManufacturer.trim() || 'บริษัท เภสัชกรรม จำกัด',
@@ -1345,6 +1549,7 @@ export default function MedicinePage() {
         setAddCategory('ยารักษาโรคทั่วไป');
         setAddProperties('');
         setAddDosage('');
+        setAddUsageMethod('รับประทาน (กิน)');
         setAddInstructions('');
         setAddExpiryDate('');
         setAddManufacturer('');
@@ -1485,9 +1690,11 @@ export default function MedicinePage() {
       const searchTerms = q.split(/\s+/).filter(Boolean);
       const nameStr = (med.name || '').toLowerCase();
       const genericStr = (med.genericName || '').toLowerCase();
+      const usageStr = (med.usage_method || '').toLowerCase();
+      const propStr = (med.properties || '').toLowerCase();
 
       const matchName = searchTerms.length > 0 && searchTerms.every(term => 
-        nameStr.includes(term) || genericStr.includes(term)
+        nameStr.includes(term) || genericStr.includes(term) || usageStr.includes(term) || propStr.includes(term)
       );
         
       matchSearch = matchId || matchName;
@@ -1795,7 +2002,7 @@ export default function MedicinePage() {
 
         {isStockTableExpanded && (
           <>
-            <div className="table-wrapper" style={{ overflowX: 'hidden', width: '100%' }}>
+            <div className="table-wrapper" style={{ overflowX: 'hidden', width: '100%', overscrollBehavior: 'auto' }}>
               <table className="stock-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                 <thead>
                   <tr>
@@ -1873,19 +2080,52 @@ export default function MedicinePage() {
                           </div>
                         </td>
                         <td style={{ padding: '10px 6px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', justifyContent: 'center' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                             <span style={{ 
                               fontSize: '12px', 
-                              padding: '3px 8px', 
+                              padding: '4px 8px', 
                               borderRadius: '6px', 
                               background: 'var(--bg-card, #F1F5F9)', 
                               color: 'var(--text-primary, #334155)',
-                              fontWeight: '500',
-                              display: 'inline-block',
-                              whiteSpace: 'nowrap'
+                              fontWeight: '600',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              textAlign: 'center',
+                              width: '165px',
+                              maxWidth: '100%',
+                              boxSizing: 'border-box',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
                             }}>
                               {med.category ? med.category.replace(/\s*\([^)]*\)/g, '').trim() : 'ยารักษาโรคทั่วไป'}
                             </span>
+                            {med.usage_method && (
+                              <span style={{
+                                fontSize: '11px',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                background: '#ECFDF5',
+                                color: '#047857',
+                                border: '1px solid #A7F3D0',
+                                fontWeight: '600',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                textAlign: 'center',
+                                gap: '3px',
+                                width: '165px',
+                                maxWidth: '100%',
+                                boxSizing: 'border-box',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                <span style={{ opacity: 0.8 }}>วิธีใช้:</span>
+                                <span>{med.usage_method}</span>
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="stock-num-cell" style={{ textAlign: 'center', padding: '10px 6px', whiteSpace: 'nowrap', fontSize: '13.5px' }}>{med.stock} เม็ด</td>
@@ -2063,7 +2303,7 @@ export default function MedicinePage() {
       {/* Medicine Info Detail Modal (รองรับทั้งดูรายละเอียด และแก้ไขลง DB ทันที) */}
       {detailModalMed && (
         <ClinicModalPortal isOpen={true} onClose={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }} className="medicine-page-container">
-          <div className="med-detail-modal-card card" style={{ maxWidth: '650px', width: '94%' }} onClick={(e) => e.stopPropagation()}>
+          <div className="med-detail-modal-card card" style={{ maxWidth: '650px', width: '94%', overscrollBehavior: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <div className="med-detail-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #E2E8F0', paddingBottom: '16px', marginBottom: '18px' }}>
               <div className="med-detail-title-box" style={{ flex: 1, minWidth: 0, paddingRight: '20px' }}>
                 <div style={{ marginBottom: '8px' }}>
@@ -2169,12 +2409,22 @@ export default function MedicinePage() {
               </div>
             </div>
 
-            <div className="med-detail-body">
+            <div className="med-detail-body" style={{ overscrollBehaviorY: 'auto' }}>
               {!isEditingDetailMed ? (
                 <>
-                  <div className="med-info-section category-section">
-                    <span className="info-label">หมวดยา:</span>
-                    <span className="info-value category-tag">{detailModalMed.category}</span>
+                  <div className="med-info-section category-section" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <div>
+                      <span className="info-label">หมวดยา:</span>
+                      <span className="info-value category-tag">{detailModalMed.category}</span>
+                    </div>
+                    {detailModalMed.usage_method && (
+                      <div>
+                        <span className="info-label">วิธีการใช้งาน:</span>
+                        <span className="info-value" style={{ marginLeft: '6px', fontWeight: '700', color: '#047857', background: '#ECFDF5', padding: '3px 10px', borderRadius: '6px', border: '1px solid #A7F3D0' }}>
+                          {detailModalMed.usage_method}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="med-info-grid">
@@ -2256,17 +2506,28 @@ export default function MedicinePage() {
                 </>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
-                  {/* Modern Downward Dropdown */}
-                  <div>
-                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>
-                      ชนิด / หมวดหมู่ยา
-                    </label>
-                    <ModernCategoryDropdown
-                      value={detailEditForm.category}
-                      onChange={(cat) => setDetailEditForm(prev => ({ ...prev, category: cat }))}
-                      categories={allAvailableCategories}
-                      onAddNewCategory={handleAddNewCategory}
-                    />
+                  {/* Modern Downward Dropdown for Category & Usage Method */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>
+                        ชนิด / หมวดหมู่ยา
+                      </label>
+                      <ModernCategoryDropdown
+                        value={detailEditForm.category}
+                        onChange={(cat) => setDetailEditForm(prev => ({ ...prev, category: cat }))}
+                        categories={allAvailableCategories}
+                        onAddNewCategory={handleAddNewCategory}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>
+                        วิธีการใช้งาน เช่น กิน ชง ดื่ม (Usage Method)
+                      </label>
+                      <ModernUsageMethodDropdown
+                        value={detailEditForm.usage_method || ''}
+                        onChange={(method) => setDetailEditForm(prev => ({ ...prev, usage_method: method }))}
+                      />
+                    </div>
                   </div>
 
                   <div>
@@ -2458,13 +2719,13 @@ export default function MedicinePage() {
       {/* Add New Medicine Modal */}
       {isAddModalOpen && (
         <ClinicModalPortal isOpen={true} onClose={() => setIsAddModalOpen(false)} className="medicine-page-container">
-          <div className="modal-card card" style={{ maxWidth: '650px', width: '94%', maxHeight: '88vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card card" style={{ maxWidth: '650px', width: '94%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overscrollBehavior: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">+ เพิ่มรายการยาใหม่เข้าคลัง</h3>
               <button className="close-btn" onClick={() => setIsAddModalOpen(false)}>✕</button>
             </div>
 
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', flex: 1, minHeight: 0, paddingRight: '4px' }}>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', flex: 1, minHeight: 0, paddingRight: '4px', overscrollBehaviorY: 'auto' }}>
               {/* Row 1: Medicine Code & Name */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="input-group">
@@ -2508,6 +2769,17 @@ export default function MedicinePage() {
                     onAddNewCategory={handleAddNewCategory}
                   />
                 </div>
+              </div>
+
+              {/* Row 3: Usage Method (Dropdown + Free Text Typing) */}
+              <div className="input-group">
+                <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px', display: 'block' }}>
+                  วิธีการใช้งาน เช่น กิน ชง ดื่ม (Usage Method)
+                </label>
+                <ModernUsageMethodDropdown
+                  value={addUsageMethod}
+                  onChange={setAddUsageMethod}
+                />
               </div>
 
               {/* Row 3: Properties */}

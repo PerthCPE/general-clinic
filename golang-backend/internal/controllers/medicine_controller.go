@@ -53,7 +53,9 @@ func GetMedicines(c *gin.Context) {
 			mCode := strings.ToLower(m.MedicineCode)
 			mName := strings.ToLower(m.Name)
 			mGeneric := strings.ToLower(m.GenericName)
-			if !strings.Contains(mCode, lowerQuery) && !strings.Contains(mName, lowerQuery) && !strings.Contains(mGeneric, lowerQuery) {
+			mUsage := strings.ToLower(m.UsageMethod)
+			mProps := strings.ToLower(m.Properties)
+			if !strings.Contains(mCode, lowerQuery) && !strings.Contains(mName, lowerQuery) && !strings.Contains(mGeneric, lowerQuery) && !strings.Contains(mUsage, lowerQuery) && !strings.Contains(mProps, lowerQuery) {
 				continue
 			}
 		}
@@ -132,6 +134,7 @@ type CreateMedicineRequest struct {
 	Category      string  `json:"category"`
 	Properties    string  `json:"properties"`
 	Dosage        string  `json:"dosage"`
+	UsageMethod   string  `json:"usage_method"`
 	Instructions  string  `json:"instructions"`
 	ExpiryDate    string  `json:"expiry_date"`
 	Manufacturer  string  `json:"manufacturer"`
@@ -180,6 +183,7 @@ func CreateMedicine(c *gin.Context) {
 		Category:      req.Category,
 		Properties:    req.Properties,
 		Dosage:        req.Dosage,
+		UsageMethod:   req.UsageMethod,
 		Instructions:  req.Instructions,
 		ExpiryDate:    req.ExpiryDate,
 		Manufacturer:  req.Manufacturer,
@@ -250,6 +254,7 @@ type UpdateMedicineDetailsRequest struct {
 	Category      string   `json:"category"`
 	Properties    string   `json:"properties"`
 	Dosage        string   `json:"dosage"`
+	UsageMethod   string   `json:"usage_method"`
 	Instructions  string   `json:"instructions"`
 	ExpiryDate    string   `json:"expiry_date"`
 	Manufacturer  string   `json:"manufacturer"`
@@ -300,6 +305,9 @@ func UpdateMedicineDetails(c *gin.Context) {
 	}
 	if strings.TrimSpace(req.Dosage) != "" {
 		medicine.Dosage = strings.TrimSpace(req.Dosage)
+	}
+	if strings.TrimSpace(req.UsageMethod) != "" {
+		medicine.UsageMethod = strings.TrimSpace(req.UsageMethod)
 	}
 	if strings.TrimSpace(req.Instructions) != "" {
 		medicine.Instructions = strings.TrimSpace(req.Instructions)

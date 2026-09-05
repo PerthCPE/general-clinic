@@ -11,6 +11,7 @@ type Medicine struct {
 	Category      string    `json:"category"`                                  //ชนิด / หมวดหมู่ยา
 	Properties    string    `json:"properties"`                                //สรรพคุณ
 	Dosage        string    `json:"dosage"`                                    //ขนาดและวิธีใช้
+	UsageMethod   string    `json:"usage_method"`                              //วิธีการใช้งาน เช่น รับประทาน (กิน), ชงดื่ม, ดื่ม, ทา, หยอด, พ่น
 	Instructions  string    `json:"instructions"`                              //คำแนะนำในการใช้ยา / ฉลากยา
 	ExpiryDate    string    `json:"expiry_date"`                               //วันหมดอายุ (เช่น "2027-12-31")
 	Manufacturer  string    `json:"manufacturer"`                              //ผู้ผลิต/บริษัท

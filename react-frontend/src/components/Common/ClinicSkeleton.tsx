@@ -16,7 +16,7 @@ export const ClinicSkeleton: React.FC<SkeletonProps> = ({
   popupSubtitle = 'กรุณารอสักครู่ ระบบกำลังดึงข้อมูล...'
 }) => {
   return (
-    <div className="clinic-skeleton-container" style={{ width: '100%', padding: '16px 0', animation: 'fadeIn 0.3s ease-out' }}>
+    <div className="clinic-skeleton-container" style={{ width: '100%', padding: '0 0 24px 0', animation: 'fadeIn 0.3s ease-out' }}>
       <style>{`
         @keyframes shimmerGPU {
           0% { background-position: -200% 0; }
@@ -56,7 +56,7 @@ export const ClinicSkeleton: React.FC<SkeletonProps> = ({
         }
       `}</style>
 
-      {/* Loading Indicator บล็อกโปร่งใสตรงกลาง (Translucent Glassmorphic Block) */}
+      {/* Loading Indicator บล็อกโปร่งใสตรงกลาง (Translucent Glassmorphic Block) - วางบนสุดเสมอ */}
       {showLoadingPopup && (
         <div 
           role="status"
@@ -65,7 +65,8 @@ export const ClinicSkeleton: React.FC<SkeletonProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '16px 0 24px 0',
+            padding: '0 0 20px 0',
+            margin: '0 auto',
             animation: 'fadeIn 0.25s ease-out'
           }}
         >
@@ -169,8 +170,8 @@ export const PharmacyHistorySkeleton: React.FC = () => (
   <ClinicSkeleton 
     type="table" 
     rows={6} 
-    popupTitle="กำลังโหลดประวัติการรับยา"
-    popupSubtitle="กรุณารอสักครู่ ระบบกำลังดึงข้อมูลประวัติการจ่ายยาย้อนหลัง..." 
+    popupTitle="กำลังโหลดประวัติการรับยาผู้ป่วย"
+    popupSubtitle="กรุณารอสักครู่ ระบบกำลังดึงข้อมูลประวัติการรักษาและยาที่ได้รับ..." 
   />
 );
 
