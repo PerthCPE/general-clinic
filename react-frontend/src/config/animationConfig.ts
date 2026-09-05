@@ -10,7 +10,7 @@ export const CLINIC_ANIMATION_CONFIG = {
   // 1. Frame Rate & Hardware Acceleration Target
   // -----------------------------------------------------------------------
   /** เป้าหมายความลื่นไหลของหน้าจอ (60Hz, 90Hz, 120Hz ProMotion, 144Hz Gaming) */
-  targetFps: 120,
+  targetFps: 165,
   /** เปิดใช้งาน GPU Hardware Acceleration (translate3d, will-change, backface-visibility) */
   gpuAccelerated: true,
 

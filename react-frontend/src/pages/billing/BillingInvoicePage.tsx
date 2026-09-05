@@ -97,17 +97,35 @@ export default function BillingInvoicePage({
   const [cashReceived, setCashReceived] = useState<string>('');
 
   // PromptPay Phone / National ID (สามารถแก้ไขเบอร์พร้อมเพย์ได้)
+  // PromptPay Phone / National ID / เลขบัญชีธนาคาร (สามารถแก้ไขและสลับเลขได้)
   const [promptPayNumber, setPromptPayNumber] = useState<string>(() => {
-    return localStorage.getItem('clinic_promptpay_number') || CLINIC_CONFIG.paymentAccount.phone || '081-999-8888';
+    const cached = localStorage.getItem('clinic_promptpay_number');
+    if (!cached || cached.includes('x') || cached.replace(/[^0-9]/g, '').length < 10) {
+      localStorage.setItem('clinic_promptpay_number', '088-587-5682');
+      return '088-587-5682';
+    }
+    return cached;
+  });
+  const [bankAccountNumber, setBankAccountNumber] = useState<string>(() => {
+    const cached = localStorage.getItem('clinic_bank_account_number');
+    if (!cached || cached.includes('x')) {
+      localStorage.setItem('clinic_bank_account_number', '020300456462');
+      return '020300456462';
+    }
+    return cached;
   });
   const [isEditingPromptPay, setIsEditingPromptPay] = useState(false);
 
-  const handleSavePromptPay = (newNumber: string) => {
+  const handleSavePromptPay = (newNumber: string, newBankAcc?: string) => {
     setPromptPayNumber(newNumber);
     localStorage.setItem('clinic_promptpay_number', newNumber);
+    if (newBankAcc) {
+      setBankAccountNumber(newBankAcc);
+      localStorage.setItem('clinic_bank_account_number', newBankAcc);
+    }
   };
 
-  const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
+const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchMasterMeds = async () => {
@@ -1019,42 +1037,73 @@ export default function BillingInvoicePage({
                     <div className="clean-account-details">
                       <div className="account-name">ชื่อบัญชี: <strong>นาย บุญค้ำ โยลัย</strong></div>
                       
-                      <div className="promptpay-number-row">
+                      <div className="promptpay-number-row" style={{ marginTop: '8px' }}>
                         {isEditingPromptPay ? (
-                          <div className="edit-promptpay-box">
-                            <input
-                              type="text"
-                              value={promptPayNumber}
-                              onChange={(e) => setPromptPayNumber(e.target.value)}
-                              placeholder="กรอกเบอร์โทร..."
-                              className="edit-phone-input"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleSavePromptPay(promptPayNumber);
-                                setIsEditingPromptPay(false);
-                              }}
-                              className="btn-save-phone"
-                            >
-                              บันทึก
-                            </button>
+                          <div className="edit-promptpay-box" style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', background: '#F8FAFC', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', textAlign: 'left' }}>
+                              <label style={{ fontSize: '11.5px', color: '#475569', fontWeight: '600' }}>เบอร์พร้อมเพย์ (สร้าง QR):</label>
+                              <input
+                                type="text"
+                                value={promptPayNumber}
+                                onChange={(e) => setPromptPayNumber(e.target.value)}
+                                placeholder="เช่น 0885875682"
+                                className="edit-phone-input"
+                                style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', textAlign: 'left' }}>
+                              <label style={{ fontSize: '11.5px', color: '#475569', fontWeight: '600' }}>เลขที่บัญชีธนาคาร (โอนตรง):</label>
+                              <input
+                                type="text"
+                                value={bankAccountNumber}
+                                onChange={(e) => setBankAccountNumber(e.target.value)}
+                                placeholder="เช่น 020300456462"
+                                className="edit-phone-input"
+                                style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingPromptPay(false)}
+                                style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                              >
+                                ยกเลิก
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleSavePromptPay(promptPayNumber, bankAccountNumber);
+                                  setIsEditingPromptPay(false);
+                                }}
+                                className="btn-save-phone"
+                                style={{ padding: '5px 14px', borderRadius: '6px', border: 'none', background: '#2563EB', color: '#FFFFFF', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                              >
+                                บันทึก
+                              </button>
+                            </div>
                           </div>
                         ) : (
-                          <div className="phone-display">
-                            <span>พร้อมเพย์: <strong>{promptPayNumber}</strong></span>
-                            <button 
-                              type="button"
-                              onClick={() => setIsEditingPromptPay(true)}
-                              className="btn-edit-phone-link"
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                              </svg>
-                              แก้ไขเบอร์
-                            </button>
+                          <div className="phone-display" style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13.5px' }}>
+                              <span>พร้อมเพย์: <strong style={{ color: '#2563EB', fontFamily: 'monospace', fontSize: '14.5px' }}>{promptPayNumber}</strong></span>
+                              <button 
+                                type="button" 
+                                onClick={() => setIsEditingPromptPay(true)}
+                                className="btn-edit-phone-link"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                แก้ไข
+                              </button>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px', color: '#475569', borderTop: '1px dashed #E2E8F0', paddingTop: '4px' }}>
+                              <span>เลขที่บัญชี: <strong style={{ fontFamily: 'monospace', color: '#1E293B', fontSize: '13px' }}>{bankAccountNumber}</strong></span>
+                              <span style={{ fontSize: '11.5px', color: '#64748B' }}>ธ.กรุงไทย</span>
+                            </div>
                           </div>
                         )}
                       </div>
