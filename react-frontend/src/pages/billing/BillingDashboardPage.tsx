@@ -24,6 +24,7 @@ interface DetailedPatientRecord {
   id: string;
   patientName: string;
   hn: string;
+  vn: string;
   date: string;
   time: string;
   amount: string;
@@ -68,8 +69,9 @@ export default function BillingDashboardPage() {
   const [hasSearched, setHasSearched] = useState(false);
   const [liveNotify, setLiveNotify] = useState<string | null>(null);
   const [selectedDetail, setSelectedDetail] = useState<DetailedPatientRecord | null>(null);
-
-  const [currentPage, setCurrentPage] = useState(1);
+  const [searchDate, setSearchDate] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
   const pageSize = 10;
 
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -379,6 +381,7 @@ export default function BillingDashboardPage() {
       id: record.id,
       patientName: raw?.patient_name || record.patientName,
       hn: raw?.hn || record.hn,
+      vn: raw?.vn || record.vn || '-',
       date: record.date,
       time: record.time,
       amount: record.amount,
@@ -627,18 +630,18 @@ export default function BillingDashboardPage() {
           </span>
         </div>
 
-        <div className="table-wrapper" style={{ overflowX: 'auto', width: '100%' }}>
-          <table className="payment-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+        <div className="table-wrapper" style={{ width: '100%' }}>
+          <table className="payment-table" style={{ width: '100%', tableLayout: 'auto' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'center', width: '160px', padding: '12px 6px' }}>เลขที่ใบเสร็จ</th>
-                <th style={{ textAlign: 'center', width: '120px', padding: '12px 6px' }}>เลข VN</th>
-                <th style={{ textAlign: 'left', width: '220px', padding: '12px 14px 12px 28px' }}>HN & ชื่อผู้ป่วย</th>
-                <th style={{ textAlign: 'center', width: '14%', padding: '12px 4px' }}>เวลาที่ชำระเงิน</th>
-                <th style={{ textAlign: 'right', width: '12%', padding: '12px 14px' }}>จำนวนเงินสุทธิ</th>
-                <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>สถานะ</th>
-                <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>วิธีการชำระ</th>
-                <th style={{ textAlign: 'center', width: '16%', padding: '12px 4px' }}>จัดการ</th>
+                <th style={{ textAlign: 'center', width: '18%', padding: '12px 6px' }}>เลขที่ใบเสร็จ</th>
+                <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>เลข VN</th>
+                <th style={{ textAlign: 'left', width: '18%', padding: '12px 14px 12px 28px' }}>HN & ชื่อผู้ป่วย</th>
+                <th style={{ textAlign: 'center', width: '12%', padding: '12px 4px' }}>เวลาที่ชำระเงิน</th>
+                <th style={{ textAlign: 'right', width: '10%', padding: '12px 14px' }}>จำนวนเงินสุทธิ</th>
+                <th style={{ textAlign: 'center', width: '10%', padding: '12px 4px' }}>สถานะ</th>
+                <th style={{ textAlign: 'center', width: '8%', padding: '12px 4px' }}>วิธีการชำระ</th>
+                <th style={{ textAlign: 'center', width: '14%', padding: '12px 4px' }}>จัดการ</th>
               </tr>
             </thead>
             <tbody>
@@ -948,7 +951,7 @@ export default function BillingDashboardPage() {
               <div className="dash-modal-footer" style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button 
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => setShowPrintPreview(true)}
                   style={{
                     padding: '8px 18px', borderRadius: '8px',
                     background: '#2563EB', color: '#FFFFFF', border: 'none',
@@ -1110,6 +1113,331 @@ export default function BillingDashboardPage() {
               >
                 ยืนยันการลบ
               </button>
+            </div>
+          </div>
+        </ClinicModalPortal>
+      )}
+    {/* Modern Receipt Preview & Print Modal */}
+      {showPrintPreview && selectedDetail && (
+        <ClinicModalPortal isOpen={true} onClose={() => setShowPrintPreview(false)} className="billing-dashboard-container">
+          <div 
+            className="receipt-preview-dialog" 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF', borderRadius: '16px',
+              maxWidth: '780px', width: '100%', maxHeight: '92vh',
+              display: 'flex', flexDirection: 'column',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Modal Top Control Bar */}
+            <div style={{
+              display: 'flex', justifySelf: 'start', justifyContent: 'space-between', alignItems: 'center',
+              padding: '16px 24px', borderBottom: '1px solid #E2E8F0',
+              background: '#F8FAFC'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '8px',
+                  background: '#EFF6FF', color: '#2563EB',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                  </svg>
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0F172A' }}>
+                    ตัวอย่างใบเสร็จรับเงิน (Receipt Preview)
+                  </h3>
+                  <span style={{ fontSize: '12.5px', color: '#64748B' }}>
+                    ตรวจสอบความถูกต้องก่อนสั่งพิมพ์หรือบันทึกไฟล์ PDF
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 16px', borderRadius: '8px',
+                    background: '#FFFFFF', color: '#0F172A',
+                    border: '1.5px solid #CBD5E1', fontSize: '13.5px',
+                    fontWeight: '700', cursor: 'pointer', transition: 'all 0.15s ease'
+                  }}
+                  title="สั่งพิมพ์ออกเครื่องพิมพ์"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                  </svg>
+                  สั่งพิมพ์ (Print)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowPrintPreview(false)}
+                  style={{
+                    width: '34px', height: '34px', borderRadius: '8px',
+                    border: '1px solid #CBD5E1', background: '#FFFFFF',
+                    color: '#64748B', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', cursor: 'pointer'
+                  }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Printable Paper Sheet */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', background: '#F1F5F9' }}>
+              <div 
+                style={{
+                  background: '#FFFFFF',
+                  borderRadius: '12px',
+                  padding: '36px 42px',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+                  maxWidth: '680px',
+                  margin: '0 auto',
+                  fontFamily: "'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                  color: '#0F172A',
+                  position: 'relative'
+                }}
+              >
+                {/* Clinic Official Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #0F172A', paddingBottom: '18px', marginBottom: '20px' }}>
+                  <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                    <div style={{
+                      width: '52px', height: '52px', borderRadius: '12px',
+                      background: 'linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%)',
+                      color: '#FFFFFF', display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', boxShadow: '0 4px 10px rgba(37,99,235,0.3)'
+                    }}>
+                      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 2v20M2 12h20"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#0F172A', letterSpacing: '0.2px' }}>
+                        คลินิกเวชกรรมทั่วไป
+                      </h1>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#2563EB', marginTop: '2px' }}>
+                        GENERAL MEDICAL CLINIC
+                      </div>
+                      <div style={{ fontSize: '11.5px', color: '#64748B', marginTop: '3px', lineHeight: '1.4' }}>
+                        ใบอนุญาตเลขที่ 1020300456 • 123/45 ถ.สาธารณสุข แขวงคลินิก เขตสุขภาพ กรุงเทพฯ 10400<br/>
+                        โทรศัพท์: 02-123-4567 • www.generalclinic.co.th
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{
+                      display: 'inline-block', padding: '4px 12px', borderRadius: '6px',
+                      background: '#EFF6FF', color: '#1E40AF', fontWeight: '800',
+                      fontSize: '13.5px', letterSpacing: '0.5px', border: '1px solid #BFDBFE'
+                    }}>
+                      ใบเสร็จรับเงิน / สำเนา
+                    </div>
+                    <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748B', marginTop: '3px' }}>
+                      RECEIPT / COPY
+                    </div>
+                    <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#0F172A', marginTop: '6px', fontFamily: 'monospace' }}>
+                      เลขที่: {selectedDetail.id}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
+                      วันที่: {selectedDetail.date}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Patient Information Box */}
+                <div style={{
+                  background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px',
+                  padding: '14px 18px', marginBottom: '20px', display: 'grid',
+                  gridTemplateColumns: '1.2fr 1fr', gap: '10px 24px', fontSize: '13px'
+                }}>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>ชื่อ-นามสกุล ผู้ป่วย: </span>
+                    <strong style={{ color: '#0F172A', fontSize: '13.5px' }}>{selectedDetail.patientName}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>แพทย์ผู้ตรวจ: </span>
+                    <strong style={{ color: '#0F172A' }}>{selectedDetail.doctorName || 'นพ. สมเกียรติ มั่นคง (ว.45892)'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>เลขประจำตัว (HN): </span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1E40AF' }}>{selectedDetail.hn}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>เลขรับบริการ (VN): </span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1E40AF' }}>{selectedDetail.vn}</span>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>สิทธิการรักษา: </span>
+                    <strong style={{ color: '#0F172A' }}>บัตรทอง (สปสช.)</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>ช่องทางชำระเงิน: </span>
+                    <strong style={{ color: selectedDetail.method === 'QR Code' ? '#7C3AED' : '#059669' }}>
+                      {selectedDetail.method === 'QR Code' ? 'PromptPay QR Code (โอนเงิน)' : 'เงินสด (Cash)'}
+                    </strong>
+                  </div>
+                  <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>สถานะการชำระ: </span>
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '3px',
+                      background: '#DCFCE7', color: '#15803D', padding: '2px 8px',
+                      borderRadius: '999px', fontWeight: '700', fontSize: '11.5px'
+                    }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                      ชำระเงินเรียบร้อยแล้ว (PAID)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Items & Medication Table */}
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: '#F1F5F9', borderTop: '1px solid #CBD5E1', borderBottom: '1.5px solid #94A3B8' }}>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', width: '38px', color: '#334155', fontWeight: '700' }}>ลำดับ</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'left', color: '#334155', fontWeight: '700' }}>รายการการรักษาและยา</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'center', width: '65px', color: '#334155', fontWeight: '700' }}>จำนวน</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', width: '90px', color: '#334155', fontWeight: '700' }}>ราคา/หน่วย</th>
+                      <th style={{ padding: '8px 10px', textAlign: 'right', width: '100px', color: '#334155', fontWeight: '700' }}>รวมเงิน (บาท)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                      <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748B' }}>1</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <div style={{ fontWeight: '600', color: '#0F172A' }}>ค่าตรวจวินิจฉัยและรักษาโดยแพทย์ (Medical Consultation)</div>
+                        <div style={{ fontSize: '11.5px', color: '#64748B' }}>ตรวจประเมินร่างกายและให้คำปรึกษาทางการแพทย์</div>
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>1</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{(selectedDetail.doctorFee || 500).toFixed(2)}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '600' }}>{(selectedDetail.doctorFee || 500).toFixed(2)}</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
+                      <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748B' }}>2</td>
+                      <td style={{ padding: '8px 10px' }}>
+                        <div style={{ fontWeight: '600', color: '#0F172A' }}>ค่าบริการทางการแพทย์และคลินิก (Clinic Service Fee)</div>
+                        <div style={{ fontSize: '11.5px', color: '#64748B' }}>ค่าบริการพยาบาล คัดกรองและวัดสัญญาณชีพ</div>
+                      </td>
+                      <td style={{ padding: '8px 10px', textAlign: 'center' }}>1</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{(selectedDetail.clinicFee || 300).toFixed(2)}</td>
+                      <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '600' }}>{(selectedDetail.clinicFee || 300).toFixed(2)}</td>
+                    </tr>
+                    {(selectedDetail.medications || []).map((med, idx) => {
+                      const qty = Number(med.quantity) || 1;
+                      const uPrice = Number(med.price) || 0;
+                      const lineTotal = qty * uPrice;
+                      return (
+                        <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748B' }}>{idx + 3}</td>
+                          <td style={{ padding: '8px 10px' }}>
+                            <div style={{ fontWeight: '600', color: '#0F172A' }}>{med.name}</div>
+                            {med.dosage && (
+                              <div style={{ fontSize: '11.5px', color: '#64748B' }}>
+                                วิธีใช้: {med.dosage}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '8px 10px', textAlign: 'center', fontFamily: 'monospace' }}>{qty}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace' }}>{uPrice.toFixed(2)}</td>
+                          <td style={{ padding: '8px 10px', textAlign: 'right', fontFamily: 'monospace', fontWeight: '600' }}>{lineTotal.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                {/* Subtotal & Grand Total Section */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderTop: '1.5px solid #CBD5E1', paddingTop: '14px', marginBottom: '24px' }}>
+                  {/* Paid Stamp Watermark */}
+                  <div style={{
+                    border: '2px solid #16A34A', borderRadius: '8px',
+                    padding: '8px 16px', color: '#16A34A', display: 'inline-flex',
+                    flexDirection: 'column', alignItems: 'center', transform: 'rotate(-3deg)'
+                  }}>
+                    <span style={{ fontSize: '15px', fontWeight: '900', letterSpacing: '1px' }}>ชำระเงินแล้ว / PAID</span>
+                    <span style={{ fontSize: '11px', fontWeight: '600' }}>
+                      {selectedDetail.date} • {selectedDetail.method === 'QR Code' ? 'PromptPay' : 'Cash'}
+                    </span>
+                  </div>
+
+                  {/* Financial calculation */}
+                  <div style={{ width: '260px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '4px' }}>
+                      <span>รวมเป็นเงิน (Subtotal):</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>
+                        ฿ {(() => {
+                           let medTotal = (selectedDetail.medications || []).reduce((acc, m) => acc + ((m.price||0) * (m.quantity||1)), 0);
+                           return ((selectedDetail.doctorFee || 500) + (selectedDetail.clinicFee || 300) + medTotal).toFixed(2);
+                        })()}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '8px' }}>
+                      <span>ส่วนลด (Discount):</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>฿ 0.00</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '8px' }}>
+                      <span>ภาษีมูลค่าเพิ่ม (VAT 7%):</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>฿ 0.00</span>
+                    </div>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      borderTop: '2px solid #0F172A', paddingTop: '8px', fontSize: '15px',
+                      fontWeight: '800', color: '#0F172A'
+                    }}>
+                      <span>ยอดชำระสุทธิ (Net Total):</span>
+                      <span style={{ fontFamily: 'monospace', fontSize: '18px', color: '#1E40AF' }}>{selectedDetail.amount}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Advice & Signatures Footer */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '24px',
+                  borderTop: '1px dashed #CBD5E1', paddingTop: '16px', fontSize: '12px'
+                }}>
+                  <div>
+                    <strong style={{ color: '#0F172A', display: 'block', marginBottom: '4px' }}>คำแนะนำจากแพทย์และการใช้ยา:</strong>
+                    <p style={{ margin: 0, color: '#475569', lineHeight: '1.5' }}>
+                      {selectedDetail.doctorAdvice}
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+                      <div style={{
+                        borderBottom: '1px solid #94A3B8', paddingBottom: '4px',
+                        marginBottom: '4px', width: '80%', margin: '0 auto', color: '#64748B', fontFamily: 'monospace'
+                      }}>
+                        {selectedDetail.method === 'QR Code' ? '(โอนชำระเงินผ่านระบบ QR Code)' : '(ชำระด้วยเงินสดสำเร็จ)'}
+                      </div>
+                      <div style={{ color: '#475569' }}>ผู้รับเงิน / พนักงานแคชเชียร์</div>
+                    </div>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{
+                        borderBottom: '1px solid #94A3B8', paddingBottom: '4px',
+                        marginBottom: '4px', width: '80%', margin: '0 auto', fontFamily: 'monospace'
+                      }}></div>
+                      <div style={{ color: '#475569' }}>ผู้รับบริการ / ผู้ป่วย</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </ClinicModalPortal>

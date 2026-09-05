@@ -477,10 +477,34 @@ func GetBillingHistories(c *gin.Context) {
 		return
 	}
 
+	var visitIDs []uint
+	for _, h := range histories {
+		if h.VisitID > 0 {
+			visitIDs = append(visitIDs, h.VisitID)
+		}
+	}
+
+	visitRecords := make(map[uint]models.VisitRecord)
+	if len(visitIDs) > 0 {
+		var vrList []models.VisitRecord
+		config.DB.Where("id IN ?", visitIDs).Find(&vrList)
+		for _, vr := range vrList {
+			visitRecords[vr.ID] = vr
+		}
+	}
+
+	type HistoryWithVN struct {
+		models.BillingHistory
+		VN string `json:"vn"`
+	}
+	
+	var result []HistoryWithVN
+
 	for i := range histories {
-		if histories[i].Medications != "" && histories[i].Medications != "null" {
+		h := histories[i]
+		if h.Medications != "" && h.Medications != "null" {
 			var parsed []gin.H
-			if err := json.Unmarshal([]byte(histories[i].Medications), &parsed); err == nil {
+			if err := json.Unmarshal([]byte(h.Medications), &parsed); err == nil {
 				for j := range parsed {
 					mName, _ := parsed[j]["name"].(string)
 					dosage, _ := parsed[j]["dosage"].(string)
@@ -489,14 +513,32 @@ func GetBillingHistories(c *gin.Context) {
 					parsed[j]["instructions"] = CleanInstructions(inst, mName)
 				}
 				b, _ := json.Marshal(parsed)
-				histories[i].Medications = string(b)
+				h.Medications = string(b)
 			}
 		}
+
+		vn := "-"
+		if vr, ok := visitRecords[h.VisitID]; ok && vr.VN != "" {
+			vn = vr.VN
+		} else {
+			// Fallback by HN and Date if VisitID is missing
+			var fallbackVR models.VisitRecord
+			if err := config.DB.Joins("JOIN patients ON patients.id = visit_records.patient_id").
+				Where("patients.hn = ? OR patients.hn = ?", h.HN, "HN"+h.HN).
+				Order("visit_records.created_at desc").First(&fallbackVR).Error; err == nil && fallbackVR.VN != "" {
+				vn = fallbackVR.VN
+			}
+		}
+
+		result = append(result, HistoryWithVN{
+			BillingHistory: h,
+			VN:             vn,
+		})
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "success",
-		"histories": histories,
+		"histories": result,
 	})
 }
 

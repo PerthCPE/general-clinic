@@ -1492,6 +1492,10 @@ export default function BillingInvoicePage({
                     )}
                   </div>
                   <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>เลขรับบริการ (VN): </span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1E40AF' }}>{activePatient.vn || '-'}</span>
+                  </div>
+                  <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>สิทธิการรักษา: </span>
                     <strong style={{ color: '#0F172A' }}>{currentRights}</strong>
                   </div>
