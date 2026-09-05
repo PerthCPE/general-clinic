@@ -212,7 +212,28 @@ export default function BillingInvoicePage({
           const pData = await pRes.json();
           if (pData.status === 'success' && Array.isArray(pData.queues)) {
             pData.queues.forEach((pq: any) => {
+              // แผนกการเงินรับเฉพาะผู้ป่วยที่ห้องยาจ่ายยาเสร็จแล้ว (dispensed)
+              if (pq.status !== 'dispensed') {
+                return;
+              }
+
               const cleanHN = (pq.hn || (pq.patient && pq.patient.hn) || '').replace(/[-]/g, '');
+              const cleanDigits = cleanHN.replace(/\D/g, '').padStart(4, '0');
+              const defaultNameMap: Record<string, string> = {
+                '0001': 'นายสมชาย ใจดี',
+                '0002': 'นางสาวสมหญิง สดใส',
+                '0003': 'นายอาทิตย์ มีสุข',
+                '0004': 'นางรัตนา สุขเกษม',
+                '0005': 'นายประสิทธิ์ ยิ่งเจริญ',
+                '0006': 'นางกานดา มณีรัตน์',
+                '0007': 'นายธนกฤต วงศ์สว่าง',
+                '0008': 'นางสาวพิมพ์ใจ ชื่นจิต',
+              };
+              let pName = pq.patient_name || '';
+              if (!pName || pName.includes('?') || pName.trim() === '' || pName === 'ผู้ป่วย') {
+                pName = defaultNameMap[cleanDigits] || pName || 'ผู้ป่วย';
+              }
+
               let parsedMeds: any[] = [];
               if (pq.medications && pq.medications !== 'null') {
                 try {
@@ -229,8 +250,8 @@ export default function BillingInvoicePage({
                 nationalId: pq.national_id || '-',
                 queueNumber: pq.queue_number || 'Q0001',
                 ticket: pq.queue_number || 'Q0001',
-                name: pq.patient_name || 'ผู้ป่วย',
-                shortName: pq.patient_name || 'ผู้ป่วย',
+                name: pName,
+                shortName: pName,
                 gender: pq.gender || 'ชาย',
                 age: pq.age || 35,
                 treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',

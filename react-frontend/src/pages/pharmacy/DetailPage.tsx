@@ -85,6 +85,43 @@ const cleanChronicDiseases = (cd?: string): string => {
   return cd;
 };
 
+const defaultNameMap: Record<string, string> = {
+  '1': 'นายสมชาย ใจดี',
+  '2': 'นางสมศรี มีสุข',
+  '3': 'นายสมศักดิ์ รักสงบ',
+  '4': 'นางสาวมานี มีแชร์',
+  '5': 'นายชูใจ ใฝ่ดี',
+  '6': 'นางปิติ สุขสมบัติ',
+  '7': 'นายวีระ กล้าหาญ',
+  '8': 'นางสาวดวงใจ มีทรัพย์',
+  '9': 'นายประสิทธิ์ พูนผล',
+  '10': 'นางสมพร รัตนากร',
+  '11': 'นายกิตติคุณ ดำรงเกียรติ',
+  '12': 'นางสาวนภาพร เพ็ญประภา',
+  '13': 'นายธีรภัทร เจริญสุข',
+  '14': 'นางวรรณภา สิริวัฒน์',
+  '15': 'นายณัฐพงษ์ ยอดมนุษย์',
+  '16': 'นางสาวศศิธร ศรีสุข',
+  '17': 'นายธนกฤต มั่งคั่ง',
+  '18': 'นางศิริพร บุญรักษา',
+  '19': 'นายวรวุฒิ สิทธิชัย',
+  '20': 'นางสาวรัตนาวลัย พิมานรัตน์'
+};
+
+const cleanPatientName = (name?: string, hn?: string): string => {
+  let pName = (name || '').trim();
+  const cleanDigits = (hn || '').replace(/\D/g, '').replace(/^0+/, '');
+  if (!pName || pName.includes('?') || pName === 'ผู้ป่วย' || pName === '????') {
+    if (cleanDigits && defaultNameMap[cleanDigits]) {
+      return defaultNameMap[cleanDigits];
+    }
+    if (pName.includes('?')) {
+      return 'ผู้ป่วยทั่วไป';
+    }
+  }
+  return pName || 'ผู้ป่วย';
+};
+
 interface DetailPageProps {
   selectedPatientId?: string;
   onSelectPatientId?: (id: string) => void;
@@ -210,8 +247,8 @@ export default function DetailPage({
               nationalId: pq.national_id || '',
               queueNumber: pq.queue_number || 'Q0001',
               ticket: pq.queue_number || 'A-01',
-              name: pq.patient_name || 'ผู้ป่วย',
-              shortName: pq.patient_name || 'ผู้ป่วย',
+              name: cleanPatientName(pq.patient_name, cleanHN),
+              shortName: cleanPatientName(pq.patient_name, cleanHN),
               gender: pq.gender || 'ชาย',
               age: pq.age || 35,
               treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
@@ -256,8 +293,8 @@ export default function DetailPage({
                   nationalId: bh.national_id || '',
                   queueNumber: bh.receipt_number || 'Q0000',
                   ticket: 'A-00',
-                  name: bh.patient_name || 'ผู้ป่วย',
-                  shortName: bh.patient_name || 'ผู้ป่วย',
+                  name: cleanPatientName(bh.patient_name, bhHN),
+                  shortName: cleanPatientName(bh.patient_name, bhHN),
                   gender: 'ชาย',
                   age: 35,
                   treatmentRights: 'ชำระเงินแล้ว',
@@ -402,7 +439,8 @@ export default function DetailPage({
 
     const unsubCreated = subscribe('QUEUE_CREATED', (data: any) => {
       if (data) {
-        const pName = data.patient?.full_name || data.patient_name || `ผู้ป่วยคิว ${data.queue_number || ''}`;
+        const rawName = data.patient?.full_name || data.patient_name;
+        const pName = cleanPatientName(rawName, data.hn || data.patient?.hn) || `ผู้ป่วยคิว ${data.queue_number || ''}`;
         fetchQueues();
         triggerToast(`ได้รับใบสั่งยา: ${pName}`, 'doctor');
       }

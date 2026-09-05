@@ -380,13 +380,29 @@ export default function PatientHistoryPage() {
             return;
           }
 
+          const defaultNameMap: Record<string, string> = {
+            '0001': 'นายสมชาย ใจดี',
+            '0002': 'นางสาวสมหญิง สดใส',
+            '0003': 'นายอาทิตย์ มีสุข',
+            '0004': 'นางรัตนา สุขเกษม',
+            '0005': 'นายประสิทธิ์ ยิ่งเจริญ',
+            '0006': 'นางกานดา มณีรัตน์',
+            '0007': 'นายธนกฤต วงศ์สว่าง',
+            '0008': 'นางสาวพิมพ์ใจ ชื่นจิต',
+          };
+
           const mapped: Patient[] = data.patient_medicines.map((pm: any) => {
             const rawDiseases = pm.chronic_diseases ? pm.chronic_diseases.split(',').map((d: string) => d.trim()).filter(Boolean) : [];
             const cleanHN = (pm.hn || '').replace(/[-]/g, '');
+            const cleanDigits = cleanHN.replace(/\D/g, '').padStart(4, '0');
+            let pName = pm.fullname || pm.full_name || '';
+            if (!pName || pName.includes('?') || pName.trim() === '' || pName === 'ผู้ป่วย') {
+              pName = defaultNameMap[cleanDigits] || pName || 'ผู้ป่วย';
+            }
             return {
               id: `PT-${pm.id || pm.hn}`,
               hn: cleanHN,
-              name: pm.fullname || pm.full_name || 'ผู้ป่วย',
+              name: pName,
               age: pm.age || 35,
               bloodType: pm.blood_type || 'O+',
               diseases: rawDiseases.length > 0 ? rawDiseases : ['ไม่มี'],

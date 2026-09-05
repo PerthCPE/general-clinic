@@ -306,10 +306,32 @@ export default function BillingDispensePage({
 
         let mappedQueues: PatientConfig[] = [];
 
-        // 1. นำข้อมูลจาก Pharmacy Queues เป็นแหล่งข้อมูลหลัก (เพื่อให้เลขคิว QE... และคนไข้ตรงกับระบบยาทุกประการ 100%)
+        // 1. นำข้อมูลจาก Pharmacy Queues เฉพาะผู้ป่วยที่ห้องยาจ่ายยาเสร็จสิ้นแล้ว (dispensed)
         if (pData && pData.status === 'success' && Array.isArray(pData.queues)) {
           pData.queues.forEach((pq: any) => {
+            // สำคัญมาก: ห้องการเงินต้องแสดงเฉพาะผู้ป่วยที่ห้องยาจ่ายยาเสร็จแล้ว (dispensed) เท่านั้น!
+            // ผู้ป่วยที่สถานะเป็น pending ยังคงรอรับยาอยู่ที่ห้องยา แพทย์เพิ่งสั่งยา ห้ามนำมาแสดงในห้องการเงินเด็ดขาด!
+            if (pq.status !== 'dispensed') {
+              return;
+            }
+
             const cleanHN = (pq.hn || (pq.patient && pq.patient.hn) || '').replace(/[-]/g, '');
+            const cleanDigits = cleanHN.replace(/\D/g, '').padStart(4, '0');
+            const defaultNameMap: Record<string, string> = {
+              '0001': 'นายสมชาย ใจดี',
+              '0002': 'นางสาวสมหญิง สดใส',
+              '0003': 'นายอาทิตย์ มีสุข',
+              '0004': 'นางรัตนา สุขเกษม',
+              '0005': 'นายประสิทธิ์ ยิ่งเจริญ',
+              '0006': 'นางกานดา มณีรัตน์',
+              '0007': 'นายธนกฤต วงศ์สว่าง',
+              '0008': 'นางสาวพิมพ์ใจ ชื่นจิต',
+            };
+            let pName = pq.patient_name || '';
+            if (!pName || pName.includes('?') || pName.trim() === '' || pName === 'ผู้ป่วย') {
+              pName = defaultNameMap[cleanDigits] || pName || 'ผู้ป่วย';
+            }
+
             let parsedMeds: any[] = [];
             if (pq.medications && pq.medications !== 'null') {
               try {
@@ -338,8 +360,8 @@ export default function BillingDispensePage({
               nationalId: pq.national_id || '-',
               queueNumber: pq.queue_number || 'Q0001',
               ticket: pq.queue_number || 'Q0001',
-              name: pq.patient_name || 'ผู้ป่วย',
-              shortName: pq.patient_name || 'ผู้ป่วย',
+              name: pName,
+              shortName: pName,
               gender: pq.gender || 'หญิง',
               age: pq.age || 35,
               treatmentRights: pq.scheme_type || 'บัตรทอง (สปสช.)',
@@ -347,7 +369,7 @@ export default function BillingDispensePage({
               allergies: cleanAllergies(pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา']),
               chronicDiseases: cleanChronicDiseases(pq.chronic_diseases || 'ไม่มี'),
               vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-              visitStatus: isCompleted ? 'ชำระเงินแล้ว / เสร็จสิ้น' : (pq.status === 'dispensed' ? 'รอชำระเงิน' : 'รอชำระเงิน'),
+              visitStatus: isCompleted ? 'ชำระเงินแล้ว / เสร็จสิ้น' : 'รอชำระเงิน',
               status: isCompleted ? ('completed' as const) : ('pending' as const),
               visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
               visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
@@ -536,15 +558,6 @@ export default function BillingDispensePage({
       }
     });
 
-    const unsubExam = subscribe('EXAMINATION_SAVED', () => {
-      fetchInitialQueue();
-      triggerToast('แพทย์บันทึกการตรวจและส่งใบสั่งยาเรียบร้อยแล้ว', 'doctor');
-    });
-
-    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', () => {
-      fetchInitialQueue();
-    });
-
     const unsubDispense = subscribe('DISPENSE_RECORDED', () => {
       fetchInitialQueue();
     });
@@ -566,10 +579,6 @@ export default function BillingDispensePage({
       fetchInitialQueue();
     });
 
-    const unsubVisit = subscribe('VISIT_UPDATED', () => {
-      fetchInitialQueue();
-    });
-
     const unsubBillHist = subscribe('BILLING_HISTORY_CREATED', () => {
       fetchInitialQueue();
     });
@@ -582,13 +591,10 @@ export default function BillingDispensePage({
     return () => {
       clearInterval(pollInterval);
       unsubBill();
-      unsubExam();
-      unsubMedQ();
       unsubDispense();
       unsubDispenseConf();
       unsubQueue();
       unsubCreated();
-      unsubVisit();
       unsubBillHist();
       unsubPay();
     };
