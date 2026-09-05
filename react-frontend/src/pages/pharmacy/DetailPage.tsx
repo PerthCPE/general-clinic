@@ -891,7 +891,7 @@ export default function DetailPage({
                     <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '100px', textAlign: 'center' }}>HN</th>
                     <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '110px', textAlign: 'center' }}>VN</th>
                     <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '140px', textAlign: 'center' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', minWidth: '200px', textAlign: 'left' }}>ชื่อ-นามสกุล คนไข้</th>
+                    <th style={{ padding: '12px 16px 12px 30px', fontWeight: '700', fontSize: '14.5px', minWidth: '200px', textAlign: 'left' }}>ชื่อ-นามสกุล</th>
                     <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '120px', textAlign: 'center' }}>สถานะ</th>
                     <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '90px', textAlign: 'center' }}>เวลารอ</th>
                     <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', width: '130px', textAlign: 'center' }}>การดำเนินการ</th>
@@ -955,7 +955,7 @@ export default function DetailPage({
                               <span style={{ color: '#94A3B8' }}>-</span>
                             )}
                           </td>
-                          <td style={{ padding: '12px 16px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'left' }}>
+                          <td style={{ padding: '12px 16px 12px 30px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'left' }}>
                             <div style={{ display: 'flex', flexDirection: 'column' }}>
                               <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '14px' }}>{p.name}</span>
                               {p.doctorAdvice && (
