@@ -363,9 +363,15 @@ export default function BillingDashboardPage() {
 
     // เรียงลำดับให้คนล่าสุดที่บันทึกอยู่บนสุดเสมอ (Newest record ALWAYS on top)
     return [...list].sort((a, b) => {
-      const timeA = new Date(a.rawHistory?.created_at || a.date || 0).getTime();
-      const timeB = new Date(b.rawHistory?.created_at || b.date || 0).getTime();
-      if (timeB !== timeA) return timeB - timeA;
+      const timeA = a.rawHistory?.created_at ? new Date(a.rawHistory.created_at).getTime() : 0;
+      const timeB = b.rawHistory?.created_at ? new Date(b.rawHistory.created_at).getTime() : 0;
+      
+      // กันเหนียวกรณี parse ไม่ผ่าน
+      const safeTimeA = isNaN(timeA) ? 0 : timeA;
+      const safeTimeB = isNaN(timeB) ? 0 : timeB;
+      
+      if (safeTimeB !== safeTimeA) return safeTimeB - safeTimeA;
+      
       const idA = Number(a.rawHistory?.id) || parseInt(String(a.id).replace(/\D/g, '')) || 0;
       const idB = Number(b.rawHistory?.id) || parseInt(String(b.id).replace(/\D/g, '')) || 0;
       return idB - idA;
