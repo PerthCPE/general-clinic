@@ -401,10 +401,12 @@ export const ScheduleView: React.FC = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t('scheduleTitle')}</h1>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+              {language === 'th' ? `ตารางงาน ${loggedInDoctor.name}` : `Work Schedule: ${loggedInDoctor.name}`}
+            </h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            {t('scheduleSubtitle')} (<strong className="text-slate-800">{loggedInDoctor.name}</strong>)
+            {loggedInDoctor.department} • {loggedInDoctor.roomLocation}
           </p>
         </div>
 
