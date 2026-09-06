@@ -475,6 +475,37 @@ export interface BackendDoctorScreening {
   smoking_history: string;
   alcohol_history: string;
 
+  // คัดกรองอาการติดเชื้อทางเดินหายใจส่วนบน (URI)
+  //   null / undefined = พยาบาลยังไม่ได้ประเมิน
+  //   false            = ประเมินแล้ว ไม่มีอาการ
+  //   true             = ประเมินแล้ว มีอาการ
+  // ต้องแยก 3 สถานะ ห้ามยุบเหลือ true/false เพราะ "ยังไม่ประเมิน"
+  // กับ "ประเมินแล้วไม่มี" มีความหมายทางคลินิกคนละอย่าง
+  has_uri?: boolean | null;
+
+  // คัดกรองวัณโรค (แยกผู้ป่วยออกจากคิวรวม) และการใช้ยาละลายลิ่มเลือด
+  // (เสี่ยงเลือดออก + ตีกับยาหลายตัว) ใช้ 3 สถานะเหมือน has_uri
+  has_tb?: boolean | null;
+  on_anticoagulant?: boolean | null;
+
+  // คัดกรองเฉพาะผู้ป่วยหญิง [role แพทย์]
+  // is_pregnant / is_breastfeeding ใช้ 3 สถานะเหมือน has_uri
+  // (null = ยังไม่ได้ถาม, false = ถามแล้วไม่ใช่, true = ใช่)
+  is_pregnant?: boolean | null;
+  is_breastfeeding?: boolean | null;
+  last_menstrual_period?: string;
+
+  // ข้อควรระวังในการดูแล: '' | Standard | Contact | Droplet | Airborne
+  precaution_type?: string;
+
+  // สมุนไพร / อาหารเสริมที่ผู้ป่วยใช้อยู่ แยกจาก current_medications
+  herbal_medicines?: string;
+  dietary_supplements?: string;
+
+  // แบบคัดกรองภาวะซึมเศร้า 2Q (2 สัปดาห์ที่ผ่านมา) 3 สถานะเหมือน has_uri
+  q2_depressed?: boolean | null;
+  q2_anhedonia?: boolean | null;
+
   screened_by_name: string;
   screened_at: string;
 }
@@ -684,6 +715,14 @@ export interface BackendExaminationDetail {
   // ใบสั่งยาที่บันทึกไว้ อ่านกลับจากตาราง dispensings
   prescriptions: BackendPrescriptionItem[] | null;
 
+  // เอกสารที่แพทย์ออกให้ผู้ป่วยในการตรวจครั้งนี้ [role แพทย์]
+  // backend เก็บเป็น JSON ใน examinations.issued_documents
+  // เวชระเบียนเก่าที่บันทึกก่อนมีช่องนี้จะไม่มีค่า ต้องเผื่อ undefined/null เสมอ
+  issuedDocuments?: BackendIssuedDocument[] | null;
+
+  /** สถานะผู้ป่วยหลังตรวจเสร็จ: '' | 'home' | 'refer' */
+  disposition?: string;
+
   patient: BackendDoctorPatient;
   screening: BackendDoctorScreening | null;
   patientHistory: BackendPatientHistory | null;
@@ -715,6 +754,21 @@ export interface BackendPrescriptionItem {
   specialInstructions?: string;
 }
 
+/** เอกสารหนึ่งชนิดที่แพทย์สั่งออกให้ผู้ป่วย [role แพทย์] */
+export interface BackendIssuedDocument {
+  /**
+   * ชนิดเอกสาร ต้องตรงกับที่ backend รู้จัก (ดู IssuedDocumentDTO ใน dto/examination.go)
+   *   medical-certificate | non-formulary   มีจำนวน + พิมพ์ได้
+   *   insurance-claim | referral-opinion | dental | other   ติ๊กอย่างเดียว
+   */
+  type: string;
+  quantity: number;
+  /** ชื่อเอกสารที่แพทย์พิมพ์เอง ใช้เฉพาะ type = 'other' */
+  name?: string;
+  /** เวลาที่กดพิมพ์ครั้งล่าสุด เว้นว่างได้ถ้าติ๊กไว้แต่ยังไม่ได้พิมพ์ */
+  printedAt?: string;
+}
+
 export interface SaveExaminationPayload {
   // draft = บันทึกร่าง (แก้ต่อได้), sign = เซ็นปิดการตรวจ (ต้องมีวินิจฉัยหลัก)
   action: 'draft' | 'sign';
@@ -736,6 +790,13 @@ export interface SaveExaminationPayload {
   prescriptions?: BackendPrescriptionItem[];
   allergies?: string;
   chronicDiseases?: string;
+
+  // ส่งมาทั้งชุดทุกครั้ง array ว่าง = ไม่ได้ออกเอกสารอะไร
+  // ไม่ส่งเลย = backend จะคงค่าเดิมในฐานข้อมูลไว้
+  issuedDocuments?: BackendIssuedDocument[];
+
+  /** สถานะผู้ป่วยหลังตรวจเสร็จ: '' | 'home' | 'refer' */
+  disposition?: string;
 }
 
 export interface SaveExaminationResult {
@@ -808,6 +869,13 @@ export interface BackendPastVisit {
   followUpDate: string;
   followUpReason?: string;
   followUpInstructions?: string;
+
+  // สถานะรวมของการมาตรวจครั้งนั้นในมุมผู้ป่วย (คำนวณจากฝั่ง backend)
+  //   progress       completed | in_progress | cancelled
+  //   progressReason doctor_cancelled | expired | no_medicine | unpaid
+  // ต่างจาก status ด้านล่างที่บอกแค่สถานะฝั่งแพทย์ (รอตรวจ/กำลังตรวจ/ตรวจเสร็จ)
+  progress?: string;
+  progressReason?: string;
 
   /** เหตุผลการยกเลิก มีเฉพาะ visit ที่สถานะเป็น Cancelled */
   cancelReason?: string;

@@ -71,6 +71,31 @@ type Examination struct {
 	// เวลาอ่านต้อง fallback ไปอ่านจาก dispensings แทน
 	PrescriptionDetail string `gorm:"type:text" json:"prescription_detail"`
 
+	// --- เอกสารที่แพทย์ออกให้ผู้ป่วยในการตรวจครั้งนี้ (JSON ข้อความเดียว) ---
+	//
+	// เก็บไว้บนแถวเดียวกับบันทึกการตรวจ ไม่แยกตารางใหม่ เพราะ
+	//   1. เป็นความสัมพันธ์ 1:1 กับการตรวจครั้งนั้น เหมือนฟิลด์อื่นในตารางนี้
+	//   2. ไม่ต้องแตะ schema ของเพื่อนร่วมทีม และไม่ต้อง join เพิ่มตอนอ่านประวัติ
+	//   3. ชนิดเอกสารมีไม่กี่แบบ ค้นหาแบบซับซ้อนไม่จำเป็น
+	// ถ้าวันหลังต้องออกรายงาน "ออกใบรับรองแพทย์ไปกี่ใบในเดือนนี้" ค่อยแยกตารางทีหลังได้
+	//
+	// รูปแบบ: JSON array ของ dto.IssuedDocumentDTO
+	//   [{"type":"medical-certificate","quantity":2,"printedAt":"2026-09-06T10:22:00Z"}]
+	//
+	// ค่าว่าง "" = ไม่ได้ออกเอกสารอะไร หรือเป็นเวชระเบียนเก่าก่อนมีช่องนี้
+	IssuedDocuments string `gorm:"type:text" json:"issued_documents"`
+
+	// --- สถานะผู้ป่วยหลังตรวจเสร็จ (Disposition) ---
+	//
+	// ค่าที่ใช้ (ตรงกับ DISPOSITION_OPTIONS ใน ExaminationView.tsx)
+	//   ""      = แพทย์ยังไม่ได้ระบุ
+	//   "home"  = กลับบ้าน
+	//   "refer" = ส่งต่อไปรักษาที่อื่น (Refer)
+	//
+	// เลือกได้อย่างเดียว เพราะผู้ป่วยหนึ่งครั้งจบได้ทางเดียว
+	// ไม่ใช่ติ๊กได้หลายอันเหมือนช่องเอกสาร
+	Disposition string `gorm:"type:text;default:''" json:"disposition"`
+
 	// --- นัดติดตามอาการ ---
 	FollowUpDate         *time.Time `json:"follow_up_date"`
 	FollowUpReason       string     `json:"follow_up_reason"`

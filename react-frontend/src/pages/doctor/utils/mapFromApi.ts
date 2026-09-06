@@ -90,6 +90,20 @@ function toSubstanceFromText(
   return { isUser: !denies, status: value };
 }
 
+/**
+ * แปลงค่าคัดกรองแบบ 3 สถานะจาก backend
+ *
+ * null / undefined = พยาบาลยังไม่ได้ประเมิน -> undefined
+ * false            = ประเมินแล้ว ไม่มี      -> false (ต้องเก็บไว้ ห้ามกลายเป็น undefined)
+ * true             = ประเมินแล้ว มี         -> true
+ *
+ * ห้ามใช้ || เด็ดขาด เพราะ false || undefined จะได้ undefined
+ * ซึ่งทำให้ "ประเมินแล้วไม่มี" กลายเป็น "ยังไม่ได้ประเมิน" ไปเลย
+ */
+function toTriState(value: boolean | null | undefined): boolean | undefined {
+  return value === null || value === undefined ? undefined : value;
+}
+
 function mapTriage(screening: BackendDoctorScreening): Patient['triage'] {
   if (!screening.triage_code) return undefined;
 
@@ -158,6 +172,28 @@ export function mapQueueItemToPatient(item: BackendDoctorQueueItem): Patient {
     if (medications) {
       mapped.currentMedications = medications;
     }
+
+    // null จาก backend แปลว่ายังไม่ได้ประเมิน ต้องเป็น undefined ไม่ใช่ false
+    // ?? ใช้ไม่ได้ตรงนี้ถ้าเขียนเป็น (x ?? undefined) เพราะ null จะกลายเป็น undefined ถูกแล้ว
+    // แต่ต้องระวังไม่เผลอใช้ || ซึ่งจะทำให้ false กลายเป็น undefined ไปด้วย
+    mapped.hasURI = toTriState(screening.has_uri);
+    mapped.hasTB = toTriState(screening.has_tb);
+    mapped.onAnticoagulant = toTriState(screening.on_anticoagulant);
+
+    // คัดกรองเฉพาะผู้ป่วยหญิง ใช้ toTriState เหมือนกัน ห้ามใช้ || เด็ดขาด
+    // ถ้าใช้ || ค่า false ("ถามแล้วไม่ตั้งครรภ์") จะกลายเป็น undefined
+    // แล้วหน้าจอจะขึ้นว่า "ยังไม่ได้ประเมิน" ทั้งที่พยาบาลถามไปแล้ว
+    mapped.isPregnant = toTriState(screening.is_pregnant);
+    mapped.isBreastfeeding = toTriState(screening.is_breastfeeding);
+    mapped.lastMenstrualPeriod = screening.last_menstrual_period || undefined;
+    mapped.precautionType = screening.precaution_type || undefined;
+
+    mapped.herbalMedicines = screening.herbal_medicines || undefined;
+    mapped.dietarySupplements = screening.dietary_supplements || undefined;
+
+    // 2Q ใช้ toTriState เหมือนข้ออื่น ห้ามใช้ || เพราะ false จะหายกลายเป็น undefined
+    mapped.q2Depressed = toTriState(screening.q2_depressed);
+    mapped.q2Anhedonia = toTriState(screening.q2_anhedonia);
 
     mapped.smokingHistory = toSubstanceFromText(screening.smoking_history);
     mapped.alcoholHistory = toSubstanceFromText(screening.alcohol_history);
@@ -279,6 +315,22 @@ export function applyExaminationDetail(base: Patient, detail: BackendExamination
       specialInstructions: item.specialInstructions || item.instructions || '',
     }));
   }
+
+  // เอกสารที่สั่งออกไว้ตอนตรวจครั้งก่อน ให้ติ๊กกลับมาให้เหมือนเดิม
+  // ใช้ Array.isArray ไม่ใช่ตรวจ length เพราะ array ว่างแปลว่า
+  // "แพทย์เอาติ๊กออกหมดแล้ว" ซึ่งต้องล้างค่าบนหน้าจอด้วย ไม่ใช่คงของเดิมไว้
+  if (Array.isArray(detail.issuedDocuments)) {
+    merged.issuedDocuments = detail.issuedDocuments.map((doc) => ({
+      type: doc.type,
+      quantity: Number(doc.quantity) || 1,
+      name: doc.name || undefined,
+      printedAt: doc.printedAt || undefined,
+    }));
+  }
+
+  // สถานะผู้ป่วยหลังตรวจเสร็จ ใช้ keep เพื่อไม่ให้ค่าว่างจาก backend
+  // ไปล้างสิ่งที่แพทย์เพิ่งเลือกค้างไว้บนหน้าจอ
+  merged.disposition = keep(detail.disposition, merged.disposition);
 
   merged.presentIllness = keep(detail.presentIllness, merged.presentIllness);
   merged.chiefComplaintDuration = keep(detail.chiefComplaintDuration, merged.chiefComplaintDuration);
@@ -431,6 +483,16 @@ export function buildExaminationRequest(
     })),
     allergies: Array.isArray(patient.drugAllergies) ? patient.drugAllergies.join(', ') : '',
     chronicDiseases: Array.isArray(patient.chronicDiseases) ? patient.chronicDiseases.join(', ') : '',
+
+    // ส่งเป็น array เสมอ (แม้ว่าง) เพื่อให้ backend รู้ว่าหน้าจอส่งฟิลด์นี้มาแล้วจริง
+    // ถ้าส่ง undefined backend จะคงค่าเดิมไว้ แล้วการเอาติ๊กออกจะไม่มีผล
+    disposition: patient.disposition || '',
+    issuedDocuments: (patient.issuedDocuments || []).map((doc) => ({
+      type: doc.type,
+      quantity: Number(doc.quantity) || 1,
+      name: doc.name,
+      printedAt: doc.printedAt,
+    })),
   };
 }
 
@@ -464,6 +526,8 @@ export function mapPastVisit(item: BackendPastVisit): PastVisitRecord {
     followUpReason: item.followUpReason || undefined,
     followUpInstructions: item.followUpInstructions || undefined,
     cancelReason: item.cancelReason || undefined,
+    progress: (item.progress as PastVisitRecord['progress']) || undefined,
+    progressReason: item.progressReason || undefined,
 
     prescriptionsList: (item.prescriptions || []).map((p, i) => ({
       id: p.id || `rx-${i + 1}`,

@@ -99,6 +99,12 @@ type ExaminationDetail struct {
 	// ใบสั่งยาที่บันทึกไว้ อ่านกลับจากตาราง dispensings
 	Prescriptions []PrescriptionItemDTO `json:"prescriptions"`
 
+	// เอกสารที่ออกให้ผู้ป่วยในการตรวจครั้งนี้ (อ่านจาก examinations.issued_documents)
+	IssuedDocuments []IssuedDocumentDTO `json:"issuedDocuments"`
+
+	// สถานะผู้ป่วยหลังตรวจเสร็จ: "" | "home" | "refer"
+	Disposition string `json:"disposition"`
+
 	// ข้อมูลประกอบที่ดึงมาแสดงคู่กัน
 	Patient        PatientBrief       `json:"patient"`
 	Screening      *ScreeningBrief    `json:"screening"`
@@ -137,6 +143,32 @@ type PrescriptionItemDTO struct {
 	SpecialInstructions string `json:"specialInstructions"`
 }
 
+// IssuedDocumentDTO - เอกสารหนึ่งชนิดที่แพทย์ออกให้ผู้ป่วยในการตรวจครั้งนี้
+//
+// type ใช้ค่าคงที่ตรงกับฝั่งหน้าจอ (DocumentRequestCard ใน ExaminationView.tsx)
+//
+//	"medical-certificate" = ใบรับรองแพทย์ (มีจำนวน + พิมพ์ได้)
+//	"non-formulary"       = ใบรับรองยานอกบัญชียาหลักแห่งชาติ (มีจำนวน + พิมพ์ได้)
+//	"insurance-claim"     = ใบเคลมประกัน (ติ๊กอย่างเดียว)
+//	"referral-opinion"    = ใบรับรองความเห็นแพทย์เพื่อการส่งต่อ (ติ๊กอย่างเดียว)
+//	"dental"              = ใบรักษาโรคฟันและโรคเหงือก (ติ๊กอย่างเดียว)
+//	"other"               = เอกสารอื่นที่แพทย์ระบุชื่อเอง (ดูฟิลด์ name)
+//
+// printedAt เก็บเวลาที่กดพิมพ์ครั้งล่าสุด เว้นว่างได้ถ้าติ๊กไว้แต่ยังไม่ได้พิมพ์
+// (แยกสองสถานะนี้สำคัญ เพราะ "สั่งออกเอกสาร" กับ "พิมพ์ออกมาแล้ว" ไม่เหมือนกัน
+//
+//	เคสที่ติ๊กแล้วเครื่องพิมพ์เสีย ต้องรู้ว่ายังไม่ได้ให้ผู้ป่วยไป)
+type IssuedDocumentDTO struct {
+	Type     string `json:"type"`
+	Quantity int    `json:"quantity"`
+
+	// ชื่อเอกสารที่แพทย์พิมพ์เอง ใช้เฉพาะ type = "other"
+	// เอกสารชนิดอื่นเว้นว่าง เพราะชื่อคงที่อยู่แล้วในหน้าจอ
+	Name string `json:"name"`
+
+	PrintedAt string `json:"printedAt"`
+}
+
 // SaveExaminationRequest - body ของ PUT /api/doctor/visits/:id/examination
 //
 // action = "draft" บันทึกร่างไว้ก่อน (แก้ไขต่อได้)
@@ -157,11 +189,19 @@ type SaveExaminationRequest struct {
 	PrimaryDiagnosis   *DiagnosisItemDTO  `json:"primaryDiagnosis"`
 	SecondaryDiagnoses []DiagnosisItemDTO `json:"secondaryDiagnoses"`
 
+	// สถานะผู้ป่วยหลังตรวจเสร็จ: "" | "home" | "refer"
+	Disposition string `json:"disposition"`
+
 	// ส่งมาด้วยได้ ถ้าแพทย์แก้ประวัติติดตัวผู้ป่วยในหน้าเดียวกัน
 	PatientHistory  *PatientHistoryDTO    `json:"patientHistory"`
 	Prescriptions   []PrescriptionItemDTO `json:"prescriptions"`
 	Allergies       string                `json:"allergies"`
 	ChronicDiseases string                `json:"chronicDiseases"`
+
+	// เอกสารที่แพทย์ติ๊กว่าต้องการออกให้ผู้ป่วย ส่งมาทั้งชุดทุกครั้ง
+	// ไม่ส่งมาเลย (nil) = หน้าจอเวอร์ชันเก่า ให้คงค่าเดิมในฐานข้อมูลไว้
+	// ส่งมาเป็น array ว่าง = แพทย์เอาติ๊กออกหมดจริงๆ ให้ล้างค่า
+	IssuedDocuments []IssuedDocumentDTO `json:"issuedDocuments"`
 }
 
 // SaveExaminationResponse - ผลลัพธ์หลังบันทึก

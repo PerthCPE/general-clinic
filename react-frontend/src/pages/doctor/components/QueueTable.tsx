@@ -8,6 +8,34 @@ import { translateClinicalText } from '../utils/clinicalTranslation';
 import { displayVN } from '../utils/vnGenerator';
 import { StatusFilterTabs } from './StatusFilterTabs';
 import { matchPatientSearch } from '../utils/searchUtils';
+import { triageTone, triageShortLabel, TRIAGE_SHORT_LABELS } from '../utils/triage';
+
+/**
+ * ป้ายระดับความรุนแรงจากจุดคัดกรอง ใช้ในคอลัมน์ "ระดับ" ของตารางคิว
+ * ----------------------------------------------------------------------------
+ * ย้ายมาจากหน้าบันทึกการตรวจ เพราะแพทย์ต้องเห็นความเร่งด่วน "ก่อน" กดเข้าตรวจ
+ * ไม่ใช่ตอนที่เข้าไปอยู่ในห้องตรวจแล้ว
+ *
+ * เคสที่พยาบาลยังไม่ได้คัดกรอง จะไม่แสดงป้ายเลย (คืน null)
+ * ห้ามแสดงเป็น "ไม่ฉุกเฉิน" เพราะจะทำให้เข้าใจผิดว่าประเมินแล้วว่าไม่ด่วน
+ */
+const TriageChip: React.FC<{ level?: string }> = ({ level }) => {
+  const { language } = useLanguage();
+  const text = triageShortLabel(level, language);
+  if (!text) return null;
+
+  const tone = triageTone(level);
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap"
+      style={{ backgroundColor: tone.bg, borderColor: tone.border, color: tone.text }}
+      title={level}
+    >
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tone.dot }}></span>
+      {text}
+    </span>
+  );
+};
 
 /**
  * ==============================================================================
@@ -57,14 +85,60 @@ export const QueueTable: React.FC<QueueTableProps> = ({
     }
   };
 
-  const displayedPatients = patients
+  /**
+   * ตัวกรองระดับความรุนแรง (Triage Filter)
+   * --------------------------------------------------------------------------
+   * เก็บ state ไว้ในตารางเอง ไม่ต้องส่งขึ้นไปให้หน้าเจ้าของ
+   * เพราะเป็นแค่การ "มองดู" คิวชุดเดิม ไม่ได้เปลี่ยนข้อมูลที่ดึงมาจาก backend
+   *
+   * ค่า 'All' = ทุกระดับ ที่เหลือเป็น triage_code ตรงๆ ตามที่ backend ส่งมา
+   */
+  const [triageFilter, setTriageFilter] = useState('All');
+
+  // คิวหลังกรองด้วยคำค้นแล้ว ใช้เป็นฐานนับจำนวนของแต่ละระดับ
+  // (ต้องนับ "ก่อน" กรองระดับ ไม่งั้นเลือกระดับไหนแล้วระดับอื่นจะกลายเป็น 0 หมด)
+  const searchedPatients = patients.filter((patient) => {
+    if (!queueSearch.trim()) return true;
+    return matchPatientSearch(patient, queueSearch);
+  });
+
+  const triageCounts: Record<string, number> = { All: searchedPatients.length };
+  for (const item of searchedPatients) {
+    const level = item.triage?.level;
+    if (level) triageCounts[level] = (triageCounts[level] || 0) + 1;
+  }
+
+  /**
+   * ปุ่มกรองระดับ เรียงจากด่วนสุดไปน้อยสุด
+   * Level 5 ไม่ใส่ไว้ เพราะจุดคัดกรองของพยาบาลมีแค่ 4 ระดับ
+   * ถ้าวันหลังเพิ่มระดับ ให้เพิ่มที่นี่และใน utils/triage.ts ให้ตรงกัน
+   */
+  const TRIAGE_FILTER_LEVELS = [
+    'Level 1: Resuscitation',
+    'Level 2: Emergency',
+    'Level 3: Urgent',
+    'Level 4: Less Urgent',
+  ];
+
+  const triageFilterOptions = [
+    { value: 'All', label: language === 'th' ? 'ทุกระดับ' : 'All levels', count: triageCounts.All },
+    ...TRIAGE_FILTER_LEVELS.map((lv) => ({
+      value: lv,
+      label: (language === 'th' ? TRIAGE_SHORT_LABELS[lv]?.th : TRIAGE_SHORT_LABELS[lv]?.en) || lv,
+      count: triageCounts[lv] || 0,
+    })),
+  ];
+
+  const displayedPatients = searchedPatients
     .filter((patient) => {
-      if (!queueSearch.trim()) return true;
-      return matchPatientSearch(patient, queueSearch);
+      if (triageFilter === 'All') return true;
+      return patient.triage?.level === triageFilter;
     })
     // ผู้ป่วยที่ตรวจเสร็จแล้วให้ตกไปอยู่ท้ายตาราง เพื่อให้คิวที่ยังต้องทำงานอยู่บนสุดเสมอ
     // .filter() คืน array ใหม่อยู่แล้ว จึง .sort() ได้โดยไม่กระทบ props เดิม
     // และ sort ของ JS เป็น stable ลำดับคิวเดิมภายในกลุ่มเดียวกันจึงไม่เปลี่ยน
+    // (ไม่เรียงตามระดับความรุนแรง เพราะลำดับคิวคือ "ใครมาก่อน" ซึ่งต้องคงไว้
+    //  ถ้าอยากดูเฉพาะเคสด่วน ให้ใช้ตัวกรองระดับด้านบนตารางแทน)
     .sort((a, b) => Number(a.status === 'Completed') - Number(b.status === 'Completed'));
 
   /**
@@ -87,7 +161,7 @@ export const QueueTable: React.FC<QueueTableProps> = ({
   // เปลี่ยนคำค้นหรือเปลี่ยนแท็บสถานะ = ดูชุดข้อมูลใหม่ ต้องกลับไปหน้าแรกเสมอ
   useEffect(() => {
     setPage(1);
-  }, [queueSearch, statusFilter]);
+  }, [queueSearch, statusFilter, triageFilter]);
 
   const totalPages = Math.max(1, Math.ceil(displayedPatients.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -112,13 +186,9 @@ export const QueueTable: React.FC<QueueTableProps> = ({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
-      {/* Header section with Title, Search Bar, and Filters */}
-      <div className="p-6 pb-4 flex flex-col md:flex-row md:items-center gap-4 border-b border-slate-100">
-        {/* คอลัมน์หัวข้อกว้างคงที่
-            ถ้าปล่อยให้กว้างตามข้อความ พอค้นหาแล้วจำนวนรายการเปลี่ยนจาก 22 เป็น 1
-            ความกว้างจะหดลง แล้วช่องค้นหาที่อยู่ถัดไปจะขยับตามทุกครั้งที่พิมพ์
-            ซึ่งกวนสายตามากเพราะเป็นช่องที่ผู้ใช้กำลังมองอยู่พอดี */}
-        <div className="shrink-0 md:w-60">
+      {/* แถวบน: หัวข้อชิดซ้าย แถบกรองสถานะชิดขวา */}
+      <div className="p-6 pb-4 flex flex-col md:flex-row md:items-start gap-4 border-b border-slate-100">
+        <div className="flex-1 min-w-0">
           <h2 className="text-xl font-bold text-slate-800 tracking-tight">
             {t('todaysQueue')}
           </h2>
@@ -129,30 +199,6 @@ export const QueueTable: React.FC<QueueTableProps> = ({
               ? `แสดง ${displayedPatients.length} รายการคิวผู้ป่วย`
               : `Showing ${displayedPatients.length} patient${displayedPatients.length !== 1 ? 's' : ''} in queue`}
           </p>
-        </div>
-
-        {/* ช่องค้นหาชิดซ้ายต่อจากหัวข้อ ยืดหดตามพื้นที่ว่าง
-            แถบกรองสถานะถูกดันไปชิดขวาด้วย ml-auto และไม่ยอมให้หด (shrink-0)
-            ถ้าปล่อยให้หด ปุ่มจะถูกบีบจนต้องมีแถบเลื่อนซึ่งผู้ใช้มักมองไม่เห็น */}
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={queueSearch}
-              onChange={(e) => setQueueSearch(e.target.value)}
-              placeholder={language === 'th' ? 'ค้นหาชื่อผู้ป่วย, เลข HN, เลข VN, เลขบัตรประชาชน, ลำดับคิว...' : 'Search Patient Name, HN, VN, National ID, Queue...'}
-              className="w-full pl-10 pr-8 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-slate-800 text-xs rounded-xl border border-slate-200 focus:outline-hidden transition-all shadow-2xs font-sans placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
-            />
-            {queueSearch && (
-              <button
-                type="button"
-                onClick={() => setQueueSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                title={language === 'th' ? 'ล้างการค้นหา' : 'Clear search'}
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
         </div>
 
         {/* Status Quick Filters */}
@@ -170,6 +216,40 @@ export const QueueTable: React.FC<QueueTableProps> = ({
         )}
       </div>
 
+      {/* แถวล่าง: ช่องค้นหาชิดซ้าย ตัวกรองระดับความรุนแรงชิดขวา
+          อยู่บรรทัดเดียวกันเพื่อไม่ให้หัวการ์ดสูงเกินไป
+          ตัวกรองระดับไม่ยอมให้หด (shrink-0) ถ้าจอแคบจะตัดลงบรรทัดใหม่แทน
+          เพราะถ้าปล่อยให้หด ปุ่มจะถูกบีบจนต้องมีแถบเลื่อนซึ่งผู้ใช้มักมองไม่เห็น */}
+      <div className="px-6 py-3 flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/40">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={queueSearch}
+            onChange={(e) => setQueueSearch(e.target.value)}
+            placeholder={language === 'th' ? 'ค้นหาชื่อผู้ป่วย, เลข HN, เลข VN, เลขบัตรประชาชน, ลำดับคิว...' : 'Search Patient Name, HN, VN, National ID, Queue...'}
+            className="w-full pl-10 pr-8 py-2 bg-white hover:bg-slate-50 focus:bg-white text-slate-800 text-xs rounded-xl border border-slate-200 focus:outline-hidden transition-all shadow-2xs font-sans placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
+          />
+          {queueSearch && (
+            <button
+              type="button"
+              onClick={() => setQueueSearch('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+              title={language === 'th' ? 'ล้างการค้นหา' : 'Clear search'}
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        <StatusFilterTabs
+          className="ml-auto"
+          value={triageFilter}
+          onChange={setTriageFilter}
+          options={triageFilterOptions}
+        />
+      </div>
+
       {/* Patients Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
@@ -179,6 +259,9 @@ export const QueueTable: React.FC<QueueTableProps> = ({
               <th className="py-5 px-6 w-32">{t('colHN')}</th>
               <th className="py-5 px-6 w-36">{t('colVN')}</th>
               <th className="py-5 px-6">{t('colPatientName')}</th>
+              {/* คอลัมน์ระดับความรุนแรงจากจุดคัดกรอง แยกออกมาเป็นคอลัมน์ของตัวเอง
+                  เพราะถ้าต่อท้ายชื่อ ป้ายจะขยับไปมาตามความยาวชื่อ อ่านเทียบกันยาก */}
+              <th className="py-5 px-6 w-36 text-center">{language === 'th' ? 'ระดับ' : 'Triage'}</th>
               <th className="py-5 px-6 w-40 text-center">{t('colStatus')}</th>
               <th className="py-5 px-6 w-36 text-center">{t('colWaitingTime')}</th>
               <th className="py-5 px-6 w-40 text-center">{t('colAction')}</th>
@@ -188,7 +271,7 @@ export const QueueTable: React.FC<QueueTableProps> = ({
           <tbody className="divide-y divide-slate-100 text-sm">
             {displayedPatients.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-slate-400">
+                <td colSpan={8} className="py-12 text-center text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <AlertCircle className="w-8 h-8 text-slate-300" />
                     <span>
@@ -232,6 +315,11 @@ export const QueueTable: React.FC<QueueTableProps> = ({
                         </span>
                       )}
                     </div>
+                  </td>
+
+                  {/* Triage Level */}
+                  <td className="py-5 px-6 text-center">
+                    <TriageChip level={patient.triage?.level} />
                   </td>
 
                   {/* Status */}

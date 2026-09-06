@@ -5,6 +5,7 @@ import { ReportsView } from './components/ReportsView';
 import { useLanguage } from './context/LanguageContext';
 import { useDoctorData } from './DoctorDataContext';
 import { DoctorLoadingScreen, DoctorErrorScreen } from './components/DoctorLoadingScreen';
+import { useUnlockPageScroll } from './utils/scrollLockGuard';
 import type { Patient } from './types';
 
 /**
@@ -16,6 +17,10 @@ interface DoctorDashboardPageProps {
 }
 
 const DoctorDashboardPage: React.FC<DoctorDashboardPageProps> = ({ onNavigate }) => {
+  /* ปลดล็อกการเลื่อนหน้าจอที่อาจค้างมาจากกล่องของโมดูลอื่น
+     (ดูคำอธิบายเต็มใน utils/scrollLockGuard.ts) */
+  useUnlockPageScroll();
+
   const { t } = useLanguage();
   const {
     patients,

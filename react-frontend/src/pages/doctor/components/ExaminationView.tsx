@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import type { Patient, QueueStatus, PrescriptionItem, LabOrderItem, ImagingOrderItem, DiagnosisItem } from '../types';
+import type { Patient, QueueStatus, PrescriptionItem, LabOrderItem, ImagingOrderItem, DiagnosisItem, IssuedDocument } from '../types';
 import { CopyableText } from './CopyableText';
 import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
 import { displayVN } from '../utils/vnGenerator';
+import { formatNationalId, rawNationalId } from '../utils/nationalId';
+import { findAllergyConflicts, describeConflict } from '../utils/allergyCheck';
 import {
   Stethoscope,
   HeartPulse,
@@ -25,7 +27,6 @@ import {
   XCircle,
   Calendar,
   User,
-  ShieldAlert,
   FileSpreadsheet,
   ArrowLeft,
   ChevronRight,
@@ -37,6 +38,7 @@ import {
   FolderOpen,
   Sparkles,
   ClipboardCheck,
+  UserCheck,
   ArrowUp,
   ArrowDown,
   Star,
@@ -69,40 +71,474 @@ import {
  * id ของกล่องข้อมูลที่ต้องกรอกก่อนปิดการตรวจ
  * ใช้คู่กับ focusIssue() เพื่อเลื่อนจอไปหาช่องที่ยังขาด
  */
-/**
- * สีของระดับการคัดแยกผู้ป่วย (Triage)
- * ----------------------------------------------------------------------------
- * ใช้ค่าสีชุดเดียวกับ TRIAGE_LEVELS ใน
- * react-frontend/src/pages/Vitals/components/TriageWidget.tsx
- * เพื่อให้ระดับเดียวกันเป็นสีเดียวกันทั้งจอพยาบาลและจอแพทย์
- * แดง = วิกฤต, ส้ม = เร่งด่วน, เหลือง = กึ่งฉุกเฉิน, เขียว = ปกติ
- *
- * key คือค่าที่ backend ส่งมาใน screening.triage_code (ดู triageInfo ใน
- * doctor_controller.go) ถ้าเพิ่มระดับใหม่ ต้องเพิ่มทั้งสองที่ให้ตรงกัน
+/*
+ * สี/ชื่อระดับการคัดแยกผู้ป่วย (Triage) ย้ายไปอยู่ที่ ../utils/triage.ts แล้ว
+ * เพราะตอนนี้แสดงระดับความรุนแรงที่ตารางคิวผู้ป่วยแทน ไม่ได้แสดงในหน้านี้
  */
-type TriageTone = { dot: string; bg: string; border: string; text: string };
 
-const TRIAGE_TONES: Record<string, TriageTone> = {
-  'Level 1: Resuscitation': { dot: '#EF4444', bg: '#FEE2E2', border: '#FCA5A5', text: '#7F1D1D' },
-  'Level 2: Emergency':     { dot: '#F97316', bg: '#FFEDD5', border: '#FDBA74', text: '#7C2D12' },
-  'Level 3: Urgent':        { dot: '#EAB308', bg: '#FEF9C3', border: '#FDE047', text: '#713F12' },
-  'Level 4: Less Urgent':   { dot: '#10B981', bg: '#D1FAE5', border: '#6EE7B7', text: '#064E3B' },
-  'Level 5: Non-Urgent':    { dot: '#10B981', bg: '#D1FAE5', border: '#6EE7B7', text: '#064E3B' },
-};
+/**
+ * แปลงเวลาที่พยาบาลคัดกรอง ให้อ่านง่ายบนหน้าจอแพทย์
+ *
+ * backend ส่งมาเป็น ISO timestamp เต็ม (เช่น 2026-09-05T18:28:41Z)
+ * ถ้าคัดกรองวันนี้ แสดงแค่เวลา เพราะแพทย์สนใจว่า "วัดไว้กี่โมง" เป็นหลัก
+ * ถ้าเป็นวันก่อนหน้า ต้องมีวันที่กำกับด้วย ไม่งั้นจะเข้าใจผิดว่าเพิ่งวัดเมื่อกี้
+ *
+ * คืนค่าว่างถ้าแปลงไม่ได้ ฝั่งเรียกใช้เช็คก่อนแสดงอยู่แล้ว
+ */
+function formatScreenedAt(value: string | undefined): string {
+  if (!value) return '';
 
-/** สีเทา สำหรับเคสที่ยังไม่ได้คัดกรอง หรือได้ค่าที่ไม่รู้จัก */
-const TRIAGE_TONE_UNKNOWN: TriageTone = {
-  dot: '#94A3B8', bg: '#F1F5F9', border: '#CBD5E1', text: '#0F172A',
-};
+  const at = new Date(value);
+  if (Number.isNaN(at.getTime())) return '';
 
-function triageTone(level: string | undefined): TriageTone {
-  if (!level) return TRIAGE_TONE_UNKNOWN;
-  return TRIAGE_TONES[level] || TRIAGE_TONE_UNKNOWN;
+  const time = at.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+  const today = new Date();
+  const sameDay =
+    at.getFullYear() === today.getFullYear() &&
+    at.getMonth() === today.getMonth() &&
+    at.getDate() === today.getDate();
+
+  if (sameDay) return time;
+
+  return `${at.toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit' })} ${time}`;
 }
+
+/**
+ * ข้อความแทนค่าที่จุดคัดกรองยังไม่ได้วัด
+ *
+ * ต้องเขียนให้ชัดว่า "ยังไม่ได้วัด" ไม่ใช่แค่ขีด - หรือ 0
+ * เพราะช่องว่างในใบสัญญาณชีพถูกอ่านได้สองแบบ คือ "วัดแล้วปกติ" กับ "ยังไม่ได้วัด"
+ * ซึ่งนำไปสู่การตัดสินใจคนละทางโดยสิ้นเชิง
+ */
+const NOT_MEASURED = { th: 'ยังไม่ได้วัด', en: 'Not measured' };
+
+/**
+ * ==============================================================================
+ * ปัดค่าสัญญาณชีพให้ตรงกับความละเอียดของเครื่องมือวัดจริง
+ * ==============================================================================
+ * เคยเจอในฐานข้อมูลจริง: อุณหภูมิ 36.89750419129597 °C
+ *                        น้ำหนัก 76.06828326560182 กก.
+ *                        ส่วนสูง 171.91949858478532 ซม.
+ * มาจากตัวจำลองคิว (AutoSimulator) ที่สุ่มเป็นเลขทศนิยมดิบแล้วเขียนลงตาราง
+ * screenings ตรงๆ แต่ปัญหาไม่ได้อยู่ที่ตัวจำลองอย่างเดียว
+ *
+ * ไม่มีเครื่องมือแพทย์เครื่องไหนวัดได้ละเอียดขนาดนั้น
+ *   เทอร์โมมิเตอร์  ทศนิยม 1 ตำแหน่ง
+ *   เครื่องชั่ง      ทศนิยม 1 ตำแหน่ง
+ *   ที่วัดส่วนสูง    จำนวนเต็ม
+ *   ชีพจร/หายใจ/SpO2 จำนวนเต็ม
+ *
+ * หน้าจอจึงควรคุมรูปแบบการแสดงผลของตัวเอง ไม่ว่าข้อมูลต้นทางจะมาแบบไหน
+ * ปัดเฉพาะ "ตอนแสดงผล" เท่านั้น ค่าที่เก็บในฐานข้อมูลยังเป็นค่าเดิมไม่ถูกแตะ
+ *
+ * ใช้ Number() ครอบอีกชั้นเพื่อตัดศูนย์ท้ายทิ้ง
+ * toFixed(1) ของ 36 จะได้ "36.0" ซึ่งอ่านแปลกกว่า "36"
+ */
+function fmtVital(value: number | undefined, decimals = 0): string {
+  if (value === undefined || Number.isNaN(value)) return '';
+  return String(Number(value.toFixed(decimals)));
+}
+
+/**
+ * ==============================================================================
+ * ผลคัดกรองความเสี่ยงแบบ 3 สถานะ (มี / ไม่มี / ยังไม่ได้ประเมิน)
+ * ==============================================================================
+ * ใช้กับข้อที่จุดคัดกรองตอบได้แค่ "มี" หรือ "ไม่มี" เช่น
+ *   URI                  อาการติดเชื้อทางเดินหายใจส่วนบน (แยกผู้ป่วยกลุ่มติดเชื้อ)
+ *   วัณโรค                โรคติดต่อทางอากาศ ต้องแยกออกจากคิวรวมและให้ใส่หน้ากาก
+ *   ยาละลายลิ่มเลือด      เสี่ยงเลือดออกไม่หยุด และตีกับยาหลายตัว ต้องรู้ก่อนสั่งยา
+ *   ตั้งครรภ์             ยาหลายกลุ่มทำให้ทารกพิการ (เฉพาะผู้ป่วยหญิง)
+ *   ให้นมบุตร             ยาบางตัวผ่านน้ำนมไปถึงทารก (เฉพาะผู้ป่วยหญิง)
+ *
+ * เหตุผลที่ต้องมี 3 สถานะ ไม่ใช่ 2:
+ * "ยังไม่ได้ประเมิน" กับ "ประเมินแล้วไม่มี" มีความหมายทางคลินิกคนละอย่างสิ้นเชิง
+ * ถ้ายุบเหลือมี/ไม่มี เคสที่ยังไม่มีใครถามจะแสดงเป็น "ไม่มี" แล้วแพทย์จะข้ามการซักไป
+ * ซึ่งอันตรายที่สุดกับข้อยาละลายลิ่มเลือดและข้อตั้งครรภ์
+ * เพราะจบที่การสั่งยาที่ทำให้เลือดออก หรือยาที่ทำให้ทารกพิการ
+ *
+ * สีของป้ายสื่อ "ต้องระวัง" ไม่ใช่ "ดี/ไม่ดี"
+ * ผลบวกทุกข้อล้วนแปลว่าแพทย์ต้องทำอะไรเพิ่ม จึงใช้สีเหลืองเตือน
+ */
+const TriageFlag: React.FC<{
+  label: string;
+  value?: boolean;
+  language: string;
+  presentTh?: string;
+  absentTh?: string;
+  presentEn?: string;
+  absentEn?: string;
+}> = ({
+  label,
+  value,
+  language,
+  presentTh = 'มีอาการ',
+  absentTh = 'ไม่มีอาการ',
+  presentEn = 'Present',
+  absentEn = 'Absent',
+}) => {
+  const isTh = language === 'th';
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[13px] font-bold text-slate-800 block">{label}</label>
+      <div className="w-full min-h-[44px] px-3.5 py-2.5 bg-[#f8fafc] border border-slate-200 rounded-xl flex items-center">
+        {value === true ? (
+          <span className="text-sm font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg">
+            {isTh ? presentTh : presentEn}
+          </span>
+        ) : value === false ? (
+          <span className="text-sm font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg">
+            {isTh ? absentTh : absentEn}
+          </span>
+        ) : (
+          <span className="text-sm font-normal text-slate-400">
+            {isTh ? 'จุดคัดกรองยังไม่ได้ประเมิน' : 'Not assessed at triage'}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * ข้อควรระวังในการดูแลผู้ป่วย (Isolation Precaution)
+ * ----------------------------------------------------------------------------
+ * บอกว่าเชื้อของผู้ป่วยรายนี้แพร่ทางไหน เจ้าหน้าที่ต้องป้องกันตัวแบบไหน
+ * ไม่ใช่ "ห้ามทำ" แต่เป็น "ทำได้ แต่ต้องระวังแบบนี้"
+ *
+ * key ต้องตรงกับ models.Screening.PrecautionType ฝั่ง backend เป๊ะๆ
+ * ถ้าเพิ่มประเภทใหม่ ต้องเพิ่มทั้งสองที่
+ */
+const PRECAUTION_OPTIONS: Record<
+  string,
+  { th: string; en: string; noteTh: string; noteEn: string; box: string; chip: string }
+> = {
+  Standard: {
+    th: 'Standard',
+    en: 'Standard',
+    noteTh: 'ข้อปฏิบัติมาตรฐาน ล้างมือ ใส่ถุงมือเมื่อสัมผัสสารคัดหลั่ง',
+    noteEn: 'Standard practice: hand hygiene, gloves for body fluids',
+    box: 'bg-[#f8fafc] border-slate-200',
+    chip: 'text-slate-700 bg-slate-100 border-slate-300',
+  },
+  Contact: {
+    th: 'Contact',
+    en: 'Contact',
+    noteTh: 'แพร่ทางการสัมผัส ต้องใส่ถุงมือและเสื้อกาวน์',
+    noteEn: 'Contact spread: gloves and gown required',
+    box: 'bg-amber-50/70 border-amber-200/80',
+    chip: 'text-amber-900 bg-amber-100 border-amber-300',
+  },
+  Droplet: {
+    th: 'Droplet',
+    en: 'Droplet',
+    noteTh: 'แพร่ทางละอองฝอย ต้องใส่หน้ากากอนามัย เว้นระยะ 1-2 เมตร',
+    noteEn: 'Droplet spread: surgical mask, keep 1-2 m distance',
+    box: 'bg-orange-50/70 border-orange-200/80',
+    chip: 'text-orange-900 bg-orange-100 border-orange-300',
+  },
+  Airborne: {
+    th: 'Airborne',
+    en: 'Airborne',
+    noteTh: 'แพร่ทางอากาศ ต้องใส่ N95 และแยกผู้ป่วยออกจากคิวรวมทันที',
+    noteEn: 'Airborne spread: N95 required, isolate from waiting area',
+    box: 'bg-rose-50/70 border-rose-200/80',
+    chip: 'text-rose-900 bg-rose-100 border-rose-300',
+  },
+};
+
+const PrecautionCard: React.FC<{ value?: string; language: string }> = ({ value, language }) => {
+  const isTh = language === 'th';
+  const key = (value || '').trim();
+  const option = PRECAUTION_OPTIONS[key];
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[13px] font-bold text-slate-800 block">
+        {isTh ? 'ข้อควรระวัง (Precaution)' : 'Precaution'}
+      </label>
+      <div
+        className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border flex flex-col justify-center gap-1 ${
+          option ? option.box : 'bg-[#f8fafc] border-slate-200'
+        }`}
+      >
+        {option ? (
+          <>
+            <span
+              className={`self-start text-sm font-bold px-2.5 py-1 rounded-lg border ${option.chip}`}
+            >
+              {isTh ? option.th : option.en}
+            </span>
+            <span className="text-[11px] text-slate-500 leading-snug">
+              {isTh ? option.noteTh : option.noteEn}
+            </span>
+          </>
+        ) : (
+          <span className="text-sm font-normal text-slate-400">
+            {/* ค่าที่ backend ส่งมาแต่ไม่รู้จัก ให้แสดงตรงๆ จะได้รู้ว่ามีค่าแปลกปลอม
+                ไม่ใช่กลบเป็น "ยังไม่ได้ระบุ" ซึ่งทำให้ข้อมูลผิดหายไปเงียบๆ */}
+            {key || (isTh ? 'จุดคัดกรองยังไม่ได้ระบุ' : 'Not specified at triage')}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * คัดกรองเฉพาะผู้ป่วยหญิง — รวมสามค่าไว้ในหัวข้อเดียว
+ * ----------------------------------------------------------------------------
+ * ตั้งครรภ์ / ให้นมบุตร / ประจำเดือนครั้งสุดท้าย เป็นเรื่องเดียวกันในทางคลินิก
+ * คือ "สั่งยาตัวนี้ให้ผู้ป่วยรายนี้ได้ไหม" จึงรวมเป็นการ์ดเดียว
+ * แยกเป็นสามหัวข้อทำให้ตารางยาวโดยไม่ได้ข้อมูลเพิ่ม
+ *
+ * แต่ละค่ายังเป็น 3 สถานะเหมือนเดิม (nil / false / true)
+ * ป้ายสีเหลือง = ต้องระวังตอนสั่งยา, เขียว = ถามแล้วไม่ใช่, เทา = ยังไม่ได้ถาม
+ */
+const FemaleScreeningCard: React.FC<{
+  isPregnant?: boolean;
+  isBreastfeeding?: boolean;
+  lastMenstrualPeriod?: string;
+  language: string;
+}> = ({ isPregnant, isBreastfeeding, lastMenstrualPeriod, language }) => {
+  const isTh = language === 'th';
+  const lmp = (lastMenstrualPeriod || '').trim();
+
+  // ถ้ามีข้อใดข้อหนึ่งเป็นบวก ให้กล่องทั้งใบเป็นสีเตือน
+  // แพทย์จะได้เห็นตั้งแต่กวาดตาผ่าน ไม่ต้องอ่านป้ายทีละอัน
+  const needsCaution = isPregnant === true || isBreastfeeding === true;
+
+  // ยังไม่มีค่าไหนถูกประเมินเลย ให้ขึ้นข้อความเดียวแบบเดียวกับช่องอื่นในกลุ่มนี้
+  // ดีกว่าโชว์ป้าย "ยังไม่ประเมิน" เรียงกันหลายอัน ซึ่งรกและอ่านแล้วไม่ได้อะไรเพิ่ม
+  const nothingAssessed =
+    isPregnant === undefined && isBreastfeeding === undefined && lmp === '';
+
+  // ค่าที่ยังไม่ได้ประเมินไม่ต้องขึ้นป้าย (คืน null) แสดงเฉพาะข้อที่พยาบาลตอบมาแล้ว
+  const chip = (value: boolean | undefined, onTh: string, offTh: string, onEn: string, offEn: string) => {
+    if (value === undefined) return null;
+
+    if (value === true) {
+      return (
+        <span className="text-xs font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-lg">
+          {isTh ? onTh : onEn}
+        </span>
+      );
+    }
+    return (
+      <span className="text-xs font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-lg">
+        {isTh ? offTh : offEn}
+      </span>
+    );
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[13px] font-bold text-slate-800 block">
+        {isTh ? 'เพศหญิง' : 'Female Screening'}
+      </label>
+      <div
+        className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border flex flex-wrap items-center gap-1.5 ${
+          needsCaution ? 'bg-amber-50/60 border-amber-200/80' : 'bg-[#f8fafc] border-slate-200'
+        }`}
+      >
+        {nothingAssessed ? (
+          <span className="text-sm font-normal text-slate-400">
+            {isTh ? 'จุดคัดกรองยังไม่ได้ระบุ' : 'Not specified at triage'}
+          </span>
+        ) : (
+          <>
+            {chip(isPregnant, 'ตั้งครรภ์', 'ไม่ตั้งครรภ์', 'Pregnant', 'Not pregnant')}
+            {chip(isBreastfeeding, 'ให้นมบุตร', 'ไม่ให้นมบุตร', 'Breastfeeding', 'Not breastfeeding')}
+
+            {/* ประจำเดือนครั้งสุดท้าย แสดงเฉพาะเมื่อมีค่าจริง */}
+            {lmp && <span className="text-xs font-semibold text-slate-600">{`LMP: ${lmp}`}</span>}
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * ข้อความปฏิเสธ เช่น "ปฏิเสธการแพ้ยา" / "ไม่มี" / "No known allergy"
+ * นับเป็น "ไม่มี" ไม่ใช่ "มี" ถึงจะเป็นข้อความที่ไม่ว่างก็ตาม
+ *
+ * จำเป็นเพราะจุดคัดกรองเก็บเป็นข้อความอิสระ พยาบาลพิมพ์คำปฏิเสธลงในช่องเดียวกัน
+ * ถ้าเช็คแค่ "มีข้อความไหม" กล่องประวัติแพ้ยาจะขึ้นสีแดงเตือน
+ * ทั้งที่ผู้ป่วยบอกว่าไม่แพ้ยา ซึ่งอ่านผิดไปคนละทางกับความจริง
+ */
+function hasRealValue(text: string | undefined): boolean {
+  const value = (text || '').trim();
+  if (value === '') return false;
+  return !/ไม่|ปฏิเสธ|no known|^none$|^no$|nka/i.test(value);
+}
+
+/** ต่อค่าหลักกับรายละเอียดเป็นบรรทัดเดียว ข้ามส่วนที่ว่าง */
+function joinDetail(main: string | undefined, detail: string | undefined): string {
+  const a = (main || '').trim();
+  const b = (detail || '').trim();
+  if (a && b) return `${a} — ${b}`;
+  return a || b;
+}
+
+/**
+ * กล่องแสดงข้อมูลจากจุดคัดกรอง หนึ่งหัวข้อ หนึ่งช่อง
+ *
+ * เดิมแบ่งเป็นสองช่องบน-ล่าง (ค่าหลัก / รายละเอียด) แต่ช่องล่างส่วนใหญ่
+ * เป็นข้อความคงที่ที่เขียนตายไว้ในโค้ด เช่น "ติดตามอาการต่อเนื่อง"
+ * "ทานตามแพทย์สั่ง" ซึ่งไม่ใช่ข้อมูลจริงจากพยาบาล และขึ้น "--" เมื่อไม่มีข้อมูล
+ * กลายเป็นกล่องที่สูงเป็นสองเท่าโดยได้ข้อมูลเท่าเดิม
+ */
+const InfoCard: React.FC<{ label: string; value?: string; danger?: boolean }> = ({
+  label,
+  value,
+  danger = false,
+}) => {
+  const text = (value || '').trim();
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[13px] font-bold text-slate-800 block">{label}</label>
+      <div
+        className={`w-full min-h-[44px] px-3.5 py-2.5 rounded-xl border flex items-center ${
+          danger ? 'bg-rose-50/70 border-rose-200/80' : 'bg-[#f8fafc] border-slate-200'
+        }`}
+      >
+        {text ? (
+          <span className={`text-sm font-bold ${danger ? 'text-rose-900' : 'text-slate-900'}`}>
+            {text}
+          </span>
+        ) : (
+          <span className="text-sm font-normal text-slate-400">-</span>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/**
+ * ==============================================================================
+ * การ์ดขอออกเอกสาร (ติ๊ก -> ระบุจำนวน -> พิมพ์)
+ * ==============================================================================
+ * ปุ่มพิมพ์ถูกปิดไว้จนกว่าจะติ๊กว่าต้องการ เจตนากันการกดพลาด
+ * เอกสารเหล่านี้มีผลทางกฎหมาย (ใช้ลาป่วย ใช้เบิกจ่าย) ไม่ควรออกโดยไม่ตั้งใจ
+ *
+ * ช่องจำนวนโผล่มาหลังติ๊กเท่านั้น เพราะถ้าโชว์ตลอดเวลาจะดูเหมือนต้องกรอก
+ * ทั้งที่ยังไม่ได้ตัดสินใจว่าจะออกเอกสารหรือเปล่า
+ */
+const DocumentRequestCard: React.FC<{
+  label: string;
+  checked: boolean;
+  onCheckedChange: (value: boolean) => void;
+  quantity: number;
+  onQuantityChange: (value: number) => void;
+  onPrint: () => void;
+  /** เวลาที่กดพิมพ์ครั้งล่าสุด ว่าง = ยังไม่เคยพิมพ์ */
+  printedAt?: string;
+  language: string;
+}> = ({ label, checked, onCheckedChange, quantity, onQuantityChange, onPrint, printedAt, language }) => {
+  const isTh = language === 'th';
+
+  return (
+    <div
+      className={`rounded-2xl border p-4 transition-colors ${
+        checked ? 'bg-blue-50/40 border-blue-200' : 'bg-white border-slate-200'
+      }`}
+    >
+      {/* ชื่อเอกสารกับช่องจำนวน/ปุ่มพิมพ์อยู่บรรทัดเดียวกัน
+          การ์ดจะสูงเท่ากันทั้งสองใบไม่ว่าติ๊กหรือไม่ติ๊ก
+          ถ้าแยกคนละบรรทัด ใบที่ติ๊กจะสูงกว่าจนแถวดูไม่สมดุล
+          จอแคบ flex-wrap จะดันลงบรรทัดใหม่ให้เอง */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 min-h-9">
+        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={checked}
+            onChange={(e) => onCheckedChange(e.target.checked)}
+            className="w-4 h-4 shrink-0 accent-blue-600 cursor-pointer"
+          />
+          <span className="text-sm font-bold text-slate-900">{label}</span>
+        </label>
+
+        {checked && (
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-[11px] font-bold text-slate-600 shrink-0">
+              {isTh ? 'จำนวน' : 'Copies'}
+            </span>
+
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={quantity}
+              /* หนีบค่าไว้ 1-20 เพราะลบหรือศูนย์แล้วพิมพ์ไม่ได้อะไรเลย
+                 และการพิมพ์ทีละหลายสิบฉบับมักเป็นการพิมพ์เลขผิด ไม่ใช่ความตั้งใจ
+                 ปล่อยว่างชั่วคราวได้ระหว่างพิมพ์ตัวเลข ค่อยเด้งกลับเป็น 1 */
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') return;
+                const next = Number(raw);
+                if (Number.isNaN(next)) return;
+                onQuantityChange(Math.min(20, Math.max(1, Math.trunc(next))));
+              }}
+              onBlur={(e) => {
+                if (e.target.value === '') onQuantityChange(1);
+              }}
+              className="w-16 h-9 px-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold font-mono text-slate-800 text-center focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+            />
+
+            <span className="text-[11px] text-slate-500 shrink-0">{isTh ? 'ฉบับ' : ''}</span>
+
+            {/* ใส่ชื่อเอกสารบนปุ่มด้วย ปุ่มจะได้ไม่เล็กจนกดยาก
+                และตอนกดก็ยืนยันในตัวว่ากำลังพิมพ์เอกสารใบไหน */}
+            <button
+              type="button"
+              onClick={onPrint}
+              className="h-9 px-4 rounded-xl bg-[#2563eb] hover:bg-blue-700 text-white text-xs font-bold shadow-2xs active:scale-95 transition-all inline-flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
+            >
+              <Printer className="w-3.5 h-3.5 shrink-0" />
+              {isTh ? `พิมพ์ ${label}` : `Print ${label}`}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* บอกว่าเคยพิมพ์ไปแล้วเมื่อไหร่
+          ต่างจาก "ติ๊กไว้เฉยๆ" ตรงที่เอกสารถึงมือผู้ป่วยแล้วจริง
+          ถ้ายังไม่เคยพิมพ์จะไม่ขึ้นบรรทัดนี้เลย ไม่ใช่ขึ้นว่า "ยังไม่ได้พิมพ์" */}
+      {checked && printedAt && (
+        <p className="text-[11px] text-slate-500 text-right mt-2">
+          {isTh ? 'พิมพ์ล่าสุด ' : 'Last printed '}
+          {formatScreenedAt(printedAt)}
+        </p>
+      )}
+    </div>
+  );
+};
+
+const DocumentCheckRow: React.FC<{
+  label: string;
+  checked: boolean;
+  onCheckedChange: (value: boolean) => void;
+}> = ({ label, checked, onCheckedChange }) => (
+  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+    <input
+      type="checkbox"
+      checked={checked}
+      onChange={(e) => onCheckedChange(e.target.checked)}
+      className="w-4 h-4 shrink-0 accent-blue-600 cursor-pointer"
+    />
+    <span className={`text-sm font-semibold ${checked ? 'text-slate-900' : 'text-slate-700'}`}>
+      {label}
+    </span>
+  </label>
+);
 
 const EXAM_ANCHOR = {
   chiefComplaint: 'exam-anchor-chief-complaint',
   vitals: 'exam-anchor-vitals',
+  assessment: 'exam-anchor-assessment',
   diagnosis: 'exam-anchor-diagnosis',
   prescription: 'exam-anchor-prescription',
 } as const;
@@ -350,7 +786,14 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
   // History & Complaints State
   const [chiefComplaint, setChiefComplaint] = useState(patient.chiefComplaint || '');
-  const [chiefComplaintDuration, setChiefComplaintDuration] = useState(patient.chiefComplaintDuration || '2 days');
+  // ห้ามใส่ค่าเริ่มต้นสมมติในช่องนี้เด็ดขาด
+  //
+  // เดิมเป็น useState(patient.chiefComplaintDuration || '2 days') ซึ่งแปลว่า
+  // เวชระเบียนทุกใบถูกบันทึกลงฐานข้อมูลว่า "เป็นมา 2 วัน" เท่ากันหมด
+  // ทั้งที่ไม่เคยมีแพทย์คนไหนกรอก และตอนนั้นก็ไม่มีช่องให้กรอกด้วยซ้ำ
+  // เป็นข้อมูลที่ระบบแต่งขึ้นเองแล้วเขียนลงเวชระเบียนจริง
+  // อันตรายกว่าช่องว่าง เพราะอ่านแล้วดูเหมือนข้อมูลที่แพทย์ซักมา
+  const [chiefComplaintDuration, setChiefComplaintDuration] = useState(patient.chiefComplaintDuration || '');
   const [presentIllness, setPresentIllness] = useState(patient.presentIllness || '');
   const [pastMedicalHistory, setPastMedicalHistory] = useState(patient.pastMedicalHistory || '');
   const [chronicDiseasesText, setChronicDiseasesText] = useState((patient.chronicDiseases || []).join(', '));
@@ -360,56 +803,67 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   const [pastSurgery, setPastSurgery] = useState(patient.pastSurgery || '');
   const [drugAllergiesText, setDrugAllergiesText] = useState((patient.drugAllergies || []).join(', '));
   const [noDrugAllergy, setNoDrugAllergy] = useState(!patient.drugAllergies || patient.drugAllergies.length === 0);
-  const [drugAllergySymptoms, setDrugAllergiesSymptoms] = useState(patient.drugAllergySymptoms || 'ผื่นคัน, ลมพิษ (Rashes, Hives)');
+  const [drugAllergySymptoms, setDrugAllergiesSymptoms] = useState(patient.drugAllergySymptoms || '');
   const [foodAllergiesText, setFoodAllergiesText] = useState((patient.foodAllergies || []).join(', '));
   const [noFoodAllergy, setNoFoodAllergy] = useState(!patient.foodAllergies || patient.foodAllergies.length === 0);
   const [foodAllergySymptoms, setFoodAllergySymptoms] = useState('');
   const [familyHistory, setFamilyHistory] = useState(patient.familyHistory || '');
   const [socialHistory, setSocialHistory] = useState(patient.socialHistory || '');
-  const [nationalId, setNationalId] = useState(patient.nationalId || '1-1002-34567-89-0');
+  const [nationalId, setNationalId] = useState(patient.nationalId || '');
   
   // Triage State
-  const [triageLevel, setTriageLevel] = useState(patient.triage?.level || 'Level 4: Less Urgent');
-  const [priorityLevel, setPriorityLevel] = useState(patient.triage?.priority || 'Medium');
-  const [triageNotes, setTriageNotes] = useState(patient.triage?.notes || 'Screened at Triage Desk. Patient is conscious and stable.');
-
-  // สีของกล่องคัดกรอง ยึดตามระดับที่พยาบาลเลือก ไม่ใช่สีคงที่
-  const tone = triageTone(triageLevel || patient.triage?.level);
+  const [triageLevel, setTriageLevel] = useState(patient.triage?.level || '');
+  const [priorityLevel, setPriorityLevel] = useState(patient.triage?.priority || '');
+  const [triageNotes, setTriageNotes] = useState(patient.triage?.notes || '');
 
   // Additional Notes
   const [nurseNotes, setNurseNotes] = useState(patient.nurseNotes || '');
   const [importantInfoForDoctor, setImportantInfoForDoctor] = useState(patient.importantInfoForDoctor || '');
-  const [attachments, setAttachments] = useState<any[]>(patient.attachments || [
-    { id: 'att-1', fileName: 'Referral_Document_2026.pdf', fileType: 'pdf', category: 'Referral Document', uploadDate: '2026-07-23 08:50', fileSize: '1.2 MB' },
-    { id: 'att-2', fileName: 'Clinical_Photo_2026.jpg', fileType: 'image', category: 'Clinical Photo', uploadDate: '2026-07-23 08:52', fileSize: '2.8 MB' }
-  ]);
+  // ไฟล์แนบ 2 รายการที่เคยใส่ไว้ตรงนี้เป็นไฟล์สมมติทั้งคู่
+  // (Referral_Document_2026.pdf / Clinical_Photo_2026.jpg)
+  // ไม่มีไฟล์จริงในระบบ กดเปิดก็ไม่ได้ และไม่มี endpoint สำหรับแนบไฟล์เลย
+  // ถ้าโชว์ไว้ แพทย์จะเข้าใจว่ามีเอกสารส่งตัวรออ่านอยู่ ทั้งที่ไม่มี
+  const [attachments, setAttachments] = useState<any[]>(patient.attachments || []);
 
   // Nursing Physical Assessment State
   const [nurseGenAppearance, setNurseGenAppearance] = useState(patient.nursingAssessment?.generalAppearance || 'Good consciousness, non-toxic appearance');
   // ระดับความรู้สึกตัวยังไม่มีคอลัมน์ในตาราง screenings จุดคัดกรองจึงยังส่งมาไม่ได้
   // เว้นว่างไว้แทนการเดาว่า "Alert" เพราะเป็นค่าที่ใช้แยกเคสฉุกเฉิน เดาผิดแล้วอันตราย
   const [nurseConsciousness, setNurseConsciousness] = useState(patient.nursingAssessment?.consciousness || '');
-  const [nurseMobility, setNurseMobility] = useState(patient.nursingAssessment?.mobility || 'Ambulatory');
-  const [nurseRespiratory, setNurseRespiratory] = useState(patient.nursingAssessment?.respiratoryCondition || 'Normal breathing, room air');
-  const [nurseBleeding, setNurseBleeding] = useState(patient.nursingAssessment?.bleeding || 'No active bleeding');
-  const [nurseOtherFindings, setNurseOtherFindings] = useState(patient.nursingAssessment?.otherFindings || 'Mild throat pain upon swallowing');
+  const [nurseMobility, setNurseMobility] = useState(patient.nursingAssessment?.mobility || '');
+  const [nurseRespiratory, setNurseRespiratory] = useState(patient.nursingAssessment?.respiratoryCondition || '');
+  const [nurseBleeding, setNurseBleeding] = useState(patient.nursingAssessment?.bleeding || '');
+  const [nurseOtherFindings, setNurseOtherFindings] = useState(patient.nursingAssessment?.otherFindings || '');
 
-  // Vital Signs State
-  const [bp, setBp] = useState(patient.vitals?.bp || '120/80');
-  const [pulse, setPulse] = useState(patient.vitals?.pulse || 78);
-  const [respiratoryRate, setRespiratoryRate] = useState(patient.vitals?.respiratoryRate || 18);
-  const [temp, setTemp] = useState(patient.vitals?.temp || 36.8);
-  const [spo2, setSpo2] = useState(patient.vitals?.spo2 || 98);
-  const [weight, setWeight] = useState(patient.vitals?.weight || 68);
-  const [height, setHeight] = useState(patient.vitals?.height || 170);
+  // ==========================================================================
+  // สัญญาณชีพ: ห้ามมีค่าเริ่มต้นสมมติเด็ดขาด
+  // ==========================================================================
+  // ทุกช่องในกลุ่มนี้เป็นค่าที่พยาบาลวัดมาจากจุดคัดกรอง แพทย์แก้ไม่ได้ (อ่านอย่างเดียว)
+  // เดิมใส่ค่าไว้เผื่อตอนทำหน้าจอก่อนต่อ API เช่น bp '120/80', temp 36.8, spo2 98
+  // พอต่อ API จริงแล้วค่าพวกนี้กลายเป็นตัวหลอก: เคสที่พยาบาลยังไม่ได้วัด
+  // หน้าจอจะขึ้นตัวเลขที่ดูเหมือนวัดมาแล้ว แพทย์แยกไม่ออกว่าอันไหนของจริง
+  //
+  // เปลี่ยนเป็น undefined เพื่อให้หน้าจอแสดง "ยังไม่ได้วัด" ได้อย่างตรงไปตรงมา
+  // ค่าสัญญาณชีพที่ระบบแต่งขึ้นเองอันตรายกว่าช่องว่างเสมอ
+  // โดยเฉพาะอุณหภูมิกับความดัน ซึ่งใช้ตัดสินว่าเคสนี้ฉุกเฉินหรือไม่
+  const [bp, setBp] = useState(patient.vitals?.bp || '');
+  const [pulse, setPulse] = useState<number | undefined>(patient.vitals?.pulse);
+  const [respiratoryRate, setRespiratoryRate] = useState<number | undefined>(patient.vitals?.respiratoryRate);
+  const [temp, setTemp] = useState<number | undefined>(patient.vitals?.temp);
+  const [spo2, setSpo2] = useState<number | undefined>(patient.vitals?.spo2);
+  const [weight, setWeight] = useState<number | undefined>(patient.vitals?.weight);
+  const [height, setHeight] = useState<number | undefined>(patient.vitals?.height);
   // ปล่อยเป็น undefined เมื่อจุดคัดกรองไม่ได้กรอก จะได้แสดงว่า "ไม่มีข้อมูล"
   // แทนการเดาค่าให้ ค่าสัญญาณชีพที่ระบบแต่งขึ้นเองอันตรายกว่าช่องว่าง
   const [painScore, setPainScore] = useState<number | undefined>(patient.vitals?.painScore);
   const [bloodSugar, setBloodSugar] = useState<number | undefined>(patient.vitals?.bloodSugar);
 
   // Auto calculated BMI
+  // คำนวณจากน้ำหนักและส่วนสูงที่พยาบาลวัดมาเท่านั้น
+  // ถ้าขาดตัวใดตัวหนึ่งคืน 0 แล้วหน้าจอจะแสดงว่ายังไม่ได้วัด
+  // ห้ามคืนค่ากลางๆ อย่าง 22.9 เพราะจะกลายเป็น "ผู้ป่วยรูปร่างปกติ" ที่ระบบแต่งขึ้นเอง
   const bmi = React.useMemo(() => {
-    if (weight > 0 && height > 0) {
+    if (weight && height && weight > 0 && height > 0) {
       const hMeter = height / 100;
       return Number((weight / (hMeter * hMeter)).toFixed(1));
     }
@@ -808,11 +1262,246 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   const [refNotes, setRefNotes] = useState(patient.referral?.notes || '');
 
   // Counseling State
-  const [counselMed, setCounselMed] = useState(patient.counseling?.medicationAdvice || 'Take prescribed antibiotic full duration.');
+  const [counselMed, setCounselMed] = useState(patient.counseling?.medicationAdvice || '');
   const [counselDiet, setCounselDiet] = useState(patient.counseling?.dietAdvice || 'Warm fluid intake, avoid cold drinks.');
   const [counselExercise, setCounselExercise] = useState(patient.counseling?.exerciseAdvice || 'Rest adequately.');
-  const [counselLifestyle, setCounselLifestyle] = useState(patient.counseling?.lifestyleAdvice || 'Gargle warm salt water twice daily.');
-  const [counselEducation, setCounselEducation] = useState(patient.counseling?.diseaseEducation || 'Viral pharyngitis self-care guidance.');
+  const [counselLifestyle, setCounselLifestyle] = useState(patient.counseling?.lifestyleAdvice || '');
+
+  /**
+   * ============================================================================
+   * เอกสารทั่วไปที่แพทย์ออกให้ผู้ป่วย [role แพทย์]
+   * ============================================================================
+   * ติ๊กว่าต้องการเอกสารไหน ติ๊กแล้วถึงกรอกจำนวนและกดพิมพ์ได้
+   * ค่าเริ่มต้นของจำนวนคือ 1 ฉบับ ซึ่งเป็นกรณีที่พบบ่อยที่สุด แก้เป็นเลขอื่นได้
+   *
+   * หมายเหตุ: ตอนนี้ยังเก็บอยู่ในหน้าจอเท่านั้น ยังไม่ได้บันทึกลงฐานข้อมูล
+   * เพราะตาราง examinations ยังไม่มีคอลัมน์รองรับ ถ้าต้องการเก็บประวัติ
+   * ว่าเคยออกเอกสารอะไรให้ใครไปบ้าง ต้องเพิ่มคอลัมน์ที่ backend ก่อน
+   */
+  const savedDoc = (type: string) => (patient.issuedDocuments || []).find((d) => d.type === type);
+
+  const [wantMedicalCert, setWantMedicalCert] = useState(!!savedDoc('medical-certificate'));
+  const [medicalCertQty, setMedicalCertQty] = useState(savedDoc('medical-certificate')?.quantity || 1);
+  const [wantNonFormularyCert, setWantNonFormularyCert] = useState(!!savedDoc('non-formulary'));
+  const [nonFormularyQty, setNonFormularyQty] = useState(savedDoc('non-formulary')?.quantity || 1);
+
+  // เวลาที่กดพิมพ์ครั้งล่าสุดของแต่ละชนิด เก็บไว้เพื่อแยกให้ออกว่า
+  // "ติ๊กไว้แต่ยังไม่ได้พิมพ์" กับ "พิมพ์ให้ผู้ป่วยไปแล้ว" ซึ่งไม่เหมือนกัน
+  // เคสที่ติ๊กแล้วเครื่องพิมพ์เสีย ต้องรู้ว่ายังไม่ได้ให้เอกสารผู้ป่วยไป
+  const [medicalCertPrintedAt, setMedicalCertPrintedAt] = useState(
+    savedDoc('medical-certificate')?.printedAt || ''
+  );
+  const [nonFormularyPrintedAt, setNonFormularyPrintedAt] = useState(
+    savedDoc('non-formulary')?.printedAt || ''
+  );
+
+  /**
+   * เอกสารอื่นๆ ที่ติ๊กอย่างเดียว ไม่มีจำนวนและไม่มีปุ่มพิมพ์
+   * เพราะยังไม่มีแบบฟอร์มมาตรฐานในระบบ แพทย์ใช้แบบฟอร์มกระดาษของคลินิก
+   * การติ๊กตรงนี้คือการ "บันทึกว่าออกเอกสารอะไรให้ผู้ป่วยไปบ้าง" เท่านั้น
+   */
+  const [wantInsuranceClaim, setWantInsuranceClaim] = useState(!!savedDoc('insurance-claim'));
+  const [wantReferralOpinion, setWantReferralOpinion] = useState(!!savedDoc('referral-opinion'));
+  const [wantDental, setWantDental] = useState(!!savedDoc('dental'));
+  const [wantOtherDoc, setWantOtherDoc] = useState(!!savedDoc('other'));
+
+  /** สถานะผู้ป่วยหลังตรวจเสร็จ '' = ยังไม่ระบุ | 'home' = กลับบ้าน | 'refer' = ส่งต่อ */
+  const [disposition, setDisposition] = useState(patient.disposition || '');
+  const [otherDocName, setOtherDocName] = useState(savedDoc('other')?.name || '');
+
+  /** รวมสถานะเอกสารทั้งหมดเป็น array เดียว สำหรับส่งไปบันทึก */
+  const collectIssuedDocuments = (): IssuedDocument[] => {
+    const docs: IssuedDocument[] = [];
+    if (wantMedicalCert) {
+      docs.push({
+        type: 'medical-certificate',
+        quantity: medicalCertQty,
+        printedAt: medicalCertPrintedAt || undefined,
+      });
+    }
+    if (wantNonFormularyCert) {
+      docs.push({
+        type: 'non-formulary',
+        quantity: nonFormularyQty,
+        printedAt: nonFormularyPrintedAt || undefined,
+      });
+    }
+
+    // เอกสารกลุ่มติ๊กอย่างเดียว quantity เป็น 1 เสมอ
+    // (backend หนีบค่าให้อย่างน้อย 1 อยู่แล้ว แต่ส่งให้ชัดเจนดีกว่าปล่อยเป็น 0)
+    if (wantInsuranceClaim) docs.push({ type: 'insurance-claim', quantity: 1 });
+    if (wantReferralOpinion) docs.push({ type: 'referral-opinion', quantity: 1 });
+    if (wantDental) docs.push({ type: 'dental', quantity: 1 });
+
+    // เอกสารที่แพทย์ระบุชื่อเอง ถ้ายังไม่พิมพ์ชื่อจะไม่ส่งไป
+    // เพราะบันทึกไปก็ไม่รู้ว่าเอกสารอะไร (backend ก็กรองซ้ำอีกชั้น)
+    if (wantOtherDoc && otherDocName.trim() !== '') {
+      docs.push({ type: 'other', quantity: 1, name: otherDocName.trim() });
+    }
+
+    return docs;
+  };
+
+  /**
+   * เปิดหน้าต่างพิมพ์เอกสาร
+   * --------------------------------------------------------------------------
+   * สร้างเอกสารเป็นหน้าต่างใหม่แล้วสั่งพิมพ์ ไม่ใช้ window.print() ของหน้าหลัก
+   * เพราะจะพิมพ์ทั้งหน้าจอออกมารวมทั้งเมนูและแท็บ ซึ่งใช้เป็นเอกสารไม่ได้
+   *
+   * เอกสารที่ออกมาเว้นช่องลงชื่อแพทย์ไว้ให้เซ็นเอง ไม่ได้พิมพ์ชื่อแพทย์ลงไปให้
+   * เพราะเอกสารพวกนี้มีผลทางกฎหมาย ต้องมีลายมือชื่อจริงของผู้ออกเสมอ
+   */
+  const printClinicDocument = (kind: 'medical-certificate' | 'non-formulary', copies: number) => {
+    const isTh = language === 'th';
+    const win = window.open('', '_blank', 'width=900,height=1000');
+
+    if (!win) {
+      // เบราว์เซอร์บล็อกป๊อปอัป ต้องบอกผู้ใช้ ไม่ใช่เงียบแล้วให้งงว่าทำไมกดแล้วไม่มีอะไรเกิด
+      alert(
+        isTh
+          ? 'เบราว์เซอร์บล็อกหน้าต่างพิมพ์ กรุณาอนุญาตป๊อปอัปของเว็บนี้แล้วลองใหม่'
+          : 'The browser blocked the print window. Please allow pop-ups for this site and try again.'
+      );
+      return;
+    }
+
+    // กันข้อความจากฐานข้อมูลไปแตก HTML (ชื่อผู้ป่วยอาจมีอักขระพิเศษ)
+    const esc = (value: string | undefined) =>
+      (value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    const title =
+      kind === 'medical-certificate'
+        ? isTh ? 'ใบรับรองแพทย์' : 'Medical Certificate'
+        : isTh ? 'ใบรับรองยานอกบัญชียาหลักแห่งชาติ' : 'Non-Formulary Drug Certificate';
+
+    const today = new Date().toLocaleDateString(isTh ? 'th-TH' : 'en-GB', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+
+    const diagText = primaryDiag ? `${primaryDiag.code} ${primaryDiag.name}` : '';
+
+    // ใบรับรองยานอกบัญชีต้องระบุว่าเป็นยาตัวไหน จึงแนบรายการยาที่สั่งในครั้งนี้
+    const drugRows = prescriptions
+      .map(
+        (item, index) => `<tr>
+            <td style="text-align:center">${index + 1}</td>
+            <td>${esc(item.medicineName)}</td>
+            <td>${esc(item.dosage)} ${esc(item.frequency)}</td>
+            <td style="text-align:center">${esc(item.duration)}</td>
+          </tr>`
+      )
+      .join('');
+
+    const bodyByKind =
+      kind === 'medical-certificate'
+        ? `
+          <div class="row"><span class="lbl">${isTh ? 'การวินิจฉัย' : 'Diagnosis'}</span><span class="val">${esc(diagText) || '&nbsp;'}</span></div>
+          <div class="row"><span class="lbl">${isTh ? 'ความเห็นแพทย์' : "Doctor's opinion"}</span><span class="val line"></span></div>
+          <div class="row"><span class="lbl">&nbsp;</span><span class="val line"></span></div>
+          <div class="row"><span class="lbl">${isTh ? 'ควรหยุดพักงาน' : 'Recommended rest'}</span><span class="val">${isTh ? '............ วัน ตั้งแต่วันที่ ................ ถึงวันที่ ................' : '........ days, from ............ to ............'}</span></div>
+        `
+        : `
+          <div class="row"><span class="lbl">${isTh ? 'การวินิจฉัย' : 'Diagnosis'}</span><span class="val">${esc(diagText) || '&nbsp;'}</span></div>
+          <p class="note">${isTh
+            ? 'ขอรับรองว่ายาต่อไปนี้เป็นยานอกบัญชียาหลักแห่งชาติ ซึ่งมีความจำเป็นต่อการรักษาของผู้ป่วยรายนี้'
+            : 'This certifies that the following non-formulary medicines are necessary for this patient.'}</p>
+          <table>
+            <thead>
+              <tr>
+                <th style="width:8%">${isTh ? 'ลำดับ' : 'No.'}</th>
+                <th style="width:42%">${isTh ? 'รายการยา' : 'Medicine'}</th>
+                <th style="width:32%">${isTh ? 'ขนาด / ความถี่' : 'Dose / Frequency'}</th>
+                <th style="width:18%">${isTh ? 'ระยะเวลา' : 'Duration'}</th>
+              </tr>
+            </thead>
+            <tbody>${drugRows || `<tr><td colspan="4" style="text-align:center;color:#64748b">${isTh ? '- ยังไม่ได้สั่งยาในการตรวจครั้งนี้ -' : '- No medicines ordered -'}</td></tr>`}</tbody>
+          </table>
+          <div class="row"><span class="lbl">${isTh ? 'เหตุผลที่ใช้ยานอกบัญชี' : 'Justification'}</span><span class="val line"></span></div>
+        `;
+
+    // พิมพ์หลายฉบับ = วนสร้างหน้าเดิมซ้ำ คั่นด้วย page-break
+    const pages = Array.from({ length: Math.max(1, copies) })
+      .map(
+        (_, index) => `
+        <section class="doc">
+          <header>
+            <h1>General Clinic</h1>
+            <p class="sub">${isTh ? 'คลินิกเวชกรรมทั่วไป' : 'General Medical Clinic'}</p>
+            <h2>${title}</h2>
+          </header>
+
+          <div class="row"><span class="lbl">${isTh ? 'ชื่อ-นามสกุล' : 'Patient name'}</span><span class="val">${esc(patient.name)}</span></div>
+          <div class="row"><span class="lbl">${isTh ? 'เลขบัตรประชาชน' : 'National ID'}</span><span class="val">${esc(formatNationalId(nationalId))}</span></div>
+          <div class="row"><span class="lbl">HN / VN</span><span class="val">${esc(patient.hn)} / ${esc(displayVN(patient.vn))}</span></div>
+          <div class="row"><span class="lbl">${isTh ? 'วันที่ตรวจ' : 'Date of visit'}</span><span class="val">${today}</span></div>
+
+          ${bodyByKind}
+
+          <div class="sign">
+            <div class="sign-line"></div>
+            <p>${isTh ? 'ลงชื่อ แพทย์ผู้ตรวจ' : 'Signature, examining physician'}</p>
+            <p class="muted">${isTh ? 'เลขที่ใบอนุญาตประกอบวิชาชีพเวชกรรม ............................' : 'Medical license no. ............................'}</p>
+          </div>
+
+          <p class="copy-no">${isTh ? `ฉบับที่ ${index + 1} จาก ${Math.max(1, copies)}` : `Copy ${index + 1} of ${Math.max(1, copies)}`}</p>
+        </section>`
+      )
+      .join('');
+
+    win.document.write(`<!doctype html>
+<html lang="${isTh ? 'th' : 'en'}">
+<head>
+<meta charset="utf-8">
+<title>${title} - ${esc(patient.name)}</title>
+<style>
+  @page { size: A4; margin: 18mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Sarabun", "TH Sarabun New", system-ui, sans-serif; color: #0f172a; margin: 0; }
+  .doc { page-break-after: always; padding-bottom: 8mm; }
+  .doc:last-child { page-break-after: auto; }
+  header { text-align: center; border-bottom: 2px solid #0f172a; padding-bottom: 10px; margin-bottom: 22px; }
+  h1 { font-size: 22px; margin: 0; letter-spacing: .5px; }
+  .sub { font-size: 13px; margin: 2px 0 14px; color: #475569; }
+  h2 { font-size: 18px; margin: 0; }
+  .row { display: flex; gap: 10px; margin-bottom: 12px; font-size: 14px; align-items: flex-end; }
+  .lbl { width: 170px; flex: none; color: #475569; }
+  .val { flex: 1; border-bottom: 1px dotted #94a3b8; padding-bottom: 2px; min-height: 20px; }
+  .val.line { min-height: 24px; }
+  .note { font-size: 14px; margin: 18px 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  th, td { border: 1px solid #94a3b8; padding: 6px 8px; }
+  th { background: #f1f5f9; text-align: left; }
+  .sign { margin-top: 48px; text-align: right; }
+  .sign-line { width: 260px; border-bottom: 1px solid #0f172a; margin-left: auto; margin-bottom: 6px; }
+  .sign p { margin: 2px 0; font-size: 13px; }
+  .muted { color: #64748b; font-size: 12px; }
+  .copy-no { text-align: right; color: #94a3b8; font-size: 11px; margin-top: 24px; }
+</style>
+</head>
+<body>${pages}</body>
+</html>`);
+
+    win.document.close();
+    win.focus();
+
+    // รอให้เบราว์เซอร์จัดหน้าเสร็จก่อนเรียกกล่องพิมพ์ ไม่งั้นบางเครื่องได้หน้าว่าง
+    setTimeout(() => win.print(), 300);
+
+    // จดเวลาที่กดพิมพ์ไว้ จะถูกบันทึกลงฐานข้อมูลตอนกดบันทึกการตรวจ
+    // หมายเหตุ: บันทึกตอน "กดปุ่มพิมพ์" ไม่ใช่ตอน "พิมพ์ออกมาสำเร็จ"
+    // เพราะเบราว์เซอร์ไม่บอกกลับมาว่าผู้ใช้กดพิมพ์จริงหรือกดยกเลิกในกล่องพิมพ์
+    const stamp = new Date().toISOString();
+    if (kind === 'medical-certificate') setMedicalCertPrintedAt(stamp);
+    else setNonFormularyPrintedAt(stamp);
+  };
+  // ค่าเริ่มต้นเดิมเป็นข้อความอังกฤษที่เขียนตายไว้ ('Viral pharyngitis self-care guidance.')
+  // ซึ่งขึ้นกับผู้ป่วยทุกคนไม่ว่าเป็นโรคอะไร เป็นค่าปลอม จึงล้างออก
+  const [counselEducation, setCounselEducation] = useState(patient.counseling?.diseaseEducation || '');
 
   // Follow Up State
   const [hasFollowUp, setHasFollowUp] = useState<boolean>(Boolean(patient.followUp && patient.followUp.followUpDate));
@@ -832,7 +1521,6 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     tab: 'notes' | 'diagnosis' | 'prescription' | 'referral' | 'followup';
     anchor: string;
   };
-  const [validationWarnings, setValidationWarnings] = useState<ValidationIssue[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState<string | null>(null);
 
   // Success Feedback Modal State
@@ -860,6 +1548,20 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     patient?: { name: string; hn: string; vn?: string };
     /** ข้อควรรู้เพิ่มเติม แสดงเป็นกล่องมีไอคอนด้านล่าง */
     hint?: string;
+
+    /**
+     * สรุปสิ่งที่แพทย์บันทึกไว้ทั้งหมด ให้ตรวจทานก่อนกดยืนยัน
+     *
+     * ทำไมต้องมี: การกดปิดการตรวจเป็นการเซ็นรับรอง แก้ย้อนหลังไม่ได้
+     * แต่ข้อมูลกระจายอยู่ 5 แท็บ แพทย์ต้องกดไล่ดูทีละแท็บถึงจะรู้ว่ากรอกครบไหม
+     * ซึ่งไม่มีใครทำจริง สุดท้ายก็กดยืนยันไปเลย
+     * เอามาสรุปหน้าเดียวตรงนี้ ตรวจครั้งเดียวจบ
+     *
+     * items ว่าง = ยังไม่ได้บันทึกอะไรในหัวข้อนั้น จะขึ้นเป็น "-" สีเทา
+     * ไม่ซ่อนหัวข้อทิ้ง เพราะการเห็นว่า "ไม่มี" คือข้อมูลที่ต้องตรวจเหมือนกัน
+     */
+    summary?: { section: string; items: string[] }[];
+
     confirmLabel: string;
 
     /**
@@ -909,11 +1611,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-        // ไฮไลต์กรอบสีเหลืองชั่วคราว ให้เห็นชัดว่าคือช่องไหน
-        el.classList.add('ring-2', 'ring-amber-400', 'ring-offset-2', 'rounded-xl');
-        window.setTimeout(() => {
-          el.classList.remove('ring-2', 'ring-amber-400', 'ring-offset-2', 'rounded-xl');
-        }, 2400);
+        // ไม่ไฮไลต์กรอบสีเหลืองแล้ว
+        // กรอบวิ่งรอบทั้งกลุ่มทำให้ดูเหมือนทั้งกลุ่มผิด ทั้งที่ขาดแค่ช่องเดียว
+        // และค้างอยู่ 2.4 วินาทีจนกวนตอนเริ่มพิมพ์
+        // แค่เลื่อนไปหาช่องแล้ววางเคอร์เซอร์ให้ ก็รู้แล้วว่าต้องกรอกตรงไหน
+        // (ข้อความเตือนด้านบนยังบอกอยู่ว่าขาดอะไร)
 
         // ถ้าในกล่องนั้นมีช่องกรอกได้ ให้เคอร์เซอร์ไปรออยู่ที่ช่องแรกเลย
         const input = el.querySelector<HTMLElement>('input, textarea, select');
@@ -936,24 +1638,46 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     if (!chiefComplaint.trim()) {
       gaps.push(language === 'th' ? 'อาการสำคัญ (Chief Complaint)' : 'Chief Complaint (CC)');
     }
-    if (!bp.trim() || pulse <= 0 || temp <= 0) {
+    if (!bp.trim() || !pulse || !temp) {
       gaps.push(language === 'th' ? 'สัญญาณชีพ (ความดัน / ชีพจร / อุณหภูมิ)' : 'Vital Signs (BP / Pulse / Temp)');
     }
     return gaps;
   }, [chiefComplaint, bp, pulse, temp, language]);
 
-  // Allergy warning check on medicine selection
-  const allergyAlert = React.useMemo(() => {
-    const allergies = drugAllergiesText.toLowerCase().split(',').map(s => s.trim());
-    for (const rx of prescriptions) {
-      for (const alg of allergies) {
-        if (alg && rx.medicineName.toLowerCase().includes(alg)) {
-          return `CRITICAL WARNING: Patient is ALLERGIC to ${alg.toUpperCase()}! Prescribed medicine '${rx.medicineName}' contains allergen.`;
-        }
-      }
+  /**
+   * ตรวจใบสั่งยากับประวัติแพ้ยาของผู้ป่วย (ดูวิธีเทียบใน utils/allergyCheck.ts)
+   *
+   * แยกผลเป็น 2 กอง เพราะผลทางการแพทย์ไม่เท่ากัน
+   *   blocking = ยาตัวเดียวกับที่แพ้ ห้ามปิดเคสจนกว่าจะเอาออก
+   *   crossGroup = คนละตัวแต่กลุ่มเดียวกัน เตือนให้ตัดสินใจ แล้วสั่งต่อได้
+   */
+  const allergyConflicts = React.useMemo(
+    () => findAllergyConflicts(drugAllergiesText, prescriptions),
+    [drugAllergiesText, prescriptions],
+  );
+  const blockingAllergies = allergyConflicts.filter((c) => c.kind === 'exact');
+  const crossGroupAllergies = allergyConflicts.filter((c) => c.kind === 'group');
+
+  /** ชื่อยาที่ชนประวัติแพ้ ใช้ระบายสีแถวในตารางรายการสั่งยา */
+  const conflictByMedicine = React.useMemo(() => {
+    const map = new Map<string, 'exact' | 'group'>();
+    for (const c of allergyConflicts) {
+      // exact สำคัญกว่า ห้ามให้ group มาเขียนทับ
+      if (map.get(c.medicineName) !== 'exact') map.set(c.medicineName, c.kind);
     }
-    return null;
-  }, [drugAllergiesText, prescriptions]);
+    return map;
+  }, [allergyConflicts]);
+
+  /**
+   * แพทย์รับทราบเรื่องแพ้ข้ามกลุ่มแล้ว ยืนยันจะสั่งยาตัวนี้ต่อ
+   *
+   * ต้องรีเซ็ตทุกครั้งที่รายการยาเปลี่ยน ไม่งั้นแพทย์ที่กดยืนยันไปแล้วรอบหนึ่ง
+   * แล้วเพิ่มยาตัวใหม่เข้ามาทีหลัง จะไม่โดนเตือนอีกเลยทั้งที่เป็นคนละตัว
+   */
+  const [crossGroupAcknowledged, setCrossGroupAcknowledged] = useState(false);
+  useEffect(() => {
+    setCrossGroupAcknowledged(false);
+  }, [prescriptions, drugAllergiesText]);
 
   // Construct updated patient object
   const buildUpdatedPatient = (newStatus?: QueueStatus): Patient => {
@@ -976,11 +1700,16 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       nurseNotes,
       importantInfoForDoctor,
       attachments,
-      triage: {
-        level: triageLevel,
-        priority: priorityLevel,
-        notes: triageNotes
-      },
+      // ไม่ส่ง triage ขึ้นไปถ้าจุดคัดกรองยังไม่ได้ประเมิน
+      // เดิมช่องพวกนี้มีค่าเริ่มต้นสมมติ ('Level 4: Less Urgent' / 'Medium')
+      // ทำให้เคสที่ยังไม่ถูกประเมินถูกส่งไปเป็น "ไม่ฉุกเฉิน" โดยอัตโนมัติ
+      triage: triageLevel
+        ? {
+            level: triageLevel as NonNullable<Patient['triage']>['level'],
+            priority: (priorityLevel || 'Medium') as NonNullable<Patient['triage']>['priority'],
+            notes: triageNotes,
+          }
+        : undefined,
       nursingAssessment: {
         generalAppearance: nurseGenAppearance,
         consciousness: nurseConsciousness,
@@ -1018,6 +1747,8 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       treatmentPlan,
       proceduresPerformed,
       prescriptions,
+      disposition,
+      issuedDocuments: collectIssuedDocuments(),
       labOrders,
       imagingOrders,
       referral: {
@@ -1165,7 +1896,104 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   };
 
   // Complete Visit Validation & Execution
-  const handleCompleteVisit = () => {
+  /**
+   * รวมสิ่งที่แพทย์บันทึกไว้ทั้ง 4 แท็บ เป็นรายการสรุปสำหรับกล่องยืนยัน
+   * เรียงตามลำดับแท็บบนหน้าจอ เพื่อให้แพทย์ไล่ตรวจได้ตรงกับที่เพิ่งกรอกมา
+   */
+  const buildVisitSummary = (): { section: string; items: string[] }[] => {
+    const isTh = language === 'th';
+    const docLabel: Record<string, string> = {
+      'medical-certificate': isTh ? 'ใบรับรองแพทย์' : 'Medical Certificate',
+      'non-formulary': isTh ? 'ใบรับรองยานอกบัญชี' : 'Non-Formulary Certificate',
+      'insurance-claim': isTh ? 'ใบเคลมประกัน' : 'Insurance Claim',
+      'referral-opinion': isTh ? 'ใบรับรองความเห็นแพทย์เพื่อการส่งต่อ' : 'Referral Opinion',
+      dental: isTh ? 'ใบรักษาโรคฟันและโรคเหงือก' : 'Dental Treatment Form',
+    };
+
+    // --- การวินิจฉัย ---
+    const diagItems: string[] = [];
+    if (primaryDiag?.code) {
+      diagItems.push(`${primaryDiag.code} ${primaryDiag.localName || primaryDiag.name}`);
+    }
+    secondaryDiags.forEach((d) => {
+      if (d.code) diagItems.push(`${d.code} ${d.localName || d.name}`);
+    });
+
+    // --- การสั่งยา ---
+    // ใส่ขนาดกับความถี่ต่อท้ายด้วย เพราะจุดที่พลาดบ่อยคือสั่งยาถูกตัวแต่ผิดขนาด
+    // ถ้าโชว์แต่ชื่อยา การตรวจทานตรงนี้ก็แทบไม่ได้ช่วยอะไร
+    const rxItems = prescriptions.map((rx) =>
+      [rx.medicineName, rx.dosage, rx.frequency].filter(Boolean).join(' · ')
+    );
+
+    // --- เอกสาร & การส่งต่อ ---
+    const docItems = collectIssuedDocuments().map((doc) => {
+      const name = doc.type === 'other' ? doc.name || '' : docLabel[doc.type] || doc.type;
+      // ใส่จำนวนเฉพาะเอกสารที่พิมพ์ได้และสั่งมากกว่า 1 ฉบับ
+      return doc.quantity > 1 ? `${name} × ${doc.quantity}` : name;
+    });
+    if (disposition === 'home') docItems.push(isTh ? 'สถานะ: กลับบ้าน' : 'Disposition: Discharge home');
+    if (disposition === 'refer') docItems.push(isTh ? 'สถานะ: Refer' : 'Disposition: Refer');
+
+    // --- นัดหมายติดตามอาการ ---
+    const followUpItems: string[] = [];
+    if (hasFollowUp && followUpDate) {
+      followUpItems.push(
+        [
+          isTh ? `วันนัด ${followUpDate}` : `Date ${followUpDate}`,
+          followUpReason,
+        ].filter(Boolean).join(' · ')
+      );
+      if (followUpInstructions) followUpItems.push(followUpInstructions);
+    }
+
+    // --- ผลการตรวจร่างกาย 8 ระบบ ---
+    // แสดงเฉพาะระบบที่แพทย์กรอกไว้จริง ไม่ต้องขึ้นทั้ง 8 ระบบให้รก
+    // ระบบที่ไม่ได้กรอก = ไม่ได้ตรวจ ซึ่งเป็นเรื่องปกติในคลินิกทั่วไป
+    const peFields: { label: string; value: string }[] = [
+      { label: isTh ? 'สภาพทั่วไป' : 'General', value: generalAppearance },
+      { label: isTh ? 'ศีรษะ ตา หู คอ จมูก' : 'HEENT', value: heent },
+      { label: isTh ? 'หัวใจและหลอดเลือด' : 'Cardiovascular', value: cardiovascular },
+      { label: isTh ? 'ระบบหายใจ' : 'Respiratory', value: respiratory },
+      { label: isTh ? 'ช่องท้อง' : 'Abdomen', value: abdomen },
+      { label: isTh ? 'กล้ามเนื้อและกระดูก' : 'Musculoskeletal', value: musculoskeletal },
+      { label: isTh ? 'ระบบประสาท' : 'Neurological', value: neurological },
+      { label: isTh ? 'ผิวหนัง' : 'Skin', value: skin },
+    ];
+    const peItems = peFields
+      .filter((f) => (f.value || '').trim() !== '')
+      .map((f) => `${f.label}: ${f.value.trim()}`);
+
+    // --- สรุปผลการตรวจ ---
+    const conclusionItems: string[] = [];
+    if (assessmentNotes.trim()) {
+      conclusionItems.push(
+        `${isTh ? 'การประเมินและวินิจฉัยเบื้องต้น' : 'Assessment'}: ${assessmentNotes.trim()}`
+      );
+    }
+    if (treatmentPlan.trim()) {
+      conclusionItems.push(
+        `${isTh ? 'แผนการรักษาและหัตถการ' : 'Treatment plan'}: ${treatmentPlan.trim()}`
+      );
+    }
+
+    // เรียงตามลำดับที่แพทย์กรอกจริงในแต่ละแท็บ ไล่ตรวจได้ตรงกับที่เพิ่งทำมา
+    return [
+      { section: isTh ? 'การตรวจร่างกาย' : 'Physical Examination', items: peItems },
+      { section: isTh ? 'สรุปผลการตรวจ' : 'Visit Conclusion', items: conclusionItems },
+      { section: isTh ? 'การวินิจฉัยโรค' : 'Diagnosis', items: diagItems },
+      { section: isTh ? 'การสั่งยา' : 'Prescription', items: rxItems },
+      { section: isTh ? 'เอกสาร & การส่งต่อ' : 'Documents & Referral', items: docItems },
+      { section: isTh ? 'นัดหมายติดตามอาการ' : 'Follow-Up', items: followUpItems },
+    ];
+  };
+
+  /**
+   * @param ackCrossGroup แพทย์เพิ่งกดรับทราบเรื่องแพ้ข้ามกลุ่มมาจากกล่องเตือน
+   *   ต้องรับเป็นพารามิเตอร์ ไม่อ่านจาก state เพราะ setState ยังไม่ทันมีผล
+   *   ในจังหวะที่ฟังก์ชันนี้ถูกเรียกต่อทันทีจาก onConfirm
+   */
+  const handleCompleteVisit = (ackCrossGroup = false) => {
     const warnings: ValidationIssue[] = [];
 
     // เช็คเฉพาะสิ่งที่ "แพทย์กรอกเองได้" เท่านั้น
@@ -1178,22 +2006,95 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         anchor: EXAM_ANCHOR.diagnosis,
       });
     }
-    if (allergyAlert) {
+    // การประเมินและวินิจฉัยเบื้องต้น เป็นเหตุผลทางการแพทย์ที่อธิบายว่า
+    // ทำไมถึงวินิจฉัยแบบนี้และรักษาแบบนี้ ถ้าไม่มี เวชระเบียนจะมีแต่รหัสโรค
+    // แต่ไม่มีใครรู้ว่าแพทย์คิดจากอะไร ซึ่งเป็นปัญหาเวลาผู้ป่วยกลับมาตรวจซ้ำ
+    // หรือเวลาต้องใช้เวชระเบียนอ้างอิงย้อนหลัง
+    if (!assessmentNotes.trim()) {
       warnings.push({
-        message: allergyAlert,
-        tab: 'prescription',
-        anchor: EXAM_ANCHOR.prescription,
+        message: language === 'th'
+          ? 'กรุณากรอก "การประเมินและวินิจฉัยเบื้องต้น" ก่อนเสร็จสิ้นการตรวจ'
+          : 'Required Field Missing: Please fill in the Assessment Notes before completing the visit.',
+        tab: 'diagnosis',
+        anchor: EXAM_ANCHOR.assessment,
       });
     }
+    // แพ้ยาเช็คก่อนเรื่องอื่นทั้งหมด เพราะเป็นความปลอดภัยของผู้ป่วยโดยตรง
+    // ไม่ใช่แค่ "กรอกไม่ครบ" และแสดงเป็นกล่องกลางจอ ไม่ใช่แบนเนอร์ที่ค้างไว้เฉยๆ
+    if (blockingAllergies.length > 0) {
+      setConfirmDialog({
+        tone: 'danger',
+        title: language === 'th' ? 'พบยาที่ผู้ป่วยแพ้!' : 'Drug Allergy Detected!',
+        message: language === 'th'
+          ? 'รายการสั่งยามียาที่ผู้ป่วยมีประวัติแพ้ ปิดการตรวจไม่ได้จนกว่าจะแก้ไข'
+          : 'The prescription contains a medicine this patient is allergic to. The visit cannot be completed until this is resolved.',
+        patient: {
+          name: patient.name,
+          hn: patient.hn,
+          vn: displayVN(patient.vn),
+        },
+        hint: blockingAllergies.map((c) => describeConflict(c, language)).join('\n'),
+        confirmLabel: language === 'th' ? 'ไปแก้ไขรายการยา' : 'Go to prescription',
+        onConfirm: () =>
+          focusIssue({
+            message: '',
+            tab: 'prescription',
+            anchor: EXAM_ANCHOR.prescription,
+          }),
+      });
+      return;
+    }
 
+    /**
+     * แพ้ข้ามกลุ่ม เตือนแต่ไม่บล็อก
+     *
+     * เช่นผู้ป่วยแพ้ Penicillin แล้วแพทย์สั่ง Amoxicillin ซึ่งอยู่กลุ่มเดียวกัน
+     * ทางการแพทย์เป็น "ความเสี่ยง" ไม่ใช่ข้อห้ามเด็ดขาด แพทย์เป็นคนตัดสินใจ
+     * แต่ต้องบังคับให้เห็นก่อนหนึ่งครั้ง ไม่ใช่ปล่อยผ่านไปเงียบๆ แบบเดิม
+     */
+    if (crossGroupAllergies.length > 0 && !crossGroupAcknowledged && !ackCrossGroup) {
+      setConfirmDialog({
+        tone: 'danger',
+        title: language === 'th' ? 'ยากลุ่มเดียวกับที่ผู้ป่วยแพ้' : 'Same Drug Class as Recorded Allergy',
+        message: language === 'th'
+          ? 'ยาที่สั่งอยู่ในกลุ่มเดียวกับยาที่ผู้ป่วยมีประวัติแพ้ อาจเกิดการแพ้ข้ามตัวได้'
+          : 'A prescribed medicine belongs to the same class as a recorded allergy. Cross-reactivity is possible.',
+        patient: {
+          name: patient.name,
+          hn: patient.hn,
+          vn: displayVN(patient.vn),
+        },
+        hint: crossGroupAllergies.map((c) => describeConflict(c, language)).join('\n'),
+        confirmLabel: language === 'th' ? 'รับทราบ สั่งยานี้ต่อ' : 'Acknowledge and continue',
+        onConfirm: () => {
+          setCrossGroupAcknowledged(true);
+          // ไปต่อที่หน้าสรุปทันที ไม่ต้องให้แพทย์กดปุ่มบันทึกซ้ำอีกรอบ
+          handleCompleteVisit(true);
+        },
+      });
+      return;
+    }
+
+    // แผนการรักษาและหัตถการ บอกว่าจะทำอะไรต่อกับผู้ป่วย
+    // คู่กับการประเมินด้านบนคือ "คิดว่าเป็นอะไร" กับ "แล้วจะทำอย่างไร"
+    // ขาดข้อใดข้อหนึ่งไป เวชระเบียนก็ตอบคำถามได้ไม่ครบ
+    if (!treatmentPlan.trim()) {
+      warnings.push({
+        message: language === 'th'
+          ? 'กรุณากรอก "แผนการรักษาและหัตถการ" ก่อนเสร็จสิ้นการตรวจ'
+          : 'Required Field Missing: Please fill in the Treatment Plan before completing the visit.',
+        tab: 'diagnosis',
+        anchor: EXAM_ANCHOR.assessment,
+      });
+    }
     if (warnings.length > 0) {
-      setValidationWarnings(warnings);
-      // พาไปที่ช่องแรกที่ยังขาดทันที ไม่ต้องให้ผู้ใช้ไล่หาเอง
+      // ไม่มีแผงเตือนสีเหลืองด้านบนแล้ว ใช้วิธีพาไปที่ช่องแรกที่ยังขาดแทน
+      // แล้ววางเคอร์เซอร์ให้พร้อมพิมพ์ทันที (ดู focusIssue)
+      // ช่องที่บังคับกรอกมีดาวแดงกำกับไว้อยู่แล้ว จึงรู้ได้ตั้งแต่ก่อนกดบันทึก
       focusIssue(warnings[0]);
       return;
     }
 
-    setValidationWarnings([]);
     setConfirmDialog({
       tone: 'primary',
       title: language === 'th' ? 'บันทึกและเสร็จสิ้นการตรวจ?' : 'Save & Complete Visit?',
@@ -1220,6 +2121,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               : `Note: ${triageGaps.join(' and ')} not received from triage.`)
           : '',
       ].filter(Boolean).join('\n'),
+      summary: buildVisitSummary(),
       confirmLabel: language === 'th' ? 'ยืนยันบันทึก' : 'Confirm & Complete',
       onConfirm: runCompleteVisit
     });
@@ -1446,7 +2348,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           </button>
 
           <button
-            onClick={handleCompleteVisit}
+            onClick={() => handleCompleteVisit()}
             className="px-4 py-1.5 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <CheckCircle className="w-3.5 h-3.5" />
@@ -1455,17 +2357,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         </div>
       </div>
 
-      {/* Auto-save notification */}
-      {/* Drug Allergy Critical Alert Banner */}
-      {allergyAlert && (
-        <div className="bg-red-50 text-red-900 border-2 border-red-300 p-4 rounded-2xl flex items-start gap-3 shadow-xs animate-bounce">
-          <ShieldAlert className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
-          <div className="space-y-0.5">
-            <h4 className="font-bold text-sm text-red-900">Drug Allergy Safety Warning!</h4>
-            <p className="text-xs text-red-800 font-medium">{allergyAlert}</p>
-          </div>
-        </div>
-      )}
+      {/* แบนเนอร์เตือนแพ้ยาแบบค้างอยู่บนหน้าจอถูกถอดออกแล้ว
+          เปลี่ยนไปเตือนเป็นกล่องกลางจอตอนกด "บันทึกและเสร็จสิ้นการตรวจ" แทน
+          (ดู handleCompleteVisit) เพราะแบนเนอร์ที่ค้างอยู่ตลอดจะถูกมองข้ามในที่สุด
+          ส่วนกล่องกลางจอบังคับให้ตัดสินใจก่อนถึงจะไปต่อได้ */}
 
       {/* แจ้งว่าข้อมูลจากจุดคัดกรองยังไม่ครบ — ไม่ได้ห้ามปิดเคส แค่ให้รู้ */}
       {triageGaps.length > 0 && (
@@ -1491,30 +2386,6 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         </div>
       )}
 
-      {/* Validation Warnings Panel */}
-      {validationWarnings.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl text-amber-900 text-xs space-y-2">
-          <div className="font-bold flex items-center gap-1.5 text-amber-900">
-            <AlertTriangle className="w-4 h-4 text-amber-600" />
-            <span>{language === 'th' ? 'รายการตรวจสอบความถูกต้องก่อนบันทึกการตรวจ' : 'Pre-Completion Validation Checks'}</span>
-          </div>
-          {/* กดที่แต่ละบรรทัดเพื่อกระโดดไปยังช่องที่ยังกรอกไม่ครบ */}
-          <ul className="list-disc list-inside space-y-1 text-amber-800 font-medium">
-            {validationWarnings.map((w, idx) => (
-              <li key={idx}>
-                <button
-                  type="button"
-                  onClick={() => focusIssue(w)}
-                  className="text-left underline decoration-amber-400 underline-offset-2 hover:text-amber-950 cursor-pointer"
-                >
-                  {w.message}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {/* PATIENT INFORMATION BANNER - Modern High-Legibility Light Layout */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
         <div className="p-6 sm:p-7 space-y-6">
@@ -1534,7 +2405,9 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   </span>
                   <CopyableText label="HN" value={patient.hn} className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
                   <CopyableText label="VN" value={displayVN(patient.vn)} className="bg-purple-50 text-purple-700 border border-purple-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
-                  <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={nationalId} className="bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
+                  {/* แสดงแบบมีขีดคั่นให้อ่านง่าย แต่คัดลอกได้เป็นตัวเลขล้วน
+                      เพราะระบบอื่นที่เอาไปวางต่อรับเฉพาะตัวเลข */}
+                  <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={formatNationalId(nationalId)} copyValue={rawNationalId(nationalId)} className="bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
                   <span className="bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold px-2.5 py-0.5 rounded-full">
                     {language === 'th'
                       ? status === 'Waiting' ? 'รอตรวจ'
@@ -1610,7 +2483,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               {/* Box 4: National ID */}
               <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                 <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เลขบัตรประชาชน :' : 'National ID :'}</span>
-                <CopyableText value={nationalId} />
+                <CopyableText value={formatNationalId(nationalId)} copyValue={rawNationalId(nationalId)} />
               </div>
 
               {/* Box 5: Insurance Scheme */}
@@ -1631,7 +2504,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 </div>
                 <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                   <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เวลา :' : 'Visit Time :'}</span>
-                  <span className="font-bold text-slate-900 text-xs">{patient.visitTime || (language === 'th' ? '08:45 น.' : '08:45 AM')}</span>
+                  <span className="font-bold text-slate-900 text-xs">{patient.visitTime || '-'}</span>
                 </div>
               </div>
             </div>
@@ -1646,7 +2519,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             { id: 'notes', label: language === 'th' ? 'ข้อมูลคัดกรอง & ประวัติ' : 'Triage & History', icon: FileText },
             { id: 'diagnosis', label: language === 'th' ? 'การวินิจฉัยโรค' : 'Diagnosis & Assessment', icon: Stethoscope },
             { id: 'prescription', label: language === 'th' ? 'การสั่งยา' : 'Prescription', badge: prescriptions.length, icon: Pill },
-            { id: 'referral', label: language === 'th' ? 'การส่งต่อ & คำแนะนำ' : 'Referral & Counseling', icon: Send },
+            { id: 'referral', label: language === 'th' ? 'เอกสาร & การส่งต่อ' : 'Documents & Referral', icon: Send },
             { id: 'followup', label: language === 'th' ? 'นัดหมายติดตามอาการ' : 'Follow-up & Actions', icon: Calendar },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
@@ -1677,70 +2550,84 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         {activeTab === 'notes' && (
           <div className="p-6 space-y-6">
             {/* Chief Complaint (CC) - Sent from Triage (Read-only for doctor) */}
-            <div id={EXAM_ANCHOR.chiefComplaint} className="space-y-1.5 scroll-mt-28">
-              <label className="text-[13px] font-bold text-slate-800 uppercase tracking-wider block">
-                {language === 'th' ? 'อาการสำคัญ' : 'Chief Complaint (CC)'}
-              </label>
+            <div id={EXAM_ANCHOR.chiefComplaint} className="space-y-3 scroll-mt-28">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                {/* ยกเป็นหัวข้อใหญ่เท่ากับ "สัญญาณชีพ" และหัวข้ออื่นในแท็บ
+                    เดิมเป็นป้ายกำกับช่องตัวเล็ก ทั้งที่เป็นข้อมูลสำคัญที่สุดในหน้า
+                    คือเหตุผลที่ผู้ป่วยมาหาหมอ ควรเด่นกว่าหรืออย่างน้อยเท่ากับหัวข้ออื่น */}
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>{language === 'th' ? 'อาการสำคัญ' : 'Chief Complaint (CC)'}</span>
+                  <Stethoscope className="w-4 h-4 text-blue-600 shrink-0" />
+                </h3>
+
+                {/* ใครคัดกรอง และคัดกรองไว้ตอนไหน
+                    สองค่านี้ backend ส่งมาให้ตั้งแต่แรก (screened_by_name, screened_at)
+                    วางไว้ข้างหัวข้อแรกของแท็บ เพราะกำกับข้อมูลทุกอย่างในหน้านี้
+                    ที่ส่งมาจากจุดคัดกรอง ทั้งอาการสำคัญ สัญญาณชีพ และประวัติ
+                    จำเป็นมาก เพราะค่าที่วัดไว้หลายชั่วโมงก่อนใช้ตัดสินใจตอนนี้ไม่ได้ ต้องวัดซ้ำ
+                    ถ้ายังไม่มีผลคัดกรอง จะไม่ขึ้นแถบนี้เลย ไม่ใช่ขึ้นค่าว่าง */}
+                {(patient.screenedBy || patient.screenedAt) && (
+                  <span className="inline-flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs">
+                    <span className="inline-flex items-center gap-1.5 min-w-0">
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      {/* คำว่า "คัดกรองโดย" ซ่อนบนจอแคบ เหลือแค่ไอคอนกับชื่อ
+                          ความหมายยังชัดจากไอคอน และไม่ดันให้ป้ายยาวจนตกบรรทัด */}
+                      <span className="text-slate-400 font-medium hidden md:inline">
+                        {language === 'th' ? 'คัดกรองโดย' : 'Screened by'}
+                      </span>
+                      <span className="text-slate-700 font-semibold truncate">
+                        {patient.screenedBy || (language === 'th' ? 'ไม่ระบุผู้คัดกรอง' : 'Unknown')}
+                      </span>
+                    </span>
+
+                    {patient.screenedAt && (
+                      <>
+                        <span className="w-px h-3.5 bg-slate-200 shrink-0"></span>
+                        <span className="inline-flex items-center gap-1 shrink-0">
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="font-mono font-semibold text-slate-700">
+                            {formatScreenedAt(patient.screenedAt)}
+                          </span>
+                        </span>
+                      </>
+                    )}
+                  </span>
+                )}
+              </div>
               <div className="w-full min-h-[44px] px-3.5 py-2.5 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm text-slate-800 font-normal flex items-center">
                 {translateClinicalText(chiefComplaint, language) || <span className="text-slate-400 font-normal">- ไม่พบข้อมูลอาการสำคัญจากจุดคัดกรอง -</span>}
               </div>
             </div>
 
-            {/* Present Illness (PI) - Sent from Triage (Read-only for doctor) */}
-            <div className="space-y-1.5">
-              <label className="text-[13px] font-bold text-slate-800 uppercase tracking-wider block">
-                {language === 'th' ? 'ประวัติการเจ็บป่วยปัจจุบัน' : 'Present Illness (PI)'}
-              </label>
-              <div className="w-full min-h-[72px] p-3.5 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm text-slate-800 leading-relaxed font-normal">
-                {presentIllness ? (
-                  <p className="whitespace-pre-wrap">{translateClinicalText(presentIllness, language)}</p>
-                ) : (
-                  <span className="text-slate-400 font-normal">- ไม่พบข้อมูลประวัติการเจ็บป่วยปัจจุบันจากจุดคัดกรอง -</span>
-                )}
-              </div>
-            </div>
+            {/* ---- "ระยะเวลาที่เป็นมา" กับ "ประวัติการเจ็บป่วยปัจจุบัน" ถูกถอดออก ----
+                 เคยเพิ่มเป็นช่องกรอกไว้ แล้วเอาออกเพราะซ้ำซ้อนกับของที่มีอยู่แล้ว
 
-            {/* TRIAGE ASSESSMENT (Data Display Container) */}
-            <div className="space-y-3 pt-3 border-t border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <ClipboardCheck className="w-4 h-4 text-purple-600" />
-                <span>{language === 'th' ? 'การประเมินคัดกรองผู้ป่วย' : 'Triage Assessment'}</span>
-              </h3>
+                 ระยะเวลาที่เป็นมา: พยาบาลเขียนรวมอยู่ในช่อง "อาการสำคัญ" ด้านบนแล้ว
+                 (เช่น "ไข้ต่ำๆ ไอมีเสมหะ เจ็บคอ มา 3 วัน") การมีช่องแยกอีกช่อง
+                 ทำให้ข้อมูลเดียวกันอยู่สองที่ แล้วไม่มีใครรู้ว่าต้องเชื่อช่องไหน
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-slate-800 block">
-                    {language === 'th' ? 'ระดับความรุนแรง' : 'Triage Level'}
-                  </label>
-                  <div
-                    className="w-full h-10 px-3 border rounded-xl text-sm font-bold flex items-center gap-1.5"
-                    style={{ backgroundColor: tone.bg, borderColor: tone.border, color: tone.text }}
-                  >
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tone.dot }}></span>
-                    <span>{triageLevel || patient.triage?.level || (language === 'th' ? 'ระดับ 4: ไม่ฉุกเฉิน' : 'Level 4: Less Urgent')}</span>
-                  </div>
-                </div>
+                 ประวัติการเจ็บป่วยปัจจุบัน: ซ้ำกับ "การประเมินและวินิจฉัยเบื้องต้น"
+                 ในแท็บการวินิจฉัยโรค ซึ่งเป็นที่ที่แพทย์เขียนอยู่แล้วจริงๆ
 
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-slate-800 block">
-                    {language === 'th' ? 'ระดับความสำคัญ' : 'Priority Level'}
-                  </label>
-                  <div
-                    className="w-full h-10 px-3 border rounded-xl text-sm font-bold flex items-center gap-1.5"
-                    style={{ backgroundColor: tone.bg, borderColor: tone.border, color: tone.text }}
-                  >
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tone.dot }}></span>
-                    <span>{priorityLevel || patient.triage?.priority || (language === 'th' ? 'ความสำคัญปานกลาง' : 'Medium Priority')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+                 ตัวแปร chiefComplaintDuration / presentIllness ยังคงไว้
+                 เพื่อให้ค่าที่เคยบันทึกไว้ในฐานข้อมูลถูกส่งกลับไปตามเดิม ไม่ถูกล้างทิ้ง
+                 ถ้าวันหลังจุดคัดกรองส่งสองค่านี้มาจริง ค่อยเอาช่องกลับมาแสดง */}
+
+            {/* หัวข้อ "การประเมินคัดกรองผู้ป่วย" ถูกย้ายออกจากหน้านี้แล้ว
+                 ระดับความรุนแรงไปแสดงที่ตารางคิวผู้ป่วย (QueueTable.tsx) ต่อจากชื่อผู้ป่วย
+                 เพราะแพทย์ต้องเห็นความเร่งด่วน "ก่อน" กดเข้าตรวจ ไม่ใช่ตอนอยู่ในห้องตรวจแล้ว
+                 state triageLevel / priorityLevel / triageNotes ยังคงไว้
+                 เพื่อส่งค่าเดิมกลับตอนบันทึก ข้อมูลของพยาบาลจะได้ไม่ถูกล้าง */}
 
             {/* VITAL SIGNS (Data Display Container) */}
             <div id={EXAM_ANCHOR.vitals} className="space-y-3 pt-2 border-t border-slate-100 scroll-mt-28">
+              {/* ไอคอนอยู่ "หลัง" ข้อความ ตัวอักษรจึงเริ่มชิดขอบซ้ายตรงแนวเดียว
+                  กับป้ายกำกับช่องข้อมูลที่อยู่ใต้ลงไป อ่านไล่ลงมาแล้วไม่สะดุด
+                  แถบ "คัดกรองโดย ... • เวลา" ย้ายไปอยู่บรรทัดหัวข้ออาการสำคัญด้านบนแล้ว
+                  เพราะกำกับข้อมูลทุกอย่างที่มาจากจุดคัดกรอง ไม่ใช่แค่สัญญาณชีพ */}
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Activity className="w-4 h-4 text-blue-600" />
                 <span>{language === 'th' ? 'สัญญาณชีพ' : 'Vital Signs'}</span>
+                <Activity className="w-4 h-4 text-blue-600" />
               </h3>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3.5">
@@ -1749,7 +2636,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'ความดันโลหิต' : 'BP (mmHg)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {bp || '120/80'}
+                    {bp || <span className="text-slate-400 font-normal">{NOT_MEASURED[language === 'th' ? 'th' : 'en']}</span>}
                   </div>
                 </div>
 
@@ -1758,7 +2645,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'ชีพจร' : 'HR / Pulse (bpm)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {pulse || 78} {language === 'th' ? 'ครั้ง/นาที' : 'bpm'}
+                    {pulse !== undefined ? `${fmtVital(pulse)} ${language === 'th' ? 'ครั้ง/นาที' : 'bpm'}` : <span className="text-slate-400 font-normal">{NOT_MEASURED[language === 'th' ? 'th' : 'en']}</span>}
                   </div>
                 </div>
 
@@ -1767,7 +2654,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'อุณหภูมิ' : 'Temp (°C)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {temp ? `${temp}°C` : '38.2°C'}
+                    {temp !== undefined ? `${fmtVital(temp, 1)}°C` : <span className="text-slate-400 font-normal">{NOT_MEASURED[language === 'th' ? 'th' : 'en']}</span>}
                   </div>
                 </div>
 
@@ -1776,7 +2663,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'น้ำหนัก' : 'Weight (kg)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {weight || 70} {language === 'th' ? 'กก.' : 'kg'}
+                    {weight !== undefined ? `${fmtVital(weight, 1)} ${language === 'th' ? 'กก.' : 'kg'}` : <span className="text-slate-400 font-normal">{NOT_MEASURED[language === 'th' ? 'th' : 'en']}</span>}
                   </div>
                 </div>
 
@@ -1785,7 +2672,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'ส่วนสูง' : 'Height (cm)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {height || 175} {language === 'th' ? 'ซม.' : 'cm'}
+                    {height !== undefined ? `${fmtVital(height)} ${language === 'th' ? 'ซม.' : 'cm'}` : <span className="text-slate-400 font-normal">{NOT_MEASURED[language === 'th' ? 'th' : 'en']}</span>}
                   </div>
                 </div>
 
@@ -1794,7 +2681,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     BMI
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {bmi > 0 ? `${bmi} kg/m²` : '22.9 kg/m²'}
+                    {bmi > 0 ? `${fmtVital(bmi, 1)} kg/m²` : <span className="text-slate-400 font-normal">{NOT_MEASURED[language === 'th' ? 'th' : 'en']}</span>}
                   </div>
                 </div>
 
@@ -1803,7 +2690,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'ระดับออกซิเจนในเลือด' : 'SpO₂ (%)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {spo2 || 98}%
+                    {spo2 !== undefined ? `${fmtVital(spo2)}%` : <span className="text-slate-400 font-normal">{NOT_MEASURED[language === 'th' ? 'th' : 'en']}</span>}
                   </div>
                 </div>
 
@@ -1812,7 +2699,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     {language === 'th' ? 'อัตราการหายใจ' : 'Resp Rate (/min)'}
                   </label>
                   <div className="w-full h-10 px-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm font-bold text-slate-800 font-mono flex items-center">
-                    {respiratoryRate || 18} {language === 'th' ? 'ครั้ง/นาที' : '/min'}
+                    {respiratoryRate !== undefined ? `${fmtVital(respiratoryRate)} ${language === 'th' ? 'ครั้ง/นาที' : '/min'}` : <span className="text-slate-400 font-normal">{NOT_MEASURED[language === 'th' ? 'th' : 'en']}</span>}
                   </div>
                 </div>
 
@@ -1840,173 +2727,225 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               </div>
             </div>
 
-            {/* MEDICAL HISTORY, ALLERGIES & SOCIAL HABITS */}
-            <div className="space-y-3 pt-4 border-t border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 text-slate-700" />
-                <span>{language === 'th' ? 'ประวัติทางการแพทย์ แพ้ยา และพฤติกรรมสุขภาพ' : 'Medical History, Allergies & Social Habits'}</span>
-              </h3>
+            {/* ============================================================
+                ประวัติจากจุดคัดกรอง แยกเป็น 4 หัวข้อใหญ่
+                ============================================================
+                เดิมยัดทุกอย่างไว้ในตารางเดียว 12-13 ช่องเรียงติดกัน
+                อ่านแล้วไม่รู้ว่าอะไรสำคัญกว่าอะไร และหาของที่ต้องการไม่เจอ
 
-              <div className="flex flex-col gap-3.5">
-                {/* Drug Allergy */}
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-slate-800 block">
-                    {language === 'th' ? 'ประวัติแพ้ยา' : 'Drug Allergies'}
-                  </label>
-                  <div className={`w-full min-h-[44px] p-3 rounded-xl border grid grid-cols-1 sm:grid-cols-2 gap-3 items-center ${!noDrugAllergy && drugAllergiesText ? 'bg-rose-50/70 border-rose-200/80' : 'bg-[#f8fafc] border-slate-200'}`}>
-                    <div className="border-b sm:border-b-0 sm:border-r border-slate-200/80 pb-2 sm:pb-0 sm:pr-3">
-                      {!noDrugAllergy && drugAllergiesText ? (
-                        <span className="text-sm font-bold text-rose-900 block">{drugAllergiesText}</span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                    <div className="pt-1 sm:pt-0 sm:pl-1">
-                      {!noDrugAllergy && drugAllergiesText ? (
-                        <span className="text-sm font-medium text-rose-800 block">
-                          {language === 'th' 
-                            ? (drugAllergySymptoms === 'Rashes, Hives' ? 'ผื่นคัน, ลมพิษ' : drugAllergySymptoms)
-                            : (drugAllergySymptoms === 'ผื่นคัน, ลมพิษ (Rashes, Hives)' ? 'Rashes, Hives' : drugAllergySymptoms)}
-                        </span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                  </div>
+                เรียงตามลำดับที่แพทย์ต้องใช้จริงในห้องตรวจ
+                  1. ติดเชื้อไหม ต้องป้องกันตัวยังไง  -> รู้ก่อนแตะตัวผู้ป่วย
+                  2. แพ้อะไร มีโรคอะไรอยู่            -> รู้ก่อนคิดเรื่องยา
+                  3. ใช้ยา/สมุนไพรอะไรอยู่            -> รู้ตอนเลือกยาว่าตีกันไหม
+                  4. พฤติกรรมสุขภาพ                  -> ใช้ตอนให้คำแนะนำ ไม่เร่งด่วน
+                ============================================================ */}
+            <div className="space-y-6">
+              {/* --- 1. ความเสี่ยงติดเชื้อและการป้องกัน --------------------
+                  สามข้อนี้ต้องอยู่ด้วยกัน เพราะ URI/TB เป็น "เหตุ"
+                  และ Precaution เป็น "สิ่งที่ต้องทำ" ที่ตามมาจากสองข้อนั้น
+                  เช่น TB = มี ควรมาคู่กับ Airborne เสมอ ถ้าไม่ตรงกันแปลว่ามีอะไรผิด */}
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>{language === 'th' ? 'ความเสี่ยงติดเชื้อและการป้องกัน' : 'Infection Risk & Precautions'}</span>
+                  <Shield className="w-4 h-4 text-sky-600" />
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  <TriageFlag
+                    label={language === 'th' ? 'อาการติดเชื้อทางเดินหายใจส่วนบน (URI)' : 'Upper Respiratory Infection (URI)'}
+                    value={patient.hasURI}
+                    language={language}
+                  />
+
+                  <TriageFlag
+                    label={language === 'th' ? 'คัดกรองวัณโรค (TB)' : 'Tuberculosis Screening (TB)'}
+                    value={patient.hasTB}
+                    language={language}
+                  />
+
+                  <PrecautionCard value={patient.precautionType} language={language} />
                 </div>
+              </div>
 
-                {/* Food Allergy */}
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-slate-800 block">
-                    {language === 'th' ? 'ประวัติแพ้อาหาร' : 'Food Allergies'}
-                  </label>
-                  <div className="w-full min-h-[44px] p-3 bg-[#f8fafc] border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                    <div className="border-b sm:border-b-0 sm:border-r border-slate-200/80 pb-2 sm:pb-0 sm:pr-3">
-                      {!noFoodAllergy && foodAllergiesText ? (
-                        <span className="text-sm font-bold text-slate-900 block">{foodAllergiesText}</span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                    <div className="pt-1 sm:pt-0 sm:pl-1">
-                      {!noFoodAllergy && foodAllergiesText && foodAllergySymptoms ? (
-                        <span className="text-sm font-medium text-slate-800 block">{foodAllergySymptoms}</span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                  </div>
+              {/* --- 2. การแพ้และโรคประจำตัว -------------------------------
+                  สองเรื่องนี้อยู่ด้วยกันเพราะเป็น "สิ่งที่ผู้ป่วยเป็น" ซึ่งคงที่
+                  ไม่เปลี่ยนตามการมาตรวจแต่ละครั้ง ต่างจากยาที่ใช้อยู่ซึ่งเปลี่ยนได้ตลอด
+                  และเป็นข้อมูลที่ต้องอ่านให้จบก่อนเริ่มคิดเรื่องยา */}
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>{language === 'th' ? 'การแพ้และโรคประจำตัว' : 'Allergies & Underlying Conditions'}</span>
+                  <AlertTriangle className="w-4 h-4 text-rose-500" />
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {/* ประวัติแพ้ยา
+                      ไฮไลต์แดงเฉพาะตอนที่ "แพ้จริง" เท่านั้น
+                      เดิมเช็คแค่ว่ามีข้อความไหม พอพยาบาลพิมพ์ว่า "ปฏิเสธการแพ้ยา"
+                      ระบบก็ขึ้นกล่องแดงเหมือนผู้ป่วยแพ้ยา ซึ่งอ่านผิดไปคนละทาง
+                      ตอนนี้ตรวจคำปฏิเสธก่อน (ไม่ / ปฏิเสธ / no / none / NKA) */}
+                  <InfoCard
+                    label={language === 'th' ? 'ประวัติแพ้ยา' : 'Drug Allergies'}
+                    value={joinDetail(drugAllergiesText, drugAllergySymptoms)}
+                    danger={hasRealValue(drugAllergiesText) && !noDrugAllergy}
+                  />
+
+                  <InfoCard
+                    label={language === 'th' ? 'ประวัติแพ้อาหาร' : 'Food Allergies'}
+                    value={joinDetail(foodAllergiesText, foodAllergySymptoms)}
+                    danger={hasRealValue(foodAllergiesText) && !noFoodAllergy}
+                  />
+
+                  <InfoCard
+                    label={language === 'th' ? 'โรคประจำตัว' : 'Underlying Diseases'}
+                    value={noChronicDisease ? '' : chronicDiseasesText}
+                  />
                 </div>
+              </div>
 
-                {/* Chronic / Underlying Diseases */}
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-slate-800 block">
-                    {language === 'th' ? 'โรคประจำตัว' : 'Underlying Diseases'}
-                  </label>
-                  <div className="w-full min-h-[44px] p-3 bg-[#f8fafc] border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                    <div className="border-b sm:border-b-0 sm:border-r border-slate-200/80 pb-2 sm:pb-0 sm:pr-3">
-                      {!noChronicDisease && chronicDiseasesText ? (
-                        <span className="text-sm font-bold text-slate-900 block">{chronicDiseasesText}</span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                    <div className="pt-1 sm:pt-0 sm:pl-1">
-                      {!noChronicDisease && chronicDiseasesText ? (
-                        <span className="text-sm font-medium text-slate-700 block">{language === 'th' ? 'ติดตามอาการต่อเนื่อง' : 'Regular Follow-up'}</span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                  </div>
+              {/* --- 3. ยาที่ใช้อยู่ และข้อควรระวังก่อนสั่งยา ----------------
+                  ทุกช่องในกลุ่มนี้ตอบคำถามเดียวกันคือ "สั่งยาตัวนี้ให้ได้ไหม"
+                  ยาละลายลิ่มเลือดย้ายมาจากกลุ่มคัดกรองด้านบน เพราะมันคือ "ยา"
+                  ควรอยู่ข้างๆ ยาประจำและสมุนไพรที่เสริมฤทธิ์กันได้
+                  การตั้งครรภ์/ให้นมบุตรก็อยู่กลุ่มนี้ด้วยเหตุผลเดียวกัน */}
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>{language === 'th' ? 'ยาที่ใช้อยู่ และข้อควรระวังก่อนสั่งยา' : 'Current Medications & Prescribing Cautions'}</span>
+                  <Pill className="w-4 h-4 text-indigo-600" />
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  <InfoCard
+                    label={language === 'th' ? 'ยาที่รับประทานประจำ' : 'Current Medications'}
+                    value={currentMedicationsText}
+                  />
+
+                  <TriageFlag
+                    label={language === 'th' ? 'ใช้ยาละลายลิ่มเลือด' : 'On Anticoagulant'}
+                    value={patient.onAnticoagulant}
+                    language={language}
+                    presentTh="ใช้อยู่"
+                    absentTh="ไม่ได้ใช้"
+                    presentEn="Yes"
+                    absentEn="No"
+                  />
+
+                  {/* สมุนไพร / อาหารเสริม แยกจากช่องยาข้างบนโดยตั้งใจ
+                      ผู้ป่วยส่วนใหญ่ไม่คิดว่าสองอย่างนี้คือ "ยา" ถามรวมกันจะได้คำตอบว่า
+                      "ไม่ได้กินยาอะไร" ทั้งที่กินขมิ้นชันกับน้ำมันปลาอยู่
+
+                      ตีกับยาจริงได้ เช่น แปะก๊วย/น้ำมันปลา/ขิง เสริมฤทธิ์ยาละลายลิ่มเลือด
+                      St. John's Wort ทำให้ยาหลายตัวเสื่อมฤทธิ์ วิตามินเคต้าน warfarin */}
+                  <InfoCard
+                    label={language === 'th' ? 'สมุนไพร' : 'Herbal Medicines'}
+                    value={patient.herbalMedicines}
+                  />
+
+                  <InfoCard
+                    label={language === 'th' ? 'อาหารเสริม' : 'Dietary Supplements'}
+                    value={patient.dietarySupplements}
+                  />
+
+                  {/* คัดกรองเฉพาะผู้ป่วยหญิง
+                      แสดงเฉพาะเมื่อเป็นเพศหญิง เพราะถ้าขึ้นกับผู้ป่วยชายด้วย
+                      จะเป็นช่องที่ขึ้นว่า "ยังไม่ได้ประเมิน" ตลอดไปโดยไม่มีวันถูกกรอก
+                      ทำให้แพทย์ชินกับการเห็นช่องว่าง แล้วมองข้ามตอนที่มันสำคัญจริง */}
+                  {patient.gender === 'Female' && (
+                    <FemaleScreeningCard
+                      isPregnant={patient.isPregnant}
+                      isBreastfeeding={patient.isBreastfeeding}
+                      lastMenstrualPeriod={patient.lastMenstrualPeriod}
+                      language={language}
+                    />
+                  )}
                 </div>
+              </div>
 
-                {/* Current Medications */}
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-slate-800 block">
-                    {language === 'th' ? 'ยาที่รับประทานประจำ' : 'Current Medications'}
-                  </label>
-                  <div className="w-full min-h-[44px] p-3 bg-[#f8fafc] border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                    <div className="border-b sm:border-b-0 sm:border-r border-slate-200/80 pb-2 sm:pb-0 sm:pr-3">
-                      {currentMedicationsText ? (
-                        <span className="text-sm font-bold text-slate-900 block">{currentMedicationsText}</span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                    <div className="pt-1 sm:pt-0 sm:pl-1">
-                      {currentMedicationsText ? (
-                        <span className="text-sm font-medium text-slate-700 block">{language === 'th' ? 'ทานตามแพทย์สั่ง' : 'Take as prescribed'}</span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                  </div>
+              {/* --- 4. พฤติกรรมสุขภาพ -------------------------------------
+                  อยู่ท้ายสุดเพราะไม่ได้ใช้ตัดสินใจเร่งด่วนในห้องตรวจ
+                  แต่ใช้ตอนให้คำแนะนำและวางแผนติดตามอาการ */}
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>{language === 'th' ? 'พฤติกรรมสุขภาพ' : 'Social & Lifestyle History'}</span>
+                  <Heart className="w-4 h-4 text-teal-600" />
+                </h3>
+
+                {/* กลุ่มนี้มีแค่ 2 ช่อง จึงใช้ 2 คอลัมน์ ไม่ใช่ 3
+                    ถ้าใช้ 3 เหมือนกลุ่มอื่นจะเหลือช่องว่างค้างท้ายแถวหนึ่งช่อง
+                    ดูเหมือนมีอะไรหายไป ทั้งที่ครบแล้ว */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  {/* แสดงข้อความเดิมที่พยาบาลพิมพ์ไว้ตรงๆ ไม่ตีความใหม่
+                      จุดคัดกรองเก็บเป็นข้อความอิสระช่องเดียว ไม่ได้แยกความถี่กับระยะเวลา
+                      ถ้าจะแยกต้องให้จุดคัดกรองเพิ่มคอลัมน์ก่อน */}
+                  <InfoCard
+                    label={language === 'th' ? 'ประวัติการสูบบุหรี่' : 'Smoking History'}
+                    value={patient.smokingHistory?.status}
+                  />
+
+                  <InfoCard
+                    label={language === 'th' ? 'ประวัติการดื่มแอลกอฮอล์' : 'Alcohol Drinking'}
+                    value={patient.alcoholHistory?.status}
+                  />
                 </div>
+              </div>
 
-                {/* Smoking History */}
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-slate-800 block">
-                    {language === 'th' ? 'ประวัติการสูบบุหรี่' : 'Smoking History'}
-                  </label>
-                  <div className="w-full min-h-[44px] p-3 bg-[#f8fafc] border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                    <div className="border-b sm:border-b-0 sm:border-r border-slate-200/80 pb-2 sm:pb-0 sm:pr-3">
-                      {patient.smokingHistory?.status && (patient.smokingHistory.status.includes('Smoker') || patient.smokingHistory.status.includes('สูบ')) && !patient.smokingHistory.status.includes('ไม่') && !patient.smokingHistory.status.includes('Non') && !patient.smokingHistory.status.includes('ปฏิเสธ') ? (
-                        <span className="text-sm font-bold text-slate-900 block">{language === 'th' ? 'สูบบุหรี่' : 'Smoker'}</span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                    <div className="pt-1 sm:pt-0 sm:pl-1">
-                      {patient.smokingHistory?.status && (patient.smokingHistory.status.includes('Smoker') || patient.smokingHistory.status.includes('สูบ')) && !patient.smokingHistory.status.includes('ไม่') && !patient.smokingHistory.status.includes('Non') && !patient.smokingHistory.status.includes('ปฏิเสธ') ? (
-                        <span className="text-sm text-slate-700 font-medium block">
-                          {patient.smokingHistory?.frequency && patient.smokingHistory?.duration 
-                            ? `${patient.smokingHistory.frequency}, ${patient.smokingHistory.duration}`
-                            : patient.smokingHistory?.frequency || patient.smokingHistory?.duration || (language === 'th' ? '10 มวน/วัน, ประมาณ 5 ปี' : '10 cigarettes/day, ~5 years')}
-                        </span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+              {/* ============================================================
+                  แบบคัดกรองภาวะซึมเศร้า 2Q
+                  ============================================================
+                  แบบคัดกรองมาตรฐานของกรมสุขภาพจิต ถามถึงช่วง 2 สัปดาห์ที่ผ่านมา
+                  รวมวันนี้ ตอบว่า "มี" แม้เพียงข้อเดียว = ผลบวก ต้องประเมินต่อด้วย 9Q
 
-                {/* Alcohol Drinking History */}
-                <div className="space-y-1.5">
-                  <label className="text-[13px] font-bold text-slate-800 block">
-                    {language === 'th' ? 'ประวัติการดื่มแอลกอฮอล์' : 'Alcohol Drinking'}
-                  </label>
-                  <div className="w-full min-h-[44px] p-3 bg-[#f8fafc] border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
-                    <div className="border-b sm:border-b-0 sm:border-r border-slate-200/80 pb-2 sm:pb-0 sm:pr-3">
-                      {patient.alcoholHistory?.status && (patient.alcoholHistory.status.includes('Drinker') || patient.alcoholHistory.status.includes('ดื่ม')) && !patient.alcoholHistory.status.includes('ไม่') && !patient.alcoholHistory.status.includes('Non') && !patient.alcoholHistory.status.includes('ปฏิเสธ') ? (
-                        <span className="text-sm font-bold text-slate-900 block">{language === 'th' ? 'ดื่มแอลกอฮอล์' : 'Drinker'}</span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                    <div className="pt-1 sm:pt-0 sm:pl-1">
-                      {patient.alcoholHistory?.status && (patient.alcoholHistory.status.includes('Drinker') || patient.alcoholHistory.status.includes('ดื่ม')) && !patient.alcoholHistory.status.includes('ไม่') && !patient.alcoholHistory.status.includes('Non') && !patient.alcoholHistory.status.includes('ปฏิเสธ') ? (
-                        <span className="text-sm text-slate-700 font-medium block">
-                          {patient.alcoholHistory?.frequency && patient.alcoholHistory?.duration 
-                            ? `${patient.alcoholHistory.frequency}, ${patient.alcoholHistory.duration}`
-                            : patient.alcoholHistory?.frequency || patient.alcoholHistory?.duration || (language === 'th' ? '2-3 ครั้ง/สัปดาห์, ประมาณ 8 ปี' : '2-3 times/week, ~8 years')}
-                        </span>
-                      ) : (
-                        <span className="text-sm font-medium text-slate-400 block">--</span>
-                      )}
-                    </div>
-                  </div>
+                  แยกเป็นหัวข้อใหญ่ของตัวเอง ไม่ยัดรวมกับกลุ่มประวัติด้านบน
+                  เพราะเป็นแบบคัดกรองที่มีเกณฑ์แปลผลชัดเจน ไม่ใช่ข้อมูลประวัติทั่วไป
+                  และผลบวกมีสิ่งที่แพทย์ต้องทำต่อทันที */}
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>{language === 'th' ? '2Q (2 สัปดาห์)' : '2Q Depression Screening (2 weeks)'}</span>
+                  <HeartPulse className="w-4 h-4 text-rose-500" />
+                </h3>
+
+                <p className="text-xs text-slate-500 -mt-1">
+                  {language === 'th'
+                    ? 'ในช่วง 2 สัปดาห์ที่ผ่านมา รวมทั้งวันนี้ ผู้ป่วยมีอาการต่อไปนี้หรือไม่'
+                    : 'In the past 2 weeks, including today, has the patient experienced:'}
+                </p>
+
+                {/* สองคำถามของ 2Q ใช้ 2 คอลัมน์เต็มแถว ด้วยเหตุผลเดียวกับกลุ่มพฤติกรรมสุขภาพ */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <TriageFlag
+                    label={language === 'th' ? 'หดหู่ เศร้า ท้อแท้' : 'Depressed mood'}
+                    value={patient.q2Depressed}
+                    language={language}
+                    presentTh="มีอาการ"
+                    absentTh="ไม่มีอาการ"
+                    presentEn="Yes"
+                    absentEn="No"
+                  />
+
+                  <TriageFlag
+                    label={language === 'th' ? 'เบื่อหน่าย' : 'Anhedonia'}
+                    value={patient.q2Anhedonia}
+                    language={language}
+                    presentTh="มีอาการ"
+                    absentTh="ไม่มีอาการ"
+                    presentEn="Yes"
+                    absentEn="No"
+                  />
                 </div>
               </div>
 
               {/* ADDITIONAL NOTES & DOCTOR HANDOVER */}
               <div className="pt-4 border-t border-slate-100">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                {/* เหลือช่องเดียวแล้ว (กล่อง "ข้อมูลสำคัญแจ้งแพทย์" ถูกถอดออกไป)
+                    จึงเลิกใช้ตาราง 2 คอลัมน์ ให้ยาวเต็มความกว้าง
+                    เหมาะกับเนื้อหาด้วย เพราะเป็นข้อความยาวที่พยาบาลพิมพ์มา
+                    บีบให้เหลือครึ่งจอจะขึ้นบรรทัดใหม่บ่อยโดยไม่จำเป็น */}
+                <div className="grid grid-cols-1 gap-3.5">
                   {/* Nurse Notes Display */}
                   <div className="space-y-1.5">
+                    {/* ไอคอนอยู่ "หลัง" ข้อความ เหมือนหัวข้อสัญญาณชีพและประวัติทางการแพทย์ */}
                     <label className="text-[13px] font-bold text-slate-800 flex items-center gap-1.5 block">
-                      <FileText className="w-3.5 h-3.5 text-blue-600" />
                       <span>{language === 'th' ? 'บันทึกการคัดกรองเบื้องต้น' : 'Initial Triage Notes'}</span>
+                      <FileText className="w-3.5 h-3.5 text-blue-600" />
                     </label>
                     <div className="w-full min-h-[48px] p-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm text-slate-800 leading-relaxed font-normal flex items-center">
                       {(nurseNotes || triageNotes || patient.triage?.notes) ? (
@@ -2021,22 +2960,13 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Important Alerts for Doctor Display */}
-                  <div className="space-y-1.5">
-                    <label className="text-[13px] font-bold text-amber-900 flex items-center gap-1.5 block">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                      <span>{language === 'th' ? 'ข้อมูลสำคัญแจ้งแพทย์' : 'Important Alerts for Doctor'}</span>
-                    </label>
-                    <div className="w-full min-h-[48px] p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-sm text-amber-950 font-medium leading-relaxed flex items-center">
-                      {importantInfoForDoctor ? (
-                        <p className="whitespace-pre-wrap">{importantInfoForDoctor}</p>
-                      ) : (
-                        <span className="text-amber-700/60 font-normal">
-                          {language === 'th' ? '- ไม่มีข้อความสำคัญหรือข้อควรระวังแจ้งแพทย์ -' : '- No critical alerts for doctor -'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  {/* กล่อง "ข้อมูลสำคัญแจ้งแพทย์" ถูกถอดออก
+                      ตาราง screenings ของพยาบาลไม่มีคอลัมน์นี้ พยาบาลจึงกรอกไม่ได้
+                      กล่องนี้ขึ้นว่า "ไม่มีข้อความสำคัญหรือข้อควรระวังแจ้งแพทย์" ตลอดไป
+                      ซึ่งอันตราย เพราะแพทย์อ่านแล้วเข้าใจว่า "พยาบาลตรวจแล้วไม่มีอะไรต้องระวัง"
+                      ทั้งที่ความจริงคือไม่มีใครเคยกรอกช่องนี้ได้เลย
+                      ถ้าอยากได้กลับมา ต้องให้เจ้าของ role พยาบาลเพิ่มคอลัมน์ในตาราง screenings ก่อน
+                      แล้วค่อยส่งผ่าน ScreeningBrief มาให้ (ตัวแปร importantInfoForDoctor ยังอยู่ครบ) */}
                 </div>
               </div>
             </div>
@@ -2049,8 +2979,9 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             
             {/* PHYSICAL EXAMINATION SYSTEM FINDINGS */}
             <div className="space-y-3">
-              <h3 className="text-lg font-bold text-slate-900">
-                {language === 'th' ? 'ผลการตรวจร่างกายตามระบบ' : 'Physical Examination System Findings'}
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <span>{language === 'th' ? 'การตรวจร่างกาย' : 'Physical Examination'}</span>
+                <Stethoscope className="w-4 h-4 text-blue-600 shrink-0" />
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
@@ -2155,15 +3086,96 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 outline-hidden transition-all resize-none leading-relaxed"
                   />
                 </div>
+
+                {/* 2 ช่องล่างนี้เพิ่มทีหลัง ตอนแรกฟอร์มมีแค่ 6 ระบบ
+                    แต่ทั้งตาราง examinations, DTO และ types.ts ออกแบบไว้ 8 ระบบ
+                    ตัวแปร neurological / skin มีอยู่แล้วและถูกส่งไปบันทึกทุกครั้ง
+                    แค่ไม่มี textarea ผูกกับมัน ค่าที่บันทึกจึงเป็นค่าว่างเสมอ
+                    ผลคือหน้าประวัติโชว์ "ระบบประสาท: -" ซึ่งอ่านได้ว่า "ตรวจแล้วปกติ"
+                    ทั้งที่ความจริงคือไม่เคยมีช่องให้แพทย์ตรวจเลย */}
+                <div>
+                  <label className="text-[13px] font-bold text-slate-800 block mb-1">
+                    {language === 'th' ? 'ระบบประสาท' : 'Neurological'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={neurological}
+                    onChange={(e) => setNeurological(e.target.value)}
+                    placeholder={
+                      language === 'th'
+                        ? 'รู้สึกตัวดี ไม่มีอาการทางระบบประสาทเฉพาะที่...'
+                        : 'Alert and oriented, no focal neurological deficit...'
+                    }
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 outline-hidden transition-all resize-none leading-relaxed"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[13px] font-bold text-slate-800 block mb-1">
+                    {language === 'th' ? 'ผิวหนัง' : 'Skin'}
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={skin}
+                    onChange={(e) => setSkin(e.target.value)}
+                    placeholder={
+                      language === 'th'
+                        ? 'ผิวหนังปกติ ไม่มีผื่น ไม่มีจุดเลือดออก...'
+                        : 'No rash, no petechiae, normal turgor...'
+                    }
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 outline-hidden transition-all resize-none leading-relaxed"
+                  />
+                </div>
               </div>
             </div>
             
+            {/* Assessment Notes & Treatment Plan Textareas
+                วางต่อจาก "การตรวจร่างกาย" เพราะเป็นบทสรุปของสิ่งที่เพิ่งตรวจ
+                แล้วค่อยไปเลือกรหัส ICD-10 ด้านล่าง */}
+            <div id={EXAM_ANCHOR.assessment} className="space-y-3 pt-3 border-t border-slate-100 scroll-mt-28">
+              <div className="pb-2 border-b border-slate-200/80">
+                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>{language === 'th' ? 'สรุปผลการตรวจ' : 'Visit Conclusion'}</span>
+                  <ClipboardCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[13px] font-bold text-slate-800 block mb-1">
+                    {language === 'th' ? 'การประเมินและวินิจฉัยเบื้องต้น' : 'Assessment Notes'}
+                    <span className="text-red-600"> *</span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={assessmentNotes}
+                    onChange={(e) => setAssessmentNotes(e.target.value)}
+                    placeholder={language === 'th' ? 'ระบุเหตุผลทางการแพทย์ ข้อควรพิจารณา การประเมินความรุนแรง...' : 'Enter clinical reasoning, severity assessment, and considerations...'}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[13px] font-bold text-slate-800 block mb-1">
+                    {language === 'th' ? 'แผนการรักษาและหัตถการ' : 'Treatment Plan & Procedures'}
+                    <span className="text-red-600"> *</span>
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={treatmentPlan}
+                    onChange={(e) => setTreatmentPlan(e.target.value)}
+                    placeholder={language === 'th' ? 'ระบุแผนการดูแล คำแนะนำที่ไม่ใช้ยา หัตถการที่ทำ...' : 'Enter care plan, non-pharmacological advice, procedures performed...'}
+                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+                  />
+                </div>
+              </div>
+            </div>
             {/* 1. ICD-10 SEARCH & AUTOCOMPLETE */}
             <div id={EXAM_ANCHOR.diagnosis} className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200 relative scroll-mt-28">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-200/80">
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>{language === 'th' ? 'ค้นหารหัสโรค ICD-10' : 'Search ICD-10 Diagnosis'}</span>
                   <Search className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span>{language === 'th' ? '1. ค้นหารหัสโรค ICD-10' : '1. Search ICD-10 Diagnosis'}</span>
                 </h3>
                 <span className="text-xs font-medium text-slate-500">
                   {language === 'th' ? 'ค้นหาจากรหัสโรค ชื่อภาษาไทย หรือภาษาอังกฤษ' : 'Search by Code, English or Thai name'}
@@ -2272,56 +3284,64 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   </>
                 )}
               </div>
+
+              {/* โรคที่วินิจฉัยบ่อย ย้ายมาอยู่ใต้ช่องค้นหาในการ์ดเดียวกัน
+                  เดิมแยกเป็นการ์ดของตัวเอง ทั้งที่ทำงานเดียวกัน
+                  คือ "เลือกโรคเข้ารายการ" แค่คนละวิธี (พิมพ์หา vs กดจากรายการที่ใช้บ่อย)
+                  แยกการ์ดทำให้ดูเหมือนสองขั้นตอนที่ต้องทำทั้งคู่ ทั้งที่เลือกทางไหนก็ได้
+
+                  ใช้ป้ายกำกับตัวเล็กแทนหัวข้อใหญ่ เพราะเป็นทางลัดของช่องค้นหาด้านบน
+                  ไม่ใช่หัวข้อระดับเดียวกัน */}
+              <div className="pt-1">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
+                  <span className="text-[13px] font-bold text-slate-800">
+                    {language === 'th' ? 'โรคที่วินิจฉัยบ่อย' : 'Recent Diagnoses'}
+                  </span>
+                  <span className="text-xs font-medium text-slate-500">
+                    {language === 'th' ? 'คลิกเพื่อเพิ่มลงในรายการวินิจฉัยปัจจุบัน' : 'Click to add directly to current diagnosis list'}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {recentDiagnoses.map((item) => {
+                    const selected = isCodeSelected(item.code);
+                    return (
+                      <button
+                        key={item.code}
+                        type="button"
+                        onClick={() => handleSelectDiagnosis(item)}
+                        disabled={selected}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all flex items-center gap-1.5 ${
+                          selected
+                            ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-75'
+                            : 'bg-white hover:bg-blue-50 text-slate-800 border-slate-200 hover:border-blue-300 hover:text-blue-900 cursor-pointer shadow-2xs'
+                        }`}
+                      >
+                        <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                          {item.code}
+                        </span>
+                        <span>{item.name}</span>
+                        {selected ? (
+                          <Check className="w-3 h-3 text-emerald-600 ml-1" />
+                        ) : (
+                          <Plus className="w-3 h-3 text-slate-400 ml-0.5" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
-            {/* 2. RECENT DIAGNOSIS SECTION */}
+            {/* 2. SELECTED DIAGNOSIS LIST */}
             <div className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-200/80">
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span>{language === 'th' ? '2. โรคที่วินิจฉัยบ่อย' : '2. Recent Diagnoses'}</span>
-                </h3>
-                <span className="text-xs font-medium text-slate-500">
-                  {language === 'th' ? 'คลิกเพื่อเพิ่มลงในรายการวินิจฉัยปัจจุบัน' : 'Click to add directly to current diagnosis list'}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap gap-2 pt-1">
-                {recentDiagnoses.map((item) => {
-                  const selected = isCodeSelected(item.code);
-                  return (
-                    <button
-                      key={item.code}
-                      type="button"
-                      onClick={() => handleSelectDiagnosis(item)}
-                      disabled={selected}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-all flex items-center gap-1.5 ${
-                        selected
-                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-75'
-                          : 'bg-white hover:bg-blue-50 text-slate-800 border-slate-200 hover:border-blue-300 hover:text-blue-900 cursor-pointer shadow-2xs'
-                      }`}
-                    >
-                      <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
-                        {item.code}
-                      </span>
-                      <span>{item.name}</span>
-                      {selected ? (
-                        <Check className="w-3 h-3 text-emerald-600 ml-1" />
-                      ) : (
-                        <Plus className="w-3 h-3 text-slate-400 ml-0.5" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* 3. SELECTED DIAGNOSIS LIST */}
-            <div className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-200/80">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                  <span>
+                    {language === 'th' ? 'รายการโรคที่วินิจฉัยแล้ว' : 'Selected Diagnoses List'}
+                    <span className="text-red-600"> *</span>
+                  </span>
                   <ClipboardCheck className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span>{language === 'th' ? '3. รายการโรคที่วินิจฉัยแล้ว' : '3. Selected Diagnoses List'}</span>
                 </h3>
                 <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
                   {language === 'th'
@@ -2345,96 +3365,154 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 </div>
               )}
 
-              <div className="space-y-3">
-                {/* PRIMARY DIAGNOSIS ITEM */}
-                {primaryDiag ? (
-                  <div className="p-4 bg-blue-50/70 border-2 border-blue-300 rounded-2xl space-y-2 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-blue-600 text-white text-[11px] font-bold px-2.5 py-1 rounded-lg uppercase flex items-center gap-1">
-                          <Star className="w-3 h-3 fill-current" /> {language === 'th' ? 'การวินิจฉัยหลัก' : 'Primary Diagnosis'}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-blue-900 bg-white px-2 py-0.5 rounded border border-blue-200">
-                          {primaryDiag.code}
-                        </span>
-                      </div>
+              {/* ============================================================
+                  รายการโรคที่วินิจฉัยแล้ว จัดเป็น "ตาราง" แถวเดียวต่อโรค
+                  ============================================================
+                  เดิมแต่ละโรคเป็นการ์ดลอยๆ สูงสองบรรทัด มีกรอบของตัวเอง
+                  พอมี 4 โรคขึ้นไป จะกลายเป็นกล่องเรียงกันเต็มจอ อ่านไม่ออกว่า
+                  โรคไหนเป็นหลัก โรคไหนเป็นร่วม และมีทั้งหมดกี่รายการ
 
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => startEditDiagnosis('primary', primaryDiag.name)}
-                          className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                        >
-                          <Edit3 className="w-3 h-3" /> {language === 'th' ? 'แก้ไข' : 'Edit'}
-                        </button>
-                        {secondaryDiags.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={handleDemotePrimary}
-                            className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"
-                          >
-                            {language === 'th' ? 'เปลี่ยนเป็นโรครอง' : 'Set as Secondary'}
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={handleRemovePrimary}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
-                          title={language === 'th' ? 'ลบรายการวินิจฉัยหลัก' : 'Remove Primary Diagnosis'}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+                  เปลี่ยนเป็นกรอบเดียวคั่นด้วยเส้นบาง แต่ละแถวมี
+                    เลขลำดับ -> รหัส ICD -> ชื่อโรค -> ปุ่มจัดการ
+                  ตำแหน่งตรงกันทุกแถว กวาดตาลงมาอ่านได้ทีเดียว
+                  โรคหลักใช้พื้นสีฟ้ากับดาว แทนการตีกรอบหนาทั้งใบ
+                  ============================================================ */}
+              {/* ยังไม่มีโรคเลย ไม่ต้องขึ้นกรอบเปล่า เพราะการ์ดเตือนสีเหลืองด้านบน
+                  บอกอยู่แล้วว่ายังไม่ได้ระบุการวินิจฉัย กรอบว่างเปล่าไม่ได้เพิ่มอะไร */}
+              {/* จำกัดความสูงไว้ประมาณ 5 แถว เกินกว่านั้นให้เลื่อนดูข้างใน
+                  แถวหนึ่งสูงราว 66px (py-3 + ชื่อโรค 1 บรรทัด + ป้ายกำกับตัวเล็ก)
+                  5 แถว = ~330px เผื่อไว้ 336px
+
+                  ทำไมต้องจำกัด: ผู้ป่วยบางรายวินิจฉัยได้ 8-10 โรค ถ้าปล่อยยาวหมด
+                  การ์ดนี้จะดันช่องอื่นในแท็บหลุดออกนอกจอ ต้องเลื่อนทั้งหน้าไปมา
+                  ตัดให้เลื่อนเฉพาะในรายการ ตำแหน่งของส่วนอื่นในหน้าจะอยู่คงที่ */}
+              {(primaryDiag || secondaryDiags.length > 0) && (
+              <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100 max-h-[336px] overflow-y-auto">
+                {/* PRIMARY DIAGNOSIS ROW
+                    ใช้พื้นฟ้าบอกว่าเป็นโรคหลัก ไม่มีแถบสีด้านซ้ายและไม่แยกกรอบ
+                    แถวจะได้เรียงตรงกับแถวอื่นในตารางเดียวกัน */}
+                {primaryDiag ? (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 bg-blue-100/70">
+                    <span className="w-7 h-7 shrink-0 rounded-full bg-blue-600 text-white flex items-center justify-center">
+                      <Star className="w-3.5 h-3.5 fill-current" />
+                    </span>
+
+                    <span className="shrink-0 text-xs font-mono font-bold text-blue-900 bg-white px-2 py-1 rounded-lg border border-blue-200">
+                      {primaryDiag.code}
+                    </span>
 
                     {editingDiagTarget === 'primary' ? (
-                      <div className="flex items-center gap-2 pt-1">
+                      <div className="flex items-center gap-2 flex-1 min-w-[220px]">
                         <input
                           type="text"
                           value={editDiagText}
                           onChange={(e) => setEditDiagText(e.target.value)}
-                          className="flex-1 p-2 bg-white border border-blue-300 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+                          className="flex-1 px-3 py-1.5 bg-white border border-blue-300 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                         />
                         <button
                           type="button"
                           onClick={saveEditDiagnosis}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-xl cursor-pointer"
+                          className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-xl cursor-pointer shrink-0"
                         >
                           {language === 'th' ? 'บันทึก' : 'Save'}
                         </button>
                       </div>
                     ) : (
-                      <div className="text-sm font-bold text-slate-900 pl-1">
-                        {primaryDiag.name} {primaryDiag.localName ? `(${primaryDiag.localName})` : ''}
+                      <div className="flex-1 min-w-[220px]">
+                        <p className="text-sm font-bold text-slate-900 leading-snug">
+                          {primaryDiag.name} {primaryDiag.localName ? `(${primaryDiag.localName})` : ''}
+                        </p>
+                        <p className="text-[11px] font-bold text-blue-700 mt-0.5">
+                          {language === 'th' ? 'การวินิจฉัยหลัก' : 'Primary Diagnosis'}
+                        </p>
                       </div>
                     )}
+
+                    <div className="flex items-center gap-1.5 ml-auto shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => startEditDiagnosis('primary', primaryDiag.name)}
+                        className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3 h-3" /> {language === 'th' ? 'แก้ไข' : 'Edit'}
+                      </button>
+
+                      {secondaryDiags.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleDemotePrimary}
+                          className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer whitespace-nowrap"
+                        >
+                          {language === 'th' ? 'เปลี่ยนเป็นโรครอง' : 'Set as Secondary'}
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={handleRemovePrimary}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                        title={language === 'th' ? 'ลบรายการวินิจฉัยหลัก' : 'Remove Primary Diagnosis'}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   secondaryDiags.length > 0 && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs font-bold text-red-800 flex items-center justify-between">
-                      <span>{language === 'th' ? '⚠️ ยังไม่มีการวินิจฉัยหลัก! โปรดเลือกโรคใต้อันนี้ให้เป็นโรคหลัก' : '⚠️ Missing Primary Diagnosis! Please set one of the diagnoses below as Primary.'}</span>
+                    <div className="px-4 py-3 bg-red-50 text-xs font-bold text-red-800 flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>{language === 'th' ? 'ยังไม่มีการวินิจฉัยหลัก โปรดตั้งโรคใดโรคหนึ่งด้านล่างเป็นโรคหลัก' : 'Missing Primary Diagnosis! Please set one of the diagnoses below as Primary.'}</span>
                     </div>
                   )
                 )}
 
-                {/* SECONDARY DIAGNOSES ITEMS */}
+                {/* SECONDARY DIAGNOSIS ROWS */}
                 {secondaryDiags.map((diag, index) => (
                   <div
                     key={diag.code + '-' + index}
-                    className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 hover:border-slate-300 transition-all"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 bg-white hover:bg-slate-50/80 transition-colors"
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="bg-slate-200 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">
-                          {language === 'th' ? `การวินิจฉัยร่วม #${index + 1}` : `Secondary #${index + 1}`}
-                        </span>
-                        <span className="text-xs font-mono font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">
-                          {diag.code}
-                        </span>
-                      </div>
+                    {/* เลขลำดับเริ่มที่ 2 เพราะโรคหลักคือลำดับที่ 1 เสมอ
+                        ให้เลขบนจอตรงกับลำดับที่บันทึกลงเวชระเบียนจริง */}
+                    <span className="w-7 h-7 shrink-0 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold flex items-center justify-center">
+                      {index + 2}
+                    </span>
 
-                      <div className="flex items-center gap-1.5">
-                        {/* Reorder Buttons */}
+                    <span className="shrink-0 text-xs font-mono font-bold text-slate-800 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                      {diag.code}
+                    </span>
+
+                    {editingDiagTarget === index ? (
+                      <div className="flex items-center gap-2 flex-1 min-w-[220px]">
+                        <input
+                          type="text"
+                          value={editDiagText}
+                          onChange={(e) => setEditDiagText(e.target.value)}
+                          className="flex-1 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+                        />
+                        <button
+                          type="button"
+                          onClick={saveEditDiagnosis}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-xl cursor-pointer shrink-0"
+                        >
+                          {language === 'th' ? 'บันทึก' : 'Save'}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex-1 min-w-[220px]">
+                        <p className="text-sm font-semibold text-slate-800 leading-snug">
+                          {diag.name} {diag.localName ? `(${diag.localName})` : ''}
+                        </p>
+                        <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+                          {language === 'th' ? 'การวินิจฉัยร่วม' : 'Secondary'}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-1.5 ml-auto shrink-0">
+                      {/* ปุ่มเลื่อนลำดับ ซ่อนเมื่อมีโรคร่วมแค่รายการเดียว
+                          เพราะกดแล้วไม่มีอะไรเกิดขึ้น มีไว้ก็รกเปล่าๆ */}
+                      {secondaryDiags.length > 1 && (
                         <div className="flex items-center border border-slate-200 rounded-lg bg-white overflow-hidden mr-1">
                           <button
                             type="button"
@@ -2449,94 +3527,45 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                             type="button"
                             disabled={index === secondaryDiags.length - 1}
                             onClick={() => handleMoveSecondaryDown(index)}
-                            className="p-1 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 cursor-pointer border-l border-slate-150"
+                            className="p-1 hover:bg-slate-100 disabled:opacity-30 disabled:hover:bg-transparent text-slate-600 cursor-pointer border-l border-slate-200"
                             title={language === 'th' ? 'เลื่อนลง' : 'Move Down'}
                           >
                             <ArrowDown className="w-3.5 h-3.5" />
                           </button>
                         </div>
+                      )}
 
-                        <button
-                          type="button"
-                          onClick={() => handlePromoteToPrimary(index)}
-                          className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-300 rounded-lg text-xs font-bold cursor-pointer"
-                        >
-                          {language === 'th' ? 'ตั้งเป็นโรคหลัก' : 'Set as Primary'}
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => handlePromoteToPrimary(index)}
+                        className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-300 rounded-lg text-xs font-bold cursor-pointer whitespace-nowrap"
+                      >
+                        {language === 'th' ? 'ตั้งเป็นโรคหลัก' : 'Set as Primary'}
+                      </button>
 
-                        <button
-                          type="button"
-                          onClick={() => startEditDiagnosis(index, diag.name)}
-                          className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
-                        >
-                          <Edit3 className="w-3 h-3" /> {language === 'th' ? 'แก้ไข' : 'Edit'}
-                        </button>
+                      <button
+                        type="button"
+                        onClick={() => startEditDiagnosis(index, diag.name)}
+                        className="px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3 h-3" /> {language === 'th' ? 'แก้ไข' : 'Edit'}
+                      </button>
 
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSecondary(index)}
-                          className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
-                          title={language === 'th' ? 'ลบรายการ' : 'Remove Diagnosis'}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSecondary(index)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg cursor-pointer transition-colors"
+                        title={language === 'th' ? 'ลบรายการ' : 'Remove Diagnosis'}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-
-                    {editingDiagTarget === index ? (
-                      <div className="flex items-center gap-2 pt-1">
-                        <input
-                          type="text"
-                          value={editDiagText}
-                          onChange={(e) => setEditDiagText(e.target.value)}
-                          className="flex-1 p-2 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
-                        />
-                        <button
-                          type="button"
-                          onClick={saveEditDiagnosis}
-                          className="px-3 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-xl cursor-pointer"
-                        >
-                          {language === 'th' ? 'บันทึก' : 'Save'}
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="text-sm font-semibold text-slate-800 pl-1">
-                        {diag.name} {diag.localName ? `(${diag.localName})` : ''}
-                      </div>
-                    )}
                   </div>
                 ))}
               </div>
+              )}
             </div>
 
-            {/* Assessment Notes & Treatment Plan Textareas */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-3 border-t border-slate-100">
-              <div>
-                <label className="text-[13px] font-bold text-slate-800 block mb-1">
-                  {language === 'th' ? 'เหตุผลทางการแพทย์และการประเมิน' : 'Assessment Notes'}
-                </label>
-                <textarea
-                  rows={4}
-                  value={assessmentNotes}
-                  onChange={(e) => setAssessmentNotes(e.target.value)}
-                  placeholder={language === 'th' ? 'ระบุเหตุผลทางการแพทย์ ข้อควรพิจารณา การประเมินความรุนแรง...' : 'Enter clinical reasoning, severity assessment, and considerations...'}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="text-[13px] font-bold text-slate-800 block mb-1">
-                  {language === 'th' ? 'แผนการรักษาและหัตถการ' : 'Treatment Plan & Procedures'}
-                </label>
-                <textarea
-                  rows={4}
-                  value={treatmentPlan}
-                  onChange={(e) => setTreatmentPlan(e.target.value)}
-                  placeholder={language === 'th' ? 'ระบุแผนการดูแล คำแนะนำที่ไม่ใช้ยา หัตถการที่ทำ...' : 'Enter care plan, non-pharmacological advice, procedures performed...'}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
-                />
-              </div>
-            </div>
 
           </div>
         )}
@@ -2547,8 +3576,15 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             {/* Add New Medicine Form */}
             <div id={EXAM_ANCHOR.prescription} className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 scroll-mt-28">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Plus className="w-4 h-4 text-[#2563eb]" />
                 <span>{language === 'th' ? 'ค้นหาและสั่งจ่ายยา' : 'Search & Prescribe Medicine'}</span>
+
+                {/* ไอคอนอยู่หลังข้อความ เหมือนหัวข้ออื่นในหน้านี้
+                    วงกลมสีเขียวรองหลังเครื่องหมายบวก เพราะ + ลอยๆ
+                    ดูเหมือนสัญลักษณ์ที่ค้างมาจากที่อื่น พอมีวงกลมรอง
+                    จะอ่านออกทันทีว่าเป็นไอคอน "เพิ่มรายการ" */}
+                <span className="w-5 h-5 shrink-0 rounded-full bg-emerald-500 flex items-center justify-center">
+                  <Plus className="w-3 h-3 text-white" strokeWidth={3.5} />
+                </span>
               </h3>
 
               {/* Medicine Selector & Search */}
@@ -2934,9 +3970,45 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {prescriptions.map((p) => (
-                        <tr key={p.id} className="hover:bg-slate-50">
-                          <td className="p-3 font-bold text-slate-900">{p.medicineName}</td>
+                      {prescriptions.map((p) => {
+                        /* ยาที่ชนประวัติแพ้ต้องเห็นได้ทันทีที่เพิ่มเข้ามา
+                           ไม่ใช่รอไปโผล่ตอนกดบันทึกอย่างเดียว เพราะกว่าจะถึงตอนนั้น
+                           แพทย์กรอกอย่างอื่นต่อไปหมดแล้ว การย้อนกลับมาแก้เสียเวลากว่า */
+                        const conflict = conflictByMedicine.get(p.medicineName);
+
+                        return (
+                        <tr
+                          key={p.id}
+                          className={
+                            conflict === 'exact'
+                              ? 'bg-red-50 hover:bg-red-100/70'
+                              : conflict === 'group'
+                                ? 'bg-amber-50 hover:bg-amber-100/70'
+                                : 'hover:bg-slate-50'
+                          }
+                        >
+                          <td className="p-3 font-bold text-slate-900">
+                            <div className="flex items-center gap-2">
+                              <span>{p.medicineName}</span>
+                              {conflict && (
+                                <span
+                                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md border whitespace-nowrap ${
+                                    conflict === 'exact'
+                                      ? 'bg-red-100 text-red-800 border-red-300'
+                                      : 'bg-amber-100 text-amber-900 border-amber-300'
+                                  }`}
+                                  title={allergyConflicts
+                                    .filter((c) => c.medicineName === p.medicineName)
+                                    .map((c) => describeConflict(c, language))
+                                    .join('\n')}
+                                >
+                                  {conflict === 'exact'
+                                    ? (language === 'th' ? 'ผู้ป่วยแพ้ยานี้' : 'ALLERGY')
+                                    : (language === 'th' ? 'กลุ่มเดียวกับที่แพ้' : 'SAME CLASS')}
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="p-3 text-slate-700">{p.dosage} • {p.frequency}</td>
                           <td className="p-3 text-slate-600">{p.duration}</td>
                           <td className="p-3 font-mono font-bold text-slate-800">{p.quantity}</td>
@@ -2955,7 +4027,8 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -2964,76 +4037,126 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           </div>
         )}
 
-        {/* TAB 4: REFERRAL & COUNSELING */}
+        {/* TAB 4: DOCUMENTS & REFERRAL */}
         {activeTab === 'referral' && (
           <div className="p-6 space-y-6">
-            {/* Referral Form */}
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-slate-900">
-                {language === 'th' ? 'การส่งต่อผู้ป่วยระหว่างแผนกและผู้เชี่ยวชาญ' : 'Inter-Departmental Specialty Referral'}
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-white p-4 rounded-2xl border border-slate-200">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    {language === 'th' ? 'แผนกที่ส่งต่อ' : 'Referral Department'}
-                  </label>
-                  <select
-                    value={refDept}
-                    onChange={(e) => setRefDept(e.target.value)}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
-                  >
-                    <option value="">{language === 'th' ? '-- เลือกแผนกผู้เชี่ยวชาญ --' : '-- Select Specialty --'}</option>
-                    <option value="Cardiology">{language === 'th' ? 'แผนกโรคหัวใจ' : 'Cardiology'}</option>
-                    <option value="Orthopedics">{language === 'th' ? 'แผนกศัลยกรรมกระดูก' : 'Orthopedics'}</option>
-                    <option value="Neurology">{language === 'th' ? 'แผนกประสาทวิทยา' : 'Neurology'}</option>
-                    <option value="Otolaryngology (ENT)">{language === 'th' ? 'แผนกหู คอ จมูก' : 'Otolaryngology (ENT)'}</option>
-                    <option value="Dermatology">{language === 'th' ? 'แผนกโรคผิวหนัง' : 'Dermatology'}</option>
-                  </select>
-                </div>
+            {/* ============================================================
+                เอกสารทั่วไป
+                ============================================================
+                ขั้นตอนคือ ติ๊กว่าต้องการ -> ระบุจำนวน -> กดพิมพ์
+                ปุ่มพิมพ์ถูกปิดไว้จนกว่าจะติ๊ก เพื่อกันการพิมพ์เอกสารที่ไม่ได้ตั้งใจ
+                ซึ่งเป็นเอกสารที่มีผลทางกฎหมาย ไม่ควรออกโดยพลาดกดปุ่ม
 
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    {language === 'th' ? 'เหตุผลในการส่งต่อ' : 'Reason for Referral'}
-                  </label>
-                  <input
-                    type="text"
-                    value={refReason}
-                    onChange={(e) => setRefReason(e.target.value)}
-                    placeholder={language === 'th' ? 'เช่น ประเมินระบบหัวใจอย่างละเอียด' : 'e.g. Further cardiac evaluation'}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
-                  />
-                </div>
+                ช่องส่งต่อผู้ป่วยและคำแนะนำถูกถอด UI ออกตามที่สั่ง
+                แต่ตัวแปร refDept / refReason / counselMed / counselLifestyle
+                ยังคงไว้ เพื่อส่งค่าเดิมกลับตอนบันทึก ข้อมูลเก่าจะได้ไม่ถูกล้าง
+                ============================================================ */}
+            <div className="space-y-3">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <span>{language === 'th' ? 'เอกสารทั่วไป' : 'General Documents'}</span>
+                <FileText className="w-4 h-4 text-blue-600" />
+              </h3>
+
+              <p className="text-xs text-slate-500 -mt-1">
+                {language === 'th'
+                  ? 'เลือกเอกสารที่ต้องการออกให้ผู้ป่วย ระบุจำนวนฉบับ แล้วจึงกดพิมพ์ (บันทึกลงเวชระเบียนเมื่อกดบันทึกการตรวจ)'
+                  : 'Select the documents to issue, set the number of copies, then print. Saved with the examination record.'}
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+                <DocumentRequestCard
+                  label={language === 'th' ? 'ใบรับรองแพทย์' : 'Medical Certificate'}
+                  checked={wantMedicalCert}
+                  onCheckedChange={setWantMedicalCert}
+                  quantity={medicalCertQty}
+                  onQuantityChange={setMedicalCertQty}
+                  onPrint={() => printClinicDocument('medical-certificate', medicalCertQty)}
+                  printedAt={medicalCertPrintedAt}
+                  language={language}
+                />
+
+                <DocumentRequestCard
+                  label={language === 'th' ? 'ใบรับรองยานอกบัญชี' : 'Non-Formulary Drug Certificate'}
+                  checked={wantNonFormularyCert}
+                  onCheckedChange={setWantNonFormularyCert}
+                  quantity={nonFormularyQty}
+                  onQuantityChange={setNonFormularyQty}
+                  onPrint={() => printClinicDocument('non-formulary', nonFormularyQty)}
+                  printedAt={nonFormularyPrintedAt}
+                  language={language}
+                />
               </div>
             </div>
 
-            {/* Patient Counseling Section */}
-            <div className="space-y-3 pt-2">
-              <h3 className="text-lg font-bold text-slate-900">
-                {language === 'th' ? 'การให้คำปรึกษาและคำแนะนำผู้ป่วย' : 'Patient Counseling & Medical Advice'}
+            {/* ============================================================
+                เอกสารอื่นๆ
+                ============================================================
+                กลุ่มนี้ติ๊กอย่างเดียว ไม่มีจำนวนและไม่มีปุ่มพิมพ์
+                เพราะยังไม่มีแบบฟอร์มมาตรฐานในระบบ แพทย์ใช้ฟอร์มกระดาษของคลินิก
+                การติ๊กคือการบันทึกลงเวชระเบียนว่าออกเอกสารอะไรให้ผู้ป่วยไปบ้าง
+                ซึ่งจำเป็นเวลาผู้ป่วยกลับมาถามภายหลังว่าเคยได้ใบอะไรไปแล้ว
+                ============================================================ */}
+            <div className="space-y-3 pt-4 border-t border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <span>{language === 'th' ? 'เอกสารอื่นๆ' : 'Other Documents'}</span>
+                <FileSpreadsheet className="w-4 h-4 text-slate-600" />
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    {language === 'th' ? 'คำแนะนำเรื่องการใช้ยาและอาหาร' : 'Medication & Diet Advice'}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={counselMed}
-                    onChange={(e) => setCounselMed(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
-                  />
-                </div>
 
-                <div>
-                  <label className="text-xs font-semibold text-slate-600 block mb-1">
-                    {language === 'th' ? 'คำแนะนำการดำเนินชีวิตและการออกกำลังกาย' : 'Lifestyle & Exercise Guidance'}
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={counselLifestyle}
-                    onChange={(e) => setCounselLifestyle(e.target.value)}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+              <p className="text-xs text-slate-500 -mt-1">
+                {language === 'th'
+                  ? 'ติ๊กเพื่อบันทึกว่าออกเอกสารนี้ให้ผู้ป่วยแล้ว (ยังไม่มีแบบฟอร์มพิมพ์ในระบบ)'
+                  : 'Tick to record that this document was issued (no printable form in the system yet).'}
+              </p>
+
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                <DocumentCheckRow
+                  label={language === 'th' ? 'ใบเคลมประกัน' : 'Insurance Claim Form'}
+                  checked={wantInsuranceClaim}
+                  onCheckedChange={setWantInsuranceClaim}
+                />
+
+                <DocumentCheckRow
+                  label={language === 'th' ? 'ใบรับรองความเห็นแพทย์เพื่อการส่งต่อ' : "Physician's Referral Opinion"}
+                  checked={wantReferralOpinion}
+                  onCheckedChange={setWantReferralOpinion}
+                />
+
+                <DocumentCheckRow
+                  label={language === 'th' ? 'ใบรักษาโรคฟันและโรคเหงือก' : 'Dental & Periodontal Treatment Form'}
+                  checked={wantDental}
+                  onCheckedChange={setWantDental}
+                />
+
+                {/* ช่องสุดท้าย ติ๊กแล้วพิมพ์ชื่อเอกสารเอง
+                    มีไว้เพราะเอกสารที่คลินิกออกจริงมีมากกว่าที่ลิสต์ไว้
+                    ถ้าไม่มีช่องนี้ แพทย์จะไม่บันทึกเลย แล้วประวัติก็ขาดไป */}
+                <div className="space-y-2">
+                  <DocumentCheckRow
+                    label={language === 'th' ? 'อื่นๆ (ระบุชื่อเอกสาร)' : 'Other (specify)'}
+                    checked={wantOtherDoc}
+                    onCheckedChange={setWantOtherDoc}
                   />
+
+                  {wantOtherDoc && (
+                    <div className="pl-6.5">
+                      <input
+                        type="text"
+                        value={otherDocName}
+                        onChange={(e) => setOtherDocName(e.target.value)}
+                        placeholder={language === 'th' ? 'พิมพ์ชื่อเอกสาร' : 'Document name'}
+                        className="w-full max-w-md h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+                      />
+                      {/* ติ๊กแล้วแต่ยังไม่พิมพ์ชื่อ = บันทึกไปก็ไม่รู้ว่าเอกสารอะไร
+                          บอกให้รู้ตรงนี้เลย ดีกว่าปล่อยให้กดบันทึกแล้วข้อมูลหายเงียบๆ */}
+                      {otherDocName.trim() === '' && (
+                        <p className="text-[11px] text-amber-700 mt-1">
+                          {language === 'th'
+                            ? 'ต้องระบุชื่อเอกสาร ไม่งั้นจะไม่ถูกบันทึก'
+                            : 'Enter a document name, otherwise it will not be saved.'}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -3043,12 +4166,14 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         {/* TAB 6: FOLLOW-UP & VISIT ACTIONS */}
         {activeTab === 'followup' && (
           <div className="p-6 space-y-6">
-            {/* Follow-up Scheduler */}
-            <div className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200">
+            {/* Follow-up Scheduler
+                เอากรอบการ์ดออก และย้ายไอคอนไปหลังข้อความ
+                ให้หน้าตาตรงกับหัวข้ออื่นในหน้านี้ (สัญญาณชีพ / เอกสารทั่วไป / สถานะ) */}
+            <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-blue-600" />
                   <span>{language === 'th' ? 'การนัดหมายติดตามอาการครั้งถัดไป' : 'Schedule Next Follow-Up Visit'}</span>
+                  <Calendar className="w-4 h-4 text-blue-600" />
                 </h3>
                 <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 self-start sm:self-auto shadow-2xs">
                   <input
@@ -3070,7 +4195,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               </div>
 
               {!hasFollowUp ? (
-                <div className="p-4 bg-white/70 rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs text-center font-medium">
+                <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs text-center font-medium">
                   {language === 'th' ? 'ไม่มีการนัดหมายติดตามอาการสำหรับเคสนี้ (หากต้องการนัดหมาย ให้ทำเครื่องหมายเลือก "ต้องการนัดหมายติดตามอาการ")' : 'No follow-up appointment scheduled for this visit. Check "Schedule a follow-up appointment" if required.'}
                 </div>
               ) : (
@@ -3116,11 +4241,57 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               )}
             </div>
 
+            {/* ============================================================
+                สถานะผู้ป่วยหลังตรวจเสร็จ (Disposition)
+                ============================================================
+                เลือกได้อย่างเดียว เพราะการมาตรวจหนึ่งครั้งจบได้ทางเดียว
+                จะกลับบ้านและถูกส่งต่อพร้อมกันไม่ได้
+
+                วางไว้ก่อนปุ่มบันทึก เพราะเป็นสิ่งสุดท้ายที่แพทย์ตัดสินใจ
+                ก่อนปิดการตรวจ และเป็นข้อมูลที่ห้องยา/การเงินต้องรู้ต่อ
+                ============================================================ */}
+            <div className="space-y-3 pt-2">
+              {/* หัวข้อขึ้นบรรทัดของตัวเอง ตัวเลือกอยู่บรรทัดล่าง
+                  ให้โครงเหมือนหัวข้ออื่นในหน้านี้ ไม่ใช่หัวข้อเดียวที่วางเรียงแนวนอน */}
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <span>{language === 'th' ? 'สถานะ' : 'Disposition'}</span>
+                <Send className="w-4 h-4 text-blue-600" />
+              </h3>
+
+              {/* กรอบและการเรียงลงล่าง ทำให้เหมือนกลุ่ม "เอกสารอื่นๆ" ในแท็บก่อนหน้า
+                  ผู้ใช้จะได้ไม่ต้องเรียนรู้รูปแบบใหม่ในแต่ละหน้า */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+                {/* ใช้ช่องติ๊กหน้าตาเหมือนกลุ่มเอกสาร แต่เลือกได้ทีละอัน
+                    ติ๊กอันหนึ่งแล้วอีกอันจะถูกปลดให้เอง
+                    เพราะการมาตรวจหนึ่งครั้งจบได้ทางเดียว จะกลับบ้าน
+                    และถูกส่งต่อพร้อมกันไม่ได้
+
+                    ที่ไม่ใช้ radio เพราะ radio กดออกไม่ได้เมื่อเลือกไปแล้ว
+                    ถ้าแพทย์กดผิดจะติดอยู่กับค่านั้นตลอด ส่วนช่องติ๊กกดซ้ำเพื่อยกเลิกได้ */}
+                <DocumentCheckRow
+                  label={language === 'th' ? 'กลับบ้าน' : 'Discharge home'}
+                  checked={disposition === 'home'}
+                  onCheckedChange={(on) => setDisposition(on ? 'home' : '')}
+                />
+
+                <DocumentCheckRow
+                  label="Refer"
+                  checked={disposition === 'refer'}
+                  onCheckedChange={(on) => setDisposition(on ? 'refer' : '')}
+                />
+              </div>
+            </div>
+
             {/* Visit Action Center Buttons */}
             <div className="space-y-3 pt-2">
               <div className="border-b border-slate-100 pb-2">
-                <h3 className="text-lg font-bold text-slate-900">
-                  {language === 'th' ? 'สรุปการตรวจและเอกสารออกบริการ' : 'Visit Summary & Output Documents'}
+                {/* จัดกึ่งกลาง เพราะเป็นหัวข้อปิดท้ายของทั้งหน้า
+                    ไม่ใช่หัวข้อของช่องกรอกข้อมูลที่ต้องเรียงชิดซ้ายให้อ่านไล่ลงมา */}
+                <h3 className="text-lg font-bold text-slate-900 text-center">
+                  {/* เดิมชื่อ "สรุปการตรวจและเอกสารออกบริการ" แต่ปุ่มออกเอกสาร
+                      ถูกย้ายไปแท็บ "เอกสาร & การส่งต่อ" หมดแล้ว เหลือแต่ปุ่มปิดการตรวจ
+                      ชื่อเดิมจึงไม่ตรงกับสิ่งที่อยู่ข้างล่างอีกต่อไป */}
+                  {language === 'th' ? 'สรุปการตรวจ' : 'Visit Summary'}
                 </h3>
               </div>
 
@@ -3128,7 +4299,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   เพราะปุ่ม "กลับสู่หน้าคิวผู้ป่วย" ด้านบนสุดทำหน้าที่นั้นอยู่แล้ว
                   (เรียก handleExitExamination เหมือนกัน คืนคิวเป็น "รอตรวจ")
                   มีสองปุ่มที่ทำงานเหมือนกันคนละที่ ทำให้สับสนโดยไม่ได้อะไรเพิ่ม */}
-              <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {/* สีแดงสงวนไว้ให้การกระทำที่เอาผู้ป่วยออกจากคิวจริงเท่านั้น */}
                 <button
                   type="button"
@@ -3150,30 +4321,21 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
                 <button
                   type="button"
-                  onClick={handleCompleteVisit}
+                  onClick={() => handleCompleteVisit()}
                   className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer"
                 >
                   <CheckCircle className="w-4 h-4" />
                   <span>{language === 'th' ? 'บันทึกและเสร็จสิ้นการตรวจ' : 'Save & Complete Visit'}</span>
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => alert(language === 'th' ? `ออกใบรับรองแพทย์สำหรับ ${patient.name} (HN: ${patient.hn}) เรียบร้อยแล้ว` : `Medical Certificate generated for ${patient.name} (HN: ${patient.hn})`)}
-                  className="p-2.5 bg-white border border-slate-200 hover:border-blue-300 rounded-xl text-xs font-bold text-slate-800 flex items-center justify-center gap-2 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-                >
-                  <FileText className="w-4 h-4 text-blue-600" />
-                  <span>{language === 'th' ? 'ใบรับรองแพทย์' : 'Medical Certificate'}</span>
-                </button>
+                {/* ปุ่ม "ใบรับรองแพทย์" กับ "พิมพ์สรุปการตรวจ" ถูกถอดออก
+                    ทั้งสองปุ่มเรียกแค่ alert() ไม่ได้ออกเอกสารอะไรจริง
+                    การมีปุ่มที่กดแล้วขึ้นข้อความว่า "ออกเรียบร้อยแล้ว"
+                    ทั้งที่ไม่มีเอกสารออกมา อันตรายกว่าการไม่มีปุ่ม
+                    เพราะแพทย์อาจเข้าใจว่าออกให้ผู้ป่วยไปแล้ว
 
-                <button
-                  type="button"
-                  onClick={() => alert(language === 'th' ? `กำลังพิมพ์เอกสารสรุปการตรวจ OPD สำหรับ ${patient.name}...` : `Printing Official OPD Visit Summary for ${patient.name}...`)}
-                  className="p-2.5 bg-white border border-slate-200 hover:border-blue-300 rounded-xl text-xs font-bold text-slate-800 flex items-center justify-center gap-2 shadow-2xs hover:shadow-xs transition-all cursor-pointer"
-                >
-                  <Printer className="w-4 h-4 text-slate-700" />
-                  <span>{language === 'th' ? 'พิมพ์สรุปการตรวจ' : 'Print Visit Summary'}</span>
-                </button>
+                    การออกใบรับรองแพทย์ของจริงอยู่ที่แท็บ "เอกสาร & การส่งต่อ"
+                    ซึ่งพิมพ์ออกมาได้จริงและบันทึกลงเวชระเบียนด้วย */}
               </div>
             </div>
           </div>
@@ -3216,10 +4378,19 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
           onClick={() => setConfirmDialog(null)}
         >
+          {/* แบ่งกล่องเป็น 3 ส่วน หัว / เนื้อหา / ปุ่ม
+              เลื่อนเฉพาะส่วนเนื้อหาตรงกลาง ไม่เลื่อนทั้งกล่อง
+
+              เดิมให้ทั้งกล่องเลื่อน แถบเลื่อนจึงไปทาบขอบมนของกล่อง
+              ทำให้มุมดูแหว่งและแถบเลื่อนลอยติดขอบขาว
+              พอเลื่อนเฉพาะตรงกลาง หัวข้อกับปุ่มยืนยันก็อยู่กับที่ตลอด
+              ไม่ต้องเลื่อนกลับขึ้นไปดูว่ากำลังยืนยันอะไรอยู่ */}
           <div
-            className="bg-white rounded-3xl max-w-md w-full p-6 space-y-5 shadow-2xl border border-slate-100"
+            className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 max-h-[85vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* ส่วนหัว อยู่กับที่ */}
+            <div className="p-6 pb-4 space-y-5 shrink-0">
             <div
               className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ring-8 shadow-inner ${
                 confirmDialog.tone === 'danger'
@@ -3255,6 +4426,45 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   HN {confirmDialog.patient.hn}
                   {confirmDialog.patient.vn ? `  ·  VN ${confirmDialog.patient.vn}` : ''}
                 </p>
+              </div>
+            )}
+            </div>
+
+            {/* ส่วนเนื้อหา เลื่อนได้เฉพาะตรงนี้
+                px-6 ให้แถบเลื่อนอยู่ในกรอบขาว ไม่ทาบขอบมนของกล่อง */}
+            <div className="px-6 pb-2 space-y-5 flex-1 overflow-y-auto min-h-0">
+
+            {/* สรุปสิ่งที่แพทย์บันทึกไว้ ให้ตรวจทานก่อนกดยืนยัน
+                เพราะกดแล้วแก้ย้อนหลังไม่ได้ */}
+            {confirmDialog.summary && (
+              <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100 text-left overflow-hidden">
+                {confirmDialog.summary.map((group) => (
+                  <div key={group.section} className="px-4 py-3">
+                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      {group.section}
+                    </p>
+
+                    {group.items.length > 0 ? (
+                      <ul className="mt-1.5 space-y-1">
+                        {group.items.map((item, index) => (
+                          <li
+                            key={`${group.section}-${index}`}
+                            className="text-xs font-semibold text-slate-800 leading-relaxed flex gap-2"
+                          >
+                            <span className="text-slate-300 shrink-0">•</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      /* ไม่ซ่อนหัวข้อที่ว่าง เพราะการเห็นว่า "ไม่มี"
+                         คือข้อมูลที่ต้องตรวจเหมือนกัน เช่นลืมสั่งยาหรือลืมนัด */
+                      <p className="mt-1 text-xs font-normal text-slate-400">
+                        {language === 'th' ? '- ไม่มี -' : '- None -'}
+                      </p>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
 
@@ -3321,7 +4531,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               </div>
             )}
 
-            <div className="pt-1 grid grid-cols-2 gap-2.5">
+            </div>
+
+            {/* แถบปุ่มอยู่กับที่ ไม่เลื่อนหายไปกับเนื้อหา
+                เส้นคั่นด้านบนบอกว่าเนื้อหายังมีต่อด้านบนถ้าเลื่อนขึ้น */}
+            <div className="p-6 pt-4 shrink-0 border-t border-slate-100 grid grid-cols-2 gap-2.5">
               <button
                 type="button"
                 onClick={() => setConfirmDialog(null)}

@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { ExaminationView } from './components/ExaminationView';
 import { useDoctorData } from './DoctorDataContext';
+import { DoctorLoadingScreen, DoctorErrorScreen } from './components/DoctorLoadingScreen';
+import { useUnlockPageScroll } from './utils/scrollLockGuard';
 
 /**
  * หน้าบันทึกการตรวจผู้ป่วยของแพทย์ ใช้ผู้ป่วยที่ถูกเลือกจากหน้าคิวผู้ป่วย/ประวัติ
@@ -11,6 +13,10 @@ interface DoctorExaminationPageProps {
 }
 
 const DoctorExaminationPage: React.FC<DoctorExaminationPageProps> = ({ onNavigate }) => {
+  /* ปลดล็อกการเลื่อนหน้าจอที่อาจค้างมาจากกล่องของโมดูลอื่น
+     (ดูคำอธิบายเต็มใน utils/scrollLockGuard.ts) */
+  useUnlockPageScroll();
+
   const {
     activeExamPatient,
     setActiveExamPatient,
@@ -19,6 +25,10 @@ const DoctorExaminationPage: React.FC<DoctorExaminationPageProps> = ({ onNavigat
     isExamLoading,
     isSaving,
     saveError,
+    patients,
+    isInitialLoading,
+    error,
+    refresh,
   } = useDoctorData();
 
   /**
@@ -37,6 +47,30 @@ const DoctorExaminationPage: React.FC<DoctorExaminationPageProps> = ({ onNavigat
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * ═══════════════════════════════════════════════════════════════════════
+   * ต่อเซิร์ฟเวอร์ไม่ได้ ต้องขึ้นจอเดียวกันทุกหน้าของ role แพทย์
+   * ═══════════════════════════════════════════════════════════════════════
+   * ต้องเช็คก่อนเงื่อนไข "ยังไม่ได้เลือกผู้ป่วย" ด้านล่าง
+   *
+   * เคยพลาดตรงนี้: หน้านี้ไม่ได้เช็คการเชื่อมต่อเลย พอ backend ดับ
+   * มันจะขึ้น "ยังไม่ได้เลือกผู้ป่วย กรุณาเลือกผู้ป่วยจากตารางคิว"
+   * ซึ่งชี้ให้แพทย์ไปทำสิ่งที่ทำไม่ได้ (หน้าคิวก็โหลดไม่ขึ้นเหมือนกัน)
+   * แพทย์จะวนไปวนมาสองหน้าโดยไม่รู้เลยว่าปัญหาจริงคือเซิร์ฟเวอร์ไม่ทำงาน
+   *
+   * เงื่อนไขเดียวกับหน้าแดชบอร์ดและหน้าคิวเป๊ะๆ เพื่อให้ทุกหน้าตอบเหมือนกัน
+   *   isInitialLoading  = โหลดครั้งแรกเท่านั้น ไม่ใช่ทุกรอบ poll 4 วินาที
+   *   patients.length===0 = ยังมีข้อมูลเก่าค้างอยู่ก็ไม่ต้องล้างจอทิ้ง
+   * ═══════════════════════════════════════════════════════════════════════
+   */
+  if (isInitialLoading) {
+    return <DoctorLoadingScreen />;
+  }
+
+  if (error && patients.length === 0) {
+    return <DoctorErrorScreen message={error} onRetry={() => { void refresh(); }} />;
+  }
 
   if (!activeExamPatient) {
     return (
