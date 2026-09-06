@@ -74,24 +74,23 @@ func RegisterPatient(c *gin.Context) {
 		return
 	}
 
-	// Auto generate HN if empty (strictly HN + 4-digit hexadecimal format without hyphen)
+	// Auto generate HN if empty (strictly HN + 4-digit decimal format: HN0001, HN0002, etc.)
 	hn := req.HN
 	if strings.TrimSpace(hn) == "" {
-		var lastPatient models.Patient
-		if err := config.DB.Order("id desc").First(&lastPatient).Error; err == nil {
-			var lastNum int
-			cleanHex := strings.TrimPrefix(strings.TrimPrefix(strings.ToUpper(lastPatient.HN), "HN-"), "HN")
-			fmt.Sscanf(cleanHex, "%X", &lastNum)
-			if lastNum > 0 {
-				hn = fmt.Sprintf("HN%04X", lastNum+1)
-			} else {
-				hn = fmt.Sprintf("HN%04X", lastPatient.ID+1)
+		var allPatients []models.Patient
+		config.DB.Select("hn, id").Find(&allPatients)
+		maxNum := 0
+		for _, p := range allPatients {
+			clean := strings.TrimPrefix(strings.TrimPrefix(strings.ToUpper(p.HN), "HN-"), "HN")
+			var num int
+			if _, err := fmt.Sscanf(clean, "%d", &num); err == nil && num > maxNum {
+				maxNum = num
 			}
-		} else {
-			var count int64
-			config.DB.Model(&models.Patient{}).Count(&count)
-			hn = fmt.Sprintf("HN%04X", count+1)
+			if int(p.ID) > maxNum {
+				maxNum = int(p.ID)
+			}
 		}
+		hn = fmt.Sprintf("HN%04d", maxNum+1)
 	}
 
 	// define new patient
@@ -144,13 +143,39 @@ func RegisterPatient(c *gin.Context) {
 	}
 	config.DB.Create(&initialEligibility)
 
+	// สร้างคิวรอคัดกรองให้อัตโนมัติ เพื่อส่งต่อเข้าสู่ระบบคัดกรองทันที
+	var qCount int64
+	config.DB.Model(&models.Queue{}).Count(&qCount)
+	queueNo := fmt.Sprintf("Q%04d", qCount+1)
+
+	var creatorID uint = 2
+	if val, exists := c.Get("userID"); exists {
+		if idFloat, ok := val.(float64); ok {
+			creatorID = uint(idFloat)
+		} else if idUint, ok := val.(uint); ok {
+			creatorID = idUint
+		}
+	}
+
+	newQueue := models.Queue{
+		PatientID:       newPatient.ID,
+		CreatedByUserID: creatorID,
+		QueueNumber:     queueNo,
+		Status:          "รอคัดกรอง",
+		Department:      "จุดคัดกรอง",
+		Note:            "ส่งเข้าคิวจากการลงทะเบียน",
+	}
+	config.DB.Create(&newQueue)
+	ws.BroadcastEvent("QUEUE_CREATED", newQueue)
+
 	// ส่ง WebSocket Broadcast แจ้งเตือนทุกเครื่องว่ามีผู้ป่วยใหม่ลงทะเบียน
 	ws.BroadcastEvent("PATIENT_REGISTERED", newPatient)
 
 	// send json object to frontend
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "ลงทะเบียนคนไข้ใหม่สำเร็จ",
+		"message": "ลงทะเบียนคนไข้ใหม่และส่งเข้าคิวคัดกรองสำเร็จ",
 		"patient": newPatient,
+		"queue":   newQueue,
 	})
 }
 

@@ -187,9 +187,9 @@ body.dark-mode .billing-invoice-container .queue-bar-title {
   background: #F8FAFC;
   border: 1.5px solid #E2E8F0;
   color: #334155;
-  padding: 6px 12px;
-  border-radius: 10px;
-  font-size: 0.82rem;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -204,9 +204,9 @@ body.dark-mode .billing-invoice-container .queue-bar-title {
   background: #E2E8F0;
   color: #475569;
   font-weight: 900;
-  font-size: 0.72rem;
-  width: 18px;
-  height: 18px;
+  font-size: 0.85rem;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
@@ -216,16 +216,16 @@ body.dark-mode .billing-invoice-container .queue-bar-title {
 .billing-invoice-container .queue-item-code {
   color: #0284C7;
   font-weight: 800;
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-family: monospace;
 }
 
 .billing-invoice-container .queue-item-name {
-  max-width: 110px;
+  max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
 }
 
 body.dark-mode .billing-invoice-container .queue-strip-item {
@@ -488,16 +488,17 @@ body.dark-mode .billing-invoice-container .grand-price {
 .billing-invoice-container .qr-modal-card,
 .clinic-modal-portal-backdrop .qr-modal-card {
   background: white;
-  border-radius: 18px;
-  max-width: 580px;
-  width: 100%;
-  padding: 24px;
+  border-radius: 20px;
+  max-width: 780px;
+  width: 95%;
+  padding: 26px 30px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  max-height: 88vh;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   animation: clinicScaleInGPU 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -519,9 +520,9 @@ body.dark-mode .clinic-modal-portal-backdrop .qr-modal-card {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   border-bottom: 1px solid #E2E8F0;
-  padding-bottom: 12px;
+  padding-bottom: 14px;
 }
 
 body.dark-mode .billing-invoice-container .qr-modal-header {
@@ -529,11 +530,12 @@ body.dark-mode .billing-invoice-container .qr-modal-header {
 }
 
 .billing-invoice-container .qr-modal-title {
-  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
-  font-size: 18px;
+  font-family: 'Prompt', var(--font-heading, sans-serif);
+  font-size: 20px;
   font-weight: 700;
-  margin: 0 0 2px 0;
+  margin: 0 0 4px 0;
   color: #0F172A;
+  letter-spacing: -0.2px;
 }
 
 body.dark-mode .billing-invoice-container .qr-modal-title {
@@ -541,8 +543,11 @@ body.dark-mode .billing-invoice-container .qr-modal-title {
 }
 
 .billing-invoice-container .qr-modal-sub {
-  font-size: 0.8rem;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif;
+  font-size: 13.5px;
   color: #64748B;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
 .billing-invoice-container .modal-close-icon {
@@ -563,7 +568,7 @@ body.dark-mode .billing-invoice-container .modal-close-icon {
 .billing-invoice-container .payment-method-toggle {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
   background: #F1F5F9;
   padding: 4px;
   border-radius: 10px;
@@ -575,13 +580,14 @@ body.dark-mode .billing-invoice-container .payment-method-toggle {
 
 .billing-invoice-container .toggle-tab-btn {
   flex: 1;
-  padding: 8px 12px;
+  padding: 10px 16px;
   border: none;
   border-radius: 8px;
   background: transparent;
   color: #64748B;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif;
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 14.5px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -618,7 +624,7 @@ body.dark-mode .billing-invoice-container .toggle-tab-btn.active-cash {
 .billing-invoice-container .qr-modal-body {
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
-  gap: 24px;
+  gap: 28px;
   align-items: start;
 }
 
@@ -659,8 +665,8 @@ body.dark-mode .billing-invoice-container .clean-cash-container {
   align-items: center;
   background: #EFF6FF;
   border: 1px solid #BFDBFE;
-  padding: 10px 16px;
-  border-radius: 10px;
+  padding: 12px 18px;
+  border-radius: 12px;
   margin-bottom: 16px;
 }
 
@@ -670,8 +676,9 @@ body.dark-mode .billing-invoice-container .checkout-amount-pill {
 }
 
 .billing-invoice-container .checkout-amount-pill .pill-label {
-  font-size: 0.9rem;
-  font-weight: 700;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
   color: #1E40AF;
 }
 
@@ -680,9 +687,11 @@ body.dark-mode .billing-invoice-container .checkout-amount-pill .pill-label {
 }
 
 .billing-invoice-container .checkout-amount-pill .pill-val {
-  font-size: 1.35rem;
+  font-family: 'Prompt', var(--font-heading, sans-serif);
+  font-size: 24px;
   font-weight: 800;
   color: #2563EB;
+  letter-spacing: -0.3px;
 }
 
 body.dark-mode .billing-invoice-container .checkout-amount-pill .pill-val {
@@ -691,20 +700,21 @@ body.dark-mode .billing-invoice-container .checkout-amount-pill .pill-val {
 
 .billing-invoice-container .clean-qr-frame {
   background: #FFFFFF;
-  padding: 14px;
-  border-radius: 14px;
+  padding: 16px;
+  border-radius: 16px;
   border: 1.5px solid #CBD5E1;
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
   margin-bottom: 14px;
 }
 
 .billing-invoice-container .clean-account-details {
   width: 100%;
   margin-bottom: 14px;
-  font-size: 0.95rem;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif;
+  font-size: 14px;
   color: #334155;
   line-height: 1.6;
 }
@@ -714,8 +724,9 @@ body.dark-mode .billing-invoice-container .clean-account-details {
 }
 
 .billing-invoice-container .clean-account-details .account-name {
+  font-family: 'Prompt', sans-serif;
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 15px;
   margin-bottom: 4px;
   color: #0F172A;
 }
@@ -729,15 +740,17 @@ body.dark-mode .billing-invoice-container .clean-account-details .account-name {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 0.9rem;
+  font-family: 'Prompt', sans-serif;
+  font-size: 14px;
 }
 
 .billing-invoice-container .btn-edit-phone-link {
   background: none;
   border: none;
   color: #2563EB;
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-family: 'Prompt', sans-serif;
+  font-size: 13.5px;
+  font-weight: 600;
   cursor: pointer;
   padding: 0;
   text-decoration: underline;
@@ -751,21 +764,23 @@ body.dark-mode .billing-invoice-container .clean-account-details .account-name {
 }
 
 .billing-invoice-container .edit-phone-input {
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
   border: 1px solid #93C5FD;
-  font-size: 0.88rem;
+  font-family: 'Prompt', sans-serif;
+  font-size: 14px;
   outline: none;
-  width: 140px;
+  width: 150px;
 }
 
 .billing-invoice-container .btn-save-phone {
   background: #10B981;
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 5px 12px;
-  font-size: 0.85rem;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-family: 'Prompt', sans-serif;
+  font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -776,11 +791,13 @@ body.dark-mode .billing-invoice-container .clean-account-details .account-name {
   background: #FFFBEB;
   border: 1px solid #FDE68A;
   color: #B45309;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 8px;
-  font-size: 0.82rem;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif;
+  font-size: 13px;
   font-weight: 600;
   margin-bottom: 14px;
+  white-space: nowrap;
 }
 
 /* Right Column Summary */
@@ -788,7 +805,7 @@ body.dark-mode .billing-invoice-container .clean-account-details .account-name {
   background: #F8FAFC;
   border: 1px solid #E2E8F0;
   border-radius: 14px;
-  padding: 20px;
+  padding: 22px 24px;
   text-align: left;
 }
 
@@ -798,12 +815,13 @@ body.dark-mode .billing-invoice-container .checkout-summary-box {
 }
 
 .billing-invoice-container .summary-box-title {
-  font-size: 1.1rem;
-  font-weight: 800;
+  font-family: 'Prompt', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
   color: #0F172A;
   margin: 0 0 16px 0;
   border-bottom: 1px solid #E2E8F0;
-  padding-bottom: 10px;
+  padding-bottom: 12px;
 }
 
 body.dark-mode .billing-invoice-container .summary-box-title {
@@ -814,13 +832,15 @@ body.dark-mode .billing-invoice-container .summary-box-title {
 .billing-invoice-container .summary-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .billing-invoice-container .summary-item {
   display: flex;
   justify-content: space-between;
-  font-size: 0.95rem;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
   color: #475569;
 }
 
@@ -842,8 +862,9 @@ body.dark-mode .billing-invoice-container .summary-divider {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 1.1rem;
-  font-weight: 800;
+  font-family: 'Prompt', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
   color: #0F172A;
 }
 
@@ -853,7 +874,8 @@ body.dark-mode .billing-invoice-container .summary-total-item {
 
 .billing-invoice-container .total-highlight {
   color: #2563EB;
-  font-size: 1.35rem;
+  font-family: 'Prompt', sans-serif;
+  font-size: 24px;
   font-weight: 800;
 }
 
@@ -865,9 +887,11 @@ body.dark-mode .billing-invoice-container .total-highlight {
   background: #EFF6FF;
   border: 1px solid #DBEAFE;
   color: #1E40AF;
-  padding: 12px;
-  border-radius: 8px;
-  font-size: 0.85rem;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1.5;
   margin-top: 18px;
 }
@@ -886,8 +910,9 @@ body.dark-mode .billing-invoice-container .summary-note {
 }
 
 .billing-invoice-container .cash-input-label {
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
   color: #475569;
   display: block;
   margin-bottom: 6px;
@@ -899,10 +924,11 @@ body.dark-mode .billing-invoice-container .cash-input-label {
 
 .billing-invoice-container .cash-input-field {
   width: 100%;
-  padding: 12px 14px;
+  padding: 10px 14px;
   border: 2px solid #CBD5E1;
   border-radius: 8px;
-  font-size: 1.1rem;
+  font-family: 'Prompt', sans-serif;
+  font-size: 16px;
   font-weight: 700;
   outline: none;
   background: #FFFFFF;
@@ -925,12 +951,13 @@ body.dark-mode .billing-invoice-container .cash-input-field {
 
 .billing-invoice-container .quick-cash-pills button {
   flex: 1;
-  padding: 8px 10px;
+  padding: 9px 12px;
   background: #EFF6FF;
   color: #2563EB;
   border: 1px solid #BFDBFE;
   border-radius: 8px;
-  font-size: 0.85rem;
+  font-family: 'Prompt', sans-serif;
+  font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
@@ -951,8 +978,9 @@ body.dark-mode .billing-invoice-container .quick-cash-pills button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-family: 'Prompt', sans-serif;
+  font-size: 14.5px;
+  font-weight: 600;
   margin-bottom: 16px;
 }
 
@@ -961,7 +989,9 @@ body.dark-mode .billing-invoice-container .cash-change-box {
 }
 
 .billing-invoice-container .change-val {
-  font-size: 1.25rem;
+  font-family: 'Prompt', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
   color: #64748B;
 }
 
@@ -984,13 +1014,15 @@ body.dark-mode .billing-invoice-container .green-change {
   background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
   color: white;
   border: none;
-  padding: 14px 16px;
+  padding: 14px 18px;
   border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 800;
+  font-family: 'Prompt', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .billing-invoice-container .confirm-qr-btn:hover {
@@ -1003,10 +1035,13 @@ body.dark-mode .billing-invoice-container .green-change {
   box-sizing: border-box;
   background: #DCFCE7;
   color: #166534;
-  padding: 12px;
+  padding: 12px 18px;
   border-radius: 10px;
-  font-weight: 800;
+  font-family: 'Prompt', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
   border: 1px solid #BBF7D0;
+  white-space: nowrap;
 }
 
 .billing-invoice-container .success-status-box {
@@ -1015,6 +1050,7 @@ body.dark-mode .billing-invoice-container .green-change {
   border-radius: 14px;
   padding: 24px 20px;
   text-align: center;
+  font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif;
 }
 
 body.dark-mode .billing-invoice-container .success-status-box {
@@ -1037,6 +1073,7 @@ body.dark-mode .billing-invoice-container .success-status-box {
 }
 
 .billing-invoice-container .success-text {
+  font-family: 'Prompt', sans-serif;
   font-size: 1.4rem;
   font-weight: 800;
   color: #0F172A;
@@ -1048,6 +1085,7 @@ body.dark-mode .billing-invoice-container .success-text {
 }
 
 .billing-invoice-container .success-sub {
+  font-family: 'Prompt', 'IBM Plex Sans Thai', sans-serif;
   font-size: 0.9rem;
   color: #64748B;
   margin: 0 0 16px 0;
@@ -1067,6 +1105,7 @@ body.dark-mode .billing-invoice-container .success-sub {
 .billing-invoice-container .receipt-btn {
   padding: 12px 16px;
   border-radius: 8px;
+  font-family: 'Prompt', sans-serif;
   font-weight: 700;
   font-size: 0.95rem;
   cursor: pointer;

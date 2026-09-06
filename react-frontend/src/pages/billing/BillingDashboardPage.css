@@ -725,7 +725,7 @@ body.dark-mode .billing-dashboard-container .dash-med-item {
 }
 
 .billing-dashboard-container .dash-med-name {
-  font-size: 1rem;
+  font-size: 1.15rem;
   font-weight: 500;
   color: #0F172A;
   display: block;
@@ -736,7 +736,7 @@ body.dark-mode .billing-dashboard-container .dash-med-name {
 }
 
 .billing-dashboard-container .dash-med-dosage {
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   color: #64748B;
   display: block;
   margin-top: 2px;
@@ -745,7 +745,7 @@ body.dark-mode .billing-dashboard-container .dash-med-name {
 .billing-dashboard-container .dash-med-price {
   font-weight: 600;
   color: #2563EB;
-  font-size: 1.05rem;
+  font-size: 1.2rem;
 }
 
 .billing-dashboard-container .finance-block {
@@ -761,7 +761,7 @@ body.dark-mode .billing-dashboard-container .finance-block {
 .billing-dashboard-container .fee-row-item {
   display: flex;
   justify-content: space-between;
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   color: #475569;
   margin-bottom: 8px;
 }
@@ -1176,4 +1176,15 @@ body.dark-mode .billing-dashboard-container .stat-card-box div {
 body.dark-mode .billing-dashboard-container .stat-card-box.active-stat {
   border-color: #3B82F6 !important;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+}
+/* Print Media Styles */
+@media print {
+  body { overflow: visible !important; }
+  body * { visibility: hidden !important; }
+  .clinic-modal-portal-backdrop { position: absolute !important; height: auto !important; overflow: visible !important; background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  .receipt-preview-dialog, .receipt-preview-dialog * { visibility: visible !important; }
+  .receipt-preview-dialog { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; max-width: 100% !important; box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important; background: transparent !important; }
+  .receipt-preview-dialog > div:first-child { display: none !important; }
+  .receipt-preview-dialog > div:last-child { padding: 0 !important; background: transparent !important; display: block !important; overflow: visible !important; }
+  div.billing-dashboard-container:not(.clinic-modal-portal-content-scope) { display: none !important; }
 }

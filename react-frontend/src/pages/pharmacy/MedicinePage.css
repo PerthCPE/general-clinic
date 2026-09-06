@@ -228,6 +228,8 @@ body.dark-mode .medicine-page-container .table-title {
 
 .medicine-page-container .table-wrapper {
   overflow-x: auto;
+  overscroll-behavior: auto !important;
+  -webkit-overflow-scrolling: touch;
 }
 
 .medicine-page-container .stock-table {
@@ -377,7 +379,7 @@ body.dark-mode .medicine-page-container .page-arrow:disabled {
 }
 
 .medicine-page-container .status-badge {
-  padding: 6px 14px;
+  padding: 3px 8px;
   border-radius: 9999px;
   font-size: 13px;
   font-weight: 700;
@@ -495,6 +497,15 @@ body.dark-mode .medicine-page-container .modal-card,
 body.dark-mode .clinic-modal-portal-backdrop .modal-card {
   background: #1E1E1E;
   border: 1px solid #334155;
+}
+
+.medicine-page-container .modal-body,
+.clinic-modal-portal-backdrop .modal-body {
+  overflow-y: auto !important;
+  overscroll-behavior-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+  max-height: calc(88vh - 130px);
 }
 
 .medicine-page-container .modal-header,

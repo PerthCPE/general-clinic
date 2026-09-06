@@ -199,7 +199,7 @@ func GetBillingQueues(c *gin.Context) {
 				SchemeType:   scheme,
 				VisitID:      vID,
 				Status:       "pending",
-				DoctorAdvice: doctorAdvice,
+				DoctorAdvice: CleanDoctorAdvice(doctorAdvice),
 				Medications:  medsJSON,
 				CreatedAt:    cq.CreatedAt,
 			}
@@ -213,9 +213,9 @@ func GetBillingQueues(c *gin.Context) {
 		}
 	}
 
-	// 2.1 ดึงคิวจาก models.MedicineQueue
+	// 2.1 ดึงคิวจาก models.MedicineQueue ที่ห้องยาจ่ายยาเสร็จแล้ว (dispensed)
 	var medQueues []models.MedicineQueue
-	if err := config.DB.Where("status IN ('dispensed', 'pending')").Order("id desc, created_at desc").Limit(50).Find(&medQueues).Error; err == nil {
+	if err := config.DB.Where("status = ?", "dispensed").Order("id desc, created_at desc").Limit(50).Find(&medQueues).Error; err == nil {
 		var medVisitIDs []uint
 		for _, mq := range medQueues {
 			if mq.VisitID > 0 && !finishedVisits[mq.VisitID] {
@@ -255,7 +255,7 @@ func GetBillingQueues(c *gin.Context) {
 				SchemeType:   mq.SchemeType,
 				VisitID:      vID,
 				Status:       "pending",
-				DoctorAdvice: mq.DoctorAdvice,
+				DoctorAdvice: CleanDoctorAdvice(mq.DoctorAdvice),
 				Medications:  mq.Medications,
 				CreatedAt:    mq.CreatedAt,
 			}
@@ -289,6 +289,7 @@ func GetBillingQueues(c *gin.Context) {
 	cachedAllMeds := getCachedMedicines()
 	for i := range queues {
 		bq := &queues[i]
+		bq.DoctorAdvice = CleanDoctorAdvice(bq.DoctorAdvice)
 		if bq.Medications == "" || bq.Medications == "[]" || bq.Medications == "null" {
 			dispList := dispByVisit[bq.VisitID]
 			if len(dispList) > 0 {
@@ -320,8 +321,8 @@ func GetBillingQueues(c *gin.Context) {
 						"genericName":  m.GenericName,
 						"category":     m.Category,
 						"properties":   m.Properties,
-						"dosage":       d.Dosage,
-						"instructions": d.Instructions,
+						"dosage":       CleanDosage(d.Dosage, m.Name),
+						"instructions": CleanInstructions(d.Instructions, m.Name),
 						"price":        p,
 						"unit_price":   p,
 						"quantity":     q,
@@ -393,8 +394,8 @@ func GetBillingQueues(c *gin.Context) {
 						"genericName":  genName,
 						"category":     cat,
 						"properties":   props,
-						"dosage":       dosage,
-						"instructions": inst,
+						"dosage":       CleanDosage(dosage, mName),
+						"instructions": CleanInstructions(inst, mName),
 						"price":        unitPrice,
 						"unit_price":   unitPrice,
 						"quantity":     qty,
@@ -405,6 +406,40 @@ func GetBillingQueues(c *gin.Context) {
 				medsBytes, _ := json.Marshal(medList)
 				bq.Medications = string(medsBytes)
 				bq.TotalAmount = totalAmount
+			}
+		}
+	}
+
+	// [Fix] Populate VN for each queue before returning
+	var qVisitIDs []uint
+	for _, bq := range queues {
+		if bq.VisitID > 0 {
+			qVisitIDs = append(qVisitIDs, bq.VisitID)
+		}
+	}
+
+	vnMap := make(map[uint]string)
+	if len(qVisitIDs) > 0 {
+		var vrList []models.VisitRecord
+		config.DB.Where("id IN ?", qVisitIDs).Find(&vrList)
+		for _, vr := range vrList {
+			vnMap[vr.ID] = vr.VN
+		}
+	}
+	for i := range queues {
+		if queues[i].VisitID > 0 {
+			queues[i].VN = vnMap[queues[i].VisitID]
+		}
+		if queues[i].VN == "" && queues[i].HN != "" && queues[i].HN != "HN0001" {
+			var p models.Patient
+			if config.DB.Where("hn = ?", queues[i].HN).First(&p).Error == nil {
+				var vr models.VisitRecord
+				if config.DB.Where("patient_id = ?", p.ID).Order("id desc").First(&vr).Error == nil {
+					queues[i].VN = vr.VN
+					if queues[i].VisitID == 0 {
+						queues[i].VisitID = vr.ID
+					}
+				}
 			}
 		}
 	}
@@ -434,17 +469,76 @@ func GetAllBillings(c *gin.Context) {
 	})
 }
 
-// [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ดึงประวัติการชำระเงิน Single Query (30 ms) ตัด loop queries ออก 100%
+// [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ดึงประวัติการชำระเงิน Single Query (30 ms) ตัด loop queries ออก
 func GetBillingHistories(c *gin.Context) {
 	var histories []models.BillingHistory
-	if err := config.DB.Order("created_at desc").Find(&histories).Error; err != nil {
+	if err := config.DB.Order("id desc, created_at desc").Find(&histories).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch billing histories: " + err.Error()})
 		return
 	}
 
+	var visitIDs []uint
+	for _, h := range histories {
+		if h.VisitID > 0 {
+			visitIDs = append(visitIDs, h.VisitID)
+		}
+	}
+
+	visitRecords := make(map[uint]models.VisitRecord)
+	if len(visitIDs) > 0 {
+		var vrList []models.VisitRecord
+		config.DB.Where("id IN ?", visitIDs).Find(&vrList)
+		for _, vr := range vrList {
+			visitRecords[vr.ID] = vr
+		}
+	}
+
+	type HistoryWithVN struct {
+		models.BillingHistory
+		VN string `json:"vn"`
+	}
+
+	var result []HistoryWithVN
+
+	for i := range histories {
+		h := histories[i]
+		if h.Medications != "" && h.Medications != "null" {
+			var parsed []gin.H
+			if err := json.Unmarshal([]byte(h.Medications), &parsed); err == nil {
+				for j := range parsed {
+					mName, _ := parsed[j]["name"].(string)
+					dosage, _ := parsed[j]["dosage"].(string)
+					inst, _ := parsed[j]["instructions"].(string)
+					parsed[j]["dosage"] = CleanDosage(dosage, mName)
+					parsed[j]["instructions"] = CleanInstructions(inst, mName)
+				}
+				b, _ := json.Marshal(parsed)
+				h.Medications = string(b)
+			}
+		}
+
+		vn := "-"
+		if vr, ok := visitRecords[h.VisitID]; ok && vr.VN != "" {
+			vn = vr.VN
+		} else {
+			// Fallback by HN and Date if VisitID is missing
+			var fallbackVR models.VisitRecord
+			if err := config.DB.Joins("JOIN patients ON patients.id = visit_records.patient_id").
+				Where("patients.hn = ? OR patients.hn = ?", h.HN, "HN"+h.HN).
+				Order("visit_records.created_at desc").First(&fallbackVR).Error; err == nil && fallbackVR.VN != "" {
+				vn = fallbackVR.VN
+			}
+		}
+
+		result = append(result, HistoryWithVN{
+			BillingHistory: h,
+			VN:             vn,
+		})
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "success",
-		"histories": histories,
+		"histories": result,
 	})
 }
 

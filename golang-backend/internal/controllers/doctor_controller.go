@@ -830,6 +830,9 @@ func UpdateVisitStatus(c *gin.Context) {
 		ws.BroadcastEvent("QUEUE_UPDATED", updatedQueue)
 	}
 
+	InvalidatePharmacyQueueCache()
+	InvalidateBillingQueueCache()
+
 	c.JSON(http.StatusOK, gin.H{
 		"message": "อัปเดตสถานะการตรวจเรียบร้อยแล้ว",
 		"status":  newStatus,

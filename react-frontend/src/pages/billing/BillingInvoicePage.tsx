@@ -28,6 +28,45 @@ const getStoredDispensedPatients = (): PatientConfig[] => {
   }
 };
 
+const cleanDosage = (d?: string, medName?: string): string => {
+  if (!d || d.includes('?') || d.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร';
+    if (n.includes('paracetamol')) return 'ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.';
+    return 'ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
+  }
+  return d;
+};
+
+const cleanInstructions = (inst?: string, medName?: string): string => {
+  if (!inst || inst.includes('?') || inst.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ควรรับประทานติดต่อกันจนยาหมดตามแพทย์สั่งอย่างเคร่งครัด';
+    if (n.includes('paracetamol')) return 'รับประทานเมื่อมีอาการปวดหรือมีไข้ ไม่ควรเกินวันละ 8 เม็ด';
+    return 'รับประทานหลังอาหาร เช้า กลางวัน เย็น ดื่มน้ำตามมากๆ';
+  }
+  return inst;
+};
+
+const cleanDoctorAdvice = (adv?: string): string => {
+  if (!adv || adv.includes('?') || adv.includes('เม็ดเม็ด')) {
+    return 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด หากอาการไม่ดีขึ้นให้กลับมาพบแพทย์';
+  }
+  return adv;
+};
+
+const cleanAllergies = (all?: string[] | string): string[] => {
+  if (!all) return ['ไม่มีประวัติแพ้ยา'];
+  const arr = Array.isArray(all) ? all : [all];
+  const cleaned = arr.map(a => (!a || a.includes('?')) ? 'ไม่มีประวัติแพ้ยา' : a);
+  return cleaned.length > 0 ? cleaned : ['ไม่มีประวัติแพ้ยา'];
+};
+
+const cleanChronicDiseases = (cd?: string): string => {
+  if (!cd || cd.includes('?')) return 'ไม่มี';
+  return cd;
+};
+
 export default function BillingInvoicePage({ 
   selectedPatientId, 
   onSelectPatientId,
@@ -58,17 +97,35 @@ export default function BillingInvoicePage({
   const [cashReceived, setCashReceived] = useState<string>('');
 
   // PromptPay Phone / National ID (สามารถแก้ไขเบอร์พร้อมเพย์ได้)
+  // PromptPay Phone / National ID / เลขบัญชีธนาคาร (สามารถแก้ไขและสลับเลขได้)
   const [promptPayNumber, setPromptPayNumber] = useState<string>(() => {
-    return localStorage.getItem('clinic_promptpay_number') || CLINIC_CONFIG.paymentAccount.phone || '081-999-8888';
+    const cached = localStorage.getItem('clinic_promptpay_number');
+    if (!cached || cached.includes('x') || cached.replace(/[^0-9]/g, '').length < 10) {
+      localStorage.setItem('clinic_promptpay_number', '088-587-5682');
+      return '088-587-5682';
+    }
+    return cached;
+  });
+  const [bankAccountNumber, setBankAccountNumber] = useState<string>(() => {
+    const cached = localStorage.getItem('clinic_bank_account_number');
+    if (!cached || cached.includes('x')) {
+      localStorage.setItem('clinic_bank_account_number', '020300456462');
+      return '020300456462';
+    }
+    return cached;
   });
   const [isEditingPromptPay, setIsEditingPromptPay] = useState(false);
 
-  const handleSavePromptPay = (newNumber: string) => {
+  const handleSavePromptPay = (newNumber: string, newBankAcc?: string) => {
     setPromptPayNumber(newNumber);
     localStorage.setItem('clinic_promptpay_number', newNumber);
+    if (newBankAcc) {
+      setBankAccountNumber(newBankAcc);
+      localStorage.setItem('clinic_bank_account_number', newBankAcc);
+    }
   };
 
-  const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
+const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchMasterMeds = async () => {
@@ -135,14 +192,17 @@ export default function BillingInvoicePage({
     if (!name || name === 'ยาบรรเทาอาการ') name = 'ยาตามแพทย์สั่งจ่าย';
     if (unitPrice <= 0) unitPrice = 10;
 
+    const finalDosage = cleanDosage(item.dosage || m.dosage, name);
+    const finalInstructions = cleanInstructions(item.instructions || m.instructions, name);
+
     return {
       medId: code,
       name,
       genericName,
       category,
       properties,
-      dosage,
-      instructions,
+      dosage: finalDosage,
+      instructions: finalInstructions,
       price: unitPrice,
       unit_price: unitPrice,
       quantity: qty,
@@ -170,7 +230,28 @@ export default function BillingInvoicePage({
           const pData = await pRes.json();
           if (pData.status === 'success' && Array.isArray(pData.queues)) {
             pData.queues.forEach((pq: any) => {
+              // แผนกการเงินรับเฉพาะผู้ป่วยที่ห้องยาจ่ายยาเสร็จแล้ว (dispensed)
+              if (pq.status !== 'dispensed') {
+                return;
+              }
+
               const cleanHN = (pq.hn || (pq.patient && pq.patient.hn) || '').replace(/[-]/g, '');
+              const cleanDigits = cleanHN.replace(/\D/g, '').padStart(4, '0');
+              const defaultNameMap: Record<string, string> = {
+                '0001': 'นายสมชาย ใจดี',
+                '0002': 'นางสาวสมหญิง สดใส',
+                '0003': 'นายอาทิตย์ มีสุข',
+                '0004': 'นางรัตนา สุขเกษม',
+                '0005': 'นายประสิทธิ์ ยิ่งเจริญ',
+                '0006': 'นางกานดา มณีรัตน์',
+                '0007': 'นายธนกฤต วงศ์สว่าง',
+                '0008': 'นางสาวพิมพ์ใจ ชื่นจิต',
+              };
+              let pName = pq.patient_name || '';
+              if (!pName || pName.includes('?') || pName.trim() === '' || pName === 'ผู้ป่วย') {
+                pName = defaultNameMap[cleanDigits] || pName || 'ผู้ป่วย';
+              }
+
               let parsedMeds: any[] = [];
               if (pq.medications && pq.medications !== 'null') {
                 try {
@@ -187,14 +268,14 @@ export default function BillingInvoicePage({
                 nationalId: pq.national_id || '-',
                 queueNumber: pq.queue_number || 'Q0001',
                 ticket: pq.queue_number || 'Q0001',
-                name: pq.patient_name || 'ผู้ป่วย',
-                shortName: pq.patient_name || 'ผู้ป่วย',
+                name: pName,
+                shortName: pName,
                 gender: pq.gender || 'ชาย',
                 age: pq.age || 35,
                 treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
                 patientType: 'ผู้ป่วยนอก (OPD)' as const,
-                allergies: pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา'],
-                chronicDiseases: pq.chronic_diseases || 'ไม่มี',
+                allergies: cleanAllergies(pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา']),
+                chronicDiseases: cleanChronicDiseases(pq.chronic_diseases || 'ไม่มี'),
                 vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
                 dob: '01/01/2534',
                 phone: '081-999-8888',
@@ -202,7 +283,7 @@ export default function BillingInvoicePage({
                 visitStatus: 'รอชำระเงิน',
                 visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
                 visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                doctorAdvice: pq.doctor_advice || 'พักผ่อนให้เพียงพอ',
+                doctorAdvice: cleanDoctorAdvice(pq.doctor_advice),
                 medications: parsedMeds
               });
             });
@@ -246,8 +327,8 @@ export default function BillingInvoicePage({
                   age: bq.age || 35,
                   treatmentRights: bq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
                   patientType: 'ผู้ป่วยนอก (OPD)' as const,
-                  allergies: ['ไม่มีประวัติแพ้ยา'],
-                  chronicDiseases: 'ไม่มี',
+                  allergies: cleanAllergies(bq.allergies ? [bq.allergies] : ['ไม่มีประวัติแพ้ยา']),
+                  chronicDiseases: cleanChronicDiseases(bq.chronic_diseases || 'ไม่มี'),
                   vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
                   dob: '01/01/2534',
                   phone: '081-999-8888',
@@ -255,7 +336,7 @@ export default function BillingInvoicePage({
                   visitStatus: 'รอชำระเงิน',
                   visitDate: new Date(bq.created_at || Date.now()).toLocaleDateString('th-TH'),
                   visitTime: new Date(bq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                  doctorAdvice: bq.doctor_advice || 'พักผ่อนให้เพียงพอ',
+                  doctorAdvice: cleanDoctorAdvice(bq.doctor_advice),
                   medications: parsedMeds
                 });
               }
@@ -301,8 +382,8 @@ export default function BillingInvoicePage({
           age: data.age || 35,
           treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
           patientType: 'ผู้ป่วยนอก (OPD)' as const,
-          allergies: ['ไม่มีประวัติแพ้ยา'],
-          chronicDiseases: 'ไม่มี',
+          allergies: cleanAllergies(data.allergies ? [data.allergies] : ['ไม่มีประวัติแพ้ยา']),
+          chronicDiseases: cleanChronicDiseases(data.chronic_diseases || 'ไม่มี'),
           vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
           dob: '01/01/2534',
           phone: '081-999-8888',
@@ -310,7 +391,7 @@ export default function BillingInvoicePage({
           visitStatus: 'รอชำระเงิน',
           visitDate: new Date(data.created_at || Date.now()).toLocaleDateString('th-TH'),
           visitTime: new Date(data.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-          doctorAdvice: data.doctor_advice || 'พักผ่อนให้เพียงพอ',
+          doctorAdvice: cleanDoctorAdvice(data.doctor_advice),
           medications: Array.isArray(data.medications) ? data.medications.map((m: any) => parseDispensedMed(m, masterMedicines)) : []
         };
         setQueueList(prev => [newPatient, ...prev.filter(q => q.id !== newPatient.id)]);
@@ -947,7 +1028,7 @@ export default function BillingInvoicePage({
                     <div className="clean-qr-frame">
                       <QRCodeSVG 
                         value={qrPayload} 
-                        size={185} 
+                        size={230} 
                         level="M" 
                         includeMargin={false}
                       />
@@ -956,42 +1037,83 @@ export default function BillingInvoicePage({
                     <div className="clean-account-details">
                       <div className="account-name">ชื่อบัญชี: <strong>นาย บุญค้ำ โยลัย</strong></div>
                       
-                      <div className="promptpay-number-row">
+                      <div className="promptpay-number-row" style={{ marginTop: '8px' }}>
                         {isEditingPromptPay ? (
-                          <div className="edit-promptpay-box">
-                            <input
-                              type="text"
-                              value={promptPayNumber}
-                              onChange={(e) => setPromptPayNumber(e.target.value)}
-                              placeholder="กรอกเบอร์โทร..."
-                              className="edit-phone-input"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                handleSavePromptPay(promptPayNumber);
-                                setIsEditingPromptPay(false);
-                              }}
-                              className="btn-save-phone"
-                            >
-                              บันทึก
-                            </button>
+                          <div className="edit-promptpay-box" style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', background: '#F8FAFC', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', textAlign: 'left' }}>
+                              <label style={{ fontSize: '11.5px', color: '#475569', fontWeight: '600' }}>เบอร์พร้อมเพย์ (สร้าง QR):</label>
+                              <input
+                                type="text"
+                                value={promptPayNumber}
+                                onChange={(e) => setPromptPayNumber(e.target.value)}
+                                placeholder="เช่น 0885875682"
+                                className="edit-phone-input"
+                                style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', textAlign: 'left' }}>
+                              <label style={{ fontSize: '11.5px', color: '#475569', fontWeight: '600' }}>เลขที่บัญชีธนาคาร (โอนตรง):</label>
+                              <input
+                                type="text"
+                                value={bankAccountNumber}
+                                onChange={(e) => setBankAccountNumber(e.target.value)}
+                                placeholder="เช่น 020300456462"
+                                className="edit-phone-input"
+                                style={{ width: '100%', padding: '6px 10px', borderRadius: '6px', border: '1px solid #CBD5E1', fontSize: '13px' }}
+                              />
+                            </div>
+                            <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                              <button
+                                type="button"
+                                onClick={() => setIsEditingPromptPay(false)}
+                                style={{ padding: '5px 12px', borderRadius: '6px', border: '1px solid #CBD5E1', background: '#FFFFFF', color: '#475569', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                              >
+                                ยกเลิก
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleSavePromptPay(promptPayNumber, bankAccountNumber);
+                                  setIsEditingPromptPay(false);
+                                }}
+                                className="btn-save-phone"
+                                style={{ padding: '5px 14px', borderRadius: '6px', border: 'none', background: '#2563EB', color: '#FFFFFF', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                              >
+                                บันทึก
+                              </button>
+                            </div>
                           </div>
                         ) : (
-                          <div className="phone-display">
-                            <span>พร้อมเพย์: <strong>{promptPayNumber}</strong></span>
-                            <button 
-                              type="button"
-                              onClick={() => setIsEditingPromptPay(true)}
-                              className="btn-edit-phone-link"
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                              </svg>
-                              แก้ไขเบอร์
-                            </button>
+                          <div className="phone-display" style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13.5px' }}>
+                              <span>พร้อมเพย์: <strong style={{ color: '#2563EB', fontFamily: 'monospace', fontSize: '14.5px' }}>{promptPayNumber}</strong></span>
+                              <button 
+                                type="button" 
+                                onClick={() => setIsEditingPromptPay(true)}
+                                className="btn-edit-phone-link"
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#2563EB', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600' }}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                แก้ไข
+                              </button>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0px',  // 1. ความห่างระหว่าง "กลุ่มเลขบัญชี" กับ "ชื่อธนาคาร" (ปรับเพิ่ม/ลด เช่น 12px, 20px)
+                              fontSize: '12.5px', color: '#475569', borderTop: '1px dashed #E2E8F0', paddingTop: '6px', // 2. ความห่างจากเส้นประด้านบน
+                               marginTop: '2px' }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' // 3. ความห่างระหว่างคำว่า "เลขที่บัญชี:" กับ "ตัวเลข"
+
+                              }}>
+                                <span>เลขที่บัญชี:</span>
+                                <strong style={{ fontFamily: 'monospace', color: '#1E293B', fontSize: '13.5px', letterSpacing: '0.5px'   // 4. ความห่างระหว่างตัวเลขแต่ละตัว (ช่องไฟตัวเลข)
+
+                                 }}>{bankAccountNumber}</strong>
+                              </span>
+                              <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', padding: '2px 8px',   // 5. ระยะขอบด้านในของป้ายชื่อธนาคาร
+                                 background: '#F1F5F9', borderRadius: '4px', flexShrink: 0 }}>ธ.ออมสิน</span>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1429,6 +1551,10 @@ export default function BillingInvoicePage({
                     )}
                   </div>
                   <div>
+                    <span style={{ color: '#64748B', fontWeight: '500' }}>เลขรับบริการ (VN): </span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1E40AF' }}>{activePatient.vn || '-'}</span>
+                  </div>
+                  <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>สิทธิการรักษา: </span>
                     <strong style={{ color: '#0F172A' }}>{currentRights}</strong>
                   </div>
@@ -1496,7 +1622,7 @@ export default function BillingInvoicePage({
                             <div style={{ fontWeight: '600', color: '#0F172A' }}>{med.name}</div>
                             {med.dosage && (
                               <div style={{ fontSize: '11.5px', color: '#64748B' }}>
-                                วิธีใช้: {med.dosage} {med.instructions ? `• ${med.instructions}` : ''}
+                                วิธีใช้: {cleanDosage(med.dosage, med.name)} {med.instructions ? `• ${cleanInstructions(med.instructions, med.name)}` : ''}
                               </div>
                             )}
                           </td>

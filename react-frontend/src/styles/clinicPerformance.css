@@ -105,7 +105,7 @@ body.dark-mode {
 .billing-dashboard-container {
   scroll-behavior: smooth !important;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: auto !important;
   transform: translateZ(0); /* Promote page container to GPU layer */
 }
 
@@ -122,7 +122,7 @@ body.dark-mode {
 .billing-dashboard-container .records-table-wrapper {
   scroll-behavior: smooth !important;
   -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+  overscroll-behavior: auto !important;
   scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
   transform: translateZ(0);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { dmsApi, type BackendDocumentForward, type BackendUser } from '../../services/api';
+import { DEMO_USERS } from '../../config/roles';
 import './DocumentForwardPage.css';
 
 interface ForwardDoc {
@@ -607,12 +608,13 @@ export const DocumentForwardPage: React.FC = () => {
                       ))
                     ) : (
                       <>
-                        <option value="6">พญ.สุดา สุขสมบูรณ์ (แพทย์)</option>
+                      {/* ปรับชื่อตาม DEMO_USERS อัตโนมัติ */}
+                        <option value="6">{DEMO_USERS.doctor?.fullName || 'พญ.สุดา สุขสมบูรณ์'} (แพทย์)</option>
                         <option value="7">นพ.วิชัย ชาญการแพทย์ (แพทย์)</option>
                         <option value="8">พญ.เกศรา รักษาดี (แพทย์)</option>
-                        <option value="3">พว. กานดา คัดกรอง (พยาบาล)</option>
-                        <option value="5">ภก.บุญชู เภสัชกร (ห้องยา)</option>
-                        <option value="6">นส.รวย การเงิน (การเงิน)</option>
+                        <option value="3">{DEMO_USERS.nurse?.fullName || 'พว. กานดา คัดกรอง'} (พยาบาล)</option>
+                        <option value="5">{DEMO_USERS.pharmacist?.fullName || 'ดร.บุญ สั่งยา'} (ห้องยา)</option>
+                        <option value="6">{DEMO_USERS.cashier?.fullName || 'นส.รวย การเงิน'} (การเงิน)</option>
                       </>
                     )}
                   </select>

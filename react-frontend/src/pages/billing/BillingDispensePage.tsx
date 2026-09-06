@@ -53,6 +53,45 @@ const persistCompletedBilling = (patient: PatientConfig) => {
   }
 };
 
+const cleanDosage = (d?: string, medName?: string): string => {
+  if (!d || d.includes('?') || d.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร';
+    if (n.includes('paracetamol')) return 'ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.';
+    return 'ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
+  }
+  return d;
+};
+
+const cleanInstructions = (inst?: string, medName?: string): string => {
+  if (!inst || inst.includes('?') || inst.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ควรรับประทานติดต่อกันจนยาหมดตามแพทย์สั่งอย่างเคร่งครัด';
+    if (n.includes('paracetamol')) return 'รับประทานเมื่อมีอาการปวดหรือมีไข้ ไม่ควรเกินวันละ 8 เม็ด';
+    return 'รับประทานหลังอาหาร เช้า กลางวัน เย็น ดื่มน้ำตามมากๆ';
+  }
+  return inst;
+};
+
+const cleanDoctorAdvice = (adv?: string): string => {
+  if (!adv || adv.includes('?') || adv.includes('เม็ดเม็ด')) {
+    return 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด หากอาการไม่ดีขึ้นให้กลับมาพบแพทย์';
+  }
+  return adv;
+};
+
+const cleanAllergies = (all?: string[] | string): string[] => {
+  if (!all) return ['ไม่มีประวัติแพ้ยา'];
+  const arr = Array.isArray(all) ? all : [all];
+  const cleaned = arr.map(a => (!a || a.includes('?')) ? 'ไม่มีประวัติแพ้ยา' : a);
+  return cleaned.length > 0 ? cleaned : ['ไม่มีประวัติแพ้ยา'];
+};
+
+const cleanChronicDiseases = (cd?: string): string => {
+  if (!cd || cd.includes('?')) return 'ไม่มี';
+  return cd;
+};
+
 interface BillingDispensePageProps {
   onNavigateToBilling?: () => void;
   selectedPatientId?: string;
@@ -107,6 +146,8 @@ export default function BillingDispensePage({
     return (
       (p.id || '').toLowerCase().includes(q) ||
       (p.hn || '').toLowerCase().includes(q) ||
+      (p.vn || '').toLowerCase().includes(q) ||
+      (p.queueNumber || '').toLowerCase().includes(q) ||
       cleanNationalId.includes(cleanQ) ||
       (p.name || '').toLowerCase().includes(q) ||
       (p.shortName || '').toLowerCase().includes(q)
@@ -215,14 +256,17 @@ export default function BillingDispensePage({
     if (!name || name === 'ยาบรรเทาอาการ') name = 'ยาตามแพทย์สั่งจ่าย';
     if (unitPrice <= 0) unitPrice = 10;
 
+    const finalDosage = cleanDosage(item.dosage || m.dosage, name);
+    const finalInstructions = cleanInstructions(item.instructions || m.instructions, name);
+
     return {
       medId: code,
       name,
       genericName,
       category,
       properties,
-      dosage,
-      instructions,
+      dosage: finalDosage,
+      instructions: finalInstructions,
       price: unitPrice,
       unit_price: unitPrice,
       quantity: qty,
@@ -264,10 +308,32 @@ export default function BillingDispensePage({
 
         let mappedQueues: PatientConfig[] = [];
 
-        // 1. นำข้อมูลจาก Pharmacy Queues เป็นแหล่งข้อมูลหลัก (เพื่อให้เลขคิว QE... และคนไข้ตรงกับระบบยาทุกประการ 100%)
+        // 1. นำข้อมูลจาก Pharmacy Queues เฉพาะผู้ป่วยที่ห้องยาจ่ายยาเสร็จสิ้นแล้ว (dispensed)
         if (pData && pData.status === 'success' && Array.isArray(pData.queues)) {
           pData.queues.forEach((pq: any) => {
+            // สำคัญมาก: ห้องการเงินต้องแสดงเฉพาะผู้ป่วยที่ห้องยาจ่ายยาเสร็จแล้ว (dispensed) เท่านั้น!
+            // ผู้ป่วยที่สถานะเป็น pending ยังคงรอรับยาอยู่ที่ห้องยา แพทย์เพิ่งสั่งยา ห้ามนำมาแสดงในห้องการเงินเด็ดขาด!
+            if (pq.status !== 'dispensed') {
+              return;
+            }
+
             const cleanHN = (pq.hn || (pq.patient && pq.patient.hn) || '').replace(/[-]/g, '');
+            const cleanDigits = cleanHN.replace(/\D/g, '').padStart(4, '0');
+            const defaultNameMap: Record<string, string> = {
+              '0001': 'นายสมชาย ใจดี',
+              '0002': 'นางสาวสมหญิง สดใส',
+              '0003': 'นายอาทิตย์ มีสุข',
+              '0004': 'นางรัตนา สุขเกษม',
+              '0005': 'นายประสิทธิ์ ยิ่งเจริญ',
+              '0006': 'นางกานดา มณีรัตน์',
+              '0007': 'นายธนกฤต วงศ์สว่าง',
+              '0008': 'นางสาวพิมพ์ใจ ชื่นจิต',
+            };
+            let pName = pq.patient_name || '';
+            if (!pName || pName.includes('?') || pName.trim() === '' || pName === 'ผู้ป่วย') {
+              pName = defaultNameMap[cleanDigits] || 'ผู้ป่วยทั่วไป';
+            }
+
             let parsedMeds: any[] = [];
             if (pq.medications && pq.medications !== 'null') {
               try {
@@ -296,20 +362,21 @@ export default function BillingDispensePage({
               nationalId: pq.national_id || '-',
               queueNumber: pq.queue_number || 'Q0001',
               ticket: pq.queue_number || 'Q0001',
-              name: pq.patient_name || 'ผู้ป่วย',
-              shortName: pq.patient_name || 'ผู้ป่วย',
+              vn: pq.vn || '-',
+              name: pName,
+              shortName: pName,
               gender: pq.gender || 'หญิง',
               age: pq.age || 35,
               treatmentRights: pq.scheme_type || 'บัตรทอง (สปสช.)',
               patientType: 'ผู้ป่วยนอก (OPD)' as const,
-              allergies: pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา'],
-              chronicDiseases: pq.chronic_diseases || 'ไม่มี',
+              allergies: cleanAllergies(pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา']),
+              chronicDiseases: cleanChronicDiseases(pq.chronic_diseases || 'ไม่มี'),
               vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
-              visitStatus: isCompleted ? 'ชำระเงินแล้ว / เสร็จสิ้น' : (pq.status === 'dispensed' ? 'รอชำระเงิน' : 'รอชำระเงิน'),
+              visitStatus: isCompleted ? 'ชำระเงินแล้ว / เสร็จสิ้น' : 'รอชำระเงิน',
               status: isCompleted ? ('completed' as const) : ('pending' as const),
               visitDate: new Date(pq.created_at || Date.now()).toLocaleDateString('th-TH'),
               visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-              doctorAdvice: pq.doctor_advice || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
+              doctorAdvice: cleanDoctorAdvice(pq.doctor_advice),
               medications: parsedMeds
             });
           });
@@ -342,20 +409,21 @@ export default function BillingDispensePage({
                 nationalId: bq.national_id || '-',
                 queueNumber: bq.queue_number || 'Q0001',
                 ticket: bq.queue_number || 'Q0001',
+                vn: bq.vn || '-',
                 name: bq.patient_name || 'ผู้ป่วย',
                 shortName: bq.patient_name || 'ผู้ป่วย',
                 gender: bq.gender || 'หญิง',
                 age: bq.age || 35,
                 treatmentRights: bq.scheme_type || 'บัตรทอง (สปสช.)',
                 patientType: 'ผู้ป่วยนอก (OPD)' as const,
-                allergies: ['ไม่มีประวัติแพ้ยา'],
-                chronicDiseases: 'ไม่มี',
+                allergies: cleanAllergies(bq.allergies ? [bq.allergies] : ['ไม่มีประวัติแพ้ยา']),
+                chronicDiseases: cleanChronicDiseases(bq.chronic_diseases || 'ไม่มี'),
                 vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
                 visitStatus: 'รอชำระเงิน',
                 status: 'pending' as const,
                 visitDate: new Date(bq.created_at || Date.now()).toLocaleDateString('th-TH'),
                 visitTime: new Date(bq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                doctorAdvice: bq.doctor_advice || 'มีไข้ ไอ เจ็บคอ แพทย์สั่งจ่ายยา',
+                doctorAdvice: cleanDoctorAdvice(bq.doctor_advice),
                 medications: parsedMeds
               });
             }
@@ -368,6 +436,7 @@ export default function BillingDispensePage({
             const bhHN = (bh.hn || '').replace(/[-]/g, '');
             const queueNo = bh.queue_number || (bh.queueNumber && bh.queueNumber.startsWith('Q') ? bh.queueNumber : '') || `Q${String(bh.id || '').padStart(4, '0')}`;
             const receiptNum = bh.receipt_number || `REC-${String(bh.id || '').padStart(4, '0')}`;
+            const vnNum = bh.vn || '-';
 
             // ตรวจสอบว่าคิวนี้มีอยู่ใน mappedQueues หรือไม่
             const existingIdx = mappedQueues.findIndex(q => {
@@ -404,20 +473,21 @@ export default function BillingDispensePage({
                 queueNumber: queueNo,
                 ticket: queueNo,
                 receiptNumber: receiptNum,
+                vn: vnNum,
                 name: bh.patient_name || 'ผู้ป่วย',
                 shortName: bh.patient_name || 'ผู้ป่วย',
                 gender: 'ชาย',
                 age: 35,
                 treatmentRights: 'ชำระเงินแล้ว',
                 patientType: 'ผู้ป่วยนอก (OPD)' as const,
-                allergies: ['ไม่มีประวัติแพ้ยา'],
-                chronicDiseases: 'ไม่มี',
+                allergies: cleanAllergies(bh.allergies ? [bh.allergies] : ['ไม่มีประวัติแพ้ยา']),
+                chronicDiseases: cleanChronicDiseases(bh.chronic_diseases || 'ไม่มี'),
                 vitals: 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C',
                 visitStatus: 'ชำระเงินแล้ว / เสร็จสิ้น',
                 status: 'completed' as const,
                 visitDate: new Date(bh.created_at || Date.now()).toLocaleDateString('th-TH'),
                 visitTime: new Date(bh.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-                doctorAdvice: bh.doctor_advice || 'รับประทานยาตามคำแนะนำของแพทย์',
+                doctorAdvice: cleanDoctorAdvice(bh.doctor_advice),
                 medications: parsedMeds
               });
             }
@@ -494,15 +564,6 @@ export default function BillingDispensePage({
       }
     });
 
-    const unsubExam = subscribe('EXAMINATION_SAVED', () => {
-      fetchInitialQueue();
-      triggerToast('แพทย์บันทึกการตรวจและส่งใบสั่งยาเรียบร้อยแล้ว', 'doctor');
-    });
-
-    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', () => {
-      fetchInitialQueue();
-    });
-
     const unsubDispense = subscribe('DISPENSE_RECORDED', () => {
       fetchInitialQueue();
     });
@@ -524,10 +585,6 @@ export default function BillingDispensePage({
       fetchInitialQueue();
     });
 
-    const unsubVisit = subscribe('VISIT_UPDATED', () => {
-      fetchInitialQueue();
-    });
-
     const unsubBillHist = subscribe('BILLING_HISTORY_CREATED', () => {
       fetchInitialQueue();
     });
@@ -540,13 +597,10 @@ export default function BillingDispensePage({
     return () => {
       clearInterval(pollInterval);
       unsubBill();
-      unsubExam();
-      unsubMedQ();
       unsubDispense();
       unsubDispenseConf();
       unsubQueue();
       unsubCreated();
-      unsubVisit();
       unsubBillHist();
       unsubPay();
     };
@@ -594,7 +648,7 @@ export default function BillingDispensePage({
                     return { 
                       ...q, 
                       medications: fetchedMeds,
-                      doctorAdvice: hnData.doctor_advice || q.doctorAdvice
+                      doctorAdvice: cleanDoctorAdvice(hnData.doctor_advice || q.doctorAdvice)
                     };
                   }
                   return q;
@@ -975,12 +1029,13 @@ export default function BillingDispensePage({
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F8FAFC' }}>
                   <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '46px', whiteSpace: 'nowrap' }}>
                     <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '90px' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '110px' }}>HN</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '13.5px', textAlign: 'left', minWidth: '190px' }}>ชื่อ-นามสกุล คนไข้</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '150px' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '125px' }}>สถานะคิว</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '160px' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 12px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '140px' }}>การดำเนินการ</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '100px' }}>HN</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '100px' }}>VN</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '140px' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 14px 12px 30px', fontWeight: '700', fontSize: '13.5px', textAlign: 'left', minWidth: '180px' }}>ชื่อ-นามสกุล</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '110px' }}>สถานะคิว</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '140px' }}>สิทธิการรักษา</th>
+                    <th style={{ padding: '12px 12px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '130px' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1014,7 +1069,15 @@ export default function BillingDispensePage({
                           <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                             <CopyableText value={(p.hn || '').replace(/[-]/g, '')} color={isCompleted ? '#64748B' : '#2563EB'} />
                           </td>
-                          <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', textAlign: 'left' }}>
+                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                            <span style={{ color: isCompleted ? '#94A3B8' : '#0F172A', fontWeight: '600', fontFamily: 'monospace', fontSize: '12.5px' }}>
+                              <CopyableText value={p.vn || '-'} />
+                            </span>
+                          </td>
+                          <td className="patient-table-sub" style={{ padding: '10px 10px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center', color: isCompleted ? '#94A3B8' : '#64748B' }}>
+                            {p.nationalId || '-'}
+                          </td>
+                          <td style={{ padding: '10px 14px 10px 30px', whiteSpace: 'nowrap', textAlign: 'left' }}>
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isCompleted ? '#64748B' : '#2563EB'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -1022,9 +1085,6 @@ export default function BillingDispensePage({
                               </svg>
                               {p.name}
                             </div>
-                          </td>
-                          <td className="patient-table-sub" style={{ padding: '10px 10px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center', color: isCompleted ? '#94A3B8' : '#64748B' }}>
-                            {p.nationalId || '-'}
                           </td>
                           <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                             <span style={{ 
@@ -1445,7 +1505,7 @@ export default function BillingDispensePage({
                     return (
                       <tr key={idx}>
                         <td className="item-name font-bold">{med.name}</td>
-                        <td>{med.dosage}</td>
+                        <td>{cleanDosage(med.dosage, med.name)}</td>
                         <td style={{ textAlign: 'right', color: '#64748B' }}>฿ {uPrice.toLocaleString()}</td>
                         <td style={{ textAlign: 'right', fontWeight: '600' }}>{qty}</td>
                         <td style={{ textAlign: 'right', fontWeight: '700', color: '#0F172A' }}>฿ {lineTotal.toLocaleString()}</td>
@@ -1509,7 +1569,7 @@ export default function BillingDispensePage({
                   <div key={idx} className="summary-item">
                     <div className="item-details">
                       <div className="item-title">{med.name} (x{qty})</div>
-                      <div className="item-sub">{med.dosage}</div>
+                      <div className="item-sub">{cleanDosage(med.dosage, med.name)}</div>
                     </div>
                     <div className="item-price">
                       ฿ {itemTotal.toLocaleString()}
