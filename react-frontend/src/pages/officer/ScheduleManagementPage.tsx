@@ -5,6 +5,7 @@ import './ScheduleManagementPage.css';
 interface ShiftSchedule {
   id: string;
   doctorCode: string;
+  username?: string;
   name: string;
   department: string;
   avatarText: string;
@@ -34,34 +35,15 @@ interface ShiftSwapItem {
 }
 
 import { vitalsApi, type BackendDoctor } from '../../services/api';
-
-const generateMockSchedules = (): ShiftSchedule[] => {
-  const doctors = [
-    { code: 'DOC-0001', name: 'พญ.สุดา สุขสมบูรณ์', dept: 'สูตินรีเวช', specialty: 'เวชศาสตร์มารดาและทารก', phone: '081-222-0001', email: 'doctor1@clinic.local', avatar: 'SS' },
-    { code: 'DOC-0002', name: 'นพ.วิชัย ชาญการแพทย์', dept: 'อายุรกรรมทั่วไป', specialty: 'โรคหัวใจและหลอดเลือด', phone: '081-222-0002', email: 'doctor2@clinic.local', avatar: 'WC' },
-    { code: 'DOC-0003', name: 'พญ.เกศรา รักษาดี', dept: 'กุมารเวชกรรม', specialty: 'กุมารเวชศาสตร์โรคภูมิแพ้', phone: '081-222-0003', email: 'doctor3@clinic.local', avatar: 'KR' },
-  ];
-
-  return doctors.map((doc, idx) => ({
-    id: `DOC-${idx + 1}`,
-    doctorCode: doc.code,
-    name: doc.name,
-    department: doc.dept,
-    avatarText: doc.avatar,
-    specialty: doc.specialty,
-    phone: doc.phone,
-    email: doc.email,
-    shifts: {
-      mon: idx === 0 ? 'morning' : idx === 1 ? 'afternoon' : 'morning',
-      tue: idx === 1 ? 'morning' : 'afternoon',
-      wed: 'morning',
-      thu: idx === 2 ? 'afternoon' : 'morning',
-      fri: 'morning',
-      sat: idx === 0 ? 'morning' : 'off',
-      sun: idx === 1 ? 'afternoon' : 'off',
-    }
-  }));
-};
+import {
+  SYSTEM_DOCTORS,
+  getStoredCalendarOverrides,
+  getStoredOfficerSchedules,
+  saveStoredCalendarOverrides,
+  saveStoredOfficerSchedules,
+  applyOfficerBatchSchedule,
+  applyOfficerDayEdit,
+} from '../../services/scheduleStorage';
 
 const initialSwapRequests: ShiftSwapItem[] = [
   { id: 'SWP-2569-01', requesterName: 'พญ.สุดา สุขสมบูรณ์', requesterShift: 'เวรเช้า (08:00 - 16:00)', receiverName: 'นพ.วิชัย ชาญการแพทย์', receiverShift: 'เวรบ่าย (16:00 - 00:00)', date: '15 ก.ย. 2569', reason: 'ติดประชุมวิชาการแพทย์', status: 'pending' },
@@ -70,7 +52,7 @@ const initialSwapRequests: ShiftSwapItem[] = [
 
 export const ScheduleManagementPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'calendar' | 'weekly' | 'employees'>('calendar');
-  const [schedules, setSchedules] = useState<ShiftSchedule[]>(generateMockSchedules());
+  const [schedules, setSchedules] = useState<ShiftSchedule[]>(() => getStoredOfficerSchedules());
   const [swapRequests, setSwapRequests] = useState<ShiftSwapItem[]>(initialSwapRequests);
   
   const [viewMode, setViewMode] = useState<'monthly' | 'weekly' | 'daily'>('monthly');
@@ -78,7 +60,7 @@ export const ScheduleManagementPage: React.FC = () => {
 
   // Edit / Details state
   const [editingSchedule, setEditingSchedule] = useState<ShiftSchedule | null>(null);
-  const [calendarOverrides, setCalendarOverrides] = useState<Record<string, Record<string, 'morning' | 'afternoon' | 'night' | 'off'>>>({});
+  const [calendarOverrides, setCalendarOverrides] = useState<Record<string, Record<string, 'morning' | 'afternoon' | 'night' | 'off'>>>(() => getStoredCalendarOverrides());
   const [editingCalendarDate, setEditingCalendarDate] = useState<string | null>(null);
   const [tempDayShifts, setTempDayShifts] = useState<Record<string, 'morning' | 'afternoon' | 'night' | 'off'>>({});
   
@@ -99,7 +81,21 @@ export const ScheduleManagementPage: React.FC = () => {
   const [previewDates, setPreviewDates] = useState<string[]>([]);
   const [hasPreviewed, setHasPreviewed] = useState(false);
 
-  // Fetch real doctors from backend if available
+  // Sync with storage on mount and events
+  React.useEffect(() => {
+    const handleUpdate = () => {
+      setCalendarOverrides(getStoredCalendarOverrides());
+      setSchedules(getStoredOfficerSchedules());
+    };
+    window.addEventListener('clinic_schedule_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('clinic_schedule_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  // Fetch real doctors from backend if available and merge
   React.useEffect(() => {
     vitalsApi.getDoctors()
       .then((data: BackendDoctor[]) => {
@@ -108,8 +104,8 @@ export const ScheduleManagementPage: React.FC = () => {
             const name = doc.fullname || doc.username;
             const initials = name.replace(/^(นพ\.|พญ\.|ทพญ\.|ทพ\.|ดร\.)\s*/, '').slice(0, 2).toUpperCase();
             return {
-              id: `DOC-${doc.id}`,
-              doctorCode: `DOC-${String(doc.id).padStart(4, '0')}`,
+              id: `DOC-${idx + 1}`,
+              doctorCode: `DOC-${String(doc.id || idx + 1).padStart(4, '0')}`,
               name: name,
               department: idx % 3 === 0 ? 'สูตินรีเวช' : idx % 3 === 1 ? 'อายุรกรรมทั่วไป' : 'กุมารเวชกรรม',
               avatarText: initials || 'DR',
@@ -128,13 +124,14 @@ export const ScheduleManagementPage: React.FC = () => {
             };
           });
           setSchedules(mapped);
+          saveStoredOfficerSchedules(mapped);
           if (mapped.length > 0) {
             setBatchForm(prev => ({ ...prev, doctorId: mapped[0].id }));
           }
         }
       })
       .catch(() => {
-        // Fallback to initial matching doctors
+        // Fallback to stored schedules
       });
   }, []);
 
@@ -233,17 +230,13 @@ export const ScheduleManagementPage: React.FC = () => {
       return;
     }
 
-    // Apply to calendar overrides
-    setCalendarOverrides(prev => {
-      const updated = { ...prev };
-      previewDates.forEach(dateStr => {
-        if (!updated[dateStr]) updated[dateStr] = {};
-        updated[dateStr][batchForm.doctorId] = batchForm.shiftType;
-      });
-      return updated;
-    });
+    // Apply to shared storage and sync to doctor shifts
+    applyOfficerBatchSchedule(batchForm.doctorId, previewDates, batchForm.shiftType);
+    setCalendarOverrides(getStoredCalendarOverrides());
 
-    toast.success(`สร้างตารางงานสำเร็จจำนวน ${previewDates.length} วัน`);
+    const docObj = schedules.find(s => s.id === batchForm.doctorId);
+    const docName = docObj ? docObj.name : 'แพทย์';
+    toast.success(`สร้างตารางงานของ ${docName} สำเร็จจำนวน ${previewDates.length} วัน (อัปเดตไปยังตารางแพทย์แล้ว)`);
     setActiveModal(null);
     setHasPreviewed(false);
     setPreviewDates([]);
@@ -271,11 +264,9 @@ export const ScheduleManagementPage: React.FC = () => {
 
   const handleSaveDayEdit = () => {
     if (editingCalendarDate) {
-      setCalendarOverrides(prev => ({
-        ...prev,
-        [editingCalendarDate]: tempDayShifts
-      }));
-      toast.success('บันทึกการปรับเปลี่ยนเวรประจำวันเรียบร้อยแล้ว');
+      applyOfficerDayEdit(editingCalendarDate, tempDayShifts);
+      setCalendarOverrides(getStoredCalendarOverrides());
+      toast.success(`บันทึกการปรับเปลี่ยนเวรประจำวัน (${editingCalendarDate}) เรียบร้อยแล้ว`);
       setEditingCalendarDate(null);
     }
   };

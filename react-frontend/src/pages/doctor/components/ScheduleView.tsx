@@ -1,6 +1,15 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StatusFilterTabs } from './StatusFilterTabs';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../../../context/AuthContext';
+import {
+  SYSTEM_DOCTORS,
+  type DoctorProfile,
+  type DoctorShift,
+  getStoredDoctorShifts,
+  saveStoredDoctorShifts,
+  findDoctorProfile,
+} from '../../../services/scheduleStorage';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -27,20 +36,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 
-export interface DoctorShift {
-  id: string;
-  doctorName: string;
-  department: string;
-  date: string; // YYYY-MM-DD
-  startTime: string; // e.g. '08:30'
-  endTime: string; // e.g. '12:00'
-  shiftType: 'General Consultation' | 'Minor Procedure' | 'Health Check-up' | 'After-hours' | 'Academic / Meeting' | 'Leave / Off';
-  roomLocation: string; // e.g. 'OPD Room 101'
-  maxPatients: number;
-  bookedPatients: number;
-  status: 'Scheduled' | 'In Progress' | 'Completed' | 'Cancelled';
-  note?: string;
-}
+export type { DoctorShift };
 
 const SHIFT_TYPES = [
   'General Consultation',
@@ -51,210 +47,41 @@ const SHIFT_TYPES = [
   'Leave / Off'
 ] as const;
 
-const ALL_DOCTORS = [
-  'Dr. Anong S.',
-  'Dr. Somchai K.',
-  'Dr. Pranee T.',
-  'Dr. Kittipong P.'
-];
-
-// Authenticated doctor account session (RBAC)
-const LOGGED_IN_DOCTOR = {
-  name: 'Dr. Anong S.',
-  licenseNo: 'MD-84920',
-  department: 'General Medicine',
-  role: 'Attending Physician (RBAC Level 2)',
-  avatar: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=150&auto=format&fit=crop&q=80'
-};
-
-const INITIAL_SHIFTS: DoctorShift[] = [
-  {
-    id: 's-1',
-    doctorName: 'Dr. Anong S.',
-    department: 'General Medicine',
-    date: '2026-07-20',
-    startTime: '08:30',
-    endTime: '12:00',
-    shiftType: 'General Consultation',
-    roomLocation: 'OPD Room 101',
-    maxPatients: 15,
-    bookedPatients: 14,
-    status: 'Completed',
-    note: 'Morning general clinic session'
-  },
-  {
-    id: 's-2',
-    doctorName: 'Dr. Anong S.',
-    department: 'General Medicine',
-    date: '2026-07-21',
-    startTime: '13:00',
-    endTime: '16:30',
-    shiftType: 'Health Check-up',
-    roomLocation: 'Check-up Room 2',
-    maxPatients: 10,
-    bookedPatients: 8,
-    status: 'Completed',
-    note: 'Annual health check-up package'
-  },
-  {
-    id: 's-3',
-    doctorName: 'Dr. Anong S.',
-    department: 'General Medicine',
-    date: '2026-07-22',
-    startTime: '08:30',
-    endTime: '12:00',
-    shiftType: 'General Consultation',
-    roomLocation: 'OPD Room 101',
-    maxPatients: 15,
-    bookedPatients: 15,
-    status: 'Completed',
-    note: 'Follow-up consultations'
-  },
-  {
-    id: 's-4',
-    doctorName: 'Dr. Anong S.',
-    department: 'General Medicine',
-    date: '2026-07-23', // Today
-    startTime: '08:30',
-    endTime: '12:00',
-    shiftType: 'General Consultation',
-    roomLocation: 'OPD Room 101',
-    maxPatients: 15,
-    bookedPatients: 12,
-    status: 'In Progress',
-    note: 'Active morning consultation session'
-  },
-  {
-    id: 's-5',
-    doctorName: 'Dr. Anong S.',
-    department: 'General Medicine',
-    date: '2026-07-23',
-    startTime: '13:30',
-    endTime: '16:30',
-    shiftType: 'Minor Procedure',
-    roomLocation: 'Procedure Room 1',
-    maxPatients: 3,
-    bookedPatients: 2,
-    status: 'Scheduled',
-    note: 'Wound care & suturing'
-  },
-  {
-    id: 's-6',
-    doctorName: 'Dr. Anong S.',
-    department: 'General Medicine',
-    date: '2026-07-24',
-    startTime: '08:30',
-    endTime: '12:00',
-    shiftType: 'General Consultation',
-    roomLocation: 'OPD Room 101',
-    maxPatients: 15,
-    bookedPatients: 9,
-    status: 'Scheduled',
-    note: 'Endocrinology & Diabetes special clinic'
-  },
-  {
-    id: 's-7',
-    doctorName: 'Dr. Anong S.',
-    department: 'General Medicine',
-    date: '2026-07-25',
-    startTime: '17:00',
-    endTime: '23:00',
-    shiftType: 'After-hours',
-    roomLocation: 'Clinic Front Desk',
-    maxPatients: 20,
-    bookedPatients: 4,
-    status: 'Scheduled',
-    note: 'Evening after-hours service'
-  },
-  {
-    id: 's-8',
-    doctorName: 'Dr. Somchai K.',
-    department: 'Cardiology',
-    date: '2026-07-23',
-    startTime: '09:00',
-    endTime: '15:00',
-    shiftType: 'General Consultation',
-    roomLocation: 'Heart Clinic Room 202',
-    maxPatients: 18,
-    bookedPatients: 16,
-    status: 'In Progress',
-    note: 'Echocardiogram & Cardiac review'
-  },
-  {
-    id: 's-9',
-    doctorName: 'Dr. Pranee T.',
-    department: 'Pediatrics',
-    date: '2026-07-23',
-    startTime: '08:00',
-    endTime: '12:00',
-    shiftType: 'General Consultation',
-    roomLocation: 'Pediatric Clinic 1',
-    maxPatients: 20,
-    bookedPatients: 18,
-    status: 'In Progress',
-    note: 'Child Vaccination & Wellness'
-  },
-  {
-    id: 's-10',
-    doctorName: 'Dr. Somchai K.',
-    department: 'Cardiology',
-    date: '2026-07-06',
-    startTime: '08:00',
-    endTime: '12:00',
-    shiftType: 'General Consultation',
-    roomLocation: 'Heart Clinic Room 202',
-    maxPatients: 15,
-    bookedPatients: 15,
-    status: 'Completed',
-    note: 'Monthly Cardiology Clinic'
-  },
-  {
-    id: 's-11',
-    doctorName: 'Dr. Kittipong P.',
-    department: 'Orthopedics',
-    date: '2026-07-15',
-    startTime: '13:00',
-    endTime: '17:00',
-    shiftType: 'Minor Procedure',
-    roomLocation: 'Procedure Room 2',
-    maxPatients: 4,
-    bookedPatients: 4,
-    status: 'Completed',
-    note: 'Joint injection & dressing change'
-  },
-  {
-    id: 's-12',
-    doctorName: 'Dr. Anong S.',
-    department: 'General Medicine',
-    date: '2026-07-28',
-    startTime: '08:30',
-    endTime: '12:00',
-    shiftType: 'General Consultation',
-    roomLocation: 'OPD Room 101',
-    maxPatients: 15,
-    bookedPatients: 5,
-    status: 'Scheduled',
-    note: 'End of Month Consultation'
-  },
-  {
-    id: 's-13',
-    doctorName: 'Dr. Pranee T.',
-    department: 'Pediatrics',
-    date: '2026-07-30',
-    startTime: '09:00',
-    endTime: '12:00',
-    shiftType: 'Academic / Meeting',
-    roomLocation: 'Meeting Hall B',
-    maxPatients: 0,
-    bookedPatients: 0,
-    status: 'Scheduled',
-    note: 'Pediatric Medical Conference'
-  }
-];
-
 export const ScheduleView: React.FC = () => {
   const { language, t } = useLanguage();
-  const [shifts, setShifts] = useState<DoctorShift[]>(INITIAL_SHIFTS);
+  const { currentUser } = useAuth();
+
+  // 1. Identify currently authenticated doctor from AuthContext
+  const loggedInDoctor = useMemo<DoctorProfile>(() => {
+    if (currentUser) {
+      if (currentUser.username === 'doctor2' || currentUser.fullName?.includes('วิชัย')) {
+        return SYSTEM_DOCTORS[1]; // นพ.วิชัย
+      } else if (currentUser.username === 'doctor3' || currentUser.fullName?.includes('เกศรา')) {
+        return SYSTEM_DOCTORS[2]; // พญ.เกศรา
+      } else if (currentUser.username === 'doctor1' || currentUser.fullName?.includes('สุดา')) {
+        return SYSTEM_DOCTORS[0]; // พญ.สุดา
+      }
+      return findDoctorProfile(currentUser.fullName || currentUser.username);
+    }
+    return SYSTEM_DOCTORS[0];
+  }, [currentUser]);
+
+  const allDoctorNames = useMemo(() => SYSTEM_DOCTORS.map(d => d.name), []);
+
+  // 2. Load and synchronize shifts from scheduleStorage
+  const [shifts, setShifts] = useState<DoctorShift[]>(() => getStoredDoctorShifts());
+
+  useEffect(() => {
+    const handleSync = () => {
+      setShifts(getStoredDoctorShifts());
+    };
+    window.addEventListener('clinic_schedule_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('clinic_schedule_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   // Filters
   const [selectedDoctorFilter, setSelectedDoctorFilter] = useState<string>('All');
@@ -262,24 +89,31 @@ export const ScheduleView: React.FC = () => {
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'list'>('month');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Month Navigation State (Year & Month)
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(2026, 6, 1)); // July 2026
+  // Month & Date Navigation State (Current dynamic date)
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<DoctorShift | null>(null);
   const [readOnlyShiftModal, setReadOnlyShiftModal] = useState<DoctorShift | null>(null);
 
-  // Form Fields State (Doctor is locked to LOGGED_IN_DOCTOR.name)
-  const [formDepartment, setFormDepartment] = useState(LOGGED_IN_DOCTOR.department);
-  const [formDate, setFormDate] = useState('2026-07-23');
-  const [formStartTime, setFormStartTime] = useState('08:30');
-  const [formEndTime, setFormEndTime] = useState('12:00');
+  // Form Fields State (Doctor is locked to loggedInDoctor.name)
+  const [formDepartment, setFormDepartment] = useState(loggedInDoctor.department);
+  const [formDate, setFormDate] = useState(todayStr);
+  const [formStartTime, setFormStartTime] = useState('08:00');
+  const [formEndTime, setFormEndTime] = useState('16:00');
   const [formShiftType, setFormShiftType] = useState<DoctorShift['shiftType']>('General Consultation');
-  const [formRoomLocation, setFormRoomLocation] = useState('OPD Room 101');
-  const [formMaxPatients, setFormMaxPatients] = useState(15);
+  const [formRoomLocation, setFormRoomLocation] = useState(loggedInDoctor.roomLocation);
+  const [formMaxPatients, setFormMaxPatients] = useState(20);
   const [formStatus, setFormStatus] = useState<DoctorShift['status']>('Scheduled');
   const [formNote, setFormNote] = useState('');
+
+  // Update form defaults when loggedInDoctor changes
+  useEffect(() => {
+    setFormDepartment(loggedInDoctor.department);
+    setFormRoomLocation(loggedInDoctor.roomLocation);
+  }, [loggedInDoctor]);
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -291,7 +125,11 @@ export const ScheduleView: React.FC = () => {
 
   // Helper check: Is this shift owned by logged-in doctor?
   const isShiftOwner = (shift: DoctorShift) => {
-    return shift.doctorName === LOGGED_IN_DOCTOR.name;
+    return (
+      shift.doctorName === loggedInDoctor.name ||
+      shift.doctorUsername === loggedInDoctor.username ||
+      shift.doctorId === loggedInDoctor.id
+    );
   };
 
   // Filtered shifts according to selection
@@ -309,16 +147,31 @@ export const ScheduleView: React.FC = () => {
     });
   }, [shifts, selectedDoctorFilter, filterShiftType, searchQuery]);
 
-  // Days of current week (July 20 - July 26, 2026)
-  const weekDays = [
-    { name: 'Mon', fullDate: '2026-07-20', dayNum: '20' },
-    { name: 'Tue', fullDate: '2026-07-21', dayNum: '21' },
-    { name: 'Wed', fullDate: '2026-07-22', dayNum: '22' },
-    { name: 'Thu', fullDate: '2026-07-23', dayNum: '23', isToday: true },
-    { name: 'Fri', fullDate: '2026-07-24', dayNum: '24' },
-    { name: 'Sat', fullDate: '2026-07-25', dayNum: '25' },
-    { name: 'Sun', fullDate: '2026-07-26', dayNum: '26' },
-  ];
+  // Dynamic Days of selected week
+  const weekDays = useMemo(() => {
+    const curr = new Date(currentDate);
+    const day = curr.getDay(); // 0 = Sun, 1 = Mon ...
+    const diff = curr.getDate() - day + (day === 0 ? -6 : 1); // get Monday
+    const monday = new Date(curr.setDate(diff));
+
+    const dayNames = language === 'th' ? ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'] : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const monthNames = language === 'th' ? ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      days.push({
+        name: dayNames[i],
+        monthName: monthNames[d.getMonth()],
+        fullDate: dateStr,
+        dayNum: String(d.getDate()),
+        isToday: dateStr === todayStr
+      });
+    }
+    return days;
+  }, [currentDate, language, todayStr]);
 
   // MONTHLY CALENDAR GRID DATA GENERATION
   const monthCalendarGrid = useMemo(() => {
@@ -328,7 +181,7 @@ export const ScheduleView: React.FC = () => {
     const firstDayOfMonth = new Date(year, month, 1);
     const lastDayOfMonth = new Date(year, month + 1, 0);
 
-    const startDayOfWeek = firstDayOfMonth.getDay();
+    const startDayOfWeek = firstDayOfMonth.getDay(); // 0 = Sun
     const totalDays = lastDayOfMonth.getDate();
 
     const days = [];
@@ -338,17 +191,16 @@ export const ScheduleView: React.FC = () => {
     for (let i = startDayOfWeek - 1; i >= 0; i--) {
       const pDay = prevMonthLastDay - i;
       const pDateObj = new Date(year, month - 1, pDay);
-      const formattedDate = `${pDateObj.getFullYear()}-${String(pDateObj.getMonth() + 1).padStart(2, '0')}-${String(pDay).padStart(2, '0')}`;
+      const formattedDate = pDateObj.toISOString().split('T')[0];
       days.push({
         dayNum: pDay,
         fullDate: formattedDate,
         isCurrentMonth: false,
-        isToday: false
+        isToday: formattedDate === todayStr
       });
     }
 
     // Current month days
-    const todayStr = '2026-07-23';
     for (let d = 1; d <= totalDays; d++) {
       const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       days.push({
@@ -363,39 +215,49 @@ export const ScheduleView: React.FC = () => {
     const remainingCells = 42 - days.length;
     for (let n = 1; n <= remainingCells; n++) {
       const nDateObj = new Date(year, month + 1, n);
-      const formattedDate = `${nDateObj.getFullYear()}-${String(nDateObj.getMonth() + 1).padStart(2, '0')}-${String(n).padStart(2, '0')}`;
+      const formattedDate = nDateObj.toISOString().split('T')[0];
       days.push({
         dayNum: n,
         fullDate: formattedDate,
         isCurrentMonth: false,
-        isToday: false
+        isToday: formattedDate === todayStr
       });
     }
 
     return days;
-  }, [currentDate]);
+  }, [currentDate, todayStr]);
 
-  // Navigate Months
+  // Navigate Months / Weeks
   const handlePrevMonth = () => {
-    setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    if (viewMode === 'week') {
+      setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth(), prev.getDate() - 7));
+    } else {
+      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    }
   };
+
   const handleNextMonth = () => {
-    setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    if (viewMode === 'week') {
+      setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth(), prev.getDate() + 7));
+    } else {
+      setCurrentDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    }
   };
+
   const handleTodayMonth = () => {
-    setCurrentDate(new Date(2026, 6, 1));
+    setCurrentDate(new Date());
   };
 
   // Open modal for NEW shift
   const handleOpenAddModal = (defaultDate?: string) => {
     setEditingShift(null);
-    setFormDepartment(LOGGED_IN_DOCTOR.department);
-    setFormDate(defaultDate || '2026-07-23');
-    setFormStartTime('08:30');
-    setFormEndTime('12:00');
+    setFormDepartment(loggedInDoctor.department);
+    setFormDate(defaultDate || todayStr);
+    setFormStartTime('08:00');
+    setFormEndTime('16:00');
     setFormShiftType('General Consultation');
-    setFormRoomLocation('OPD Room 101');
-    setFormMaxPatients(15);
+    setFormRoomLocation(loggedInDoctor.roomLocation);
+    setFormMaxPatients(20);
     setFormStatus('Scheduled');
     setFormNote('');
     setIsModalOpen(true);
@@ -422,40 +284,44 @@ export const ScheduleView: React.FC = () => {
     }
   };
 
-  // Save Shift (Always bound to LOGGED_IN_DOCTOR)
+  // Save Shift (Always bound to loggedInDoctor)
   const handleSaveShift = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formDate || !formStartTime || !formEndTime) {
-      alert('Please fill in required shift date and time.');
+      alert(language === 'th' ? 'กรุณาระบุวันที่และเวลาปฏิบัติงาน' : 'Please fill in required shift date and time.');
       return;
     }
 
     if (editingShift) {
-      setShifts((prev) =>
-        prev.map((s) =>
-          s.id === editingShift.id
-            ? {
-                ...s,
-                doctorName: LOGGED_IN_DOCTOR.name,
-                department: formDepartment,
-                date: formDate,
-                startTime: formStartTime,
-                endTime: formEndTime,
-                shiftType: formShiftType,
-                roomLocation: formRoomLocation,
-                maxPatients: formMaxPatients,
-                status: formStatus,
-                note: formNote
-              }
-            : s
-        )
+      const updated = shifts.map((s) =>
+        s.id === editingShift.id
+          ? {
+              ...s,
+              doctorName: loggedInDoctor.name,
+              doctorId: loggedInDoctor.id,
+              doctorUsername: loggedInDoctor.username,
+              department: formDepartment,
+              date: formDate,
+              startTime: formStartTime,
+              endTime: formEndTime,
+              shiftType: formShiftType,
+              roomLocation: formRoomLocation,
+              maxPatients: formMaxPatients,
+              status: formStatus,
+              note: formNote
+            }
+          : s
       );
-      showToast(`Updated schedule for ${LOGGED_IN_DOCTOR.name} on ${formDate}`);
+      setShifts(updated);
+      saveStoredDoctorShifts(updated);
+      showToast(language === 'th' ? `อัปเดตตารางเวรของ ${loggedInDoctor.name} วันที่ ${formDate} เรียบร้อยแล้ว` : `Updated schedule for ${loggedInDoctor.name} on ${formDate}`);
     } else {
       const newShift: DoctorShift = {
-        id: `s-${Date.now()}`,
-        doctorName: LOGGED_IN_DOCTOR.name,
+        id: `shift-doc-${loggedInDoctor.id.toLowerCase()}-${formDate}-${Date.now() % 100000}`,
+        doctorName: loggedInDoctor.name,
+        doctorId: loggedInDoctor.id,
+        doctorUsername: loggedInDoctor.username,
         department: formDepartment,
         date: formDate,
         startTime: formStartTime,
@@ -467,8 +333,10 @@ export const ScheduleView: React.FC = () => {
         status: formStatus,
         note: formNote
       };
-      setShifts((prev) => [...prev, newShift]);
-      showToast(`Added new shift for ${LOGGED_IN_DOCTOR.name} on ${formDate}`);
+      const updated = [...shifts, newShift];
+      setShifts(updated);
+      saveStoredDoctorShifts(updated);
+      showToast(language === 'th' ? `เพิ่มกะการออกตรวจของ ${loggedInDoctor.name} วันที่ ${formDate} เรียบร้อยแล้ว` : `Added new shift for ${loggedInDoctor.name} on ${formDate}`);
     }
 
     setIsModalOpen(false);
@@ -477,13 +345,19 @@ export const ScheduleView: React.FC = () => {
   // Delete Shift (RBAC protected)
   const handleDeleteShift = (shift: DoctorShift) => {
     if (!isShiftOwner(shift)) {
-      showToast(`RBAC Restriction: You cannot delete ${shift.doctorName}'s schedule.`);
+      showToast(language === 'th' ? `ข้อจำกัดสิทธิ์: ท่านไม่สามารถลบตารางเวรของแพทย์ท่านอื่น (${shift.doctorName}) ได้` : `RBAC Restriction: You cannot delete ${shift.doctorName}'s schedule.`);
       return;
     }
 
-    if (confirm(`Are you sure you want to remove your shift on ${shift.date} (${shift.shiftType})?`)) {
-      setShifts((prev) => prev.filter((s) => s.id !== shift.id));
-      showToast('Shift removed successfully.');
+    const confirmMsg = language === 'th'
+      ? `คุณแน่ใจหรือไม่ว่าต้องการลบเวรออกตรวจวันที่ ${shift.date} (${shift.shiftType})?`
+      : `Are you sure you want to remove your shift on ${shift.date} (${shift.shiftType})?`;
+
+    if (confirm(confirmMsg)) {
+      const updated = shifts.filter((s) => s.id !== shift.id);
+      setShifts(updated);
+      saveStoredDoctorShifts(updated);
+      showToast(language === 'th' ? 'ลบเวรออกตรวจเรียบร้อยแล้ว' : 'Shift removed successfully.');
     }
   };
 
@@ -509,7 +383,7 @@ export const ScheduleView: React.FC = () => {
 
   // Stats
   const totalShiftsCount = filteredShifts.length;
-  const myShiftsCount = shifts.filter((s) => s.doctorName === LOGGED_IN_DOCTOR.name).length;
+  const myShiftsCount = shifts.filter((s) => s.doctorName === loggedInDoctor.name || s.doctorUsername === loggedInDoctor.username).length;
   const totalOPDShifts = filteredShifts.filter((s) => s.shiftType === 'General Consultation').length;
   const onCallCount = filteredShifts.filter((s) => s.shiftType === 'After-hours').length;
 
@@ -527,8 +401,8 @@ export const ScheduleView: React.FC = () => {
       <div className="bg-gradient-to-r from-[#162a4a] via-[#1e3a8a] to-[#2563eb] text-white p-5 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 border border-blue-900/50">
         <div className="flex items-center gap-4">
           <img
-            src={LOGGED_IN_DOCTOR.avatar}
-            alt={LOGGED_IN_DOCTOR.name}
+            src={loggedInDoctor.avatar}
+            alt={loggedInDoctor.name}
             className="w-12 h-12 rounded-2xl object-cover border-2 border-white/30 shadow-xs shrink-0"
           />
           <div>
@@ -538,18 +412,25 @@ export const ScheduleView: React.FC = () => {
               </span>
               <span className="bg-emerald-400/20 text-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-400/30 flex items-center gap-1">
                 <ShieldCheck className="w-3 h-3" />
-                <span>RBAC Active</span>
+                <span>RBAC Active ({loggedInDoctor.username})</span>
               </span>
             </div>
             <div className="text-lg font-bold tracking-tight text-white flex items-center gap-2 mt-0.5">
-              <span>{LOGGED_IN_DOCTOR.name}</span>
+              <span>{loggedInDoctor.name}</span>
               <span className="text-xs font-mono font-medium text-blue-200 bg-white/10 px-2 py-0.5 rounded-md">
-                License: {LOGGED_IN_DOCTOR.licenseNo}
+                License: {loggedInDoctor.licenseNo}
               </span>
             </div>
             <div className="text-xs text-blue-200 mt-0.5">
-              {LOGGED_IN_DOCTOR.department} • {LOGGED_IN_DOCTOR.role}
+              {loggedInDoctor.department} • {loggedInDoctor.role} • {loggedInDoctor.roomLocation}
             </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 self-end md:self-center">
+          <div className="text-right">
+            <span className="text-[11px] text-blue-200 block font-medium">เวรของคุณทั้งหมด</span>
+            <span className="text-xl font-black text-white">{myShiftsCount} กะ</span>
           </div>
         </div>
       </div>
@@ -561,13 +442,12 @@ export const ScheduleView: React.FC = () => {
             <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t('scheduleTitle')}</h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            {t('scheduleSubtitle')} (<strong className="text-slate-800">{LOGGED_IN_DOCTOR.name}</strong>)
+            {t('scheduleSubtitle')} (<strong className="text-slate-800">{loggedInDoctor.name}</strong>)
           </p>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {/* ปุ่มสลับมุมมอง ใช้คอมโพเนนต์เดียวกับแถบกรองในหน้าคิวและหน้าประวัติ
-              หน้าตาจึงตรงกันทั้งระบบ แก้ที่เดียวมีผลทุกหน้า */}
+          {/* ปุ่มสลับมุมมอง */}
           <StatusFilterTabs
             value={viewMode}
             onChange={(next) => setViewMode(next as 'month' | 'week' | 'list')}
@@ -602,28 +482,28 @@ export const ScheduleView: React.FC = () => {
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
-            <UserCheck className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+            <User className="w-5 h-5" />
           </div>
           <div>
             <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('myManagedShifts')}</span>
-            <span className="text-lg font-extrabold text-indigo-700">{myShiftsCount} {language === 'th' ? 'กะ' : 'Duties'}</span>
+            <span className="text-lg font-extrabold text-slate-900">{myShiftsCount} {language === 'th' ? 'กะ' : 'Duties'}</span>
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
             <Stethoscope className="w-5 h-5" />
           </div>
           <div>
             <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('opdSessions')}</span>
-            <span className="text-lg font-extrabold text-slate-900">{totalOPDShifts} {language === 'th' ? 'รอบ' : 'Sessions'}</span>
+            <span className="text-lg font-extrabold text-slate-900">{totalOPDShifts} {language === 'th' ? 'กะ' : 'Sessions'}</span>
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center font-bold">
-            <ShieldAlert className="w-5 h-5" />
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+            <Clock className="w-5 h-5" />
           </div>
           <div>
             <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('emergencyOnCall')}</span>
@@ -643,9 +523,9 @@ export const ScheduleView: React.FC = () => {
             className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer"
           >
             <option value="All">{t('allDoctors')}</option>
-            {ALL_DOCTORS.map((doc) => (
-              <option key={doc} value={doc}>
-                {doc} {doc === LOGGED_IN_DOCTOR.name ? (language === 'th' ? '⭐ (บัญชีของคุณ)' : '⭐ (Your Account)') : ''}
+            {SYSTEM_DOCTORS.map((doc) => (
+              <option key={doc.id} value={doc.name}>
+                {doc.name} — {doc.department} {doc.name === loggedInDoctor.name ? (language === 'th' ? '⭐ (บัญชีของคุณ)' : '⭐ (Your Account)') : ''}
               </option>
             ))}
           </select>
@@ -670,10 +550,10 @@ export const ScheduleView: React.FC = () => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
           <input
             type="text"
+            placeholder={language === 'th' ? 'ค้นหาตารางเวร, ห้องตรวจ, หมายเหตุ...' : 'Search duty, room, note...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={language === 'th' ? 'ค้นหาห้อง, แพทย์, หมายเหตุ...' : 'Search room, doctor, note...'}
-            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+            className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 transition-all"
           />
         </div>
       </div>
@@ -742,7 +622,7 @@ export const ScheduleView: React.FC = () => {
               return (
                 <div
                   key={day.fullDate}
-                  className={`min-h-[100px] p-2 flex flex-col justify-between transition-colors ${
+                  className={`min-h-[105px] p-2 flex flex-col justify-between transition-colors ${
                     !day.isCurrentMonth
                       ? 'bg-slate-50/60 text-slate-400'
                       : day.isToday
@@ -769,7 +649,7 @@ export const ScheduleView: React.FC = () => {
                       <button
                         onClick={() => handleOpenAddModal(day.fullDate)}
                         className="opacity-0 hover:opacity-100 focus:opacity-100 p-0.5 text-slate-400 hover:text-blue-600 rounded transition-all cursor-pointer"
-                        title={`Add shift for ${LOGGED_IN_DOCTOR.name} on ${day.fullDate}`}
+                        title={`Add shift for ${loggedInDoctor.name} on ${day.fullDate}`}
                       >
                         <Plus className="w-3.5 h-3.5" />
                       </button>
@@ -835,11 +715,34 @@ export const ScheduleView: React.FC = () => {
             <div className="flex items-center gap-3">
               <CalendarIcon className="w-5 h-5 text-blue-300" />
               <h2 className="text-sm font-bold tracking-tight">
-                Schedule Week: July 20 - July 26, 2026
+                {language === 'th'
+                  ? `สัปดาห์: ${weekDays[0]?.dayNum} ${weekDays[0]?.monthName} - ${weekDays[6]?.dayNum} ${weekDays[6]?.monthName} (${currentDate.getFullYear() + 543})`
+                  : `Schedule Week: ${weekDays[0]?.monthName} ${weekDays[0]?.dayNum} - ${weekDays[6]?.monthName} ${weekDays[6]?.dayNum}, ${currentDate.getFullYear()}`}
               </h2>
             </div>
-            <div className="text-xs text-slate-300 font-mono">
-              Displaying {filteredShifts.length} duty items
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleTodayMonth}
+                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-bold border border-white/20 transition-all cursor-pointer"
+              >
+                สัปดาห์นี้
+              </button>
+              <div className="flex items-center gap-1 bg-white/10 p-1 rounded-lg border border-white/20">
+                <button
+                  onClick={handlePrevMonth}
+                  className="p-1 text-slate-200 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer"
+                  title="Previous Week"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={handleNextMonth}
+                  className="p-1 text-slate-200 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer"
+                  title="Next Week"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -861,7 +764,7 @@ export const ScheduleView: React.FC = () => {
                       <div>
                         <span className="text-[11px] font-bold text-slate-400 uppercase block">{day.name}</span>
                         <span className={`text-base font-black ${day.isToday ? 'text-blue-600' : 'text-slate-800'}`}>
-                          July {day.dayNum}
+                          {day.dayNum} {day.monthName}
                         </span>
                       </div>
                       {day.isToday && (
@@ -871,20 +774,20 @@ export const ScheduleView: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Add shift button — วางไว้บนสุดของแต่ละวัน กดเพิ่มเวรได้ทันทีโดยไม่ต้องเลื่อนลงไปท้ายคอลัมน์ */}
+                    {/* Add shift button */}
                     <button
                       onClick={() => handleOpenAddModal(day.fullDate)}
                       className="w-full py-1.5 bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-700 rounded-xl text-[11px] font-bold border border-dashed border-slate-200 hover:border-blue-300 transition-all flex items-center justify-center gap-1 mt-3 cursor-pointer"
                     >
                       <Plus className="w-3 h-3 shrink-0" />
-                      <span>Add Duty</span>
+                      <span>{language === 'th' ? 'เพิ่มเวร' : 'Add Duty'}</span>
                     </button>
 
                     {/* Shifts inside this day */}
                     <div className="space-y-2.5 mt-3">
                       {dayShifts.length === 0 ? (
                         <div className="text-[11px] text-slate-400 py-6 text-center italic border border-dashed border-slate-200 rounded-xl">
-                          No shifts scheduled
+                          {language === 'th' ? 'ไม่มีตารางเวร' : 'No shifts scheduled'}
                         </div>
                       ) : (
                         dayShifts.map((shift) => {
@@ -920,19 +823,19 @@ export const ScheduleView: React.FC = () => {
                                       </button>
                                       <button
                                         onClick={() => handleDeleteShift(shift)}
-                                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors cursor-pointer"
-                                        title="Delete Your Shift"
+                                        className="p-1 text-slate-400 hover:text-red-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                        title="Delete Shift"
                                       >
                                         <Trash2 className="w-3 h-3" />
                                       </button>
                                     </>
                                   ) : (
                                     <button
-                                      onClick={() => handleShiftClick(shift)}
+                                      onClick={() => setReadOnlyShiftModal(shift)}
                                       className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                                      title="Read-Only View"
+                                      title="View Details (Read-Only)"
                                     >
-                                      <Lock className="w-3 h-3 text-slate-400" />
+                                      <Eye className="w-3 h-3" />
                                     </button>
                                   )}
                                 </div>
@@ -940,13 +843,9 @@ export const ScheduleView: React.FC = () => {
 
                               {/* Doctor Name & Room */}
                               <div>
-                                <div className="text-xs font-bold text-slate-900 leading-tight flex items-center justify-between">
-                                  <span>{shift.doctorName}</span>
-                                  {owner && (
-                                    <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 rounded">
-                                      You
-                                    </span>
-                                  )}
+                                <div className="font-bold text-xs text-slate-900 flex items-center gap-1">
+                                  <User className="w-3 h-3 text-slate-400 shrink-0" />
+                                  <span className="truncate">{shift.doctorName}</span>
                                 </div>
                                 <div className="text-[11px] font-semibold text-slate-500 flex items-center gap-1 mt-0.5">
                                   <Building className="w-3 h-3 text-slate-400 shrink-0" />
@@ -1050,59 +949,64 @@ export const ScheduleView: React.FC = () => {
                         </td>
 
                         <td className="p-3.5">
-                          <div className="font-semibold text-slate-800">{shift.date}</div>
-                          <div className="text-[11px] font-mono text-slate-500">{shift.startTime} - {shift.endTime}</div>
+                          <div className="font-bold text-slate-800">{shift.date}</div>
+                          <div className="text-[11px] text-slate-500 font-mono">
+                            {shift.startTime} - {shift.endTime}
+                          </div>
                         </td>
 
                         <td className="p-3.5 font-medium text-slate-700">
                           {shift.roomLocation}
                         </td>
 
-                        <td className="p-3.5 font-mono">
-                          <span className="font-bold text-slate-900">{shift.bookedPatients}</span>
-                          <span className="text-slate-400">/{shift.maxPatients} max</span>
+                        <td className="p-3.5">
+                          <div className="font-mono text-slate-800 font-bold">
+                            {shift.bookedPatients} / {shift.maxPatients}
+                          </div>
+                          <div className="text-[10px] text-slate-400">patients</div>
                         </td>
 
                         <td className="p-3.5">
-                          <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
-                            shift.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
-                            shift.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
-                            shift.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
-                          }`}>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase ${
+                              shift.status === 'In Progress'
+                                ? 'bg-amber-100 text-amber-800'
+                                : shift.status === 'Completed'
+                                ? 'bg-slate-100 text-slate-600'
+                                : 'bg-emerald-100 text-emerald-800'
+                            }`}
+                          >
                             {shift.status}
                           </span>
                         </td>
 
                         <td className="p-3.5 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            {owner ? (
-                              <>
-                                <button
-                                  onClick={() => handleShiftClick(shift)}
-                                  className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
-                                  title="Edit Your Shift"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteShift(shift)}
-                                  className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                                  title="Delete Your Shift"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            ) : (
+                          {owner ? (
+                            <div className="flex items-center justify-end gap-1">
                               <button
                                 onClick={() => handleShiftClick(shift)}
-                                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer"
-                                title="View Only (Other Doctor)"
+                                className="px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
                               >
-                                <Lock className="w-3.5 h-3.5 text-slate-400" />
-                                <span>Read Only</span>
+                                <Edit2 className="w-3 h-3" />
+                                <span>Edit</span>
                               </button>
-                            )}
-                          </div>
+                              <button
+                                onClick={() => handleDeleteShift(shift)}
+                                className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all cursor-pointer"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setReadOnlyShiftModal(shift)}
+                              className="px-2.5 py-1 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-lg text-xs font-medium transition-all cursor-pointer inline-flex items-center gap-1"
+                            >
+                              <Lock className="w-3 h-3" />
+                              <span>Details</span>
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );
@@ -1114,23 +1018,24 @@ export const ScheduleView: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL 1: ADD / EDIT SHIFT DIALOG (For Logged-In Doctor) */}
+      {/* ============================================================ */}
+      {/* MODAL 1: ADD / EDIT SHIFT MODAL */}
+      {/* ============================================================ */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col border border-slate-200 shadow-2xl overflow-hidden">
-
+          <div className="bg-white rounded-3xl max-w-xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* ===== Header ===== */}
-            <div className="shrink-0 px-6 py-4 bg-[#162a4a] text-white flex items-start justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-                  <CalendarIcon className="w-5 h-5 text-blue-300" />
+            <div className="px-6 py-4 bg-[#162a4a] text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-300">
+                  {editingShift ? <Edit2 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                 </div>
-                <div className="min-w-0">
-                  <h3 className="font-bold text-base leading-snug">
-                    {editingShift ? 'แก้ไขกะการออกตรวจ' : 'เพิ่มกะการออกตรวจ'}
+                <div>
+                  <h3 className="font-bold text-sm leading-tight">
+                    {editingShift ? 'แก้ไขกะการออกตรวจ' : 'เพิ่มกะการออกตรวจใหม่'}
                   </h3>
-                  <p className="text-[11px] text-slate-300 leading-snug mt-2">
-                    ช่องที่มีเครื่องหมาย <span className="text-rose-300 font-bold">*</span> จำเป็นต้องกรอก
+                  <p className="text-[11px] text-blue-200/80 mt-0.5">
+                    {editingShift ? 'ปรับปรุงรายละเอียดเวลาหรือสถานที่ปฏิบัติงาน' : 'กำหนดช่วงเวลาและห้องตรวจของแพทย์'}
                   </p>
                 </div>
               </div>
@@ -1154,8 +1059,8 @@ export const ScheduleView: React.FC = () => {
                   </div>
                   <div className="min-w-0">
                     <span className="text-[11px] font-bold text-blue-700 block leading-tight">บัญชีแพทย์ประจำตาราง</span>
-                    <span className="text-sm font-extrabold text-slate-900">{LOGGED_IN_DOCTOR.name}</span>
-                    <span className="text-xs text-slate-500 ml-1.5">({LOGGED_IN_DOCTOR.department})</span>
+                    <span className="text-sm font-extrabold text-slate-900">{loggedInDoctor.name}</span>
+                    <span className="text-xs text-slate-500 ml-1.5">({loggedInDoctor.department})</span>
                   </div>
                 </div>
 
@@ -1219,7 +1124,7 @@ export const ScheduleView: React.FC = () => {
 
                     <div>
                       <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                        เวลาเริ่ม <span className="text-rose-500">*</span>
+                        เวลาเริ่มต้น <span className="text-rose-500">*</span>
                       </label>
                       <input
                         type="time"
@@ -1243,58 +1148,58 @@ export const ScheduleView: React.FC = () => {
                   </div>
                 </section>
 
-                {/* กลุ่ม 3 — รายละเอียดเพิ่มเติม */}
+                {/* กลุ่ม 3 — จำนวนผู้ป่วยและสถานะ */}
                 <section className="rounded-2xl border border-slate-200 overflow-hidden">
                   <header className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
                     <Users className="w-4 h-4 text-slate-500 shrink-0" />
-                    <h4 className="text-xs font-bold text-slate-700">รายละเอียดเพิ่มเติม</h4>
+                    <h4 className="text-xs font-bold text-slate-700">ขีดความสามารถและสถานะ</h4>
                   </header>
-                  <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                          จำนวนผู้ป่วยสูงสุดต่อกะ
-                        </label>
-                        <input
-                          type="number"
-                          min={0}
-                          value={formMaxPatients}
-                          onChange={(e) => setFormMaxPatients(Number(e.target.value))}
-                          className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                          สถานะกะ
-                        </label>
-                        <select
-                          value={formStatus}
-                          onChange={(e) => setFormStatus(e.target.value as any)}
-                          className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer"
-                        >
-                          <option value="Scheduled">Scheduled</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Completed">Completed</option>
-                          <option value="Cancelled">Cancelled</option>
-                        </select>
-                      </div>
+                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                        จำนวนผู้ป่วยสูงสุด (คน)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={formMaxPatients}
+                        onChange={(e) => setFormMaxPatients(Number(e.target.value))}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
+                      />
                     </div>
 
                     <div>
                       <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                        หมายเหตุ / คำแนะนำสำหรับทีมงาน
+                        สถานะกะ
                       </label>
-                      <textarea
-                        rows={3}
-                        value={formNote}
-                        onChange={(e) => setFormNote(e.target.value)}
-                        placeholder="ระบุรายละเอียดเพิ่มเติมสำหรับเจ้าหน้าที่หรือพยาบาล เช่น อุปกรณ์ที่ต้องเตรียม..."
-                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 outline-none transition resize-none focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 placeholder:text-slate-400"
-                      />
+                      <select
+                        value={formStatus}
+                        onChange={(e) => setFormStatus(e.target.value as any)}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer"
+                      >
+                        <option value="Scheduled">Scheduled (รอดำเนินการ)</option>
+                        <option value="In Progress">In Progress (กำลังดำเนินการ)</option>
+                        <option value="Completed">Completed (เสร็จสิ้น)</option>
+                        <option value="Cancelled">Cancelled (ยกเลิก)</option>
+                      </select>
                     </div>
                   </div>
                 </section>
+
+                {/* กลุ่ม 4 — หมายเหตุเพิ่มเติม */}
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
+                    หมายเหตุเพิ่มเติม (ถ้ามี)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formNote}
+                    onChange={(e) => setFormNote(e.target.value)}
+                    placeholder="เช่น เตรียมเครื่องมืออัลตราซาวด์, ตรวจเคสส่งต่อ ฯลฯ"
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 placeholder:text-slate-400 resize-none"
+                  />
+                </div>
               </div>
 
               {/* ===== Footer ===== */}
@@ -1328,7 +1233,7 @@ export const ScheduleView: React.FC = () => {
               <div className="flex items-center gap-2">
                 <Lock className="w-5 h-5 text-amber-400" />
                 <h3 className="font-bold text-base">
-                  Duty Schedule Details (Read-Only)
+                  {language === 'th' ? 'รายละเอียดตารางเวร (ดูอย่างเดียว)' : 'Duty Schedule Details (Read-Only)'}
                 </h3>
               </div>
               <button
@@ -1342,31 +1247,31 @@ export const ScheduleView: React.FC = () => {
             <div className="p-6 space-y-4">
               <div className="bg-slate-50 p-4 rounded-xl space-y-2 border border-slate-200 text-xs">
                 <div className="flex justify-between border-b border-slate-200 pb-2">
-                  <span className="text-slate-500 font-medium">Doctor:</span>
+                  <span className="text-slate-500 font-medium">{language === 'th' ? 'แพทย์ผู้ตรวจ:' : 'Doctor:'}</span>
                   <span className="font-bold text-slate-900">{readOnlyShiftModal.doctorName}</span>
                 </div>
                 <div className="flex justify-between border-b border-slate-200 pb-2">
-                  <span className="text-slate-500 font-medium">Department:</span>
+                  <span className="text-slate-500 font-medium">{language === 'th' ? 'แผนก:' : 'Department:'}</span>
                   <span className="font-semibold text-slate-800">{readOnlyShiftModal.department}</span>
                 </div>
                 <div className="flex justify-between border-b border-slate-200 pb-2">
-                  <span className="text-slate-500 font-medium">Shift Type:</span>
+                  <span className="text-slate-500 font-medium">{language === 'th' ? 'ประเภทกะ:' : 'Shift Type:'}</span>
                   <span className={`px-2 py-0.5 rounded font-bold border ${getShiftBadgeStyle(readOnlyShiftModal.shiftType)}`}>
                     {readOnlyShiftModal.shiftType}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-slate-200 pb-2">
-                  <span className="text-slate-500 font-medium">Date & Time:</span>
+                  <span className="text-slate-500 font-medium">{language === 'th' ? 'วันและเวลา:' : 'Date & Time:'}</span>
                   <span className="font-mono font-semibold text-slate-900">
                     {readOnlyShiftModal.date} ({readOnlyShiftModal.startTime} - {readOnlyShiftModal.endTime})
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-slate-200 pb-2">
-                  <span className="text-slate-500 font-medium">Location:</span>
+                  <span className="text-slate-500 font-medium">{language === 'th' ? 'สถานที่/ห้องตรวจ:' : 'Location:'}</span>
                   <span className="font-medium text-slate-800">{readOnlyShiftModal.roomLocation}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-medium">Patients Booked:</span>
+                  <span className="text-slate-500 font-medium">{language === 'th' ? 'จำนวนผู้ป่วย:' : 'Patients Booked:'}</span>
                   <span className="font-mono font-bold text-slate-900">
                     {readOnlyShiftModal.bookedPatients} / {readOnlyShiftModal.maxPatients} max
                   </span>
@@ -1383,7 +1288,7 @@ export const ScheduleView: React.FC = () => {
                   onClick={() => setReadOnlyShiftModal(null)}
                   className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
                 >
-                  Close View
+                  {language === 'th' ? 'ปิดหน้าต่าง' : 'Close View'}
                 </button>
               </div>
             </div>
