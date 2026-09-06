@@ -562,7 +562,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
       const payload = {
-        visit_id: activePatient.visitId || 1,
+        visit_id: activePatient.visitId || 0,
         hn: activePatient.hn || 'HN0001',
         patient_name: activePatient.name || 'ผู้ป่วย',
         national_id: activePatient.nationalId || '',
