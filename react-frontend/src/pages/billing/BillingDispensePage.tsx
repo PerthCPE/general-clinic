@@ -4,6 +4,7 @@ import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
 import { BillingDispenseSkeleton } from '../../components/Common/ClinicSkeleton';
+import { playNotificationDingDong } from '../../utils/audioQueue';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface ToastState {
@@ -561,6 +562,7 @@ export default function BillingDispensePage({
       if (data) {
         const pName = data.patient_name || 'ผู้ป่วย';
         triggerToast(`ได้รับคิวใหม่สำหรับการเงิน: ${pName} (${data.queue_number || ''})`, 'doctor');
+        playNotificationDingDong('มีผู้ป่วยใหม่ ส่งมาที่ห้องการเงินค่ะ');
       }
     });
 

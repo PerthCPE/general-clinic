@@ -308,3 +308,9 @@ body.dark-mode thead th {
   color: #F8FAFC !important;
 }
 
+
+/* ทดสอบฟอนต์ระบบจัดการสิทธิ์ (Prompt) */
+body.admin-font-theme {
+  --font-primary: 'Prompt', 'Kanit', sans-serif !important;
+  --font-heading: 'Prompt', 'Kanit', sans-serif !important;
+}
