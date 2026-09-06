@@ -402,39 +402,14 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 	var medList []gin.H
 
-	// วนลูปตัดสต็อกยาแต่ละตัวที่ถูกสั่งจ่าย และรวมราคาจริง
-	for _, d := range dispensings {
-		var med models.Medicine
-		if err := tx.Where("id = ?", d.MedicineID).First(&med).Error; err == nil {
-			if med.StockQuantity >= d.Quantity {
-				med.StockQuantity -= d.Quantity
-				tx.Save(&med)
-			}
-			price := med.UnitPrice
-			if price <= 0 {
-				price = 10.0
-			}
-			totalAmount += float64(d.Quantity) * price
-
-			medList = append(medList, gin.H{
-				"medId":        med.MedicineCode,
-				"name":         med.Name,
-				"genericName":  med.GenericName,
-				"category":     med.Category,
-				"properties":   med.Properties,
-				"dosage":       CleanDosage(d.Dosage, med.Name),
-				"instructions": CleanInstructions(d.Instructions, med.Name),
-				"price":        price,
-				"unit_price":   price,
-				"quantity":     d.Quantity,
-				"stock":        med.StockQuantity,
-				"stockStatus":  "พร้อมจ่าย",
-			})
+	// 🚨 บันทึกลงตารางยาด้วยเสมอเมื่อส่งไปการเงิน (ระบบจัดการยา)
+	// เพื่อให้เวลาเลื่อนลำดับคิวอัตโนมัติแล้วกด Submit ข้อมูลจะถูกบันทึกลงตารางประวัติยาผู้ป่วย (dispensings) 100%
+	if len(req.Medications) > 0 {
+		// ถ้ามี VisitID ให้ล้างรายการยาเดิมของ Visit นี้ออกก่อน แล้วบันทึกรายการล่าสุดจากห้องยาเข้าไปใหม่
+		if req.VisitID > 0 {
+			tx.Where("visit_id = ?", req.VisitID).Delete(&models.Dispensing{})
 		}
-	}
 
-	// หากยังไม่มีในตาราง dispensings แต่มีรายการยาจาก frontend ให้บันทึกลง dispensings
-	if len(dispensings) == 0 && len(req.Medications) > 0 {
 		for _, mObj := range req.Medications {
 			name, _ := mObj["name"].(string)
 			dosage, _ := mObj["dosage"].(string)
@@ -481,10 +456,12 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 					}
 				}
 
+				// ตัดสต็อกยา
 				if med.StockQuantity >= qty {
 					med.StockQuantity -= qty
 					tx.Save(&med)
 				}
+				
 				price := med.UnitPrice
 				if price <= 0 {
 					price = 10.0
@@ -502,6 +479,37 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 					"price":        price,
 					"unit_price":   price,
 					"quantity":     qty,
+					"stock":        med.StockQuantity,
+					"stockStatus":  "พร้อมจ่าย",
+				})
+			}
+		}
+	} else if len(dispensings) > 0 {
+		// กรณีที่ไม่มี req.Medications ส่งมาจากหน้าบ้าน ให้ใช้ข้อมูลเดิมที่มีอยู่
+		for _, d := range dispensings {
+			var med models.Medicine
+			if err := tx.Where("id = ?", d.MedicineID).First(&med).Error; err == nil {
+				if med.StockQuantity >= d.Quantity {
+					med.StockQuantity -= d.Quantity
+					tx.Save(&med)
+				}
+				price := med.UnitPrice
+				if price <= 0 {
+					price = 10.0
+				}
+				totalAmount += float64(d.Quantity) * price
+
+				medList = append(medList, gin.H{
+					"medId":        med.MedicineCode,
+					"name":         med.Name,
+					"genericName":  med.GenericName,
+					"category":     med.Category,
+					"properties":   med.Properties,
+					"dosage":       CleanDosage(d.Dosage, med.Name),
+					"instructions": CleanInstructions(d.Instructions, med.Name),
+					"price":        price,
+					"unit_price":   price,
+					"quantity":     d.Quantity,
 					"stock":        med.StockQuantity,
 					"stockStatus":  "พร้อมจ่าย",
 				})

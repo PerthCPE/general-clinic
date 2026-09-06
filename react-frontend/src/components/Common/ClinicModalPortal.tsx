@@ -10,6 +10,11 @@ interface ClinicModalPortalProps {
   className?: string;
 }
 
+let activeModalsCount = 0;
+let globalOriginalBodyOverflow = '';
+let globalOriginalHtmlOverflow = '';
+let globalOriginalBodyPaddingRight = '';
+
 export const ClinicModalPortal: React.FC<ClinicModalPortalProps> = ({
   children,
   isOpen = true,
@@ -22,23 +27,29 @@ export const ClinicModalPortal: React.FC<ClinicModalPortalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    const originalBodyOverflow = document.body.style.overflow;
-    const originalHtmlOverflow = document.documentElement.style.overflow;
-    const originalBodyPaddingRight = document.body.style.paddingRight;
+    if (activeModalsCount === 0) {
+      globalOriginalBodyOverflow = document.body.style.overflow;
+      globalOriginalHtmlOverflow = document.documentElement.style.overflow;
+      globalOriginalBodyPaddingRight = document.body.style.paddingRight;
 
-    // คำนวณความกว้าง scrollbar เพื่อป้องกันหน้าจอขยับ
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
-
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    if (scrollbarWidth > 0) {
-      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      // คำนวณความกว้าง scrollbar เพื่อป้องกันหน้าจอขยับ
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+      document.body.style.overflow = 'hidden';
+      document.documentElement.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`;
+      }
     }
+    
+    activeModalsCount++;
 
     return () => {
-      document.body.style.overflow = originalBodyOverflow;
-      document.documentElement.style.overflow = originalHtmlOverflow;
-      document.body.style.paddingRight = originalBodyPaddingRight;
+      activeModalsCount--;
+      if (activeModalsCount === 0) {
+        document.body.style.overflow = globalOriginalBodyOverflow;
+        document.documentElement.style.overflow = globalOriginalHtmlOverflow;
+        document.body.style.paddingRight = globalOriginalBodyPaddingRight;
+      }
     };
   }, [isOpen]);
 

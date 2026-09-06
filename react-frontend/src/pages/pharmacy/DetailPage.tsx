@@ -547,7 +547,7 @@ export default function DetailPage({
     setIsSubmitting(true);
     const submitStart = Date.now();
     const pName = activePatient.name;
-    const vId = activePatient.visitId || 1;
+    const vId = activePatient.visitId || 0; // ส่ง 0 เพื่อให้ backend สร้าง VisitRecord ใหม่หากยังไม่มี
 
     // 1. ⚡ Optimistic UI: อัปเดตสถานะในหน้าจอทันทีใน 0 ms โดยไม่ต้องรอ Network Round-trip จาก Supabase
     const dispensedPatient: PatientConfig = {
@@ -876,7 +876,7 @@ export default function DetailPage({
             <div 
               className="recent-patients-scroll-container"
               style={{ 
-                overflowX: 'auto', 
+                overflowX: 'hidden', 
                 overflowY: 'auto', 
                 overscrollBehavior: 'auto',
                 maxHeight: '340px', 
@@ -884,17 +884,17 @@ export default function DetailPage({
                 borderRadius: '10px' 
               }}
             >
-              <table style={{ width: '100%', minWidth: '1020px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px', tableLayout: 'fixed' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F8FAFC' }}>
                   <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '90px', textAlign: 'center' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '100px', textAlign: 'center' }}>HN</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '110px', textAlign: 'center' }}>VN</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '140px', textAlign: 'center' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 16px 12px 30px', fontWeight: '700', fontSize: '14.5px', minWidth: '200px', textAlign: 'left' }}>ชื่อ-นามสกุล</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '120px', textAlign: 'center' }}>สถานะ</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '90px', textAlign: 'center' }}>เวลารอ</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', width: '130px', textAlign: 'center' }}>การดำเนินการ</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '8%', textAlign: 'center' }}>ลำดับคิว</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '10%', textAlign: 'center' }}>HN</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '10%', textAlign: 'center' }}>VN</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '14%', textAlign: 'center' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 16px 12px 30px', fontWeight: '700', fontSize: '14.5px', width: '22%', textAlign: 'left' }}>ชื่อ-นามสกุล</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '12%', textAlign: 'center' }}>สถานะ</th>
+                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '10%', textAlign: 'center' }}>เวลารอ</th>
+                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', width: '14%', textAlign: 'center' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -955,9 +955,9 @@ export default function DetailPage({
                               <span style={{ color: '#94A3B8' }}>-</span>
                             )}
                           </td>
-                          <td style={{ padding: '12px 16px 12px 30px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'left' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column' }}>
-                              <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '14px' }}>{p.name}</span>
+                          <td style={{ padding: '12px 16px 12px 30px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                              <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
                               {p.doctorAdvice && (
                                 <span style={{ fontSize: '12px', color: '#64748B', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {cleanDoctorAdvice(p.doctorAdvice)}
@@ -970,7 +970,8 @@ export default function DetailPage({
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              minWidth: '105px',
+                              width: '100%',
+                              maxWidth: '105px',
                               padding: '4px 10px',
                               boxSizing: 'border-box',
                               borderRadius: '9999px',
@@ -1003,7 +1004,8 @@ export default function DetailPage({
                                   if (onSelectPatientId) onSelectPatientId(p.id);
                                 }}
                                 style={{ 
-                                  width: '125px',
+                                  width: '100%',
+                                  maxWidth: '125px',
                                   height: '34px',
                                   background: localPatientId === p.id ? '#0D9488' : '#F0FDFA', 
                                   color: localPatientId === p.id ? '#FFFFFF' : '#0F766E', 
@@ -1026,7 +1028,8 @@ export default function DetailPage({
                                   if (onSelectPatientId) onSelectPatientId(p.id);
                                 }}
                                 style={{ 
-                                  width: '125px',
+                                  width: '100%',
+                                  maxWidth: '125px',
                                   height: '34px',
                                   background: localPatientId === p.id ? '#10B981' : '#2563EB', 
                                   color: 'white', border: 'none', borderRadius: '8px', 
