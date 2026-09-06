@@ -1,5 +1,6 @@
 /* ===== Global Reset & Base Styles ===== */
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Kanit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Prompt:wght@400;500;600;700;800&display=swap');
+@import './styles/clinicPerformance.css';
 
 /* ===========================================================================
    Tailwind CSS — ใช้กับหน้าจอฝั่งแพทย์ที่ย้ายมาจากระบบ clinicms

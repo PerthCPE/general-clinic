@@ -1257,14 +1257,14 @@ export const DocumentForwardPage: React.FC = () => {
                       ))
                     ) : (
                       <>
-                        <option value="6">พญ.สุดา สุขสมบูรณ์ — แพทย์ (doctor1)</option>
-                        <option value="7">นพ.วิชัย ชาญการแพทย์ — แพทย์ (doctor2)</option>
-                        <option value="8">พญ.เกศรา รักษาดี — แพทย์ (doctor3)</option>
-                        <option value="3">พว.กานดา คัดกรอง — พยาบาล (nurse1)</option>
-                        <option value="4">พว.สมหญิง ดูแลดี — พยาบาล (nurse2)</option>
-                        <option value="5">ภก.บุญชู เภสัชกร — เภสัชกร (pharmacist1)</option>
-                        <option value="9">นส.รวย การเงิน — การเงิน (cashier1)</option>
-                        <option value="2">คุณสมจิต ดีใจ — ธุรการ (officer1)</option>
+                        {/* รายชื่อบุคลากรสำรอง (Fallback) */}
+                        <option value="7">พญ.สุดา สุขสมบูรณ์ — แพทย์ (doctor1)</option>
+                        <option value="8">นพ.วิชัย ชาญการแพทย์ — แพทย์ (doctor2)</option>
+                        <option value="9">พญ.เกศรา รักษาดี — แพทย์ (doctor3)</option>
+                        <option value="3">พว. กานดา คัดกรอง — พยาบาล (nurse1)</option>
+                        <option value="5">ภก.บุญชู เภสัชกร — ห้องยา/เภสัชกร (pharmacist1)</option>
+                        <option value="6">นส.รวย การเงิน — การเงิน (cashier1)</option>
+                        <option value="1">คุณสมจิต ดีใจ — ธุรการ (officer1)</option>
                       </>
                     )}
                   </select>

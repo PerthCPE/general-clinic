@@ -8,6 +8,8 @@ export interface PatientConfig {
   nationalId: string;
   queueNumber: string;
   ticket: string;
+  receiptNumber?: string;
+  vn?: string;
   name: string;
   shortName: string;
   age: number;
@@ -31,26 +33,28 @@ export interface PatientConfig {
     name: string;
     dosage: string;
     instructions: string;
+    expiry_date?: string;
     stock: number;
     stockStatus: 'in-stock' | 'low-stock' | 'out-stock';
     quantity?: number;
     price: number;
     properties: string;
   }[];
+  createdAt?: string;
 }
 
 export const CLINIC_CONFIG = {
   appName: 'General Clinic',
   appSubTitle: 'ระบบบริหารจัดการคลินิกเวชกรรมและบริการผู้ป่วย',
-
+// ====================================
   // ข้อมูลบัญชีรับโอนเงิน PromptPay (QR Code)
   paymentAccount: {
     accountName: 'นาย บุญค้ำ โยลัย',
-    phone: 'xxx-xxx-5682',
-    accountNumber: '0203xxxx6462',
+    phone: '088-587-5682',
+    accountNumber: '020300456462',
     qrImagePath: '/thai_qr_bunkham.png',
   },
-
+// ====================================
   staff: {
     pharmacist: {
       name: 'ดร.บุญ หล่อ',

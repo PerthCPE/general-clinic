@@ -87,7 +87,7 @@ func SetUpRoutes(r *gin.Engine) {
 
 	// ===== ระบบย่อยที่ 1: คลังยา (Pharmacy / Dispensing) - Bun =====
 	pharmacyRoutes := api.Group("/pharmacy")
-	pharmacyRoutes.Use(middleware.RoleRequired("pharmacist", "doctor", "registrar"))
+	pharmacyRoutes.Use(middleware.RoleRequired("pharmacist", "doctor", "registrar", "cashier", "admin"))
 	{
 		pharmacyRoutes.GET("/queues", controllers.GetPharmacyQueues)
 		pharmacyRoutes.GET("/medicines", controllers.GetMedicines)

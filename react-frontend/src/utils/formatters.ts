@@ -4,24 +4,23 @@
  * and 13-digit Thai National ID / 10-digit Phone formats.
  */
 
-// 1. Hospital Number (HN) Formatter: HN + 4-digit Uppercase Hex (HN0001 - HNFFFF)
+// 1. Hospital Number (HN) Formatter: HN + 4-digit Decimal (HN0001 - HN9999)
 export const formatHN = (raw: string | number | undefined | null): string => {
   if (!raw) return 'HN0001';
   if (typeof raw === 'number' && raw > 0) {
-    return 'HN' + raw.toString(16).toUpperCase().padStart(4, '0');
+    return 'HN' + String(raw).padStart(4, '0');
   }
   const str = String(raw).trim();
-  if (/^HN[0-9A-Fa-f]{4}$/i.test(str)) {
+  if (/^HN\d{4,}$/i.test(str)) {
     return str.toUpperCase();
   }
-  const cleanHex = str.replace(/^HN-?/i, '');
-  const hexNum = parseInt(cleanHex, 16);
-  if (!isNaN(hexNum) && hexNum > 0) {
-    return 'HN' + hexNum.toString(16).toUpperCase().padStart(4, '0');
+  const digits = str.replace(/\D/g, '');
+  if (digits.length > 0) {
+    return 'HN' + digits.padStart(4, '0');
   }
-  const decNum = parseInt(str.replace(/\D/g, ''), 10);
-  if (!isNaN(decNum) && decNum > 0) {
-    return 'HN' + decNum.toString(16).toUpperCase().padStart(4, '0');
+  const clean = str.replace(/^HN-?/i, '');
+  if (clean.length > 0) {
+    return 'HN' + clean.toUpperCase();
   }
   return 'HN0001';
 };

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { Patient, PastVisitRecord } from '../types';
+import type { Patient, PastVisitRecord, PrescriptionItem } from '../types';
 import { matchPatientSearch } from '../utils/searchUtils';
 import {
   Search,
@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Calendar,
   Clock,
-  Pill,
   FileText,
   Printer,
   ChevronDown,
@@ -52,6 +51,127 @@ interface PatientRecordsViewProps {
   selectedPatient?: Patient | null;
   onSelectPatient?: (patient: Patient | null) => void;
 }
+
+/**
+ * ==============================================================================
+ * ช่องแสดงข้อมูลหนึ่งหัวข้อในการ์ดประวัติการรักษา
+ * ==============================================================================
+ * ใช้หน้าตาเดียวกับฟอร์มในหน้า "บันทึกการตรวจ" คือหัวข้อตัวหนาอยู่บน
+ * แล้วมีกล่องพื้นอ่อนอยู่ล่าง เพื่อให้แพทย์ที่สลับมาดูประวัติเห็นโครงเดียวกัน
+ * ไม่ต้องเรียนรู้ layout ใหม่
+ *
+ * ทำไมต้องโชว์ทุกหัวข้อแม้ไม่มีข้อมูล (ขึ้น "-" แทน)
+ *   ถ้าซ่อนหัวข้อที่ว่าง แพทย์จะแยกไม่ออกระหว่าง "ไม่ได้บันทึก" กับ "ไม่มีหัวข้อนี้"
+ *   และจำนวนช่องจะไม่เท่ากันในแต่ละครั้ง ทำให้กวาดตาเทียบข้ามครั้งไม่ได้
+ *   การเห็น "-" บอกชัดว่าหัวข้อนี้มีอยู่ แต่วันนั้นแพทย์ไม่ได้กรอก
+ */
+const HistoryField: React.FC<{ label: string; value?: string }> = ({ label, value }) => {
+  const text = (value || '').trim();
+  return (
+    <div>
+      <span className="block text-[11px] font-bold text-slate-700 mb-1">{label}</span>
+      <div
+        className={`p-2.5 bg-slate-50 border border-slate-200 rounded-xl leading-relaxed whitespace-pre-line min-h-[38px] ${
+          text ? 'text-slate-800 font-medium' : 'text-slate-400'
+        }`}
+      >
+        {text || '-'}
+      </div>
+    </div>
+  );
+};
+
+/** หัวข้อกลุ่มในการ์ดประวัติ ใช้ขนาดและน้ำหนักเดียวกับหัวข้อในหน้าบันทึกการตรวจ */
+/**
+ * รวมรายละเอียดการใช้ยา 1 รายการให้เป็นข้อความหลายบรรทัด
+ * ใช้กับหัวข้อ "ยาที่แพทย์สั่งจ่าย" ในประวัติการมาตรวจ
+ *
+ * ชื่อหัวข้อแต่ละบรรทัดใช้คำเดียวกับช่องกรอกในหน้าบันทึกการตรวจ (แท็บการสั่งยา)
+ * เพื่อให้แพทย์อ่านประวัติแล้วเทียบกับฟอร์มที่ตัวเองกรอกได้ทันที
+ *
+ * ที่มาของข้อมูล:
+ * ตาราง dispensings ของห้องยามีแค่ 3 ช่อง (quantity, dosage, instructions)
+ * เก็บครบ 7 ช่องที่แพทย์กรอกไม่ได้ ความถี่กับระยะเวลาเคยหายไปทั้งหมด
+ * จึงเพิ่มคอลัมน์ examinations.prescription_detail เก็บใบสั่งยาฉบับเต็มเป็น JSON
+ * ค่าที่อ่านมาตรงนี้จึงเป็นสิ่งที่แพทย์กรอกไว้จริงทุกช่อง
+ *
+ * เวชระเบียนเก่าที่บันทึกก่อนมีคอลัมน์นั้น จะได้ข้อมูลไม่ครบ (ไม่มีความถี่/ระยะเวลา)
+ * บรรทัดที่ไม่มีข้อมูลจะถูกข้ามไปเลย ไม่โชว์หัวข้อเปล่าๆ ค้างไว้
+ */
+function buildPrescriptionDetail(item: PrescriptionItem, language: string): string {
+  const isTh = language === 'th';
+  const lines: string[] = [];
+
+  const push = (label: string, value?: string | number) => {
+    const text = String(value ?? '').trim();
+    if (text) lines.push(`${label}: ${text}`);
+  };
+
+  push(isTh ? 'ขนาดการใช้ยา' : 'Dosage', item.dosage);
+  push(isTh ? 'ความถี่' : 'Frequency', item.frequency);
+  push(isTh ? 'ระยะเวลา' : 'Duration', item.duration);
+  push(isTh ? 'จำนวน' : 'Quantity', item.quantity > 0 ? item.quantity : '');
+  push(isTh ? 'ทางให้ยา' : 'Route', item.route);
+  push(isTh ? 'เวลารับประทาน' : 'Timing', item.timing);
+  push(isTh ? 'คำแนะนำพิเศษ / ฉลากยา' : 'Special Instructions', item.specialInstructions);
+
+  return lines.join('\n');
+}
+
+/**
+ * ยา 1 รายการในประวัติ แสดงเป็นแถวพับเก็บได้
+ *
+ * ปกติแสดงแค่ชื่อยากับรหัสยา กดที่แถวถึงจะกางรายละเอียดออกมา
+ * เหตุผล: ถ้ากางรายละเอียด 7 บรรทัดของทุกตัวไว้ตลอด
+ * เคสที่สั่งยา 5-6 ตัวจะยาวเป็นหน้าจอ ต้องเลื่อนผ่านไปนานกว่าจะถึงหัวข้อถัดไป
+ * ส่วนใหญ่แพทย์อยากรู้แค่ว่า "ครั้งก่อนได้ยาอะไรไปบ้าง" ชื่อยาอย่างเดียวก็พอ
+ *
+ * เก็บสถานะเปิด/ปิดไว้ในตัวเอง ไม่ต้องยกไปไว้ที่การ์ดแม่
+ * เพราะแต่ละแถวเปิดปิดอิสระกัน และไม่มีใครอื่นต้องรู้ว่าแถวไหนเปิดอยู่
+ */
+const HistoryPrescriptionRow: React.FC<{
+  index: number;
+  item: PrescriptionItem;
+  language: string;
+}> = ({ index, item, language }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const detail = buildPrescriptionDetail(item, language);
+  const name = item.medicineName || (language === 'th' ? 'ไม่ระบุชื่อยา' : 'Unnamed');
+
+  return (
+    <div className="border border-slate-200 rounded-xl bg-white overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setIsOpen((v) => !v)}
+        aria-expanded={isOpen}
+        className="w-full flex items-center justify-between gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors"
+      >
+        <span className="text-[13px] font-bold text-slate-800">
+          {index + 1}. {name}
+          {item.medicineCode ? ` (${item.medicineCode})` : ''}
+        </span>
+        <ChevronDown
+          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="px-3 pb-3">
+          <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[13px] leading-relaxed whitespace-pre-line text-slate-800 font-medium">
+            {detail || '-'}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const HistorySection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <div className="space-y-2">
+    <h5 className="text-sm font-bold text-slate-900">{title}</h5>
+    {children}
+  </div>
+);
 
 export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
   patients,
@@ -128,21 +248,53 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
     return matchPatientSearch(p, search);
   });
 
-  // Combine current visit (if has diagnosis or chief complaint) with past visits list
+  /**
+   * ==========================================================================
+   * รวมการรับบริการครั้งปัจจุบัน เข้ากับประวัติย้อนหลังจากฐานข้อมูล
+   * ==========================================================================
+   * ปัญหาเดิม 2 ข้อ ที่แก้ไว้ตรงนี้
+   *
+   * 1) เคสวันนี้ขึ้นซ้ำสองแถว
+   *    ฝั่งนี้ปั้นแถว "การรับบริการวันนี้" ขึ้นมาเองจากข้อมูลในหน่วยความจำ
+   *    แต่ endpoint ประวัติก็คืน visit ของวันนี้มาให้ด้วยอยู่แล้ว
+   *    เพราะมันดึงทุก visit ของผู้ป่วยโดยไม่กรองวันที่
+   *    ผลคือ VN เดียวกัน เวลาเดียวกัน โผล่ติดกันสองแถว
+   *
+   * 2) แถวที่ปั้นเองขึ้นว่า "กำลังตรวจวินิจฉัย" ตลอดเวลา
+   *    เพราะ selectedRecordPatient มาจาก /patient-records ซึ่งไม่ส่งการวินิจฉัยมา
+   *    ช่อง diagnosis จึงตกไปที่ค่าสำรองเสมอ ไม่ว่าฐานข้อมูลจะบันทึกอะไรไว้
+   *
+   * วิธีแก้: ให้ "ฐานข้อมูลเป็นความจริง" ถ้าประวัติจากฐานข้อมูลมี VN นี้อยู่แล้ว
+   * ใช้แถวนั้นเป็นหลัก แล้วเติมเฉพาะรายละเอียดที่ endpoint ประวัติไม่ได้ส่งมา
+   */
   const getCombinedHistory = (patient: Patient): PastVisitRecord[] => {
     const list: PastVisitRecord[] = [];
 
-    // Add current visit if available
-    if (patient.chiefComplaint || patient.diagnosis || patient.primaryDiagnosis) {
+    const pastVisits = patient.pastVisits || [];
+    const currentVN = displayVN(patient.vn);
+
+    // รายละเอียดที่มีอยู่แค่ในหน่วยความจำ endpoint ประวัติไม่ได้ส่งมา
+    const liveDetails = {
+      chiefComplaint: patient.chiefComplaint || '',
+      prescription: patient.prescription || (patient.prescriptions && patient.prescriptions.length > 0
+        ? patient.prescriptions.map(p => p.medicineName).join(', ')
+        : undefined),
+      prescriptionsList: patient.prescriptions,
+      doctorNotes: patient.assessmentNotes || patient.clinicalNotes || patient.treatmentPlan,
+    };
+
+    const alreadyInHistory = !!currentVN && pastVisits.some((v) => v.vn === currentVN);
+
+    // ยังไม่มีในฐานข้อมูล (เพิ่งเปิดเคส ยังไม่ได้บันทึกอะไร) ค่อยปั้นแถวขึ้นมาเอง
+    if (!alreadyInHistory && (patient.chiefComplaint || patient.diagnosis || patient.primaryDiagnosis)) {
       list.push({
         id: `current-${patient.id}`,
-        vn: displayVN(patient.vn),
+        vn: currentVN,
         visitDate: patient.visitDate || '2026-07-23',
         visitTime: patient.visitTime || '08:45 AM',
         doctorName: language === 'th' ? 'แพทย์ประจำคลินิก (Current Session)' : 'Attending Physician (Current)',
         department: language === 'th' ? 'แผนกผู้ป่วยนอก (OPD)' : 'Outpatient Department (OPD)',
-        chiefComplaint: patient.chiefComplaint || (language === 'th' ? 'ไม่ระบุ' : 'N/A'),
-        diagnosis: patient.primaryDiagnosis?.name || patient.diagnosis || (language === 'th' ? 'กำลังตรวจวินิจฉัย' : 'In Examination'),
+        diagnosis: patient.primaryDiagnosis?.name || patient.diagnosis || (language === 'th' ? 'ยังไม่ได้ระบุการวินิจฉัย' : 'No diagnosis recorded'),
         icdCode: patient.primaryDiagnosis?.code || '',
         vitals: patient.vitals ? {
           bp: patient.vitals.bp,
@@ -151,20 +303,40 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
           weight: patient.vitals.weight,
           spo2: patient.vitals.spo2
         } : undefined,
-        prescription: patient.prescription || (patient.prescriptions && patient.prescriptions.length > 0
-          ? patient.prescriptions.map(p => p.medicineName).join(', ')
-          : undefined),
-        prescriptionsList: patient.prescriptions,
-        doctorNotes: patient.assessmentNotes || patient.clinicalNotes || patient.treatmentPlan,
+        ...liveDetails,
+        chiefComplaint: liveDetails.chiefComplaint || (language === 'th' ? 'ไม่ระบุ' : 'N/A'),
         followUpDate: patient.followUp?.followUpDate,
         status: patient.status
       });
     }
 
-    // Add past visits
-    if (patient.pastVisits && patient.pastVisits.length > 0) {
-      list.push(...patient.pastVisits);
-    }
+    // ประวัติจากฐานข้อมูล ถือเป็นความจริง
+    // แถวของเคสวันนี้ให้เติมรายละเอียดที่ endpoint ไม่ได้ส่งมาเข้าไปด้วย
+    list.push(
+      ...pastVisits.map((v) =>
+        v.vn && v.vn === currentVN
+          ? {
+              ...v,
+              chiefComplaint: v.chiefComplaint || liveDetails.chiefComplaint,
+              prescription: v.prescription || liveDetails.prescription,
+
+              // ต้องเช็ค .length ไม่ใช่เช็คแค่ว่ามีค่าไหม
+              //
+              // เคยพลาดตรงนี้: mapPastVisit สร้าง prescriptionsList เป็น [] เสมอ
+              // แม้ฐานข้อมูลจะไม่ได้ส่งรายการยามาเลย
+              // ใน JavaScript อาร์เรย์ว่าง [] เป็นค่า truthy
+              // เงื่อนไข "v.prescriptionsList || liveDetails.prescriptionsList" จึงหยุดที่ []
+              // ค่าสำรองไม่เคยถูกใช้เลยแม้แต่ครั้งเดียว
+              // ผลคือช่องยาในประวัติว่างเปล่า ทั้งที่หน้าจอมีรายการยาอยู่ในมือ
+              prescriptionsList:
+                v.prescriptionsList && v.prescriptionsList.length > 0
+                  ? v.prescriptionsList
+                  : liveDetails.prescriptionsList,
+              doctorNotes: v.doctorNotes || liveDetails.doctorNotes,
+            }
+          : v
+      )
+    );
 
     // Filter history if user typed in historySearch
     if (!historySearch.trim()) return list;
@@ -621,47 +793,123 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                                   </div>
                                 )}
 
-                                {/* Prescriptions List */}
-                                {(visit.prescription || (visit.prescriptionsList && visit.prescriptionsList.length > 0)) && (
-                                  <div className="p-3.5 bg-emerald-50/60 rounded-xl border border-emerald-100 space-y-2">
-                                    <span className="font-bold text-emerald-900 block text-[11px] uppercase tracking-wide flex items-center gap-1.5">
-                                      <Pill className="w-3.5 h-3.5 text-emerald-600" />
-                                      <span>{language === 'th' ? 'รายการยาที่สั่งจ่าย (MEDICATIONS PRESCRIBED)' : 'MEDICATIONS PRESCRIBED'}</span>
-                                    </span>
-                                    {visit.prescriptionsList && visit.prescriptionsList.length > 0 ? (
-                                      <div className="space-y-1.5 pt-1">
-                                        {visit.prescriptionsList.map((item, idx) => (
-                                          <div key={idx} className="bg-white p-2.5 rounded-lg border border-emerald-200/80 flex items-center justify-between text-xs">
-                                            <div>
-                                              <span className="font-bold text-slate-900">{item.medicineName}</span>
-                                              <div className="text-[11px] text-slate-500">{item.dosage} • {item.frequency}</div>
-                                            </div>
-                                            <span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                              x{item.quantity}
-                                            </span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : (
-                                      <p className="text-emerald-950 font-semibold">{visit.prescription}</p>
-                                    )}
-                                  </div>
-                                )}
+                                {/* หมายเหตุ: กล่องเขียว "รายการยาที่สั่งจ่าย" ที่เคยอยู่ตรงนี้ถูกย้ายลงไป
+                                    เป็นหัวข้อ "ยาที่แพทย์สั่งจ่าย" ด้านล่าง (แทนที่หัวข้อคำแนะนำที่ให้ผู้ป่วย)
+                                    เพื่อให้ทุกหัวข้อในประวัติใช้รูปแบบช่องเดียวกันทั้งหมด
+                                    ถ้าปล่อยไว้ทั้งสองที่ ข้อมูลยาจะโชว์ซ้ำสองรอบในการ์ดเดียวกัน */}
 
-                                {/* Doctor Notes & Follow-Up */}
-                                {visit.doctorNotes && (
-                                  <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
-                                    <span className="font-bold text-slate-700 block text-[11px] uppercase tracking-wide">
-                                      {language === 'th' ? 'คำแนะนำและบันทึกแพทย์ (DOCTOR NOTES)' : 'DOCTOR NOTES'}
-                                    </span>
-                                    <p className="text-slate-800 leading-relaxed font-medium">{visit.doctorNotes}</p>
+                                {/* ---- ข้อมูลการรักษาของครั้งนั้น ----
+                                     จัดเป็น "ช่องหัวข้อ" แบบเดียวกับฟอร์มหน้าบันทึกการตรวจ
+                                     เดิมทำเป็นกล่องสีต่างๆ (ฟ้า/เหลือง/ม่วง) ซึ่งดูไม่เข้ากับ
+                                     หน้าอื่นในระบบและอ่านยากเวลามีหลายกล่องต่อกัน
+                                     ทุกหัวข้อโชว์เสมอ ถ้าไม่มีข้อมูลจะขึ้น "-" (ดู HistoryField) */}
+
+                                <HistorySection title={language === 'th' ? 'ประวัติการเจ็บป่วยปัจจุบัน' : 'Present Illness'}>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <HistoryField
+                                      label={language === 'th' ? 'ประวัติการเจ็บป่วยปัจจุบัน' : 'Present Illness'}
+                                      value={visit.presentIllness}
+                                    />
+                                    <HistoryField
+                                      label={language === 'th' ? 'ระยะเวลาที่เป็นมา' : 'Duration'}
+                                      value={visit.complaintDuration}
+                                    />
                                   </div>
+                                </HistorySection>
+
+                                <HistorySection title={language === 'th' ? 'ผลการตรวจร่างกายตามระบบ' : 'Physical Examination'}>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <HistoryField label={language === 'th' ? 'สภาพทั่วไป' : 'General Appearance'} value={visit.physicalExam?.generalAppearance} />
+                                    <HistoryField label={language === 'th' ? 'ศีรษะ ตา หู จมูก คอ' : 'HEENT'} value={visit.physicalExam?.heent} />
+                                    <HistoryField label={language === 'th' ? 'ระบบหัวใจและหลอดเลือด' : 'Cardiovascular'} value={visit.physicalExam?.cardiovascular} />
+                                    <HistoryField label={language === 'th' ? 'ระบบทางเดินหายใจและปอด' : 'Respiratory'} value={visit.physicalExam?.respiratory} />
+                                    <HistoryField label={language === 'th' ? 'ระบบช่องท้อง' : 'Abdomen'} value={visit.physicalExam?.abdomen} />
+                                    <HistoryField label={language === 'th' ? 'ระบบกล้ามเนื้อและกระดูก' : 'Musculoskeletal'} value={visit.physicalExam?.musculoskeletal} />
+                                    <HistoryField label={language === 'th' ? 'ระบบประสาท' : 'Neurological'} value={visit.physicalExam?.neurological} />
+                                    <HistoryField label={language === 'th' ? 'ผิวหนัง' : 'Skin'} value={visit.physicalExam?.skin} />
+                                  </div>
+                                </HistorySection>
+
+                                <HistorySection title={language === 'th' ? 'การวินิจฉัยโรค' : 'Diagnosis'}>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <HistoryField
+                                      label={language === 'th' ? 'การวินิจฉัยหลัก' : 'Primary Diagnosis'}
+                                      value={visit.diagnosis ? `${visit.diagnosis}${visit.icdCode ? `  (${visit.icdCode})` : ''}` : ''}
+                                    />
+                                    <HistoryField
+                                      label={language === 'th' ? 'การวินิจฉัยรอง' : 'Secondary Diagnoses'}
+                                      value={(visit.secondaryDiagnoses || [])
+                                        .map((d) => `${d.name}${d.code ? `  (${d.code})` : ''}`)
+                                        .join('\n')}
+                                    />
+                                  </div>
+                                </HistorySection>
+
+                                <HistorySection title={language === 'th' ? 'การประเมินและแผนการรักษา' : 'Assessment & Plan'}>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <HistoryField label={language === 'th' ? 'เหตุผลทางการแพทย์และการประเมิน' : 'Assessment'} value={visit.assessmentNotes} />
+                                    <HistoryField label={language === 'th' ? 'แผนการรักษาและหัตถการ' : 'Treatment Plan'} value={visit.treatmentPlan} />
+                                    <HistoryField label={language === 'th' ? 'บันทึกทางคลินิกเพิ่มเติม' : 'Clinical Notes'} value={visit.clinicalNotes} />
+                                    <HistoryField label={language === 'th' ? 'หัตถการที่ทำ' : 'Procedures Performed'} value={visit.proceduresPerformed} />
+                                  </div>
+                                </HistorySection>
+
+                                {/* ยาที่แพทย์สั่งจ่ายในครั้งนั้น
+                                    เดิมตรงนี้เป็นหัวข้อ "คำแนะนำที่ให้ผู้ป่วย" (counseling 5 ช่อง)
+                                    ซึ่งไม่ค่อยได้ใช้ตอนเปิดดูประวัติย้อนหลัง
+                                    สิ่งที่แพทย์อยากเห็นจริงๆ คือครั้งก่อนจ่ายยาอะไรไป
+                                    ข้อมูลชุดนี้อ่านจากตาราง dispensings ของห้องยา (ยาที่จ่ายจริง)
+                                    ไม่ใช่ข้อความที่พิมพ์ค้างไว้บนหน้าจอ */}
+                                <HistorySection title={language === 'th' ? 'ยาที่แพทย์สั่งจ่าย' : 'Medications Prescribed'}>
+                                  {visit.prescriptionsList && visit.prescriptionsList.length > 0 ? (
+                                    <div className="space-y-2">
+                                      {visit.prescriptionsList.map((item, idx) => (
+                                        <HistoryPrescriptionRow
+                                          key={item.id || idx}
+                                          index={idx}
+                                          item={item}
+                                          language={language}
+                                        />
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    /* ไม่มีรายการยาในตาราง dispensings
+                                       ยังโชว์ช่องเดียวไว้ให้เห็นว่า "ครั้งนั้นไม่ได้จ่ายยา"
+                                       ถ้าซ่อนหัวข้อไปเลย แพทย์จะแยกไม่ออกระหว่าง
+                                       "ไม่ได้จ่ายยา" กับ "ระบบดึงข้อมูลไม่มา" */
+                                    <HistoryField
+                                      label={language === 'th' ? 'รายการยา' : 'Medication List'}
+                                      value={visit.prescription}
+                                    />
+                                  )}
+                                </HistorySection>
+
+                                <HistorySection title={language === 'th' ? 'การนัดหมายติดตามอาการ' : 'Follow-up'}>
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    <HistoryField label={language === 'th' ? 'วันนัดครั้งถัดไป' : 'Follow-up Date'} value={visit.followUpDate} />
+                                    <HistoryField label={language === 'th' ? 'เหตุผลการนัด' : 'Reason'} value={visit.followUpReason} />
+                                    <HistoryField label={language === 'th' ? 'คำแนะนำเพิ่มเติม' : 'Instructions'} value={visit.followUpInstructions} />
+                                  </div>
+                                </HistorySection>
+
+                                {/* เหตุผลการยกเลิก เป็นหัวข้อเดียวที่ซ่อนได้เมื่อไม่มีข้อมูล
+                                    เพราะการมาตรวจปกติไม่ควรมีหัวข้อ "ยกเลิก" ขึ้นค้างไว้ให้สับสน */}
+                                {visit.cancelReason && (
+                                  <HistorySection title={language === 'th' ? 'ยกเลิกการรับบริการ' : 'Visit Cancelled'}>
+                                    <HistoryField
+                                      label={language === 'th' ? 'เหตุผลการยกเลิก' : 'Reason'}
+                                      value={visit.cancelReason}
+                                    />
+                                  </HistorySection>
                                 )}
 
                                 {visit.followUpDate && (
                                   <div className="flex items-center gap-2 text-xs font-semibold text-blue-900 bg-blue-50 px-3 py-1.5 rounded-xl border border-blue-200 w-fit">
                                     <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                                    <span>{language === 'th' ? `นัดหมายติดตามอาการครั้งถัดไป: ${visit.followUpDate}` : `Next Follow-up Appointment: ${visit.followUpDate}`}</span>
+                                    <span>
+                                      {language === 'th' ? `นัดหมายติดตามอาการครั้งถัดไป: ${visit.followUpDate}` : `Next Follow-up Appointment: ${visit.followUpDate}`}
+                                      {visit.followUpReason ? ` — ${visit.followUpReason}` : ''}
+                                    </span>
                                   </div>
                                 )}
                               </div>

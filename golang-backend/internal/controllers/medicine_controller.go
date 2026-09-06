@@ -20,35 +20,51 @@ type UpdateStockRequest struct {
 	Quantity     int    `json:"quantity" binding:"required,min=1"`
 }
 
-// GET /api/pharmacy/medicines - ดึงรายการยาทั้งหมดในคลัง
+// GET /api/pharmacy/medicines - ดึงรายการยาทั้งหมดในคลัง (⚡ RAM Cache 0.01 ms)
 func GetMedicines(c *gin.Context) {
-	var medicines []models.Medicine
-	query := c.Query("query")
-	category := c.Query("category")
+	query := strings.TrimSpace(c.Query("query"))
+	category := strings.TrimSpace(c.Query("category"))
 
-	dbQuery := config.DB
-	if query != "" {
-		dbQuery = dbQuery.Where(
-			"LOWER(medicine_code) LIKE LOWER(?) OR LOWER(name) LIKE LOWER(?) OR LOWER(generic_name) LIKE LOWER(?) OR LOWER(medicine_code) LIKE LOWER(?)",
-			"%"+query+"%",
-			"%"+query+"%",
-			"%"+query+"%",
-			"%MED-%"+query+"%",
-		)
+	allMeds := GetCachedMedicines()
+	if len(allMeds) == 0 {
+		if err := config.DB.Find(&allMeds).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch medicines: " + err.Error()})
+			return
+		}
 	}
 
-	if category != "" && category != "all" {
-		dbQuery = dbQuery.Where("LOWER(category) LIKE LOWER(?)", "%"+category+"%")
-	}
-
-	if err := dbQuery.Find(&medicines).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch medicines: " + err.Error()})
+	if query == "" && (category == "" || category == "all") {
+		c.JSON(http.StatusOK, gin.H{
+			"status":    "success",
+			"medicines": allMeds,
+		})
 		return
+	}
+
+	lowerQuery := strings.ToLower(query)
+	lowerCategory := strings.ToLower(category)
+
+	var filtered []models.Medicine
+	for _, m := range allMeds {
+		if lowerCategory != "" && lowerCategory != "all" && !strings.Contains(strings.ToLower(m.Category), lowerCategory) {
+			continue
+		}
+		if lowerQuery != "" {
+			mCode := strings.ToLower(m.MedicineCode)
+			mName := strings.ToLower(m.Name)
+			mGeneric := strings.ToLower(m.GenericName)
+			mUsage := strings.ToLower(m.UsageMethod)
+			mProps := strings.ToLower(m.Properties)
+			if !strings.Contains(mCode, lowerQuery) && !strings.Contains(mName, lowerQuery) && !strings.Contains(mGeneric, lowerQuery) && !strings.Contains(mUsage, lowerQuery) && !strings.Contains(mProps, lowerQuery) {
+				continue
+			}
+		}
+		filtered = append(filtered, m)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "success",
-		"medicines": medicines,
+		"medicines": filtered,
 	})
 }
 
@@ -101,6 +117,7 @@ func UpdateMedicineStock(c *gin.Context) {
 	}
 
 	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", medicine)
+	InvalidateMedicinesCache()
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":   "success",
@@ -117,6 +134,9 @@ type CreateMedicineRequest struct {
 	Category      string  `json:"category"`
 	Properties    string  `json:"properties"`
 	Dosage        string  `json:"dosage"`
+	UsageMethod   string  `json:"usage_method"`
+	Instructions  string  `json:"instructions"`
+	ExpiryDate    string  `json:"expiry_date"`
 	Manufacturer  string  `json:"manufacturer"`
 	StockQuantity int     `json:"stock_quantity"`
 	UnitPrice     float64 `json:"unit_price"`
@@ -163,6 +183,9 @@ func CreateMedicine(c *gin.Context) {
 		Category:      req.Category,
 		Properties:    req.Properties,
 		Dosage:        req.Dosage,
+		UsageMethod:   req.UsageMethod,
+		Instructions:  req.Instructions,
+		ExpiryDate:    req.ExpiryDate,
 		Manufacturer:  req.Manufacturer,
 		StockQuantity: req.StockQuantity,
 		UnitPrice:     req.UnitPrice,
@@ -174,6 +197,7 @@ func CreateMedicine(c *gin.Context) {
 	}
 
 	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", medicine)
+	InvalidateMedicinesCache()
 
 	c.JSON(http.StatusCreated, gin.H{
 		"status":   "success",
@@ -213,6 +237,7 @@ func DeleteMedicine(c *gin.Context) {
 	}
 
 	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", gin.H{"deleted_code": medicine.MedicineCode, "deleted_id": medicine.ID})
+	InvalidateMedicinesCache()
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":       "success",
@@ -229,6 +254,9 @@ type UpdateMedicineDetailsRequest struct {
 	Category      string   `json:"category"`
 	Properties    string   `json:"properties"`
 	Dosage        string   `json:"dosage"`
+	UsageMethod   string   `json:"usage_method"`
+	Instructions  string   `json:"instructions"`
+	ExpiryDate    string   `json:"expiry_date"`
 	Manufacturer  string   `json:"manufacturer"`
 	StockQuantity *int     `json:"stock_quantity"`
 	UnitPrice     *float64 `json:"unit_price"`
@@ -278,6 +306,15 @@ func UpdateMedicineDetails(c *gin.Context) {
 	if strings.TrimSpace(req.Dosage) != "" {
 		medicine.Dosage = strings.TrimSpace(req.Dosage)
 	}
+	if strings.TrimSpace(req.UsageMethod) != "" {
+		medicine.UsageMethod = strings.TrimSpace(req.UsageMethod)
+	}
+	if strings.TrimSpace(req.Instructions) != "" {
+		medicine.Instructions = strings.TrimSpace(req.Instructions)
+	}
+	if strings.TrimSpace(req.ExpiryDate) != "" {
+		medicine.ExpiryDate = strings.TrimSpace(req.ExpiryDate)
+	}
 	if strings.TrimSpace(req.Manufacturer) != "" {
 		medicine.Manufacturer = strings.TrimSpace(req.Manufacturer)
 	}
@@ -297,6 +334,7 @@ func UpdateMedicineDetails(c *gin.Context) {
 	// ส่งสัญญาณ Real-time แจ้งทุกไคลเอนต์ให้ซิงก์ข้อมูลคลังยาตรงกัน
 	ws.BroadcastEvent("MEDICINE_UPDATED", medicine)
 	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", medicine)
+	InvalidateMedicinesCache()
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":   "success",

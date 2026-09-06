@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
 import './MedicinePage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
+import { PharmacyMedicineSkeleton } from '../../components/Common/ClinicSkeleton';
+import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface Medicine {
   id: string;
@@ -11,6 +15,9 @@ interface Medicine {
   category: string;
   properties: string;
   dosage: string;
+  usage_method?: string;
+  instructions?: string;
+  expiry_date?: string;
   precautions: string;
   price: string;
   unit_price: number;
@@ -19,6 +26,446 @@ interface Medicine {
   stock_quantity: number;
   status: 'In Stock' | 'Low Stock' | 'Out of Stock';
   dispensedToday: number;
+  created_at?: string;
+  updated_at?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Modern Interactive Dosage Input Builder with Pattern Slot Locking & Balanced 3-Column Grid
+function ModernDosageInputBuilder({
+  value,
+  onChange,
+  placeholder = 'เช่น ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร...',
+  isTextarea = false
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  isTextarea?: boolean;
+}) {
+  const [selectedDose, setSelectedDose] = useState<string>('');
+  const [selectedFreq, setSelectedFreq] = useState<string>('');
+  const [selectedTiming, setSelectedTiming] = useState<string>('');
+
+  // Custom Dose Stepper / Inputs
+  const [customDoseAmount, setCustomDoseAmount] = useState<string>('1');
+  const [customDoseUnit, setCustomDoseUnit] = useState<string>('เม็ด');
+
+  // Custom Time / Interval
+  const [customHours, setCustomHours] = useState<string>('');
+
+  // 9 items = exactly 3 balanced columns (3x3)
+  const DOSE_PRESETS = [
+    'ครั้งละ 1 เม็ด',
+    'ครั้งละ 2 เม็ด',
+    'ครั้งละ 1/2 เม็ด',
+    'ครั้งละ 1 แคปซูล',
+    'ครั้งละ 1 ซอง',
+    'ครั้งละ 1 ช้อนชา',
+    'ครั้งละ 1 ช้อนโต๊ะ',
+    'ครั้งละ 5 ml',
+    'ครั้งละ 10 ml'
+  ];
+
+  // 9 items = exactly 3 balanced columns (3x3)
+  const FREQ_PRESETS = [
+    'วันละ 1 ครั้ง',
+    'วันละ 2 ครั้ง',
+    'วันละ 3 ครั้ง',
+    'วันละ 4 ครั้ง',
+    'ทุก 4-6 ชั่วโมง',
+    'ทุก 8 ชั่วโมง',
+    'ทุก 12 ชั่วโมง',
+    'เมื่อมีอาการ',
+    'ติดต่อกันจนหมด'
+  ];
+
+  // 9 items = exactly 3 balanced columns (3x3)
+  const TIMING_PRESETS = [
+    'ก่อนอาหาร (30 นาที)',
+    'หลังอาหารทันที',
+    'หลังอาหาร 15-30 นาที',
+    'พร้อมอาหาร',
+    'ก่อนนอน',
+    'เช้า-เย็น',
+    'เช้า-กลางวัน-เย็น',
+    'เช้า-กลางวัน-เย็น-ก่อนนอน',
+    'ทานเมื่อมีอาการปวด/ไข้'
+  ];
+
+  const DOSE_UNITS = ['เม็ด', 'แคปซูล', 'ซอง', 'ช้อนชา', 'ช้อนโต๊ะ', 'ml', 'หยด', 'แผ่น'];
+
+  // Initialize or synchronize slots from incoming initial value
+  useEffect(() => {
+    if (!value) {
+      setSelectedDose('');
+      setSelectedFreq('');
+      setSelectedTiming('');
+      return;
+    }
+
+    // Try to detect slots from text if not set
+    DOSE_PRESETS.forEach(d => {
+      if (value.includes(d)) setSelectedDose(d);
+    });
+    FREQ_PRESETS.forEach(f => {
+      if (value.includes(f)) setSelectedFreq(f);
+    });
+    TIMING_PRESETS.forEach(t => {
+      if (value.includes(t)) setSelectedTiming(t);
+    });
+  }, []);
+
+  const updatePattern = (newDose: string, newFreq: string, newTiming: string) => {
+    setSelectedDose(newDose);
+    setSelectedFreq(newFreq);
+    setSelectedTiming(newTiming);
+
+    const parts = [newDose, newFreq, newTiming].filter(Boolean);
+    const result = parts.join(' ');
+    onChange(result);
+  };
+
+  const handleSelectDose = (dose: string) => {
+    const nextDose = selectedDose === dose ? '' : dose;
+    updatePattern(nextDose, selectedFreq, selectedTiming);
+  };
+
+  const handleApplyCustomDose = (amount = customDoseAmount, unit = customDoseUnit) => {
+    const cleanAmt = amount.trim();
+    if (!cleanAmt) return;
+    const constructed = `ครั้งละ ${cleanAmt} ${unit}`;
+    updatePattern(constructed, selectedFreq, selectedTiming);
+  };
+
+  const handleSelectFreq = (freq: string) => {
+    const nextFreq = selectedFreq === freq ? '' : freq;
+    updatePattern(selectedDose, nextFreq, selectedTiming);
+  };
+
+  const handleApplyCustomHours = (hrs = customHours) => {
+    const cleanHrs = hrs.trim();
+    if (!cleanHrs) return;
+    const constructed = `ทุก ${cleanHrs} ชั่วโมง`;
+    updatePattern(selectedDose, constructed, selectedTiming);
+  };
+
+  const handleSelectTiming = (timing: string) => {
+    const nextTiming = selectedTiming === timing ? '' : timing;
+    updatePattern(selectedDose, selectedFreq, nextTiming);
+  };
+
+  const handleClearAll = () => {
+    setSelectedDose('');
+    setSelectedFreq('');
+    setSelectedTiming('');
+    setCustomHours('');
+    onChange('');
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', background: '#F8FAFC', padding: '14px', borderRadius: '10px', border: '1.5px solid #CBD5E1' }}>
+      {/* Composed Output Textbox with direct editable capability */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+          <span style={{ fontSize: '12.5px', fontWeight: '800', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+            ข้อความระบุวิธีรับประทาน (ตรวจสอบ / พิมพ์แก้ไขได้):
+          </span>
+          {value && (
+            <button
+              type="button"
+              onClick={handleClearAll}
+              style={{ background: '#FEE2E2', border: '1px solid #FECACA', color: '#DC2626', fontSize: '11px', fontWeight: '700', cursor: 'pointer', padding: '2px 8px', borderRadius: '4px' }}
+            >
+              ล้างทั้งหมด
+            </button>
+          )}
+        </div>
+
+        {isTextarea ? (
+          <textarea
+            rows={2}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            style={{
+              width: '100%',
+              padding: '9px 12px',
+              border: '1.5px solid #2563EB',
+              borderRadius: '7px',
+              fontSize: '13.5px',
+              boxSizing: 'border-box',
+              resize: 'vertical',
+              color: '#0F172A',
+              fontWeight: '600',
+              background: '#FFFFFF'
+            }}
+          />
+        ) : (
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={placeholder}
+            style={{
+              width: '100%',
+              padding: '9px 12px',
+              border: '1.5px solid #2563EB',
+              borderRadius: '7px',
+              fontSize: '13.5px',
+              boxSizing: 'border-box',
+              color: '#0F172A',
+              fontWeight: '600',
+              background: '#FFFFFF'
+            }}
+          />
+        )}
+      </div>
+
+      {/* Section 1: Dosage / Amount (ขนาด/ปริมาณยา - 3 คอลัมน์สมดุล) */}
+      <div style={{ background: '#FFFFFF', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+        <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>1. ขนาด / ปริมาณยา (3 คอลัมน์):</span>
+          {selectedDose && (
+            <span style={{ fontSize: '11px', color: '#2563EB', fontWeight: '700', background: '#EFF6FF', padding: '2px 8px', borderRadius: '4px', border: '1px solid #BFDBFE' }}>
+              {selectedDose}
+            </span>
+          )}
+        </div>
+
+        {/* 3-Column Balanced Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '10px' }}>
+          {DOSE_PRESETS.map((dose) => {
+            const isSelected = selectedDose === dose || (Boolean(selectedDose) && selectedDose === dose) || (!selectedDose && value.includes(dose));
+            return (
+              <button
+                key={dose}
+                type="button"
+                onClick={() => handleSelectDose(dose)}
+                style={{
+                  height: '38px',
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 8px',
+                  borderRadius: '7px',
+                  fontSize: '12.5px',
+                  fontWeight: isSelected ? '700' : '600',
+                  color: isSelected ? '#1D4ED8' : '#1E293B',
+                  background: isSelected ? '#DBEAFE' : '#F8FAFC',
+                  border: isSelected ? '1.5px solid #2563EB' : '1px solid #CBD5E1',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxSizing: 'border-box',
+                  textAlign: 'center',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  boxShadow: isSelected ? '0 1px 3px rgba(37, 99, 235, 0.2)' : 'none'
+                }}
+                title={dose}
+              >
+                {dose}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom Dose Stepper & Unit Selector (ปรับขนาดยาต่อลงมา) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F1F5F9', padding: '8px 12px', borderRadius: '7px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: '#1E293B', fontWeight: '700' }}>กำหนดขนาดยาเอง: ครั้งละ</span>
+          <input
+            type="text"
+            placeholder="เช่น 1.5 หรือ 2"
+            value={customDoseAmount}
+            onChange={(e) => setCustomDoseAmount(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleApplyCustomDose(customDoseAmount, customDoseUnit);
+              }
+            }}
+            style={{ width: '90px', height: '34px', padding: '0 8px', fontSize: '12.5px', fontWeight: '700', border: '1.5px solid #CBD5E1', borderRadius: '6px', textAlign: 'center', background: '#FFFFFF', outline: 'none' }}
+          />
+          <select
+            value={customDoseUnit}
+            onChange={(e) => {
+              setCustomDoseUnit(e.target.value);
+            }}
+            style={{ height: '34px', padding: '0 10px', fontSize: '12.5px', fontWeight: '700', border: '1.5px solid #CBD5E1', borderRadius: '6px', background: '#FFFFFF', cursor: 'pointer', outline: 'none' }}
+          >
+            {DOSE_UNITS.map(u => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => handleApplyCustomDose(customDoseAmount, customDoseUnit)}
+            style={{
+              height: '34px',
+              padding: '0 16px',
+              fontSize: '12.5px',
+              fontWeight: '700',
+              background: '#2563EB',
+              color: '#FFFFFF',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            + ใช้ขนาดนี้
+          </button>
+        </div>
+      </div>
+
+      {/* Section 2: Frequency & Interval (ความถี่ / ช่วงเวลา - 3 คอลัมน์สมดุล) */}
+      <div style={{ background: '#FFFFFF', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+        <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>2. ความถี่ / รอบการทานยา (3 คอลัมน์):</span>
+          {selectedFreq && (
+            <span style={{ fontSize: '11px', color: '#2563EB', fontWeight: '700', background: '#EFF6FF', padding: '2px 8px', borderRadius: '4px', border: '1px solid #BFDBFE' }}>
+              {selectedFreq}
+            </span>
+          )}
+        </div>
+
+        {/* 3-Column Balanced Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '10px' }}>
+          {FREQ_PRESETS.map((freq) => {
+            const isSelected = selectedFreq === freq || (Boolean(selectedFreq) && selectedFreq === freq) || (!selectedFreq && value.includes(freq));
+            return (
+              <button
+                key={freq}
+                type="button"
+                onClick={() => handleSelectFreq(freq)}
+                style={{
+                  height: '38px',
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 8px',
+                  borderRadius: '7px',
+                  fontSize: '12.5px',
+                  fontWeight: isSelected ? '700' : '600',
+                  color: isSelected ? '#1D4ED8' : '#1E293B',
+                  background: isSelected ? '#DBEAFE' : '#F8FAFC',
+                  border: isSelected ? '1.5px solid #2563EB' : '1px solid #CBD5E1',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxSizing: 'border-box',
+                  textAlign: 'center',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  boxShadow: isSelected ? '0 1px 3px rgba(37, 99, 235, 0.2)' : 'none'
+                }}
+                title={freq}
+              >
+                {freq}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Custom Hours Interval (เพิ่มเวลา) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F1F5F9', padding: '8px 12px', borderRadius: '7px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: '#1E293B', fontWeight: '700' }}>กำหนดช่วงเวลาทานยาเอง: ทุก</span>
+          <input
+            type="text"
+            placeholder="เช่น 4-6, 6-8 หรือ 4"
+            value={customHours}
+            onChange={(e) => setCustomHours(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleApplyCustomHours(customHours);
+              }
+            }}
+            style={{ width: '130px', height: '34px', padding: '0 10px', fontSize: '12.5px', fontWeight: '700', border: '1.5px solid #CBD5E1', borderRadius: '6px', textAlign: 'center', background: '#FFFFFF', outline: 'none' }}
+          />
+          <span style={{ fontSize: '12px', color: '#1E293B', fontWeight: '700' }}>ชั่วโมง</span>
+          <button
+            type="button"
+            onClick={() => handleApplyCustomHours(customHours)}
+            disabled={!customHours.trim()}
+            style={{
+              height: '34px',
+              padding: '0 16px',
+              fontSize: '12.5px',
+              fontWeight: '700',
+              background: customHours.trim() ? '#2563EB' : '#CBD5E1',
+              color: customHours.trim() ? '#FFFFFF' : '#64748B',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: customHours.trim() ? 'pointer' : 'default',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            + ใช้เวลานี้
+          </button>
+        </div>
+      </div>
+
+      {/* Section 3: Timing & Conditions (เวลารับประทาน / เงื่อนไข - 3 คอลัมน์สมดุล) */}
+      <div style={{ background: '#FFFFFF', padding: '12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+        <div style={{ fontSize: '12.5px', fontWeight: '800', color: '#1E293B', marginBottom: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>3. เวลารับประทาน / เงื่อนไขมื้ออาหาร (3 คอลัมน์):</span>
+          {selectedTiming && (
+            <span style={{ fontSize: '11px', color: '#2563EB', fontWeight: '700', background: '#EFF6FF', padding: '2px 8px', borderRadius: '4px', border: '1px solid #BFDBFE' }}>
+              {selectedTiming}
+            </span>
+          )}
+        </div>
+
+        {/* 3-Column Balanced Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+          {TIMING_PRESETS.map((timing) => {
+            const isSelected = selectedTiming === timing || (Boolean(selectedTiming) && selectedTiming === timing) || (!selectedTiming && value.includes(timing));
+            return (
+              <button
+                key={timing}
+                type="button"
+                onClick={() => handleSelectTiming(timing)}
+                style={{
+                  height: '38px',
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '0 8px',
+                  borderRadius: '7px',
+                  fontSize: '12.5px',
+                  fontWeight: isSelected ? '700' : '600',
+                  color: isSelected ? '#1D4ED8' : '#1E293B',
+                  background: isSelected ? '#DBEAFE' : '#F8FAFC',
+                  border: isSelected ? '1.5px solid #2563EB' : '1px solid #CBD5E1',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                  boxSizing: 'border-box',
+                  textAlign: 'center',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  boxShadow: isSelected ? '0 1px 3px rgba(37, 99, 235, 0.2)' : 'none'
+                }}
+                title={timing}
+              >
+                {timing}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Custom Modern Category Dropdown that ALWAYS opens downwards with modern UI and high-contrast typography
@@ -316,6 +763,201 @@ function ModernCategoryDropdown({
   );
 }
 
+// Modern Usage Method Combobox Dropdown (Select Preset or Type Custom, no emojis)
+function ModernUsageMethodDropdown({
+  value,
+  onChange,
+  placeholder = 'เลือกหรือพิมพ์วิธีการใช้งาน เช่น กิน ชง ดื่ม...'
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const PRESET_METHODS = [
+    { label: 'รับประทาน (กิน)', desc: 'ยารับประทาน เม็ด/แคปซูล/น้ำ' },
+    { label: 'ชงดื่ม', desc: 'ผงเกลือแร่ หรือยาผงละลายน้ำ' },
+    { label: 'ดื่ม', desc: 'ยาน้ำ/สารละลายสำหรับดื่มโดยตรง' },
+    { label: 'เคี้ยวให้ละเอียดก่อนกลืน', desc: 'ยาเม็ดเคี้ยว เช่น ยาลดกรด/ขับลม' },
+    { label: 'อมใต้ลิ้น', desc: 'ยาออกฤทธิ์เร็ว ดูดซึมผ่านใต้ลิ้น' },
+    { label: 'ทาภายนอก', desc: 'ครีม ยาหม่อง โลชั่น ขี้ผึ้ง' },
+    { label: 'หยอดตา', desc: 'ยาหยอดตาปราศจากเชื้อ' },
+    { label: 'หยอดหู', desc: 'ยาหยอดรูหู' },
+    { label: 'พ่นจมูก', desc: 'สเปรย์พ่นจมูกรักษาภูมิแพ้' },
+    { label: 'พ่นคอ', desc: 'สเปรย์พ่นช่องปากและลำคอ' },
+    { label: 'สวนทวาร', desc: 'ยาระบายหรือยาลดไข้เหน็บทวาร' },
+    { label: 'ฉีด', desc: 'ฉีดเข้ากล้ามเนื้อ หรือหลอดเลือด' }
+  ];
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', position: 'relative', width: '100%' }}>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setIsOpen(true)}
+          placeholder={placeholder}
+          style={{
+            width: '100%',
+            padding: '9px 36px 9px 12px',
+            borderRadius: '8px',
+            border: '1.5px solid #CBD5E1',
+            fontSize: '13.5px',
+            fontWeight: '600',
+            color: '#0F172A',
+            background: '#FFFFFF',
+            outline: 'none',
+            boxSizing: 'border-box',
+            transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          style={{
+            position: 'absolute',
+            right: '8px',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#64748B'
+          }}
+          title="เปิด/ปิด รายการวิธีใช้งานที่แนะนำ"
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease'
+            }}
+          >
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+      </div>
+
+      {isOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            right: 0,
+            maxHeight: '230px',
+            overflowY: 'auto',
+            background: '#FFFFFF',
+            borderRadius: '10px',
+            border: '1.5px solid #CBD5E1',
+            boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+            zIndex: 1100,
+            padding: '8px',
+            boxSizing: 'border-box'
+          }}
+        >
+          <div
+            style={{
+              padding: '4px 6px 8px 6px',
+              fontSize: '11px',
+              fontWeight: '800',
+              color: '#64748B',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}
+          >
+            เลือกวิธีใช้งานที่แนะนำ หรือพิมพ์เพิ่มเติมด้านบน
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+              gap: '6px'
+            }}
+          >
+            {PRESET_METHODS.map((preset) => {
+              const isSelected = value === preset.label;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => {
+                    onChange(preset.label);
+                    setIsOpen(false);
+                  }}
+                  style={{
+                    padding: '8px 10px',
+                    borderRadius: '7px',
+                    textAlign: 'left',
+                    border: isSelected ? '1.5px solid #2563EB' : '1px solid #E2E8F0',
+                    background: isSelected ? '#EFF6FF' : '#F8FAFC',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                    transition: 'all 0.15s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSelected) e.currentTarget.style.background = '#F1F5F9';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSelected) e.currentTarget.style.background = '#F8FAFC';
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '12.5px',
+                      fontWeight: '700',
+                      color: isSelected ? '#1D4ED8' : '#0F172A'
+                    }}
+                  >
+                    {preset.label}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: '10.5px',
+                      color: '#64748B',
+                      lineHeight: '1.2'
+                    }}
+                  >
+                    {preset.desc}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Modern Dropdown to select/search medicine to edit by Code or Name
 function MedicineSelectorDropdown({
   medicines,
@@ -530,10 +1172,18 @@ export default function MedicinePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockStatusFilter, setStockStatusFilter] = useState<'all' | 'in-stock' | 'low-stock' | 'out-of-stock'>('all');
+  const [sortOrder, setSortOrder] = useState<'latest' | 'code'>('latest');
   
   const [showSuccessBadge, setShowSuccessBadge] = useState(false);
   const [successBadgeText, setSuccessBadgeText] = useState('✓ อัปเดตคลังยาเรียบร้อยแล้ว');
   const [isStockTableExpanded, setIsStockTableExpanded] = useState(true);
+
+  // สถานะการโหลดข้อมูลเริ่มต้นจากฐานข้อมูล (แสดงอนิเมะชันโหลดข้อมูล)
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  // สถานะกำลังบันทึกข้อมูลยาลงฐานข้อมูล (แสดงอนิเมะชัน Modal)
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitTitle, setSubmitTitle] = useState('กำลังบันทึกลงฐานข้อมูล');
+  const [submitSubtitle, setSubmitSubtitle] = useState('กรุณารอสักครู่ ระบบกำลังบันทึกข้อมูลยาลงฐานข้อมูล');
 
   const triggerSuccessBadge = (msg: string) => {
     setSuccessBadgeText(msg);
@@ -542,10 +1192,19 @@ export default function MedicinePage() {
   };
 
   // Sync with Backend API
-  const fetchMedicines = useCallback(() => {
+  const fetchMedicines = useCallback((isInitial = false) => {
+    const startTime = Date.now();
     const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const finishLoading = () => {
+      if (isInitial) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+        setTimeout(() => setIsInitialLoading(false), remaining);
+      }
+    };
 
     const processMedicinesData = (data: any) => {
       if (data?.medicines && Array.isArray(data.medicines) && data.medicines.length > 0) {
@@ -563,7 +1222,10 @@ export default function MedicinePage() {
             category: m.category || 'ยารักษาโรคทั่วไป',
             properties: m.properties || 'ยารักษาโรคและบรรเทาอาการตามแพทย์สั่ง',
             dosage: m.dosage || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
-            precautions: 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
+            usage_method: m.usage_method || 'รับประทาน (กิน)',
+            instructions: m.instructions || '',
+            expiry_date: m.expiry_date || '',
+            precautions: m.precautions || 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
             price: `฿ ${(m.unit_price || 0).toFixed(2)}`,
             unit_price: m.unit_price || 0,
             manufacturer: m.manufacturer || 'บริษัท เภสัชกรรม จำกัด',
@@ -574,6 +1236,7 @@ export default function MedicinePage() {
           };
         });
         setMedicines(formatted);
+        finishLoading();
         return true;
       }
       return false;
@@ -589,21 +1252,33 @@ export default function MedicinePage() {
           // Fallback to system endpoint
           fetch('/api/system/medicines')
             .then(res => res.json())
-            .then(sysData => processMedicinesData(sysData))
-            .catch(err => console.error('Fallback fetch medicines failed:', err));
+            .then(sysData => {
+              processMedicinesData(sysData);
+              finishLoading();
+            })
+            .catch(err => {
+              console.error('Fallback fetch medicines failed:', err);
+              finishLoading();
+            });
         }
       })
       .catch(() => {
         // Fallback to system endpoint on 401 or network error
         fetch('/api/system/medicines')
           .then(res => res.json())
-          .then(sysData => processMedicinesData(sysData))
-          .catch(err => console.error('Fallback fetch medicines failed:', err));
+          .then(sysData => {
+            processMedicinesData(sysData);
+            finishLoading();
+          })
+          .catch(err => {
+            console.error('Fallback fetch medicines failed:', err);
+            finishLoading();
+          });
       });
   }, []);
 
   useEffect(() => {
-    fetchMedicines();
+    fetchMedicines(true);
 
     // Real-time WebSocket Listeners
     const unsubStock = subscribe('MEDICINE_STOCK_UPDATED', () => {
@@ -671,8 +1346,11 @@ export default function MedicinePage() {
     category: '',
     properties: '',
     dosage: '',
+    usage_method: 'รับประทาน (กิน)',
+    instructions: '',
     precautions: '',
     manufacturer: '',
+    expiryDate: '',
     unitPrice: 0,
     stock: 0
   });
@@ -690,8 +1368,11 @@ export default function MedicinePage() {
       category: detailModalMed.category,
       properties: detailModalMed.properties,
       dosage: detailModalMed.dosage,
+      usage_method: detailModalMed.usage_method || 'รับประทาน (กิน)',
+      instructions: detailModalMed.instructions || '',
       precautions: detailModalMed.precautions || 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
       manufacturer: detailModalMed.manufacturer,
+      expiryDate: detailModalMed.expiry_date ? detailModalMed.expiry_date.substring(0, 10) : '',
       unitPrice: cleanPrice,
       stock: detailModalMed.stock
     });
@@ -710,8 +1391,11 @@ export default function MedicinePage() {
       category: med.category || 'ยารักษาโรคทั่วไป',
       properties: med.properties || '',
       dosage: med.dosage || '',
+      usage_method: med.usage_method || 'รับประทาน (กิน)',
+      instructions: med.instructions || '',
       precautions: med.precautions || 'ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว',
       manufacturer: med.manufacturer || 'บริษัท เภสัชกรรม จำกัด',
+      expiryDate: med.expiry_date ? med.expiry_date.substring(0, 10) : '',
       unitPrice: cleanPrice,
       stock: med.stock
     });
@@ -728,7 +1412,11 @@ export default function MedicinePage() {
       category: detailEditForm.category.trim(),
       properties: detailEditForm.properties.trim(),
       dosage: detailEditForm.dosage.trim(),
+      usage_method: (detailEditForm.usage_method || 'รับประทาน (กิน)').trim(),
+      instructions: detailEditForm.instructions.trim(),
+      precautions: detailEditForm.precautions.trim(),
       manufacturer: detailEditForm.manufacturer.trim(),
+      expiry_date: detailEditForm.expiryDate.trim() || undefined,
       unit_price: Number(detailEditForm.unitPrice),
       stock_quantity: Number(detailEditForm.stock)
     };
@@ -765,8 +1453,11 @@ export default function MedicinePage() {
           category: detailEditForm.category.trim(),
           properties: detailEditForm.properties.trim(),
           dosage: detailEditForm.dosage.trim(),
+          usage_method: (detailEditForm.usage_method || 'รับประทาน (กิน)').trim(),
+          instructions: detailEditForm.instructions.trim(),
           precautions: detailEditForm.precautions.trim(),
           manufacturer: detailEditForm.manufacturer.trim(),
+          expiry_date: detailEditForm.expiryDate.trim(),
           price: `฿ ${Number(detailEditForm.unitPrice).toFixed(2)}`,
           unit_price: Number(detailEditForm.unitPrice),
           stock: newStock,
@@ -797,9 +1488,74 @@ export default function MedicinePage() {
   const [addCategory, setAddCategory] = useState('ยารักษาโรคทั่วไป');
   const [addProperties, setAddProperties] = useState('');
   const [addDosage, setAddDosage] = useState('');
+  const [addUsageMethod, setAddUsageMethod] = useState('รับประทาน (กิน)');
+  const [addInstructions, setAddInstructions] = useState('');
+  const [addExpiryDate, setAddExpiryDate] = useState('');
   const [addManufacturer, setAddManufacturer] = useState('');
   const [addStock, setAddStock] = useState<number | ''>(100);
   const [addUnitPrice, setAddUnitPrice] = useState<number | ''>(20);
+
+  const [hasDraft, setHasDraft] = useState(false);
+
+  // ตรวจสอบแบบร่างเมื่อเปิด Modal
+  useEffect(() => {
+    if (isAddModalOpen) {
+      const draft = localStorage.getItem('medicine_draft');
+      if (draft) {
+        try {
+          const parsed = JSON.parse(draft);
+          if (parsed.name || parsed.generic_name || parsed.medicine_code) {
+            setHasDraft(true);
+          }
+        } catch {}
+      }
+    }
+  }, [isAddModalOpen]);
+
+  // บันทึกแบบร่างอัตโนมัติ
+  useEffect(() => {
+    if (isAddModalOpen && (addMedName || addGenericName || addMedCode)) {
+      const draftData = {
+        medicine_code: addMedCode,
+        name: addMedName,
+        generic_name: addGenericName,
+        category: addCategory,
+        properties: addProperties,
+        dosage: addDosage,
+        usage_method: addUsageMethod,
+        instructions: addInstructions,
+        expiry_date: addExpiryDate,
+        manufacturer: addManufacturer,
+        stock_quantity: addStock,
+        unit_price: addUnitPrice
+      };
+      localStorage.setItem('medicine_draft', JSON.stringify(draftData));
+    }
+  }, [addMedCode, addMedName, addGenericName, addCategory, addProperties, addDosage, addUsageMethod, addInstructions, addExpiryDate, addManufacturer, addStock, addUnitPrice, isAddModalOpen]);
+
+  const handleRestoreDraft = () => {
+    try {
+      const draft = localStorage.getItem('medicine_draft');
+      if (draft) {
+        const parsed = JSON.parse(draft);
+        setAddMedCode(parsed.medicine_code || '');
+        setAddMedName(parsed.name || '');
+        setAddGenericName(parsed.generic_name || '');
+        setAddCategory(parsed.category || 'ยารักษาโรคทั่วไป');
+        setAddProperties(parsed.properties || '');
+        setAddDosage(parsed.dosage || '');
+        setAddUsageMethod(parsed.usage_method || 'รับประทาน (กิน)');
+        setAddInstructions(parsed.instructions || '');
+        setAddExpiryDate(parsed.expiry_date || '');
+        setAddManufacturer(parsed.manufacturer || '');
+        setAddStock(parsed.stock_quantity !== undefined ? parsed.stock_quantity : 100);
+        setAddUnitPrice(parsed.unit_price !== undefined ? parsed.unit_price : 20);
+        setHasDraft(false);
+      }
+    } catch (err) {
+      console.error('Failed to restore draft', err);
+    }
+  };
 
   // Delete Confirmation state
   const [deleteConfirmMed, setDeleteConfirmMed] = useState<Medicine | null>(null);
@@ -824,6 +1580,11 @@ export default function MedicinePage() {
   const handleAddMedicineSubmit = () => {
     if (!addMedName.trim()) return;
 
+    setSubmitTitle('กำลังบันทึกลงฐานข้อมูล');
+    setSubmitSubtitle('กรุณารอสักครู่ ระบบกำลังบันทึกข้อมูลยาใหม่ลงฐานข้อมูล');
+    setIsSubmitting(true);
+    const start = Date.now();
+
     const payload = {
       medicine_code: addMedCode.trim() || undefined,
       name: addMedName.trim(),
@@ -831,6 +1592,9 @@ export default function MedicinePage() {
       category: addCategory.trim() || 'ยารักษาโรคทั่วไป',
       properties: addProperties.trim() || 'บรรเทาอาการตามแพทย์สั่ง',
       dosage: addDosage.trim() || 'ทานตามแพทย์สั่งอย่างเคร่งครัด',
+      usage_method: addUsageMethod.trim() || 'รับประทาน (กิน)',
+      instructions: addInstructions.trim() || undefined,
+      expiry_date: addExpiryDate.trim() || undefined,
       manufacturer: addManufacturer.trim() || 'บริษัท เภสัชกรรม จำกัด',
       stock_quantity: Number(addStock) || 0,
       unit_price: Number(addUnitPrice) || 0
@@ -839,6 +1603,31 @@ export default function MedicinePage() {
     const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const completeSubmit = () => {
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
+      setTimeout(() => {
+        setIsSubmitting(false);
+        setIsAddModalOpen(false);
+        localStorage.removeItem('medicine_draft');
+        setHasDraft(false);
+        setAddMedCode('');
+        setAddMedName('');
+        setAddGenericName('');
+        setAddCategory('ยารักษาโรคทั่วไป');
+        setAddProperties('');
+        setAddDosage('');
+        setAddUsageMethod('รับประทาน (กิน)');
+        setAddInstructions('');
+        setAddExpiryDate('');
+        setAddManufacturer('');
+        setAddStock(100);
+        setAddUnitPrice(20);
+        setShowSuccessBadge(true);
+        setTimeout(() => setShowSuccessBadge(false), 3000);
+      }, remaining);
+    };
 
     fetch('/api/pharmacy/medicines', {
       method: 'POST',
@@ -851,8 +1640,7 @@ export default function MedicinePage() {
     })
     .then(() => {
       fetchMedicines();
-      setShowSuccessBadge(true);
-      setTimeout(() => setShowSuccessBadge(false), 3000);
+      completeSubmit();
     })
     .catch(() => {
       // Fallback to system endpoint
@@ -863,21 +1651,12 @@ export default function MedicinePage() {
       })
       .then(() => {
         fetchMedicines();
-        setShowSuccessBadge(true);
-        setTimeout(() => setShowSuccessBadge(false), 3000);
+        completeSubmit();
+      })
+      .catch(() => {
+        completeSubmit();
       });
     });
-
-    setIsAddModalOpen(false);
-    setAddMedCode('');
-    setAddMedName('');
-    setAddGenericName('');
-    setAddCategory('ยารักษาโรคทั่วไป');
-    setAddProperties('');
-    setAddDosage('');
-    setAddManufacturer('');
-    setAddStock(100);
-    setAddUnitPrice(20);
   };
 
   // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ลบยาออกจากหน้าจอทันทีใน 0 ms โดยไม่ต้องรอ Supabase
@@ -920,6 +1699,11 @@ export default function MedicinePage() {
     }
     
     const qty = Number(quantity);
+
+    setSubmitTitle('กำลังบันทึกลงฐานข้อมูล');
+    setSubmitSubtitle('กรุณารอสักครู่ ระบบกำลังอัปเดตสต็อกยาลงฐานข้อมูล');
+    setIsSubmitting(true);
+    const start = Date.now();
     
     setMedicines(prev => prev.map(med => {
       if (med.id === selectedMedicine.id) {
@@ -947,9 +1731,14 @@ export default function MedicinePage() {
       })
     }).catch(() => {});
 
-    handleCloseModal();
-    setShowSuccessBadge(true);
-    setTimeout(() => setShowSuccessBadge(false), 3000);
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      handleCloseModal();
+      setShowSuccessBadge(true);
+      setTimeout(() => setShowSuccessBadge(false), 3000);
+    }, remaining);
   };
 
   const filteredMedicines = medicines.filter(med => {
@@ -970,9 +1759,11 @@ export default function MedicinePage() {
       const searchTerms = q.split(/\s+/).filter(Boolean);
       const nameStr = (med.name || '').toLowerCase();
       const genericStr = (med.genericName || '').toLowerCase();
+      const usageStr = (med.usage_method || '').toLowerCase();
+      const propStr = (med.properties || '').toLowerCase();
 
       const matchName = searchTerms.length > 0 && searchTerms.every(term => 
-        nameStr.includes(term) || genericStr.includes(term)
+        nameStr.includes(term) || genericStr.includes(term) || usageStr.includes(term) || propStr.includes(term)
       );
         
       matchSearch = matchId || matchName;
@@ -989,6 +1780,18 @@ export default function MedicinePage() {
     else if (stockStatusFilter === 'out-of-stock') matchStatus = med.status === 'Out of Stock';
 
     return matchSearch && matchCategory && matchStatus;
+  }).sort((a, b) => {
+    if (sortOrder === 'latest') {
+      const timeA = new Date(a.updatedAt || a.createdAt || 0).getTime();
+      const timeB = new Date(b.updatedAt || b.createdAt || 0).getTime();
+      return timeB - timeA;
+    } else {
+      const codeA = (a.medicine_code || a.id).toLowerCase();
+      const codeB = (b.medicine_code || b.id).toLowerCase();
+      if (codeA < codeB) return -1;
+      if (codeA > codeB) return 1;
+      return 0;
+    }
   });
 
   const ITEMS_PER_PAGE = 10;
@@ -1030,8 +1833,20 @@ export default function MedicinePage() {
 
   const isReduceInvalid = selectedMedicine && updateMode === 'reduce' && quantity !== '' && Number(quantity) > selectedMedicine.stock;
 
+  if (isInitialLoading) {
+    return <PharmacyMedicineSkeleton />;
+  }
+
   return (
     <div className="medicine-page-container">
+
+      {/* 1. Modal Popup แสดงอนิเมะชันตอนบันทึกลงฐานข้อมูล (ฉากหลังเบลอสวยงาม ข้อความและอนิเมะชันตรงกลาง) */}
+      <ClinicActionLoadingModal
+        isOpen={isSubmitting}
+        title={submitTitle}
+        subtitle={submitSubtitle}
+      />
+
       <div className="page-header" style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
         <div className="header-titles" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', textAlign: 'left', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -1172,6 +1987,22 @@ export default function MedicinePage() {
               ))}
             </select>
           </div>
+          <div className="input-group">
+            <label>การจัดเรียง (Sort)</label>
+            <select
+              className="filter-select"
+              value={sortOrder}
+              onChange={(e: any) => setSortOrder(e.target.value)}
+              style={{
+                padding: '10px 14px', borderRadius: '8px',
+                border: '1px solid #CBD5E1', background: 'var(--bg-card, #F8FAFC)',
+                color: 'var(--text-primary, #0F172A)', fontSize: '14px'
+              }}
+            >
+              <option value="latest">อัปเดตล่าสุด</option>
+              <option value="code">ตามรหัสยา</option>
+            </select>
+          </div>
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button className="search-btn" type="button">ค้นหา</button>
@@ -1268,7 +2099,7 @@ export default function MedicinePage() {
 
         {isStockTableExpanded && (
           <>
-            <div className="table-wrapper" style={{ overflowX: 'hidden', width: '100%' }}>
+            <div className="table-wrapper" style={{ overflowX: 'hidden', width: '100%', overscrollBehavior: 'auto' }}>
               <table className="stock-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                 <thead>
                   <tr>
@@ -1346,19 +2177,52 @@ export default function MedicinePage() {
                           </div>
                         </td>
                         <td style={{ padding: '10px 6px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', justifyContent: 'center' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
                             <span style={{ 
                               fontSize: '12px', 
-                              padding: '3px 8px', 
+                              padding: '4px 8px', 
                               borderRadius: '6px', 
                               background: 'var(--bg-card, #F1F5F9)', 
                               color: 'var(--text-primary, #334155)',
-                              fontWeight: '500',
-                              display: 'inline-block',
-                              whiteSpace: 'nowrap'
+                              fontWeight: '600',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              textAlign: 'center',
+                              width: '165px',
+                              maxWidth: '100%',
+                              boxSizing: 'border-box',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
                             }}>
                               {med.category ? med.category.replace(/\s*\([^)]*\)/g, '').trim() : 'ยารักษาโรคทั่วไป'}
                             </span>
+                            {med.usage_method && (
+                              <span style={{
+                                fontSize: '11px',
+                                padding: '3px 8px',
+                                borderRadius: '6px',
+                                background: '#ECFDF5',
+                                color: '#047857',
+                                border: '1px solid #A7F3D0',
+                                fontWeight: '600',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                textAlign: 'center',
+                                gap: '3px',
+                                width: '165px',
+                                maxWidth: '100%',
+                                boxSizing: 'border-box',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis'
+                              }}>
+                                <span style={{ opacity: 0.8 }}>วิธีใช้:</span>
+                                <span>{med.usage_method}</span>
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="stock-num-cell" style={{ textAlign: 'center', padding: '10px 6px', whiteSpace: 'nowrap', fontSize: '13.5px' }}>{med.stock} เม็ด</td>
@@ -1458,8 +2322,8 @@ export default function MedicinePage() {
 
       {/* Stock Adjustment Modal */}
       {isModalOpen && selectedMedicine && (
-        <div className="modal-overlay">
-          <div className="modal-card card">
+        <ClinicModalPortal isOpen={true} onClose={handleCloseModal} className="medicine-page-container">
+          <div className="modal-card card" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">ปรับปรุงสต็อกยา - {selectedMedicine.name}</h3>
               <button className="close-btn" onClick={handleCloseModal}>✕</button>
@@ -1530,13 +2394,13 @@ export default function MedicinePage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Medicine Info Detail Modal (รองรับทั้งดูรายละเอียด และแก้ไขลง DB ทันที) */}
       {detailModalMed && (
-        <div className="modal-overlay" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>
-          <div className="med-detail-modal-card card" style={{ maxWidth: '680px', width: '92%' }} onClick={(e) => e.stopPropagation()}>
+        <ClinicModalPortal isOpen={true} onClose={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }} className="medicine-page-container">
+          <div className="med-detail-modal-card card" style={{ maxWidth: '650px', width: '94%', overscrollBehavior: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <div className="med-detail-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #E2E8F0', paddingBottom: '16px', marginBottom: '18px' }}>
               <div className="med-detail-title-box" style={{ flex: 1, minWidth: 0, paddingRight: '20px' }}>
                 <div style={{ marginBottom: '8px' }}>
@@ -1642,12 +2506,22 @@ export default function MedicinePage() {
               </div>
             </div>
 
-            <div className="med-detail-body">
+            <div className="med-detail-body" style={{ overscrollBehaviorY: 'auto' }}>
               {!isEditingDetailMed ? (
                 <>
-                  <div className="med-info-section category-section">
-                    <span className="info-label">หมวดยา:</span>
-                    <span className="info-value category-tag">{detailModalMed.category}</span>
+                  <div className="med-info-section category-section" style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <div>
+                      <span className="info-label">หมวดยา:</span>
+                      <span className="info-value category-tag">{detailModalMed.category}</span>
+                    </div>
+                    {detailModalMed.usage_method && (
+                      <div>
+                        <span className="info-label">วิธีการใช้งาน:</span>
+                        <span className="info-value" style={{ marginLeft: '6px', fontWeight: '700', color: '#047857', background: '#ECFDF5', padding: '3px 10px', borderRadius: '6px', border: '1px solid #A7F3D0' }}>
+                          {detailModalMed.usage_method}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="med-info-grid">
@@ -1660,6 +2534,20 @@ export default function MedicinePage() {
                       <h4 className="info-box-title">ขนาดและวิธีรับประทาน</h4>
                       <p className="info-box-desc">{detailModalMed.dosage}</p>
                     </div>
+
+                    {detailModalMed.instructions && (
+                      <div className="med-info-box" style={{ background: '#F0FDF4', border: '1px solid #BBF7D0' }}>
+                        <h4 className="info-box-title" style={{ color: '#166534', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                          </svg>
+                          คำแนะนำพิเศษ / ฉลากยา
+                        </h4>
+                        <p className="info-box-desc" style={{ color: '#14532D' }}>{detailModalMed.instructions}</p>
+                      </div>
+                    )}
 
                     <div className="med-info-box warning-box">
                       <h4 className="info-box-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1678,6 +2566,12 @@ export default function MedicinePage() {
                       <p className="info-box-desc">
                         ผู้ผลิต: {detailModalMed.manufacturer}<br />
                         ราคาจำหน่าย: <strong>{detailModalMed.price}</strong>
+                        {detailModalMed.expiry_date && (
+                          <>
+                            <br />
+                            วันหมดอายุ: <strong>{detailModalMed.expiry_date.substring(0, 10)}</strong>
+                          </>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -1691,6 +2585,14 @@ export default function MedicinePage() {
                       <span className="stat-label">จ่ายออกวันนี้:</span>
                       <span className="stat-val">{detailModalMed.dispensedToday} เม็ด</span>
                     </div>
+                    {detailModalMed.expiry_date && (
+                      <div className="stock-stat-item">
+                        <span className="stat-label">วันหมดอายุ:</span>
+                        <span className="stat-val" style={{ color: '#D97706', fontWeight: '700' }}>
+                          {detailModalMed.expiry_date.substring(0, 10)}
+                        </span>
+                      </div>
+                    )}
                     <div className="stock-stat-item">
                       <span className="stat-label">สถานะสต็อก:</span>
                       <span className={`status-badge ${getStatusClass(detailModalMed.status)}`}>
@@ -1700,62 +2602,90 @@ export default function MedicinePage() {
                   </div>
                 </>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {/* Modern Downward Dropdown */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '60vh', overflowY: 'auto', paddingRight: '4px' }}>
+                  {/* Modern Downward Dropdown for Category & Usage Method */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>
+                        ชนิด / หมวดหมู่ยา
+                      </label>
+                      <ModernCategoryDropdown
+                        value={detailEditForm.category}
+                        onChange={(cat) => setDetailEditForm(prev => ({ ...prev, category: cat }))}
+                        categories={allAvailableCategories}
+                        onAddNewCategory={handleAddNewCategory}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>
+                        วิธีการใช้งาน เช่น กิน ชง ดื่ม (Usage Method)
+                      </label>
+                      <ModernUsageMethodDropdown
+                        value={detailEditForm.usage_method || ''}
+                        onChange={(method) => setDetailEditForm(prev => ({ ...prev, usage_method: method }))}
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <label style={{ fontSize: '13.5px', fontWeight: '700', color: '#1E293B', marginBottom: '6px', display: 'block' }}>
-                      ชนิด / หมวดหมู่ยา
-                    </label>
-                    <ModernCategoryDropdown
-                      value={detailEditForm.category}
-                      onChange={(cat) => setDetailEditForm(prev => ({ ...prev, category: cat }))}
-                      categories={allAvailableCategories}
-                      onAddNewCategory={handleAddNewCategory}
+                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>สรรพคุณและข้อบ่งใช้ (Properties)</label>
+                    <textarea 
+                      rows={2}
+                      value={detailEditForm.properties} 
+                      onChange={(e) => setDetailEditForm(prev => ({ ...prev, properties: e.target.value }))}
+                      placeholder="ระบุสรรพคุณและอาการที่ใช้รักษา..."
+                      style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                    <div>
-                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>สรรพคุณและข้อบ่งใช้</label>
-                      <textarea 
-                        rows={3}
-                        value={detailEditForm.properties} 
-                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, properties: e.target.value }))}
-                        placeholder="ระบุสรรพคุณและอาการที่ใช้รักษา..."
-                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>ขนาดและวิธีรับประทาน</label>
-                      <textarea 
-                        rows={3}
-                        value={detailEditForm.dosage} 
-                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, dosage: e.target.value }))}
-                        placeholder="เช่น ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร..."
-                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', resize: 'vertical' }}
-                      />
-                    </div>
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>ขนาดและวิธีรับประทาน (Dosage)</label>
+                    <ModernDosageInputBuilder
+                      value={detailEditForm.dosage}
+                      onChange={(val) => setDetailEditForm(prev => ({ ...prev, dosage: val }))}
+                      isTextarea={true}
+                      placeholder="เช่น ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร..."
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#166534', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                      </svg>
+                      คำแนะนำพิเศษ / ฉลากยา (Instructions)
+                    </label>
+                    <input 
+                      type="text" 
+                      value={detailEditForm.instructions} 
+                      onChange={(e) => setDetailEditForm(prev => ({ ...prev, instructions: e.target.value }))}
+                      placeholder="เช่น ควรดื่มน้ำตามมากๆ, รับประทานติดต่อกันจนหมด..."
+                      style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #86EFAC', borderRadius: '8px', fontSize: '13px', background: '#F0FDF4', boxSizing: 'border-box' }}
+                    />
                   </div>
 
                   <div>
                     <label style={{ fontSize: '13px', fontWeight: '700', color: '#DC2626', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
                         <line x1="12" y1="9" x2="12" y2="13"></line>
                         <line x1="12" y1="17" x2="12.01" y2="17"></line>
                       </svg>
-                      ข้อควรระวังและผลข้างเคียง
+                      ข้อควรระวังและผลข้างเคียง (Precautions)
                     </label>
                     <textarea 
                       rows={2}
                       value={detailEditForm.precautions} 
                       onChange={(e) => setDetailEditForm(prev => ({ ...prev, precautions: e.target.value }))}
                       placeholder="เช่น ระวังการใช้ในผู้แพ้ยาหรือมีโรคประจำตัว..."
-                      style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #FCA5A5', borderRadius: '8px', fontSize: '13px', background: '#FEF2F2', boxSizing: 'border-box', resize: 'vertical' }}
+                      style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #FCA5A5', borderRadius: '8px', fontSize: '13px', background: '#FEF2F2', boxSizing: 'border-box', resize: 'vertical' }}
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr', gap: '14px' }}>
+                  {/* Row 1: Manufacturer & Expiry Date */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
                       <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>ผู้ผลิต / บริษัท</label>
                       <input 
@@ -1763,7 +2693,30 @@ export default function MedicinePage() {
                         value={detailEditForm.manufacturer} 
                         onChange={(e) => setDetailEditForm(prev => ({ ...prev, manufacturer: e.target.value }))}
                         placeholder="เช่น องค์การเภสัชกรรม (GPO)"
-                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }}
+                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>วันหมดอายุ (Expiry Date)</label>
+                      <input 
+                        type="date" 
+                        value={detailEditForm.expiryDate} 
+                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, expiryDate: e.target.value }))}
+                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Stock & Price (Moved down to the bottom) */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <div>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>สต็อกคงเหลือ (เม็ด)</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={detailEditForm.stock} 
+                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, stock: e.target.value === '' ? 0 : Number(e.target.value) }))}
+                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', boxSizing: 'border-box' }}
                       />
                     </div>
                     <div>
@@ -1774,17 +2727,7 @@ export default function MedicinePage() {
                         min="0"
                         value={detailEditForm.unitPrice} 
                         onChange={(e) => setDetailEditForm(prev => ({ ...prev, unitPrice: e.target.value === '' ? 0 : Number(e.target.value) }))}
-                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', boxSizing: 'border-box' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>สต็อกคงเหลือ (เม็ด)</label>
-                      <input 
-                        type="number" 
-                        min="0"
-                        value={detailEditForm.stock} 
-                        onChange={(e) => setDetailEditForm(prev => ({ ...prev, stock: e.target.value === '' ? 0 : Number(e.target.value) }))}
-                        style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', boxSizing: 'border-box' }}
+                        style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #CBD5E1', borderRadius: '8px', fontSize: '14px', fontWeight: 'bold', boxSizing: 'border-box' }}
                       />
                     </div>
                   </div>
@@ -1867,22 +2810,46 @@ export default function MedicinePage() {
               )}
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Add New Medicine Modal */}
       {isAddModalOpen && (
-        <div className="modal-overlay">
-          <div className="modal-card card" style={{ maxWidth: '560px' }}>
-            <div className="modal-header">
+        <ClinicModalPortal isOpen={true} onClose={() => setIsAddModalOpen(false)} className="medicine-page-container">
+          <div className="modal-card card" style={{ maxWidth: '650px', width: '94%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', overscrollBehavior: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h3 className="modal-title">+ เพิ่มรายการยาใหม่เข้าคลัง</h3>
-              <button className="close-btn" onClick={() => setIsAddModalOpen(false)}>✕</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                {hasDraft && (
+                  <button 
+                    onClick={handleRestoreDraft}
+                    style={{
+                      background: '#FFFBEB',
+                      border: '1px solid #FCD34D',
+                      color: '#B45309',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                    กู้คืนแบบร่าง
+                  </button>
+                )}
+                <button className="close-btn" onClick={() => setIsAddModalOpen(false)}>✕</button>
+              </div>
             </div>
 
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', maxHeight: '70vh', overflowY: 'auto' }}>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px', overflowY: 'auto', flex: 1, minHeight: 0, paddingRight: '4px', overscrollBehaviorY: 'auto' }}>
+              {/* Row 1: Medicine Code & Name */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="input-group">
-                  <label style={{ fontSize: '13px', fontWeight: '600' }}>รหัสยา (Medicine Code)</label>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>รหัสยา (Medicine Code)</label>
                   <input
                     type="text"
                     placeholder="เช่น MED-013 (ว่างไว้ให้ระบบสร้างให้)"
@@ -1891,7 +2858,7 @@ export default function MedicinePage() {
                   />
                 </div>
                 <div className="input-group">
-                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ชื่อยา * (Trade Name)</label>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>ชื่อยา * (Trade Name)</label>
                   <input
                     type="text"
                     placeholder="เช่น Paracetamol 500mg"
@@ -1902,9 +2869,10 @@ export default function MedicinePage() {
                 </div>
               </div>
 
+              {/* Row 2: Generic Name & Category */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="input-group">
-                  <label style={{ fontSize: '13px', fontWeight: '600' }}>ชื่อสามัญทางยา (Generic Name)</label>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>ชื่อสามัญทางยา (Generic Name)</label>
                   <input
                     type="text"
                     placeholder="เช่น Acetaminophen"
@@ -1923,8 +2891,20 @@ export default function MedicinePage() {
                 </div>
               </div>
 
+              {/* Row 3: Usage Method (Dropdown + Free Text Typing) */}
               <div className="input-group">
-                <label style={{ fontSize: '13px', fontWeight: '600' }}>สรรพคุณและข้อบ่งใช้ (Properties)</label>
+                <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px', display: 'block' }}>
+                  วิธีการใช้งาน เช่น กิน ชง ดื่ม (Usage Method)
+                </label>
+                <ModernUsageMethodDropdown
+                  value={addUsageMethod}
+                  onChange={setAddUsageMethod}
+                />
+              </div>
+
+              {/* Row 3: Properties */}
+              <div className="input-group">
+                <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>สรรพคุณและข้อบ่งใช้ (Properties)</label>
                 <input
                   type="text"
                   placeholder="เช่น บรรเทาอาการปวดและลดไข้"
@@ -1933,29 +2913,73 @@ export default function MedicinePage() {
                 />
               </div>
 
+              {/* Row 4: Dosage with ModernDosageInputBuilder */}
               <div className="input-group">
-                <label style={{ fontSize: '13px', fontWeight: '600' }}>ขนาดและวิธีรับประทาน (Dosage)</label>
-                <input
-                  type="text"
-                  placeholder="เช่น ครั้งละ 1-2 เม็ด ทุก 4-6 ชั่วโมง"
+                <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px', display: 'block' }}>
+                  ขนาดและวิธีรับประทาน (Dosage)
+                </label>
+                <ModernDosageInputBuilder
                   value={addDosage}
-                  onChange={(e) => setAddDosage(e.target.value)}
+                  onChange={setAddDosage}
+                  placeholder="เช่น ครั้งละ 1-2 เม็ด ทุก 4-6 ชั่วโมง หลังอาหาร..."
                 />
               </div>
 
+              {/* Row 5: Instructions */}
+              <div className="input-group">
+                <label style={{ fontSize: '13px', fontWeight: '700', color: '#166534', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                  </svg>
+                  คำแนะนำพิเศษ / ฉลากยา (Instructions)
+                </label>
+                <input
+                  type="text"
+                  placeholder="เช่น ดื่มน้ำมากๆ หลังรับประทานยา, รับประทานติดต่อกันจนหมด"
+                  value={addInstructions}
+                  onChange={(e) => setAddInstructions(e.target.value)}
+                  style={{ border: '1.5px solid #86EFAC', background: '#F0FDF4' }}
+                />
+              </div>
+
+              {/* Row 6: Manufacturer & Expiry Date */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="input-group">
-                  <label style={{ fontSize: '13.5px', fontWeight: '600', color: '#334155' }}>จำนวนสต็อกรับเข้าแรกเริ่ม (เม็ด)</label>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>บริษัทผู้ผลิต / ผู้จัดจำหน่าย (Manufacturer)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น บริษัท สยามเภสัช จำกัด, องค์การเภสัชกรรม (GPO)"
+                    value={addManufacturer}
+                    onChange={(e) => setAddManufacturer(e.target.value)}
+                  />
+                </div>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>วันหมดอายุ (Expiry Date)</label>
+                  <input
+                    type="date"
+                    value={addExpiryDate}
+                    onChange={(e) => setAddExpiryDate(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Row 7: Initial Stock & Unit Price (Positioned at the bottom) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div className="input-group">
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>จำนวนสต็อกรับเข้าแรกเริ่ม (เม็ด)</label>
                   <input
                     type="number"
                     min="0"
                     placeholder="100"
                     value={addStock}
                     onChange={(e) => setAddStock(e.target.value === '' ? '' : Number(e.target.value))}
+                    style={{ fontWeight: '600' }}
                   />
                 </div>
                 <div className="input-group">
-                  <label style={{ fontSize: '13.5px', fontWeight: '600', color: '#334155' }}>ราคาจำหน่ายต่อหน่วย (บาท)</label>
+                  <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>ราคาจำหน่ายต่อหน่วย (บาท)</label>
                   <input
                     type="number"
                     min="0"
@@ -1963,22 +2987,13 @@ export default function MedicinePage() {
                     placeholder="20"
                     value={addUnitPrice}
                     onChange={(e) => setAddUnitPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                    style={{ fontWeight: '600' }}
                   />
                 </div>
               </div>
-
-              <div className="input-group">
-                <label style={{ fontSize: '13.5px', fontWeight: '600', color: '#334155' }}>บริษัทผู้ผลิต / ผู้จัดจำหน่าย (Manufacturer)</label>
-                <input
-                  type="text"
-                  placeholder="เช่น บริษัท สยามเภสัช จำกัด, องค์การเภสัชกรรม (GPO)"
-                  value={addManufacturer}
-                  onChange={(e) => setAddManufacturer(e.target.value)}
-                />
-              </div>
             </div>
 
-            <div className="modal-footer" style={{ marginTop: '16px' }}>
+            <div className="modal-footer" style={{ marginTop: '16px', flexShrink: 0 }}>
               <button className="cancel-btn" onClick={() => setIsAddModalOpen(false)}>ยกเลิก</button>
               <button
                 className="save-btn"
@@ -1990,13 +3005,13 @@ export default function MedicinePage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmMed && (
-        <div className="modal-overlay">
-          <div className="modal-card card" style={{ maxWidth: '420px', textAlign: 'center' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setDeleteConfirmMed(null)} className="medicine-page-container">
+          <div className="modal-card card" style={{ maxWidth: '420px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ padding: '24px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
               <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -2011,7 +3026,7 @@ export default function MedicinePage() {
                 คุณต้องการลบยา <strong style={{ color: '#0F172A' }}>{deleteConfirmMed.name}</strong> ({deleteConfirmMed.medicine_code || deleteConfirmMed.id}) ออกจากฐานข้อมูลคลังยาใช่หรือไม่?
               </p>
             </div>
-            <div className="modal-footer" style={{ justifyContent: 'center', gap: '12px', background: '#F8FAFC', padding: '16px 20px', borderRadius: '0 0 12px 12px' }}>
+            <div className="modal-footer" style={{ justifyContent: 'center', gap: '12px', background: '#F8FAFC', padding: '16px 20px', borderRadius: '0 0 12px 12px', flexShrink: 0 }}>
               <button className="cancel-btn" onClick={() => setDeleteConfirmMed(null)}>ยกเลิก</button>
               <button
                 type="button"
@@ -2026,7 +3041,7 @@ export default function MedicinePage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
     </div>
   );

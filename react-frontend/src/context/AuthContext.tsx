@@ -109,6 +109,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       else if (roleOrUsername === 'nurse') usernameToSend = 'nurse1';
       else if (roleOrUsername === 'nurse_assistant') usernameToSend = 'assistant1';
       else if (roleOrUsername === 'doctor') usernameToSend = 'doctor1';
+      else if (roleOrUsername === 'pharmacist') usernameToSend = 'pharmacist1';
+      else if (roleOrUsername === 'cashier') usernameToSend = 'cashier1';
 
       const res = await authApi.login(usernameToSend, password || 'password');
       if (res && res.user) {
@@ -147,10 +149,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchRole = async (role: UserRole) => {
-    let username = 'registrar1';
-    if (role === 'nurse') username = 'nurse1';
+    let username = 'cashier1';
+    if (role === 'registrar') username = 'registrar1';
+    else if (role === 'nurse') username = 'nurse1';
     else if (role === 'nurse_assistant') username = 'assistant1';
     else if (role === 'doctor') username = 'doctor1';
+    else if (role === 'pharmacist') username = 'pharmacist1';
+    else if (role === 'cashier') username = 'cashier1';
 
     try {
       await authApi.login(username, 'password');

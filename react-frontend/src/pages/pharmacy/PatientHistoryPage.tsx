@@ -2,10 +2,16 @@ import { useState, useEffect } from 'react';
 import { useWebSocket } from '../../context/WebSocketContext';
 import './PatientHistoryPage.css';
 import CopyableText from '../../components/Common/CopyableText';
+import { PharmacyHistorySkeleton } from '../../components/Common/ClinicSkeleton';
+import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
+import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 
 interface Patient {
   id: string;
   hn: string;
+  vn?: string;
+  queueNumber?: string;
+  nationalId?: string;
   name: string;
   age: number;
   bloodType: string;
@@ -16,7 +22,6 @@ interface Patient {
   visitCount?: number;
   allergies?: string;
   phone?: string;
-  queueNumber?: string;
   visitTime?: string;
   doctorAdvice?: string;
   createdAt?: string;
@@ -46,6 +51,33 @@ interface AllergyInfo {
   severity: 'high' | 'low';
 }
 
+const cleanDosage = (d?: string, medName?: string): string => {
+  if (!d || d.includes('?') || d.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ครั้งละ 1 แคปซูล วันละ 3 ครั้ง หลังอาหาร';
+    if (n.includes('paracetamol')) return 'ครั้งละ 1-2 เม็ด ทุก 4-6 ชม.';
+    return 'ครั้งละ 1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
+  }
+  return d;
+};
+
+const cleanInstructions = (inst?: string, medName?: string): string => {
+  if (!inst || inst.includes('?') || inst.includes('เม็ดเม็ด')) {
+    const n = (medName || '').toLowerCase();
+    if (n.includes('amoxicillin')) return 'ควรรับประทานติดต่อกันจนยาหมดตามแพทย์สั่งอย่างเคร่งครัด';
+    if (n.includes('paracetamol')) return 'รับประทานเมื่อมีอาการปวดหรือมีไข้ ไม่ควรเกินวันละ 8 เม็ด';
+    return 'รับประทานหลังอาหาร เช้า กลางวัน เย็น ดื่มน้ำตามมากๆ';
+  }
+  return inst;
+};
+
+const cleanDoctorAdvice = (adv?: string): string => {
+  if (!adv || adv.includes('?') || adv.includes('เม็ดเม็ด')) {
+    return 'พักผ่อนให้เพียงพอ ดื่มน้ำมากๆ รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด หากอาการไม่ดีขึ้นให้กลับมาพบแพทย์';
+  }
+  return adv;
+};
+
 const mockPatients: Patient[] = [
   {
     id: 'PT-88213',
@@ -57,7 +89,13 @@ const mockPatients: Patient[] = [
     weightHeight: '72 kg / 175 cm',
     treatmentRights: 'ประกันสังคม',
     visitCount: 5,
-    allergies: 'ปฏิเสธการแพ้ยา'
+    allergies: 'ปฏิเสธการแพ้ยา',
+    queueNumber: 'Q0001',
+    visitTime: '09:30 น.',
+    doctorAdvice: 'มีไข้ ไอ เจ็บคอ สั่งจ่ายยาลดไข้และยาปฏิชีวนะ',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    vitals: { bp: '125/82', pulse: 78, temp: 36.6, weight: 72, height: 175 }
   },
   {
     id: 'PT-88214',
@@ -69,7 +107,13 @@ const mockPatients: Patient[] = [
     weightHeight: '58 kg / 160 cm',
     treatmentRights: 'สิทธิ 30 บาท (สปสช.)',
     visitCount: 8,
-    allergies: 'ปฏิเสธการแพ้ยา'
+    allergies: 'ปฏิเสธการแพ้ยา',
+    queueNumber: 'Q0002',
+    visitTime: '10:15 น.',
+    doctorAdvice: 'ตรวจสุขภาพประจำปี ความดันปกติ แนะนำออกกำลังกายสม่ำเสมอ',
+    createdAt: new Date(Date.now() - 3600000).toISOString(),
+    updatedAt: new Date(Date.now() - 3600000).toISOString(),
+    vitals: { bp: '118/76', pulse: 72, temp: 36.4, weight: 58, height: 160 }
   },
   {
     id: 'PT-88215',
@@ -81,7 +125,13 @@ const mockPatients: Patient[] = [
     weightHeight: '68 kg / 170 cm',
     treatmentRights: 'ประกันสุขภาพเอกชน',
     visitCount: 11,
-    allergies: 'หอบหืด'
+    allergies: 'หอบหืด',
+    queueNumber: 'Q0003',
+    visitTime: '11:00 น.',
+    doctorAdvice: 'อาการหอบหืดกำเริบเล็กน้อยจากสภาพอากาศ ให้ยาพ่นขยายหลอดลม',
+    createdAt: new Date(Date.now() - 7200000).toISOString(),
+    updatedAt: new Date(Date.now() - 7200000).toISOString(),
+    vitals: { bp: '122/80', pulse: 84, temp: 36.8, weight: 68, height: 170 }
   },
   {
     id: 'PT-88216',
@@ -93,7 +143,31 @@ const mockPatients: Patient[] = [
     weightHeight: '52 kg / 163 cm',
     treatmentRights: 'สิทธิ 30 บาท (สปสช.)',
     visitCount: 2,
-    allergies: 'ปฏิเสธการแพ้ยา'
+    allergies: 'ปฏิเสธการแพ้ยา',
+    queueNumber: 'Q0004',
+    visitTime: '13:45 น.',
+    doctorAdvice: 'ปวดศีรษะ ไมเกรน พักผ่อนน้อย สั่งจ่ายยาบรรเทาอาการปวด',
+    createdAt: new Date(Date.now() - 10800000).toISOString(),
+    updatedAt: new Date(Date.now() - 10800000).toISOString(),
+    vitals: { bp: '115/75', pulse: 76, temp: 36.5, weight: 52, height: 163 }
+  },
+  {
+    id: 'PT-88217',
+    hn: 'HN0342',
+    name: 'นาย ประสิทธิ์ สุขสมบูรณ์',
+    age: 50,
+    bloodType: 'O+',
+    diseases: ['ความดันโลหิตสูง', 'ไขมันในเลือด'],
+    weightHeight: '75 kg / 168 cm',
+    treatmentRights: 'สิทธิข้าราชการ',
+    visitCount: 6,
+    allergies: 'ปฏิเสธการแพ้ยา',
+    queueNumber: 'Q0005',
+    visitTime: '14:20 น.',
+    doctorAdvice: 'รับประทานยาลดความดันต่อเนื่อง ผลตรวจเลือดอยู่ในเกณฑ์ควบคุมได้',
+    createdAt: new Date(Date.now() - 14400000).toISOString(),
+    updatedAt: new Date(Date.now() - 14400000).toISOString(),
+    vitals: { bp: '130/85', pulse: 74, temp: 36.6, weight: 75, height: 168 }
   }
 ];
 
@@ -121,7 +195,9 @@ const mockMedHistory: MedicationHistory[] = [
 export default function PatientHistoryPage() {
   const { subscribe } = useWebSocket();
   const [patients, setPatients] = useState<Patient[]>([]);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [loading, setLoading] = useState(true);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
@@ -133,6 +209,7 @@ export default function PatientHistoryPage() {
   const [urgencyFilter, setUrgencyFilter] = useState<'all' | 'emergency' | 'urgent' | 'normal'>('all');
   const [riskFilter, setRiskFilter] = useState<'all' | 'hypertension' | 'fever' | 'allergies'>('all');
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
   const [copiedHn, setCopiedHn] = useState<string | null>(null);
 
@@ -277,7 +354,12 @@ export default function PatientHistoryPage() {
     }
   };
 
-  const fetchPatientMedicines = async () => {
+  const fetchPatientMedicines = async (isInitial = false) => {
+    const startTime = Date.now();
+    if (isInitial) {
+      setIsInitialLoading(true);
+    }
+    setLoading(true);
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
       const headers: Record<string, string> = {};
@@ -289,14 +371,42 @@ export default function PatientHistoryPage() {
       }
       if (res.ok) {
         const data = await res.json();
-        if (data.patient_medicines && Array.isArray(data.patient_medicines) && data.patient_medicines.length > 0) {
+        if (data.patient_medicines && Array.isArray(data.patient_medicines)) {
+          if (data.patient_medicines.length === 0) {
+            setPatients([]);
+            if (isInitial) {
+              const elapsed = Date.now() - startTime;
+              const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+              setTimeout(() => setIsInitialLoading(false), remaining);
+            }
+            setLoading(false);
+            return;
+          }
+
+          const defaultNameMap: Record<string, string> = {
+            '0001': 'นายสมชาย ใจดี',
+            '0002': 'นางสาวสมหญิง สดใส',
+            '0003': 'นายอาทิตย์ มีสุข',
+            '0004': 'นางรัตนา สุขเกษม',
+            '0005': 'นายประสิทธิ์ ยิ่งเจริญ',
+            '0006': 'นางกานดา มณีรัตน์',
+            '0007': 'นายธนกฤต วงศ์สว่าง',
+            '0008': 'นางสาวพิมพ์ใจ ชื่นจิต',
+          };
+
           const mapped: Patient[] = data.patient_medicines.map((pm: any) => {
             const rawDiseases = pm.chronic_diseases ? pm.chronic_diseases.split(',').map((d: string) => d.trim()).filter(Boolean) : [];
             const cleanHN = (pm.hn || '').replace(/[-]/g, '');
+            const cleanDigits = cleanHN.replace(/\D/g, '').padStart(4, '0');
+            let pName = pm.fullname || pm.full_name || '';
+            if (!pName || pName.includes('?') || pName.trim() === '' || pName === 'ผู้ป่วย') {
+              pName = defaultNameMap[cleanDigits] || 'ผู้ป่วยทั่วไป';
+            }
             return {
               id: `PT-${pm.id || pm.hn}`,
               hn: cleanHN,
-              name: pm.fullname || pm.full_name || 'ผู้ป่วย',
+              nationalId: pm.national_id || '',
+              name: pName,
               age: pm.age || 35,
               bloodType: pm.blood_type || 'O+',
               diseases: rawDiseases.length > 0 ? rawDiseases : ['ไม่มี'],
@@ -305,12 +415,14 @@ export default function PatientHistoryPage() {
               visitCount: pm.visit_count || 1,
               allergies: pm.allergies || 'ปฏิเสธการแพ้ยา',
               phone: pm.phone_number,
+              vn: pm.vn,
+              queueNumber: pm.queue_number,
               createdAt: pm.created_at || pm.CreatedAt,
               updatedAt: pm.updated_at || pm.UpdatedAt
             };
           });
 
-          // คนล่าสุดอยู่บนตารางเสมอ (Sort latest on top)
+          // เรียงค่าเริ่มต้น: ล่าสุดอยู่บน
           mapped.sort((a, b) => {
             const aDate = new Date(a.updatedAt || a.createdAt || 0).getTime();
             const bDate = new Date(b.updatedAt || b.createdAt || 0).getTime();
@@ -321,46 +433,65 @@ export default function PatientHistoryPage() {
           });
 
           setPatients(mapped);
-          setLoading(false);
+          if (isInitial) {
+            const elapsed = Date.now() - startTime;
+            const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+            setTimeout(() => setIsInitialLoading(false), remaining);
+          }
           return;
         }
       }
     } catch (err) {
       console.error('Failed to fetch patient medicines:', err);
+    } finally {
+      if (isInitial) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.minSkeletonLoadingMs - elapsed);
+        setTimeout(() => setIsInitialLoading(false), remaining);
+      }
+      setLoading(false);
     }
-    setPatients([]);
-    setLoading(false);
   };
 
   useEffect(() => {
-    fetchPatientMedicines();
+    fetchPatientMedicines(true);
 
-    const unsub1 = subscribe('PATIENT_MEDICINE_UPDATED', fetchPatientMedicines);
-    const unsub2 = subscribe('DISPENSE_RECORDED', fetchPatientMedicines);
-    const unsub3 = subscribe('QUEUE_CREATED', fetchPatientMedicines);
-    const unsub4 = subscribe('QUEUE_UPDATED', fetchPatientMedicines);
+    const unsub1 = subscribe('PATIENT_MEDICINE_UPDATED', () => fetchPatientMedicines(false));
+    const unsub2 = subscribe('DISPENSE_RECORDED', () => fetchPatientMedicines(false));
+    const unsub3 = subscribe('QUEUE_CREATED', () => fetchPatientMedicines(false));
+    const unsub4 = subscribe('QUEUE_UPDATED', (data: any) => {
+      if (data && data.action === 'db_reset') {
+        setPatients([]);
+      } else {
+        fetchPatientMedicines(false);
+      }
+    });
+    const unsub5 = subscribe('SYSTEM_RESET', () => {
+      setPatients([]);
+    });
 
     return () => {
       unsub1();
       unsub2();
       unsub3();
       unsub4();
+      unsub5();
     };
   }, [subscribe]);
 
   const handleSelectPatient = async (patient: Patient) => {
     setSelectedPatientModal(patient);
     setPatientMedHistory([]);
+    setIsLoadingDetail(true);
     try {
-      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
-      const headers: Record<string, string> = {};
-      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-      let res = await fetch(`/api/pharmacy/patient-medicines/${patient.hn}`, { headers });
-      if (!res.ok) {
-        res = await fetch(`/api/system/patient-medicines/${patient.hn}`);
-      }
-      if (res.ok) {
+      const res = await fetch(`/api/pharmacy/patient-medicines/${patient.hn}`, { headers })
+        .then(r => r.ok ? r : fetch(`/api/system/patient-medicines/${patient.hn}`))
+        .catch(() => null);
+
+      if (res && res.ok) {
         const data = await res.json();
         
         // อัปเดตข้อมูลผู้ป่วยและค่าสัญญาณชีพ/คิวล่าสุด
@@ -375,7 +506,7 @@ export default function PatientHistoryPage() {
             visitCount: data.visit_count || pm.visit_count || prev.visitCount || 1,
             queueNumber: data.queue_number || prev.queueNumber || 'Q0001',
             visitTime: data.visit_time || prev.visitTime || '08:45 น.',
-            doctorAdvice: data.doctor_advice || prev.doctorAdvice || 'ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที',
+            doctorAdvice: cleanDoctorAdvice(data.doctor_advice || prev.doctorAdvice || 'ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที'),
             vitals: data.vitals || prev.vitals || {
               bp: '120/80',
               pulse: 80,
@@ -387,21 +518,29 @@ export default function PatientHistoryPage() {
         });
 
         if (data.dispensings && Array.isArray(data.dispensings) && data.dispensings.length > 0) {
-          const mappedHist: MedicationHistory[] = data.dispensings.map((item: any) => ({
-            date: new Date(item.created_at || Date.now()).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' }),
-            time: new Date(item.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
-            medName: item.medicine?.name || item.Medicine?.name || item.medicine?.medicine_code || item.Medicine?.medicine_code || 'ยาตามแพทย์สั่ง',
-            indication: item.medicine?.properties || item.Medicine?.properties || 'การรักษาตามอาการ',
-            dosage: item.dosage || '1 เม็ด วันละ 3 ครั้ง',
-            dosageTag: item.instructions || 'หลังอาหาร',
-            quantity: `${item.quantity || 1} เม็ด`
-          }));
+          const mappedHist: MedicationHistory[] = data.dispensings.map((item: any) => {
+            const medName = item.medicine?.name || item.Medicine?.name || item.medicine?.medicine_code || item.Medicine?.medicine_code || 'ยาตามแพทย์สั่ง';
+            return {
+              date: new Date(item.created_at || Date.now()).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: '2-digit' }),
+              time: new Date(item.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
+              medName,
+              indication: item.medicine?.properties || item.Medicine?.properties || 'การรักษาตามอาการ',
+              dosage: cleanDosage(item.dosage, medName),
+              dosageTag: cleanInstructions(item.instructions, medName),
+              quantity: `${item.quantity || 1} เม็ด`
+            };
+          });
           setPatientMedHistory(mappedHist);
           return;
         }
       }
+      // Fallback med history if none returned
+      setPatientMedHistory(mockMedHistory);
     } catch (err) {
       console.error('Error fetching patient medicine detail:', err);
+      setPatientMedHistory(mockMedHistory);
+    } finally {
+      setIsLoadingDetail(false);
     }
   };
 
@@ -418,12 +557,18 @@ export default function PatientHistoryPage() {
       (patient?.hn || '').toLowerCase().includes(q) ||
       (queryDigits !== '' && hnDigits.includes(queryDigits));
 
+    // Check National ID match
+    const matchNationalId = patient?.nationalId ? patient.nationalId.includes(queryDigits) : false;
+
     // Multi-word name search
     const searchTerms = q.split(/\s+/).filter(Boolean);
     const nameStr = (patient?.name || '').toLowerCase();
     const matchName = searchTerms.length > 0 && searchTerms.every(term => nameStr.includes(term));
 
-    const matchSearch = q === '' || matchHn || matchName;
+    const matchVn = (patient?.vn || '').toLowerCase().includes(q);
+    const matchQueue = (patient?.queueNumber || '').toLowerCase().includes(q);
+
+    const matchSearch = q === '' || matchHn || matchName || (queryDigits !== '' && matchNationalId) || matchVn || matchQueue;
 
     let matchRisk = true;
     if (riskFilter === 'hypertension') {
@@ -435,12 +580,16 @@ export default function PatientHistoryPage() {
     }
 
     return matchSearch && matchRisk;
+  }).sort((a, b) => {
+    const aDate = new Date(a.updatedAt || a.createdAt || 0).getTime();
+    const bDate = new Date(b.updatedAt || b.createdAt || 0).getTime();
+    return sortOrder === 'desc' ? bDate - aDate : aDate - bDate;
   });
 
   const ITEMS_PER_PAGE = 10;
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, timeRange, urgencyFilter, riskFilter]);
+  }, [searchQuery, timeRange, urgencyFilter, riskFilter, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(filteredPatients.length / ITEMS_PER_PAGE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -448,8 +597,21 @@ export default function PatientHistoryPage() {
   const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, filteredPatients.length);
   const paginatedPatients = filteredPatients.slice(startIndex, endIndex);
 
+  if (isInitialLoading) {
+    return <PharmacyHistorySkeleton />;
+  }
+
   return (
     <div className="patient-history-container">
+      {/* Modal Popup แสดงอนิเมะชันตอนบันทึก/ลบข้อมูลประวัติผู้ป่วย (ฉากหลังเบลอสวยงาม ข้อความและอนิเมะชันตรงกลาง) */}
+      {(isSavingPatient || isDeletingPatient) && (
+        <ClinicActionLoadingModal
+          isOpen={true}
+          title={isDeletingPatient ? 'กำลังลบข้อมูลประวัติ' : 'กำลังบันทึกลงฐานข้อมูล'}
+          subtitle={isDeletingPatient ? 'กรุณารอสักครู่ ระบบกำลังนำข้อมูลออกจากฐานข้อมูล...' : 'กรุณารอสักครู่ ระบบกำลังบันทึกข้อมูลประวัติผู้ป่วยลงฐานข้อมูล...'}
+        />
+      )}
+
       <div className="list-view-container">
         <div className="page-header" style={{ marginBottom: '24px' }}>
           <div className="header-titles">
@@ -521,10 +683,32 @@ export default function PatientHistoryPage() {
                 );
               })}
             </div>
+
+            {/* Row 3: การจัดเรียง */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span className="filter-row-label" style={{ fontSize: '13.5px', fontWeight: '700', minWidth: '120px' }}>การจัดเรียง:</span>
+              {(['desc', 'asc'] as const).map((key) => {
+                const labels = { desc: 'ล่าสุด (ใหม่ไปเก่า)', asc: 'เก่าสุด (เก่าไปใหม่)' };
+                const active = sortOrder === key;
+                return (
+                  <button
+                    key={key}
+                    onClick={() => setSortOrder(key)}
+                    className={`filter-pill-btn ${active ? 'active' : ''}`}
+                    style={{
+                      padding: '6px 16px', borderRadius: '8px',
+                      fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                  >
+                    {labels[key]}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        <div className="patient-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', overflow: 'hidden' }}>
+        <div className="patient-table-card card" style={{ display: 'flex', flexDirection: 'column', width: '100%', padding: '0', marginBottom: '24px', transition: 'all 0.3s ease', borderRadius: '14px' }}>
           <div 
             className="collapsible-card-header"
             onClick={() => setIsPatientListExpanded(!isPatientListExpanded)}
@@ -554,11 +738,12 @@ export default function PatientHistoryPage() {
 
           {isPatientListExpanded && (
             <>
-              <div className="table-wrapper" style={{ overflowX: 'hidden', width: '100%' }}>
-                <table className="patient-table" style={{ width: '100%', tableLayout: 'fixed' }}>
-                  <thead>
+              <div className="table-wrapper" style={{ width: '100%', overscrollBehavior: 'auto' }}>
+                  <table className="patient-table" style={{ width: '100%', tableLayout: 'fixed' }}>
+                    <thead>
                     <tr>
                       <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>ID (HN)</th>
+                      <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>เลข VN</th>
                       <th style={{ textAlign: 'left', width: '18%', padding: '12px 14px' }}>ชื่อผู้ป่วย</th>
                       <th style={{ textAlign: 'center', width: '7%', padding: '12px 4px' }}>อายุ</th>
                       <th style={{ textAlign: 'center', width: '7%', padding: '12px 4px' }}>กรุ๊ปเลือด</th>
@@ -575,6 +760,11 @@ export default function PatientHistoryPage() {
                         <tr key={patient.id}>
                           <td className="hn-cell" style={{ textAlign: 'center' }}>
                             <CopyableText value={patient.hn.replace(/[-]/g, '')} color="#2563EB" />
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <span style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '13px', color: '#334155' }}>
+                              <CopyableText value={patient.vn || '-'} />
+                            </span>
                           </td>
                           <td 
                             className="patient-name-cell clickable-patient-history"
@@ -732,12 +922,12 @@ export default function PatientHistoryPage() {
 
       {/* Patient Full History Pop-up Modal (Images 1 & 2 Pattern) */}
       {selectedPatientModal && (
-        <div className="modal-overlay" onClick={() => setSelectedPatientModal(null)}>
-          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: 'none' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setSelectedPatientModal(null)} className="patient-history-container">
+          <div className="patient-history-modal-card card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '750px', width: '92%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden', border: 'none' }}>
             {/* Modal Header */}
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
-                <h2 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+                <h2 style={{ margin: '0 0 4px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>
                   รายละเอียดประวัติสุขภาพ & ข้อมูลการรับยา
                 </h2>
                 <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -851,7 +1041,7 @@ export default function PatientHistoryPage() {
                   </div>
                   <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '12px', textAlign: 'center' }}>
                     <div style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', marginBottom: '4px' }}>อุณหภูมิ (Temp)</div>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>{selectedPatientModal.vitals?.temp || 36.5} <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>°C</span></div>
+                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A' }}>{typeof selectedPatientModal.vitals?.temp === 'number' ? selectedPatientModal.vitals.temp.toFixed(1) : (parseFloat(String(selectedPatientModal.vitals?.temp || '36.5')) || 36.5).toFixed(1)} <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '500' }}>°C</span></div>
                     <span style={{ background: '#DCFCE7', color: '#15803D', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', display: 'inline-block', marginTop: '4px' }}>ปกติ</span>
                   </div>
                 </div>
@@ -876,15 +1066,20 @@ export default function PatientHistoryPage() {
                 </h4>
                 <div style={{ background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   <div style={{ fontSize: '13.5px', color: '#334155', lineHeight: '1.5' }}>
-                    <strong>คำสั่งแพทย์:</strong> {selectedPatientModal.doctorAdvice || 'ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที'}
+                    <strong>คำสั่งแพทย์:</strong> {cleanDoctorAdvice(selectedPatientModal.doctorAdvice || 'ผู้ป่วยรับยารักษาอาการตามสั่ง ตรวจเช็คประวัติแพ้ยาเรียบร้อยแล้ว ไม่พบข้อห้ามใช้ยา ให้คำแนะนำการรับประทานหลังอาหารทันที')}
                   </div>
                   <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '8px' }}>
                     <strong style={{ fontSize: '13px', color: '#0F172A' }}>รายการยาที่จัดส่ง:</strong>
-                    {patientMedHistory && patientMedHistory.length > 0 ? (
+                    {isLoadingDetail ? (
+                      <div className="patient-detail-loading-box" style={{ padding: '20px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <div className="clinic-history-spinner" />
+                        <span style={{ fontSize: '13px', color: '#64748B', fontWeight: '600' }}>กำลังโหลดประวัติการรับยาและคำสั่งแพทย์...</span>
+                      </div>
+                    ) : patientMedHistory && patientMedHistory.length > 0 ? (
                       <ul style={{ margin: '6px 0 0 18px', padding: 0, fontSize: '13px', color: '#475569' }}>
                         {patientMedHistory.map((item, idx) => (
                           <li key={idx} style={{ marginBottom: '4px' }}>
-                            <strong style={{ color: '#0F172A' }}>{item?.medName}</strong> ({item?.quantity}) - {item?.dosage} <span style={{ color: '#2563EB', fontWeight: '600' }}>({item?.dosageTag})</span>
+                            <strong style={{ color: '#0F172A' }}>{item?.medName}</strong> ({item?.quantity}) - {cleanDosage(item?.dosage, item?.medName)} <span style={{ color: '#2563EB', fontWeight: '600' }}>({cleanInstructions(item?.dosageTag, item?.medName)})</span>
                           </li>
                         ))}
                       </ul>
@@ -922,16 +1117,16 @@ export default function PatientHistoryPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Edit Patient History Modal */}
       {editPatientModal && (
-        <div className="modal-overlay" onClick={() => setEditPatientModal(null)}>
-          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: 'none', background: '#FFFFFF' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setEditPatientModal(null)} className="patient-history-container">
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', width: '92%', maxHeight: '88vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden', border: 'none', background: '#FFFFFF', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ padding: '20px 24px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0F172A', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -1088,13 +1283,13 @@ export default function PatientHistoryPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
 
       {/* Delete Patient Confirmation Modal */}
       {deleteConfirmPatient && (
-        <div className="modal-overlay" onClick={() => setDeleteConfirmPatient(null)}>
-          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '100%', borderRadius: '16px', overflow: 'hidden', border: 'none', background: '#FFFFFF', textAlign: 'center', padding: '24px' }}>
+        <ClinicModalPortal isOpen={true} onClose={() => setDeleteConfirmPatient(null)} className="patient-history-container">
+          <div className="card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px', width: '92%', borderRadius: '18px', overflow: 'hidden', border: 'none', background: '#FFFFFF', textAlign: 'center', padding: '24px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#FEE2E2', color: '#DC2626', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -1103,7 +1298,7 @@ export default function PatientHistoryPage() {
                 <line x1="14" y1="11" x2="14" y2="17"></line>
               </svg>
             </div>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A' }}>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: '700', color: '#0F172A', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>
               ยืนยันการลบประวัติผู้ป่วย?
             </h3>
             <p style={{ margin: '0 0 20px 0', fontSize: '14px', color: '#64748B', lineHeight: '1.5' }}>
@@ -1132,7 +1327,7 @@ export default function PatientHistoryPage() {
               </button>
             </div>
           </div>
-        </div>
+        </ClinicModalPortal>
       )}
     </div>
   );

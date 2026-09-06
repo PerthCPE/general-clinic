@@ -109,7 +109,20 @@ const EXAM_ANCHOR = {
 
 interface ExaminationViewProps {
   patient: Patient;
-  onBackToQueue: () => void;
+
+  /**
+   * ออกจากหน้าตรวจกลับไปหน้าคิว
+   *
+   * nextStatus บอกว่าจะให้คิวของผู้ป่วยคนนี้เป็นสถานะอะไรต่อ
+   *   'Waiting'   = คืนคิว ผู้ป่วยกลับไปรอตรวจตามเดิม (แพทย์เรียกผิดคน/ต้องออกไปก่อน)
+   *   'Cancelled' = ยกเลิกการรับบริการ ผู้ป่วยหลุดออกจากคิววันนี้ไปเลย
+   *   ไม่ส่งมา     = แค่เปลี่ยนหน้า ไม่แตะสถานะ (ใช้ตอนบันทึกเสร็จแล้ว)
+   *
+   * ต้องมีพารามิเตอร์นี้เพราะตอนกดเรียกผู้ป่วยเข้าตรวจ ระบบเปลี่ยนสถานะใน
+   * ฐานข้อมูลเป็น "กำลังตรวจ" ไปแล้ว ถ้าออกจากหน้านี้โดยไม่คืนสถานะ
+   * ผู้ป่วยจะค้างเป็น "กำลังตรวจ" ตลอดไปทั้งที่ไม่มีใครตรวจอยู่
+   */
+  onBackToQueue: (nextStatus?: 'Waiting' | 'Cancelled', note?: string) => void;
   /** บันทึกลงฐานข้อมูล คืน false ถ้า backend ปฏิเสธ
    *  ต้องรอผลก่อนขึ้นกล่อง "บันทึกสำเร็จ" ไม่งั้นจะบอกว่าสำเร็จทั้งที่ยังไม่ได้บันทึก */
   onSavePatient: (updatedPatient: Patient) => void | boolean | Promise<void | boolean>;
@@ -641,13 +654,66 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           const data = await res.json();
           if (data.status === 'success' && Array.isArray(data.medicines) && data.medicines.length > 0) {
             const mapped = data.medicines.map((m: any) => {
+              // ================================================================
+              // ค่าตั้งต้นของยาแต่ละตัว
+              // ================================================================
+              // ลำดับ: ใช้ค่าที่ห้องยากรอกไว้ตอนเพิ่มยาเข้าคลังก่อนเสมอ
+              //        ถ้ายังไม่ได้กรอก ค่อยตกมาใช้ค่าที่เดาจากชื่อ/สรรพคุณ
+              //
+              // ทำไมต้องมีลำดับนี้:
+              // ของเดิมเดาค่าตั้งต้นจากการหาคำในชื่อยาและสรรพคุณล้วนๆ
+              // (เห็นคำว่า cap = 1 แคปซูล, เห็นคำว่า ความดัน = วันละ 1 ครั้ง 30 วัน)
+              // ซึ่งเดาผิดได้ง่ายมาก เช่นยาที่ชื่อมีคำว่า "cap" แต่เป็นยาน้ำ
+              // หรือยาลดความดันที่ชื่อไม่มีคำว่าความดันและสรรพคุณเขียนคนละแบบ
+              // แพทย์ต้องมานั่งแก้เองทุกครั้ง และถ้าเผลอไม่แก้ก็ได้ค่าผิดไปเลย
+              //
+              // พอห้องยากรอกค่าตั้งต้นจริงไว้ในตาราง medicines ก็ไม่ต้องเดาอีก
+              // แพทย์ยังแก้ทับได้ทุกช่องเหมือนเดิม ค่าที่แก้จะไม่ย้อนกลับไปแตะคลังยา
+              //
+              // ชื่อคอลัมน์ที่รองรับ (ห้องยาเพิ่มเมื่อไรก็ทำงานทันที ไม่ต้องแก้โค้ดนี้อีก)
+              //   default_dosage / default_frequency / default_duration
+              //   default_quantity / default_route / default_timing / default_instructions
+              const pick = (...vals: any[]) => {
+                for (const v of vals) {
+                  if (typeof v === 'string' && v.trim()) return v.trim();
+                }
+                return '';
+              };
+
               const isLiquid = (m.name || '').toLowerCase().includes('syrup') || (m.name || '').toLowerCase().includes('liquid') || (m.name || '').toLowerCase().includes('sol');
               const isCap = (m.name || '').toLowerCase().includes('cap');
-              const defaultDosageStr = isLiquid ? '10 มล.' : (isCap ? '1 แคปซูล' : '1 เม็ด');
-              const defaultFreqStr = (m.properties || '').includes('ความดัน') || (m.properties || '').includes('เบาหวาน') || (m.name || '').includes('Amlodipine') || (m.name || '').includes('Omeprazole') ? 'วันละ 1 ครั้ง' : 'วันละ 3 ครั้ง';
-              const defaultTimingStr = (m.name || '').includes('Omeprazole') ? 'ก่อนอาหาร' : ((m.properties || '').includes('ลดไข้') || (m.name || '').includes('Paracetamol') ? 'เมื่อมีอาการ' : 'หลังอาหาร');
-              const defaultDurationStr = (m.properties || '').includes('ความดัน') || (m.properties || '').includes('เบาหวาน') ? '30 วัน' : '5 วัน';
-              const defaultQtyNum = (m.properties || '').includes('ความดัน') || (m.properties || '').includes('เบาหวาน') ? 30 : 10;
+              const isLongTerm = (m.properties || '').includes('ความดัน') || (m.properties || '').includes('เบาหวาน');
+
+              const defaultDosageStr = pick(
+                m.default_dosage, m.defaultDosage,
+                isLiquid ? '10 มล.' : (isCap ? '1 แคปซูล' : '1 เม็ด'),
+              );
+              const defaultFreqStr = pick(
+                m.default_frequency, m.default_freq, m.defaultFrequency,
+                isLongTerm || (m.name || '').includes('Amlodipine') || (m.name || '').includes('Omeprazole') ? 'วันละ 1 ครั้ง' : 'วันละ 3 ครั้ง',
+              );
+              const defaultTimingStr = pick(
+                m.default_timing, m.defaultTiming,
+                (m.name || '').includes('Omeprazole') ? 'ก่อนอาหาร' : ((m.properties || '').includes('ลดไข้') || (m.name || '').includes('Paracetamol') ? 'เมื่อมีอาการ' : 'หลังอาหาร'),
+              );
+              const defaultDurationStr = pick(
+                m.default_duration, m.defaultDuration,
+                isLongTerm ? '30 วัน' : '5 วัน',
+              );
+              const defaultRouteStr = pick(m.default_route, m.route, m.defaultRoute, 'รับประทาน');
+
+              // จำนวนเป็นตัวเลข ต้องเช็คแยก เพราะ 0 กับค่าว่างมีความหมายต่างกัน
+              // ห้องยาใส่ 0 ไว้ = ยังไม่ได้กำหนด ให้ตกไปใช้ค่าเดาตามเดิม
+              const rawQty = Number(m.default_quantity ?? m.defaultQty);
+              const defaultQtyNum = Number.isFinite(rawQty) && rawQty > 0
+                ? rawQty
+                : (isLongTerm ? 30 : 10);
+
+              const defaultLabelStr = pick(
+                m.default_instructions, m.label_instructions, m.defaultInstructions,
+                m.properties,
+                'รับประทานยาตามแพทย์สั่งอย่างเคร่งครัด',
+              );
 
               return {
                 id: m.id,
@@ -662,10 +728,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 defaultFreq: { th: defaultFreqStr, en: defaultFreqStr },
                 defaultDuration: { th: defaultDurationStr, en: defaultDurationStr },
                 defaultQty: defaultQtyNum,
-                defaultRoute: { th: 'รับประทาน', en: 'Oral' },
+                defaultRoute: { th: defaultRouteStr, en: defaultRouteStr === 'รับประทาน' ? 'Oral' : defaultRouteStr },
                 defaultTiming: { th: defaultTimingStr, en: defaultTimingStr },
                 defaultInstructions: {
-                  th: m.properties || 'รับประทานยาตามแพทย์สั่งอย่างเคร่งครัด',
+                  th: defaultLabelStr,
                   en: m.generic_name ? `Generic: ${m.generic_name}` : 'Take as directed by physician.'
                 }
               };
@@ -795,8 +861,35 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     /** ข้อควรรู้เพิ่มเติม แสดงเป็นกล่องมีไอคอนด้านล่าง */
     hint?: string;
     confirmLabel: string;
-    onConfirm: () => void;
+
+    /**
+     * ให้กล่องยืนยันถามเหตุผลก่อนกดยืนยัน (ตอนนี้ใช้กับการยกเลิกการรับบริการ)
+     *
+     * ทำไมต้องถาม: ตาราง queues มีช่อง note รองรับอยู่แล้ว และ API
+     * PUT /visits/:id/status ก็รับ note ได้ แต่หน้าจอไม่เคยส่งอะไรไป
+     * ฐานข้อมูลจึงบันทึกได้แค่ว่า "ยกเลิก" โดยไม่มีใครรู้ว่าเพราะอะไร
+     * ในเวชระเบียนจริงต้องตอบได้ว่าผู้ป่วยกลับเองหรือปฏิเสธการรักษา
+     *
+     * options = ตัวเลือกสำเร็จรูป กดปุ๊บได้เลย ไม่ต้องพิมพ์
+     * แพทย์ยังพิมพ์เองได้ในช่องด้านล่างถ้าไม่ตรงกับตัวเลือกไหน
+     */
+    reason?: {
+      label: string;
+      options: string[];
+      placeholder: string;
+    };
+
+    onConfirm: (reason?: string) => void;
   } | null>(null);
+
+  /** เหตุผลที่แพทย์เลือกหรือพิมพ์ในกล่องยืนยัน ล้างทุกครั้งที่เปิดกล่องใหม่ */
+  const [confirmReason, setConfirmReason] = useState('');
+
+  // ล้างเหตุผลเดิมทิ้งทุกครั้งที่กล่องยืนยันถูกเปิด/ปิด
+  // ไม่งั้นเหตุผลที่เคยพิมพ์ไว้ของผู้ป่วยคนก่อนจะติดค้างมาให้คนถัดไป
+  useEffect(() => {
+    setConfirmReason('');
+  }, [confirmDialog]);
 
   /**
    * เลื่อนจอไปยังช่องที่ยังกรอกไม่ครบ พร้อมสลับแท็บให้ถ้าอยู่คนละแท็บ
@@ -1010,24 +1103,64 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     });
   };
 
-  // Cancel Visit — เปิดโมดัลยืนยัน
-  const handleCancelVisit = () => {
+  /**
+   * ==========================================================================
+   * ออกจากหน้าตรวจ 2 แบบ ผลต่อคิวไม่เหมือนกัน จึงต้องเป็นคนละปุ่ม
+   * ==========================================================================
+   * เดิมมีปุ่มเดียวชื่อ "ยกเลิกการตรวจรับบริการ" ซึ่งทำแค่เปลี่ยนหน้ากลับไปหน้าคิว
+   * ไม่ได้แตะฐานข้อมูลเลย ชื่อปุ่มกับสิ่งที่มันทำจึงไม่ตรงกัน
+   *
+   * และเมื่อระบบเปลี่ยนสถานะเป็น "กำลังตรวจ" ตั้งแต่ตอนกดเรียกผู้ป่วยเข้าตรวจ
+   * การออกจากหน้านี้โดยไม่คืนสถานะจะทำให้ผู้ป่วยค้างเป็น "กำลังตรวจ" ถาวร
+   * คิวนั้นจะไม่มีใครหยิบไปตรวจอีกเลยเพราะดูเหมือนมีคนดูแลอยู่แล้ว
+   */
+
+  /** ออกจากหน้าตรวจแบบคืนคิว ผู้ป่วยกลับไปต่อแถวรอตรวจตามเดิม */
+  const handleExitExamination = () => {
     setConfirmDialog({
-      tone: 'danger',
-      title: language === 'th' ? 'ยกเลิกการตรวจรับบริการ?' : 'Cancel Visit Session?',
+      tone: 'primary',
+      title: language === 'th' ? 'ออกจากหน้าตรวจ?' : 'Leave examination?',
       message: language === 'th'
-        ? 'กลับไปหน้าคิวผู้ป่วย ข้อมูลที่กรอกไว้แต่ยังไม่ได้บันทึกจะหายทั้งหมด'
-        : 'Returns to the patient queue. Anything not yet saved will be lost.',
+        ? 'ผู้ป่วยจะกลับไปอยู่ในคิว "รอตรวจ" ตามเดิม ข้อมูลที่กรอกไว้แต่ยังไม่ได้บันทึกจะหายทั้งหมด'
+        : 'The patient returns to the waiting queue. Anything not yet saved will be lost.',
       patient: {
         name: patient.name,
         hn: patient.hn,
         vn: displayVN(patient.vn),
       },
       hint: language === 'th'
-        ? 'หากยังต้องการเก็บข้อมูลไว้ ให้กด "บันทึกฉบับร่าง" แทน'
+        ? 'หากยังต้องการเก็บข้อมูลไว้ ให้กด "บันทึกฉบับร่าง" แทน แล้วกลับมาทำต่อได้ทุกเมื่อ'
         : 'To keep your work, use "Save Draft" instead.',
-      confirmLabel: language === 'th' ? 'ยืนยันยกเลิก' : 'Confirm Cancel',
-      onConfirm: onBackToQueue
+      confirmLabel: language === 'th' ? 'ออกและคืนคิว' : 'Leave and requeue',
+      onConfirm: () => onBackToQueue('Waiting')
+    });
+  };
+
+  /** ยกเลิกการรับบริการจริง ผู้ป่วยหลุดออกจากคิววันนี้ ไม่กลับมาอีก */
+  const handleCancelVisit = () => {
+    setConfirmDialog({
+      tone: 'danger',
+      title: language === 'th' ? 'ยกเลิกการรับบริการ?' : 'Cancel this visit?',
+      message: language === 'th'
+        ? 'ผู้ป่วยจะถูกนำออกจากคิววันนี้ และจะไม่ปรากฏในรายการรอตรวจอีก'
+        : 'The patient is removed from today\'s queue and will no longer appear in the waiting list.',
+      patient: {
+        name: patient.name,
+        hn: patient.hn,
+        vn: displayVN(patient.vn),
+      },
+      hint: language === 'th'
+        ? 'ใช้เมื่อผู้ป่วยกลับบ้านก่อนหรือไม่ประสงค์รับการรักษา หากแค่ต้องการออกจากหน้านี้ ให้กด "ออกจากหน้าตรวจ" แทน'
+        : 'Use this only when the patient has left or declined treatment. To simply leave this page, use "Leave examination".',
+      confirmLabel: language === 'th' ? 'ยืนยันยกเลิกการรับบริการ' : 'Confirm cancellation',
+      reason: {
+        label: language === 'th' ? 'เหตุผลการยกเลิก' : 'Reason for cancellation',
+        options: language === 'th'
+          ? ['ผู้ป่วยกลับก่อนพบแพทย์', 'ผู้ป่วยปฏิเสธการรักษา', 'ส่งต่อโรงพยาบาลอื่นทันที', 'ข้อมูลคิวซ้ำซ้อน']
+          : ['Patient left before consultation', 'Patient declined treatment', 'Referred out immediately', 'Duplicate queue entry'],
+        placeholder: language === 'th' ? 'ระบุเหตุผลอื่น...' : 'Other reason...',
+      },
+      onConfirm: (reason) => onBackToQueue('Cancelled', reason)
     });
   };
 
@@ -1278,8 +1411,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       {/* Top Navigation & Status Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
+          {/* ปุ่มลูกศรกลับด้านบน ต้องคืนคิวเหมือนปุ่ม "ออกจากหน้าตรวจ" ด้านล่าง
+              ไม่งั้นแพทย์ที่กดปุ่มนี้แทนจะทิ้งผู้ป่วยค้างสถานะ "กำลังตรวจ" ไว้
+              ผ่านกล่องยืนยันเดียวกัน เพื่อกันการกดพลาดแล้วข้อมูลที่กรอกหาย */}
           <button
-            onClick={onBackToQueue}
+            onClick={handleExitExamination}
             className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -2988,14 +3124,19 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 </h3>
               </div>
 
+              {/* แถวนี้มีแต่ปุ่ม "ยกเลิกการรับบริการ" ไม่มีปุ่มออกเฉยๆ
+                  เพราะปุ่ม "กลับสู่หน้าคิวผู้ป่วย" ด้านบนสุดทำหน้าที่นั้นอยู่แล้ว
+                  (เรียก handleExitExamination เหมือนกัน คืนคิวเป็น "รอตรวจ")
+                  มีสองปุ่มที่ทำงานเหมือนกันคนละที่ ทำให้สับสนโดยไม่ได้อะไรเพิ่ม */}
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
+                {/* สีแดงสงวนไว้ให้การกระทำที่เอาผู้ป่วยออกจากคิวจริงเท่านั้น */}
                 <button
                   type="button"
                   onClick={handleCancelVisit}
                   className="p-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
                 >
                   <XCircle className="w-4 h-4 text-white" />
-                  <span>{language === 'th' ? 'ยกเลิกการตรวจรับบริการ' : 'Cancel Visit Session'}</span>
+                  <span>{language === 'th' ? 'ยกเลิกการรับบริการ' : 'Cancel Visit'}</span>
                 </button>
 
                 <button
@@ -3140,6 +3281,46 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               </div>
             )}
 
+            {/* เลือกเหตุผล กดปุ่มสำเร็จรูปหรือพิมพ์เองก็ได้
+                บังคับให้มีเหตุผลก่อนถึงจะกดยืนยันได้ เพราะถ้าปล่อยให้ข้าม
+                สุดท้ายจะไม่มีใครกรอก แล้วฐานข้อมูลก็จะว่างเหมือนเดิม */}
+            {confirmDialog.reason && (
+              <div className="space-y-2 text-left">
+                <label className="text-xs font-bold text-slate-700 block">
+                  {confirmDialog.reason.label}
+                  <span className="text-red-600"> *</span>
+                </label>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {confirmDialog.reason.options.map((opt) => {
+                    const isActive = confirmReason === opt;
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setConfirmReason(isActive ? '' : opt)}
+                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-colors cursor-pointer ${
+                          isActive
+                            ? 'bg-red-600 border-red-600 text-white'
+                            : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50 hover:border-slate-400'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <input
+                  type="text"
+                  value={confirmReason}
+                  onChange={(e) => setConfirmReason(e.target.value)}
+                  placeholder={confirmDialog.reason.placeholder}
+                  className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 focus:border-red-500 focus:ring-4 focus:ring-red-500/15 focus:outline-hidden transition-all"
+                />
+              </div>
+            )}
+
             <div className="pt-1 grid grid-cols-2 gap-2.5">
               <button
                 type="button"
@@ -3150,15 +3331,24 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               </button>
               <button
                 type="button"
+                disabled={!!confirmDialog.reason && !confirmReason.trim()}
+                title={
+                  !!confirmDialog.reason && !confirmReason.trim()
+                    ? (language === 'th' ? 'กรุณาระบุเหตุผลก่อน' : 'Please give a reason first')
+                    : undefined
+                }
                 onClick={() => {
                   const run = confirmDialog.onConfirm;
+                  const reason = confirmReason.trim();
                   setConfirmDialog(null);
-                  run();
+                  run(reason || undefined);
                 }}
-                className={`w-full py-3 px-4 text-white rounded-xl text-sm font-bold shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap ${
-                  confirmDialog.tone === 'danger'
-                    ? 'bg-red-600 hover:bg-red-700 shadow-red-600/20'
-                    : 'bg-[#2563eb] hover:bg-blue-700 shadow-blue-600/20'
+                className={`w-full py-3 px-4 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 whitespace-nowrap ${
+                  !!confirmDialog.reason && !confirmReason.trim()
+                    ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    : confirmDialog.tone === 'danger'
+                      ? 'bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/20 cursor-pointer'
+                      : 'bg-[#2563eb] hover:bg-blue-700 text-white shadow-md shadow-blue-600/20 cursor-pointer'
                 }`}
               >
                 {confirmDialog.tone === 'danger' ? (

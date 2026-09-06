@@ -270,9 +270,13 @@ export function applyExaminationDetail(base: Patient, detail: BackendExamination
       frequency: item.frequency || '',
       duration: item.duration || '',
       quantity: Number(item.quantity) || 0,
-      route: '',
-      timing: '',
-      specialInstructions: item.instructions || '',
+
+      // เวชระเบียนที่บันทึกหลังมีช่อง prescription_detail จะได้ 3 ช่องนี้กลับมาแยกกัน
+      // ส่วนของเก่า backend ส่งมาแต่ instructions ที่รวมกันแล้ว
+      // จึงคืนลง specialInstructions ช่องเดียวเหมือนพฤติกรรมเดิม แพทย์แก้ต่อได้ตามปกติ
+      route: item.route || '',
+      timing: item.timing || '',
+      specialInstructions: item.specialInstructions || item.instructions || '',
     }));
   }
 
@@ -412,7 +416,17 @@ export function buildExaminationRequest(
       frequency: p.frequency,
       duration: p.duration,
       quantity: Number(p.quantity) || 1,
+      // instructions = ข้อความรวมสำหรับห้องยา (ตาราง dispensings มีช่องเดียว)
+      // ยังส่งเหมือนเดิมทุกอย่าง ห้องยาไม่ได้รับผลกระทบจากการเปลี่ยนแปลงนี้
       instructions: [p.route, p.timing, p.specialInstructions].filter(Boolean).join(' - ') || 'รับประทานตามแพทย์สั่ง',
+
+      // ส่ง 3 ช่องนี้แยกไปด้วย เพื่อให้ backend เก็บใบสั่งยาฉบับเต็มลง
+      // examinations.prescription_detail แล้วอ่านกลับมาแสดงในประวัติได้ครบทุกช่อง
+      // ถ้าส่งแต่ข้อความรวม พอเปิดประวัติย้อนหลังจะแยกไม่ออกว่า
+      // ท่อนไหนคือทางให้ยา ท่อนไหนคือเวลา ท่อนไหนคือคำแนะนำพิเศษ
+      route: p.route,
+      timing: p.timing,
+      specialInstructions: p.specialInstructions,
       status: 'Active'
     })),
     allergies: Array.isArray(patient.drugAllergies) ? patient.drugAllergies.join(', ') : '',
@@ -429,12 +443,45 @@ export function mapPastVisit(item: BackendPastVisit): PastVisitRecord {
     visitTime: item.visitTime || undefined,
     doctorName: item.doctorName || undefined,
     department: item.department || undefined,
-    // endpoint ประวัติยังไม่ส่งอาการสำคัญของครั้งนั้นมา จึงเว้นว่างไว้ก่อน
-    chiefComplaint: '',
+    chiefComplaint: item.chiefComplaint || '',
     diagnosis: item.diagnosis || '',
     icdCode: item.icdCode || undefined,
     vitals: item.vitals || undefined,
     followUpDate: item.followUpDate || undefined,
     status: item.status || undefined,
+
+    // ข้อมูลการรักษาของครั้งนั้น เพิ่งเพิ่มให้ backend ส่งมา
+    // เพื่อให้ประวัติย้อนหลังบอกได้ว่า "รักษาอย่างไร" ไม่ใช่แค่ "เป็นโรคอะไร"
+    presentIllness: item.presentIllness || undefined,
+    complaintDuration: item.complaintDuration || undefined,
+    physicalExam: item.physicalExam || undefined,
+    secondaryDiagnoses: item.secondaryDiagnoses || undefined,
+    treatmentPlan: item.treatmentPlan || undefined,
+    proceduresPerformed: item.proceduresPerformed || undefined,
+    assessmentNotes: item.assessmentNotes || undefined,
+    clinicalNotes: item.clinicalNotes || undefined,
+    counseling: item.counseling || undefined,
+    followUpReason: item.followUpReason || undefined,
+    followUpInstructions: item.followUpInstructions || undefined,
+    cancelReason: item.cancelReason || undefined,
+
+    prescriptionsList: (item.prescriptions || []).map((p, i) => ({
+      id: p.id || `rx-${i + 1}`,
+      medicineId: p.medicineId,
+      medicineCode: p.medicineCode,
+      unitPrice: p.unitPrice,
+      medicineName: p.medicineName || '',
+      dosage: p.dosage || '',
+      frequency: p.frequency || '',
+      duration: p.duration || '',
+      quantity: Number(p.quantity) || 0,
+
+      // ประวัติย้อนหลัง: ครั้งที่บันทึกหลังมี examinations.prescription_detail
+      // จะได้ทางให้ยา / เวลารับประทาน / คำแนะนำพิเศษ กลับมาแยกช่องครบ
+      // ครั้งเก่ากว่านั้นอ่านจากตาราง dispensings ได้แค่ข้อความรวมใน instructions
+      route: p.route || '',
+      timing: p.timing || '',
+      specialInstructions: p.specialInstructions || p.instructions || '',
+    })),
   };
 }

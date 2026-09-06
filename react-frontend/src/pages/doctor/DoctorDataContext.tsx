@@ -42,7 +42,10 @@ interface DoctorDataContextType {
   /** คืน true เมื่อ backend บันทึกสำเร็จจริง, false เมื่อล้มเหลว
    *  หน้าจอต้องรอค่านี้ก่อนขึ้นกล่อง "บันทึกสำเร็จ" */
   handleSavePatient: (updatedPatient: Patient) => Promise<boolean>;
-  handleUpdateStatus: (patientId: string, newStatus: QueueStatus) => void;
+  /** เปลี่ยนสถานะคิว/visit ของผู้ป่วย
+   *  note = บันทึกเหตุผลลงช่อง note ของคิว ใช้ตอนยกเลิกการรับบริการ
+   *  ถ้าไม่ส่งมา backend จะไม่แตะ note เดิม */
+  handleUpdateStatus: (patientId: string, newStatus: QueueStatus, note?: string) => void;
 
   /**
    * ผู้ป่วยสำหรับหน้าประวัติเวชระเบียน
@@ -59,6 +62,20 @@ interface DoctorDataContextType {
   // สถานะการเชื่อมต่อ backend
   summary: BackendDoctorQueueSummary | null;
   isLoading: boolean;
+
+  /**
+   * true ตั้งแต่เปิดหน้ามา จนกว่าจะโหลดคิวจากฐานข้อมูลจบ "รอบแรก"
+   *
+   * ต่างจาก isLoading ตรงที่ isLoading เป็น true ทุกครั้งที่ยิง API รวมถึง
+   * การรีเฟรชเบื้องหลังทุก 4 วินาที และทุกครั้งที่มี WebSocket event เข้ามา
+   * ถ้าเอา isLoading ไปคุมหน้าจอโหลด หน้าจะกะพริบเป็นหน้าโหลดตลอดเวลา
+   * ยิ่งเปิด simulator ไว้ยิ่งกะพริบถี่ เพราะมันยิง event ตลอด
+   *
+   * ตัวนี้จึงเป็น true แค่รอบแรกรอบเดียว ใช้คุมหน้าจอ "กำลังโหลดข้อมูล"
+   * ที่บังทั้งหน้าได้อย่างปลอดภัย
+   */
+  isInitialLoading: boolean;
+
   isSaving: boolean;
   isExamLoading: boolean;
 
@@ -93,6 +110,10 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const [summary, setSummary] = useState<BackendDoctorQueueSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  // เริ่มต้นเป็น true เสมอ เพราะตอน component เพิ่งถูกสร้าง ยังไม่มีข้อมูลจากฐานข้อมูลเลย
+  // ถ้าเริ่มเป็น false หน้าจะแว่บโชว์ "ไม่พบข้อมูลผู้ป่วย" พร้อมเลข 0 ก่อนข้อมูลจริงจะมา
+  // ซึ่งทำให้แพทย์เข้าใจผิดว่าวันนี้ไม่มีคิว
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   // true ระหว่างดึงผลตรวจเดิมของเคสที่เพิ่งเปิด (ครั้งแรกของแต่ละ visit)
   const [isExamLoading, setIsExamLoading] = useState<boolean>(false);
@@ -104,7 +125,19 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // จำ visit ที่ดึงผลตรวจมาแล้ว กันไม่ให้ effect ยิงซ้ำไม่รู้จบ
   // (เพราะ effect เองเป็นคนแก้ activeExamPatient)
   const hydratedVisitRef = useRef<number | null>(null);
-  const hydratedRecordRef = useRef<number | null>(null);
+  // เก็บเป็น "patientId:recordsRefreshKey" ไม่ใช่แค่ patientId
+  // เพื่อให้บังคับดึงประวัติใหม่ได้ตอนเพิ่งบันทึกผลตรวจ ทั้งที่ยังเป็นผู้ป่วยคนเดิม
+  const hydratedRecordRef = useRef<string | null>(null);
+
+  /**
+   * ตัวนับสั่งให้หน้าประวัติเวชระเบียนโหลดข้อมูลใหม่
+   *
+   * หน้าประวัติถือข้อมูลคนละชุดกับหน้าคิว (recordPatients / selectedRecordPatient)
+   * ซึ่ง refresh() ไม่ได้แตะเลย และไม่มี polling ทุก 4 วินาทีเหมือนหน้าคิวด้วย
+   * ถ้าไม่บังคับให้โหลดใหม่ แพทย์ที่บันทึกผลตรวจเสร็จแล้วสลับไปดูหน้าประวัติ
+   * จะยังเห็นสถานะเก่าและยังไม่เห็นการวินิจฉัยที่เพิ่งบันทึกลงไป
+   */
+  const [recordsRefreshKey, setRecordsRefreshKey] = useState(0);
 
   const refresh = useCallback(async () => {
     if (!isDoctor) return;
@@ -119,6 +152,9 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setError(err instanceof Error ? err.message : 'ไม่สามารถโหลดคิวผู้ป่วยได้');
     } finally {
       setIsLoading(false);
+      // ปลดหน้าจอโหลดใน finally ไม่ใช่ใน try
+      // เพื่อให้กรณีต่อ backend ไม่ได้ ผู้ใช้ได้เห็นข้อความ error ไม่ใช่ค้างที่หน้าโหลดตลอดไป
+      setIsInitialLoading(false);
     }
   }, [isDoctor]);
 
@@ -159,6 +195,9 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setRecordPatients([]);
       setSummary(null);
       setError(null);
+      // ผู้ใช้ที่ไม่ใช่แพทย์จะไม่มีการยิง refresh เลย
+      // ถ้าไม่ปิดตรงนี้ isInitialLoading จะค้างเป็น true ตลอดไป = หน้าโหลดหมุนไม่หยุด
+      setIsInitialLoading(false);
       return;
     }
     void refresh();
@@ -238,12 +277,23 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const patientId = selectedRecordPatient?.patientId;
     if (!patientId) {
+      // ไม่มีรหัสผู้ป่วยจริง = ดึงประวัติย้อนหลังไม่ได้เลย
+      //
+      // เคยเจออาการ "ประวัติขึ้นแต่การวินิจฉัย นอกนั้นเป็น - หมด"
+      // สาเหตุคือ pastVisits ว่าง หน้าจอเลยไปโชว์แถวที่ปั้นเองจากข้อมูลในหน่วยความจำ
+      // ซึ่งมีแค่การวินิจฉัยกับสัญญาณชีพ (สองอย่างนี้มากับ /patient-records)
+      // ส่วนยา แผนการรักษา ผลตรวจร่างกาย ต้องมาจาก endpoint ประวัติเท่านั้น
+      if (selectedRecordPatient) {
+        console.warn('[doctor] ผู้ป่วยที่เลือกไม่มี patientId จึงไม่ได้ดึงประวัติย้อนหลัง', selectedRecordPatient);
+      }
       hydratedRecordRef.current = null;
       return;
     }
-    if (hydratedRecordRef.current === patientId) return;
 
-    hydratedRecordRef.current = patientId;
+    const cacheKey = `${patientId}:${recordsRefreshKey}`;
+    if (hydratedRecordRef.current === cacheKey) return;
+
+    hydratedRecordRef.current = cacheKey;
     let cancelled = false;
 
     void examinationApi
@@ -255,16 +305,40 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           prev && prev.patientId === patientId ? { ...prev, pastVisits } : prev
         );
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
-        // ไม่ต้องแจ้งเตือน แค่ไม่มีประวัติย้อนหลังให้ดู
+        // ไม่ขึ้นกล่องเตือนให้แพทย์ แต่ต้องเห็นใน console ไม่งั้นเงียบหายไปเลย
+        // ของเดิมกลืน error ทิ้งทั้งก้อน เวลาประวัติไม่ขึ้นจึงไล่หาสาเหตุไม่ได้
+        console.error('[doctor] ดึงประวัติย้อนหลังไม่สำเร็จ patientId=' + patientId, err);
         hydratedRecordRef.current = null;
       });
 
     return () => {
       cancelled = true;
     };
-  }, [isDoctor, selectedRecordPatient?.patientId]);
+  }, [isDoctor, selectedRecordPatient?.patientId, recordsRefreshKey]);
+
+  /**
+   * ซิงก์ผู้ป่วยที่เลือกอยู่ในหน้าประวัติ ให้ตรงกับรายการล่าสุดที่โหลดมา
+   *
+   * selectedRecordPatient เป็นสำเนาที่ถ่ายไว้ตอนแพทย์กดเลือกผู้ป่วย
+   * ถ้าไม่ซิงก์ ป้ายสถานะบนหัวการ์ด (รอตรวจ / กำลังตรวจ / ตรวจเสร็จแล้ว)
+   * จะค้างเป็นค่าตอนที่กดเลือก ไม่เปลี่ยนแม้บันทึกผลตรวจไปแล้ว
+   *
+   * เก็บ pastVisits เดิมไว้ เพราะข้อมูลชุดนั้นมาจากอีก endpoint หนึ่ง
+   * ซึ่ง recordPatients ไม่มีให้ ถ้าเขียนทับจะทำให้ประวัติย้อนหลังหายไปวาบหนึ่ง
+   */
+  useEffect(() => {
+    if (!selectedRecordPatient) return;
+
+    const fresh = recordPatients.find((p) => p.id === selectedRecordPatient.id);
+    if (!fresh) return;
+    if (fresh.status === selectedRecordPatient.status) return;
+
+    setSelectedRecordPatient((prev) =>
+      prev && prev.id === fresh.id ? { ...prev, status: fresh.status } : prev
+    );
+  }, [recordPatients, selectedRecordPatient]);
 
   /**
    * บันทึกผลตรวจของแพทย์ลงฐานข้อมูล
@@ -303,7 +377,17 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             : null
         );
         // ดึงผลตรวจที่เพิ่งบันทึกกลับมาทับ เพื่อให้หน้าจอตรงกับฐานข้อมูลจริง
-        return Promise.all([refresh(), hydrateExamination(visitId)]).then(() => true);
+        //
+        // ต้องรีเฟรชหน้าประวัติเวชระเบียนด้วย ไม่ใช่แค่หน้าคิว
+        // เพราะสองหน้านี้ใช้ข้อมูลคนละชุดและมาจากคนละ endpoint
+        // ถ้าเรียกแต่ refresh() หน้าประวัติจะค้างอยู่ที่ข้อมูลตอนเปิดหน้า
+        // แพทย์บันทึกเสร็จแล้วสลับไปดูจะยังเห็น "ยังไม่ได้ระบุการวินิจฉัย" อยู่
+        setRecordsRefreshKey((k) => k + 1);
+        return Promise.all([
+          refresh(),
+          refreshRecords(),
+          hydrateExamination(visitId),
+        ]).then(() => true);
       })
       .catch((err: unknown) => {
         setSaveError(err instanceof Error ? err.message : 'ไม่สามารถบันทึกผลการตรวจได้');
@@ -326,7 +410,7 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
    * อัปเดตหน้าจอก่อนทันที (optimistic) เพื่อไม่ให้ปุ่มหน่วง
    * ถ้า API ล้มเหลวจะดึงข้อมูลจริงกลับมาทับ พร้อมแสดงข้อความผิดพลาด
    */
-  const handleUpdateStatus = (patientId: string, newStatus: QueueStatus) => {
+  const handleUpdateStatus = (patientId: string, newStatus: QueueStatus, note?: string) => {
     const target = patients.find((p) => p.id === patientId);
 
     setPatients((prev) => prev.map((p) => (p.id === patientId ? { ...p, status: newStatus } : p)));
@@ -338,10 +422,12 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     void doctorApi
-      .updateVisitStatus(target.visitId, newStatus)
+      .updateVisitStatus(target.visitId, newStatus, note)
       .then(() => {
         setError(null);
-        return refresh();
+        // เหตุผลเดียวกับตอนบันทึกผลตรวจ หน้าประวัติต้องรู้ว่าสถานะเปลี่ยนแล้ว
+        setRecordsRefreshKey((k) => k + 1);
+        return Promise.all([refresh(), refreshRecords()]).then(() => undefined);
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : 'ไม่สามารถอัปเดตสถานะได้');
@@ -368,6 +454,7 @@ export const DoctorDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         handleUpdateStatus,
         summary,
         isLoading,
+        isInitialLoading,
         isSaving,
         isExamLoading,
         saveError,
