@@ -397,44 +397,6 @@ export const ScheduleView: React.FC = () => {
         </div>
       )}
 
-      {/* Authenticated Doctor Account Banner (RBAC Security Info) */}
-      <div className="bg-gradient-to-r from-[#162a4a] via-[#1e3a8a] to-[#2563eb] text-white p-5 rounded-2xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 border border-blue-900/50">
-        <div className="flex items-center gap-4">
-          <img
-            src={loggedInDoctor.avatar}
-            alt={loggedInDoctor.name}
-            className="w-12 h-12 rounded-2xl object-cover border-2 border-white/30 shadow-xs shrink-0"
-          />
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-200">
-                Authenticated Doctor Session
-              </span>
-              <span className="bg-emerald-400/20 text-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full border border-emerald-400/30 flex items-center gap-1">
-                <ShieldCheck className="w-3 h-3" />
-                <span>RBAC Active ({loggedInDoctor.username})</span>
-              </span>
-            </div>
-            <div className="text-lg font-bold tracking-tight text-white flex items-center gap-2 mt-0.5">
-              <span>{loggedInDoctor.name}</span>
-              <span className="text-xs font-mono font-medium text-blue-200 bg-white/10 px-2 py-0.5 rounded-md">
-                License: {loggedInDoctor.licenseNo}
-              </span>
-            </div>
-            <div className="text-xs text-blue-200 mt-0.5">
-              {loggedInDoctor.department} • {loggedInDoctor.role} • {loggedInDoctor.roomLocation}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 self-end md:self-center">
-          <div className="text-right">
-            <span className="text-[11px] text-blue-200 block font-medium">เวรของคุณทั้งหมด</span>
-            <span className="text-xl font-black text-white">{myShiftsCount} กะ</span>
-          </div>
-        </div>
-      </div>
-
       {/* Page Title & Main Action Buttons */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
         <div>
