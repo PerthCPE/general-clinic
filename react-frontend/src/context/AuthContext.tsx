@@ -94,6 +94,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (currentUser) {
+      // ตรวจสอบว่าชื่อหรือตำแหน่งใน DEMO_USERS เปลี่ยนไปหรือไม่ ถ้าเปลี่ยน ให้อัปเดตทันที
+      if (currentUser.role && DEMO_USERS[currentUser.role]) {
+        const latest = DEMO_USERS[currentUser.role];
+        if (
+          currentUser.fullName !== latest.fullName ||
+          currentUser.roleTitleTh !== latest.roleTitleTh ||
+          currentUser.roleTitleEn !== latest.roleTitleEn ||
+          currentUser.avatarText !== latest.avatarText ||
+          currentUser.avatarColor !== latest.avatarColor
+        ) {
+          setCurrentUser(prev => prev ? ({
+            ...prev,
+            fullName: latest.fullName,
+            roleTitleTh: latest.roleTitleTh,
+            roleTitleEn: latest.roleTitleEn,
+            avatarText: latest.avatarText,
+            avatarColor: latest.avatarColor,
+          }) : null);
+          return;
+        }
+      }
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
     } else {
       localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -131,7 +152,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const loggedInUser: User = {
           id: String(res.user.id),
           username: res.user.username,
-          fullName: res.user.fullname || fallback.fullName,
+          // ดึงชื่อและข้อมูลจาก DEMO_USERS (roles.ts) เป็นหลักเสมอ เพื่อให้แก้ที่ roles.ts ที่เดียวแล้วเปลี่ยนทันที
+          fullName: fallback.fullName || res.user.fullname,
           role: userRole,
           roleTitleTh: fallback.roleTitleTh,
           roleTitleEn: fallback.roleTitleEn,
