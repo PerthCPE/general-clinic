@@ -30,6 +30,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
 import { StatusFilterTabs } from './StatusFilterTabs';
 import { displayVN } from '../utils/vnGenerator';
+import { formatNationalId, rawNationalId } from '../utils/nationalId';
 
 /**
  * ==============================================================================
@@ -117,6 +118,62 @@ function buildPrescriptionDetail(item: PrescriptionItem, language: string): stri
 
   return lines.join('\n');
 }
+
+/**
+ * ==============================================================================
+ * ป้ายสถานะรวมของการมาตรวจ 1 ครั้ง (ในมุมของผู้ป่วย ไม่ใช่มุมของแพทย์)
+ * ==============================================================================
+ * ต่างจากป้ายสถานะคิว (รอตรวจ / กำลังตรวจ / ตรวจเสร็จ) ซึ่งจบแค่ตอนแพทย์ปิดเคส
+ * ป้ายนี้ตอบว่า "ผู้ป่วยคนนี้ได้รับบริการจนจบจริงหรือเปล่า"
+ * คือต้องผ่านครบทั้งตรวจ รับยา และชำระเงิน
+ *
+ * แพทย์ต้องแยกออกว่าเคสไหนตกหล่นระหว่างทาง เช่นตรวจแล้วแต่ไม่ได้ไปรับยา
+ * เพราะครั้งหน้าที่ผู้ป่วยกลับมา จะได้รู้ว่ายาที่สั่งไปครั้งก่อนไม่เคยถึงมือคนไข้
+ *
+ * ค่าคำนวณมาจาก backend (ดู computeVisitProgress) ไม่ได้คิดที่หน้าจอ
+ * เพราะต้องดูตารางของห้องยาและการเงินประกอบ ซึ่งหน้าจอแพทย์ไม่ได้ดึงมา
+ *
+ * เวชระเบียนเก่าที่ backend ยังไม่ได้ส่ง progress มา จะไม่แสดงป้ายเลย
+ * ดีกว่าเดาแล้วแสดงผิด เพราะป้ายนี้ใช้ตัดสินใจทางการรักษา
+ */
+const VisitProgressBadge: React.FC<{ visit: PastVisitRecord; language: string }> = ({
+  visit,
+  language,
+}) => {
+  if (!visit.progress) return null;
+
+  const isTh = language === 'th';
+
+  if (visit.progress === 'completed') {
+    return (
+      <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md">
+        {isTh ? 'เสร็จสิ้น' : 'Completed'}
+      </span>
+    );
+  }
+
+  if (visit.progress === 'in_progress') {
+    return (
+      <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md">
+        {isTh ? 'กำลังดำเนินการ' : 'In Progress'}
+      </span>
+    );
+  }
+
+  // ยกเลิก — ต่อท้ายด้วยสาเหตุ เพื่อให้แพทย์รู้ว่าตกหล่นที่ขั้นตอนไหน
+  const reasonText: Record<string, { th: string; en: string }> = {
+    no_medicine: { th: ' (ไม่ได้รับยา)', en: ' (No Medicine)' },
+    unpaid: { th: ' (ยังไม่ชำระค่าบริการ)', en: ' (Unpaid)' },
+  };
+  const suffix = reasonText[visit.progressReason || ''];
+
+  return (
+    <span className="text-[10px] font-extrabold text-rose-800 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md">
+      {isTh ? 'ยกเลิกการรับบริการ' : 'Cancelled'}
+      {suffix ? (isTh ? suffix.th : suffix.en) : ''}
+    </span>
+  );
+};
 
 /**
  * ยา 1 รายการในประวัติ แสดงเป็นแถวพับเก็บได้
@@ -481,7 +538,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                           <div className="flex flex-wrap items-center gap-2">
                             <CopyableText label="VN" value={vnCode} />
                             <span>•</span>
-                            <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={patient.nationalId || '1-1002-34567-89-0'} />
+                            <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={formatNationalId(patient.nationalId)} copyValue={rawNationalId(patient.nationalId)} />
                           </div>
                           <div className="px-1.5 py-0.5"><strong className="text-slate-800">{language === 'th' ? 'เพศ/อายุ:' : 'Gender/Age:'}</strong> {patient.gender}, {patient.age} {language === 'th' ? 'ปี' : 'yrs'}</div>
                         </div>
@@ -563,7 +620,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                     <span>•</span>
                     <CopyableText label="VN" value={displayVN(selectedPatient.vn)} />
                     <span>•</span>
-                    <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={selectedPatient.nationalId || '1-1002-34567-89-0'} />
+                    <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={formatNationalId(selectedPatient.nationalId)} copyValue={rawNationalId(selectedPatient.nationalId)} />
                     <span>•</span>
                     <span>{selectedPatient.gender}, {selectedPatient.age} {language === 'th' ? 'ปี' : 'yrs'}</span>
                   </div>
@@ -722,6 +779,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                                       </span>
                                     )}
                                     <CopyableText label="VN" value={visit.vn} />
+                                    <VisitProgressBadge visit={visit} language={language} />
                                   </div>
 
                                   <h4 className="text-sm font-bold text-blue-900 mt-1">
@@ -804,18 +862,10 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                                      หน้าอื่นในระบบและอ่านยากเวลามีหลายกล่องต่อกัน
                                      ทุกหัวข้อโชว์เสมอ ถ้าไม่มีข้อมูลจะขึ้น "-" (ดู HistoryField) */}
 
-                                <HistorySection title={language === 'th' ? 'ประวัติการเจ็บป่วยปัจจุบัน' : 'Present Illness'}>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <HistoryField
-                                      label={language === 'th' ? 'ประวัติการเจ็บป่วยปัจจุบัน' : 'Present Illness'}
-                                      value={visit.presentIllness}
-                                    />
-                                    <HistoryField
-                                      label={language === 'th' ? 'ระยะเวลาที่เป็นมา' : 'Duration'}
-                                      value={visit.complaintDuration}
-                                    />
-                                  </div>
-                                </HistorySection>
+                                {/* "ประวัติการเจ็บป่วยปัจจุบัน" กับ "ระยะเวลาที่เป็นมา" ถูกถอดออก
+                                    หน้าบันทึกการตรวจเอาสองช่องนี้ออกไปแล้ว เพราะซ้ำกับ
+                                    "อาการสำคัญ" (ที่พยาบาลเขียนระยะเวลารวมมาด้วย)
+                                    และ "การประเมินและวินิจฉัยเบื้องต้น" ตามลำดับ */}
 
                                 <HistorySection title={language === 'th' ? 'ผลการตรวจร่างกายตามระบบ' : 'Physical Examination'}>
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -847,10 +897,12 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
 
                                 <HistorySection title={language === 'th' ? 'การประเมินและแผนการรักษา' : 'Assessment & Plan'}>
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <HistoryField label={language === 'th' ? 'เหตุผลทางการแพทย์และการประเมิน' : 'Assessment'} value={visit.assessmentNotes} />
+                                    <HistoryField label={language === 'th' ? 'การประเมินและวินิจฉัยเบื้องต้น' : 'Assessment'} value={visit.assessmentNotes} />
                                     <HistoryField label={language === 'th' ? 'แผนการรักษาและหัตถการ' : 'Treatment Plan'} value={visit.treatmentPlan} />
-                                    <HistoryField label={language === 'th' ? 'บันทึกทางคลินิกเพิ่มเติม' : 'Clinical Notes'} value={visit.clinicalNotes} />
-                                    <HistoryField label={language === 'th' ? 'หัตถการที่ทำ' : 'Procedures Performed'} value={visit.proceduresPerformed} />
+                                    {/* "บันทึกทางคลินิกเพิ่มเติม" กับ "หัตถการที่ทำ" ถูกถอดออก
+                                        ไม่มีช่องกรอกในหน้าบันทึกการตรวจ ค่าจึงว่างตลอด
+                                        หัตถการที่แพทย์ทำจริงถูกเขียนรวมอยู่ในช่อง "แผนการรักษาและหัตถการ"
+                                        ด้านบนอยู่แล้ว (ดูข้อความ placeholder ของช่องนั้น) */}
                                   </div>
                                 </HistorySection>
 
@@ -977,7 +1029,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                         </div>
                         <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                           <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เลขบัตรประชาชน :' : 'National ID :'}</span>
-                          <CopyableText value={selectedPatient.nationalId || '1-1002-34567-89-0'} />
+                          <CopyableText value={formatNationalId(selectedPatient.nationalId)} copyValue={rawNationalId(selectedPatient.nationalId)} />
                         </div>
                       </div>
                     </div>

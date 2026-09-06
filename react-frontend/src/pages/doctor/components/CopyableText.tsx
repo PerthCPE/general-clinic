@@ -3,33 +3,41 @@ import { Copy, Check } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 interface CopyableTextProps {
+  /** ข้อความที่แสดงบนจอ */
   value: string;
   label?: string;
   className?: string;
   showIcon?: boolean;
+
+  /** ข้อความที่จะคัดลอกจริง ถ้าไม่ส่งมาจะคัดลอกตามที่แสดง
+   *  ใช้กับค่าที่จัดรูปแบบให้อ่านง่ายบนจอ แต่ระบบอื่นต้องการค่าดิบ
+   *  เช่น เลขบัตรประชาชนที่โชว์ 1-2345-67890-12-3 แต่คัดลอกได้ 1234567890123 */
+  copyValue?: string;
 }
 
 export const CopyableText: React.FC<CopyableTextProps> = ({
   value,
   label,
   className = '',
-  showIcon = true
+  showIcon = true,
+  copyValue
 }) => {
   const [copied, setCopied] = useState(false);
   const { language } = useLanguage();
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent parent clicks (e.g. card selection)
-    if (!value) return;
+    const textToCopy = copyValue || value;
+    if (!textToCopy) return;
 
     try {
-      navigator.clipboard.writeText(value);
+      navigator.clipboard.writeText(textToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
       // Fallback if clipboard API fails
       const textArea = document.createElement('textarea');
-      textArea.value = value;
+      textArea.value = textToCopy;
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand('copy');
