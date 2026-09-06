@@ -34,7 +34,38 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const [isAdminFontEnabled, setIsAdminFontEnabled] = useState(false);
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const isFontEnabled = localStorage.getItem('adminFontEnabled') === 'true';
+    setIsAdminFontEnabled(isFontEnabled);
+    if (isFontEnabled) {
+      document.body.classList.add('admin-font-theme');
+    }
+
+    const soundSetting = localStorage.getItem('notificationSoundEnabled');
+    setIsSoundEnabled(soundSetting !== 'false'); // Default true
+  }, []);
+
+  const toggleAdminFont = () => {
+    const isEnabled = !isAdminFontEnabled;
+    setIsAdminFontEnabled(isEnabled);
+    if (isEnabled) {
+      document.body.classList.add('admin-font-theme');
+      localStorage.setItem('adminFontEnabled', 'true');
+    } else {
+      document.body.classList.remove('admin-font-theme');
+      localStorage.removeItem('adminFontEnabled');
+    }
+  };
+
+  const toggleNotificationSound = () => {
+    const newVal = !isSoundEnabled;
+    setIsSoundEnabled(newVal);
+    localStorage.setItem('notificationSoundEnabled', newVal ? 'true' : 'false');
+  };
 
   // โหลดผู้ป่วยย้อนหลังไว้ให้ช่องค้นหาด้านบนใช้ด้วย ไม่งั้นจะค้นเจอเฉพาะคิววันนี้
   useEffect(() => {
@@ -757,7 +788,56 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 </span>
               </button>
 
-              {/* 3. ล้างข้อมูลทดสอบในระบบ */}
+              {/* 3. สลับรูปแบบตัวอักษร (ทดสอบ) */}
+              <button
+                className="dropdown-menu-item dropdown-item-3"
+                onClick={() => {
+                  toggleAdminFont();
+                  setIsDropdownOpen(false);
+                }}
+              >
+                <span className="theme-toggle-text">
+                  {isAdminFontEnabled ? 'ยกเลิกฟอนต์ทดสอบ' : 'ทดสอบฟอนต์ระบบจัดการสิทธิ์'}
+                </span>
+                <span className="theme-toggle-icon-wrapper" style={{ marginLeft: '8px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                    <line x1="9" y1="20" x2="15" y2="20"></line>
+                    <line x1="12" y1="4" x2="12" y2="20"></line>
+                  </svg>
+                </span>
+              </button>
+
+              {/* 4. เปิด/ปิด เสียงแจ้งเตือน */}
+              <button
+                className="dropdown-menu-item dropdown-item-4"
+                onClick={() => {
+                  toggleNotificationSound();
+                  setIsDropdownOpen(false);
+                }}
+              >
+                <span className="theme-toggle-text">
+                  {isSoundEnabled ? 'ปิดเสียงแจ้งเตือนคิว' : 'เปิดเสียงแจ้งเตือนคิว'}
+                </span>
+                <span className="theme-toggle-icon-wrapper" style={{ marginLeft: '8px' }}>
+                  {isSoundEnabled ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                      <line x1="23" y1="9" x2="17" y2="15"></line>
+                      <line x1="17" y1="9" x2="23" y2="15"></line>
+                    </svg>
+                  )}
+                </span>
+              </button>
+
+              <div className="dropdown-divider"></div>
+
+              {/* 5. ล้างข้อมูลทดสอบในระบบ */}
               <button
                 className="dropdown-menu-item dropdown-item-reset"
                 onClick={async () => {

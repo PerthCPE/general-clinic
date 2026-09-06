@@ -8,6 +8,104 @@ let currentAudioElement: HTMLAudioElement | null = null;
 let isAudioSequencePlaying = false;
 
 /**
+ * Play a simple Ding-Dong notification sound (ดุงๆ) followed by optional TTS
+ * สามารถปรับตั้งค่าให้ใช้ไฟล์ MP3 หรือเปลี่ยนความถี่เสียงสังเคราะห์ได้ที่นี่
+ */
+export function playNotificationDingDong(message?: string): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      // ตรวจสอบว่าผู้ใช้ปิดเสียงแจ้งเตือนไว้หรือไม่
+      if (localStorage.getItem('notificationSoundEnabled') === 'false') {
+        resolve();
+        return;
+      }
+
+      // ==========================================
+      // ตั้งค่ารูปแบบเสียงแจ้งเตือน
+      // ==========================================
+      const USE_MP3 = true; // เปลี่ยนเป็น true ถ้าต้องการใช้ไฟล์เสียง MP3 แทนเสียงสังเคราะห์
+      const MP3_FILE_PATH = '/audio/pin_a1.mp3'; // ชื่อไฟล์เสียงในโฟลเดอร์ public/audio/
+      
+      // หน่วงเวลากี่มิลลิวินาทีก่อนที่บอทจะพูด (1 วินาที = 1000)
+      // เช่น ถ้าไฟล์ MP3 ยาว 3 วินาที ให้ตั้งค่าเป็น 3000
+      const WAIT_BEFORE_TTS_MS = 6000; 
+
+      // ตั้งค่าความถี่เสียงสังเคราะห์ (มีผลเมื่อ USE_MP3 = false)
+      const TONE_1_FREQ = 659.25; // ความถี่เสียงที่ 1 (ดุง) เช่น 659.25 (E5)
+      const TONE_2_FREQ = 523.25; // ความถี่เสียงที่ 2 (ด๊ง) เช่น 523.25 (C5)
+      // ==========================================
+
+      const playTTS = () => {
+        if (message) {
+          const win = window as any;
+          if (win.responsiveVoice) {
+            win.responsiveVoice.speak(message, "Thai Female", { rate: 1.0 });
+          }
+        }
+        resolve();
+      };
+
+      if (USE_MP3) {
+        // เล่นจากไฟล์เสียง MP3 (ตั้งค่าให้เล่นวนลูปไปจนกว่าจะครบเวลา)
+        const audio = new Audio(MP3_FILE_PATH);
+        audio.loop = true;
+        currentAudioElement = audio;
+        audio.play().catch(e => console.error('MP3 play failed', e));
+        
+        // รอให้เสียง mp3 เล่นครบตามเวลาที่ตั้งไว้ แล้วหยุดเพื่อบอทพูด
+        setTimeout(() => {
+          audio.pause();
+          audio.currentTime = 0;
+          playTTS();
+        }, WAIT_BEFORE_TTS_MS);
+      } else {
+        // เล่นเสียงจากระบบสังเคราะห์ (Web Audio API)
+        const AudioCtx =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+
+        if (!AudioCtx) {
+          playTTS();
+          return;
+        }
+        const ctx = new AudioCtx();
+
+        // First tone
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(TONE_1_FREQ, ctx.currentTime);
+        gain1.gain.setValueAtTime(0.5, ctx.currentTime);
+        gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start();
+        osc1.stop(ctx.currentTime + 0.5);
+
+        // Second tone
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(TONE_2_FREQ, ctx.currentTime + 0.15);
+        gain2.gain.setValueAtTime(0, ctx.currentTime);
+        gain2.gain.setValueAtTime(0.5, ctx.currentTime + 0.15);
+        gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.65);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(ctx.currentTime + 0.15);
+        osc2.stop(ctx.currentTime + 0.65);
+
+        // รอเสียงดุงๆ จบก่อนตามวินาทีที่ตั้งไว้ แล้วบอทค่อยพูด
+        setTimeout(playTTS, WAIT_BEFORE_TTS_MS);
+      }
+    } catch (e) {
+      console.error('Audio play failed', e);
+      resolve();
+    }
+  });
+}
+
+/**
  * Play a prestigious, soothing hospital announcement chime
  * 3-Tone Gentle Melodic Progression: F#5 -> A#5 -> C#6 with warm acoustic harmonics
  */
