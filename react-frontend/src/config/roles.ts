@@ -60,7 +60,7 @@ export const DEMO_USERS: Record<UserRole, User> = {
   doctor: {
     id: 'user-doc-01',
     username: 'doctor1',
-    fullName: 'นพ.อานนท์ ศรีตรวจ',
+    fullName: 'นพ.สุดา สุขสมบูรณ์',
     role: 'doctor',
     roleTitleTh: 'แพทย์ผู้ตรวจ',
     roleTitleEn: 'Doctor',

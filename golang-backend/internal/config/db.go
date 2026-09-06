@@ -197,7 +197,7 @@ func seedDatabase() {
 		{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
 		{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
 		{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
-		{Username: "pharmacist1", Password: passStr, Role: "pharmacist", FullName: "ภก.บุญชู เภสัชกร", Phone: "081-333-0001"},
+		{Username: "pharmacist1", Password: passStr, Role: "pharmacist", FullName: "ดร.บุญ สั่งยา", Phone: "081-333-0001"},
 		{Username: "cashier1", Password: passStr, Role: "cashier", FullName: "นส.รวย การเงิน", Phone: "081-444-0001"},
 		{Username: "doctor1", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
 		{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
@@ -207,9 +207,16 @@ func seedDatabase() {
 		var existing models.User
 		if err := DB.Where("username = ?", users[i].Username).First(&existing).Error; err != nil {
 			DB.Create(&users[i])
+		} else {
+			// อัปเดตข้อมูล FullName, Role, Phone ให้ตรงกับค่า seed ล่าสุดเสมอ
+			DB.Model(&existing).Updates(map[string]interface{}{
+				"full_name": users[i].FullName,
+				"role":      users[i].Role,
+				"phone":     users[i].Phone,
+			})
 		}
 	}
-	log.Println("Users & Doctors verified and seeded successfully.")
+	log.Println("Users & Doctors verified, updated and seeded successfully.")
 
 	// 2. Seed Medicines (if empty)
 	var medCount int64

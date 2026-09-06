@@ -62,12 +62,24 @@ const initialDefaultQueue: PatientQueueItem[] = [
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   
-  // ของเพื่อน: ดึงข้อมูล User
+  // ของเพื่อน: ดึงข้อมูล User (ซิงค์ชื่อและข้อมูลล่าสุดตาม DEMO_USERS เสมอ ไม่ให้ติดแคชเก่า)
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem(AUTH_STORAGE_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed: User = JSON.parse(saved);
+        if (parsed && parsed.role && DEMO_USERS[parsed.role as UserRole]) {
+          const latest = DEMO_USERS[parsed.role as UserRole];
+          return {
+            ...parsed,
+            fullName: latest.fullName,
+            roleTitleTh: latest.roleTitleTh,
+            roleTitleEn: latest.roleTitleEn,
+            avatarText: latest.avatarText,
+            avatarColor: latest.avatarColor,
+          };
+        }
+        return parsed;
       } catch {
         return null;
       }

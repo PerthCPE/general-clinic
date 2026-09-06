@@ -612,7 +612,7 @@ export const DocumentForwardPage: React.FC = () => {
                         <option value="7">นพ.วิชัย ชาญการแพทย์ (แพทย์)</option>
                         <option value="8">พญ.เกศรา รักษาดี (แพทย์)</option>
                         <option value="3">พว. กานดา คัดกรอง (พยาบาล)</option>
-                        <option value="5">ภก.บุญชู เภสัชกร (ห้องยา)</option>
+                        <option value="5">ดร.บุญชู เภสัชกร (ห้องยา)</option>
                         <option value="6">นส.รวย การเงิน (การเงิน)</option>
                       </>
                     )}
