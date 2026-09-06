@@ -104,9 +104,9 @@ export interface OfficerShiftSchedule {
   };
 }
 
-const STORAGE_KEY_SHIFTS = 'clinic_doctor_shifts_v2';
-const STORAGE_KEY_OVERRIDES = 'clinic_calendar_overrides_v2';
-const STORAGE_KEY_OFFICER_SCHEDULES = 'clinic_officer_schedules_v2';
+const STORAGE_KEY_SHIFTS = 'clinic_doctor_shifts_v4';
+const STORAGE_KEY_OVERRIDES = 'clinic_calendar_overrides_v4';
+const STORAGE_KEY_OFFICER_SCHEDULES = 'clinic_officer_schedules_v4';
 
 export function findDoctorProfile(identifier?: string): DoctorProfile {
   if (!identifier) return SYSTEM_DOCTORS[0];
@@ -125,45 +125,47 @@ export function findDoctorProfile(identifier?: string): DoctorProfile {
 
 /**
  * Generates initial mockup shifts for all 3 doctors in the system
- * spans from past 7 days to next 30 days
+ * Clinic shifts:
+ * - Morning Shift: 07:00 - 12:00
+ * - Afternoon Shift: 13:00 - 18:00
  */
 export function generateInitialDoctorShifts(): DoctorShift[] {
   const shifts: DoctorShift[] = [];
   const today = new Date();
   
-  // Define routine template for each doctor
+  // Define routine template for each doctor (2 clinic shifts only: 07:00-12:00, 13:00-18:00)
   const templates = [
     {
       doc: SYSTEM_DOCTORS[0], // พญ.สุดา (สูตินรีเวช)
       routines: [
-        { day: 1, type: 'General Consultation' as const, time: ['08:00', '16:00'], room: 'ห้องตรวจ 1 (สูตินรีเวช)', max: 20, booked: 14, note: 'ตรวจครรภ์และสูตินรีเวชทั่วไป' },
-        { day: 2, type: 'Minor Procedure' as const, time: ['13:00', '16:30'], room: 'ห้องหัตถการสูติ 1', max: 6, booked: 4, note: 'อัลตราซาวด์ 4 มิติ และหัตถการพิเศษ' },
-        { day: 3, type: 'General Consultation' as const, time: ['08:00', '16:00'], room: 'ห้องตรวจ 1 (สูตินรีเวช)', max: 20, booked: 18, note: 'คลินิกฝากครรภ์พิเศษ (ANC Clinic)' },
-        { day: 4, type: 'Academic / Meeting' as const, time: ['08:30', '12:00'], room: 'ห้องประชุมวิชาการ 2', max: 0, booked: 0, note: 'ประชุมวิชาการสูตินรีแพทย์ประจำเดือน' },
-        { day: 5, type: 'General Consultation' as const, time: ['08:00', '16:00'], room: 'ห้องตรวจ 1 (สูตินรีเวช)', max: 20, booked: 15, note: 'ตรวจรักษาโรคสตรีและวางแผนครอบครัว' },
-        { day: 6, type: 'After-hours' as const, time: ['08:30', '12:30'], room: 'ห้องตรวจ 1 (สูตินรีเวช)', max: 12, booked: 9, note: 'คลินิกนอกเวลาราชการ (วันเสาร์)' },
+        { day: 1, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 1 (สูตินรีเวช)', max: 20, booked: 14, note: 'ตรวจครรภ์และสูตินรีเวชทั่วไป (รอบเช้า)' },
+        { day: 2, type: 'Minor Procedure' as const, time: ['13:00', '18:00'], room: 'ห้องหัตถการสูติ 1', max: 8, booked: 5, note: 'อัลตราซาวด์ 4 มิติ และหัตถการพิเศษ (รอบบ่าย)' },
+        { day: 3, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 1 (สูตินรีเวช)', max: 20, booked: 18, note: 'คลินิกฝากครรภ์พิเศษ (ANC Clinic รอบเช้า)' },
+        { day: 4, type: 'Academic / Meeting' as const, time: ['07:00', '12:00'], room: 'ห้องประชุมวิชาการ 2', max: 0, booked: 0, note: 'ประชุมวิชาการสูตินรีแพทย์ประจำเดือน' },
+        { day: 5, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 1 (สูตินรีเวช)', max: 20, booked: 15, note: 'ตรวจรักษาโรคสตรีและวางแผนครอบครัว' },
+        { day: 6, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 1 (สูตินรีเวช)', max: 15, booked: 10, note: 'คลินิกสูตินรีเวชวันเสาร์ (รอบเช้า)' },
       ]
     },
     {
       doc: SYSTEM_DOCTORS[1], // นพ.วิชัย (อายุรกรรม)
       routines: [
-        { day: 1, type: 'After-hours' as const, time: ['16:00', '00:00'], room: 'ห้องตรวจ 2 (อายุรกรรม)', max: 15, booked: 11, note: 'เวรตรวจอายุรกรรมช่วงบ่าย-ค่ำ' },
-        { day: 2, type: 'General Consultation' as const, time: ['08:00', '16:00'], room: 'ห้องตรวจ 2 (อายุรกรรม)', max: 25, booked: 22, note: 'คลินิกเบาหวาน ความดันโลหิตสูง และหัวใจ' },
-        { day: 3, type: 'Health Check-up' as const, time: ['08:30', '12:00'], room: 'ศูนย์ตรวจสุขภาพ (Check-up Center)', max: 15, booked: 12, note: 'ตรวจสุขภาพประจำปีกลุ่มเสี่ยงโรคหัวใจ' },
-        { day: 4, type: 'General Consultation' as const, time: ['08:00', '16:00'], room: 'ห้องตรวจ 2 (อายุรกรรม)', max: 25, booked: 19, note: 'ตรวจรักษาโรคอายุรกรรมทั่วไป' },
-        { day: 5, type: 'General Consultation' as const, time: ['08:00', '16:00'], room: 'ห้องตรวจ 2 (อายุรกรรม)', max: 25, booked: 20, note: 'ตรวจผู้ป่วยนอกอายุรกรรมประจำวันศุกร์' },
-        { day: 0, type: 'After-hours' as const, time: ['13:00', '18:00'], room: 'ห้องตรวจ 2 (อายุรกรรม)', max: 12, booked: 8, note: 'เวรตรวจนอกเวลาประจำวันอาทิตย์' },
+        { day: 1, type: 'After-hours' as const, time: ['13:00', '18:00'], room: 'ห้องตรวจ 2 (อายุรกรรม)', max: 18, booked: 12, note: 'เวรตรวจอายุรกรรมช่วงบ่าย' },
+        { day: 2, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 2 (อายุรกรรม)', max: 25, booked: 22, note: 'คลินิกเบาหวาน ความดันโลหิตสูง และหัวใจ (รอบเช้า)' },
+        { day: 3, type: 'Health Check-up' as const, time: ['07:00', '12:00'], room: 'ศูนย์ตรวจสุขภาพ (Check-up Center)', max: 15, booked: 12, note: 'ตรวจสุขภาพประจำปีกลุ่มเสี่ยงโรคหัวใจ' },
+        { day: 4, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 2 (อายุรกรรม)', max: 25, booked: 19, note: 'ตรวจรักษาโรคอายุรกรรมทั่วไป (รอบเช้า)' },
+        { day: 5, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 2 (อายุรกรรม)', max: 25, booked: 20, note: 'ตรวจผู้ป่วยนอกอายุรกรรมประจำวันศุกร์' },
+        { day: 0, type: 'After-hours' as const, time: ['13:00', '18:00'], room: 'ห้องตรวจ 2 (อายุรกรรม)', max: 15, booked: 9, note: 'เวรตรวจอายุรกรรมประจำวันอาทิตย์ (รอบบ่าย)' },
       ]
     },
     {
       doc: SYSTEM_DOCTORS[2], // พญ.เกศรา (กุมารเวชกรรม)
       routines: [
-        { day: 1, type: 'General Consultation' as const, time: ['08:00', '16:00'], room: 'ห้องตรวจ 3 (กุมารเวชกรรม)', max: 20, booked: 16, note: 'ตรวจรักษาโรคเด็กทั่วไปและทางเดินหายใจ' },
-        { day: 2, type: 'Health Check-up' as const, time: ['08:30', '12:00'], room: 'คลินิกวัคซีนและพัฒนาการเด็ก', max: 15, booked: 14, note: 'คลินิกฉีดวัคซีนเด็กและประเมินพัฒนาการ' },
-        { day: 3, type: 'General Consultation' as const, time: ['08:00', '16:00'], room: 'ห้องตรวจ 3 (กุมารเวชกรรม)', max: 20, booked: 15, note: 'คลินิกโรคภูมิแพ้และหอบหืดในเด็ก' },
-        { day: 4, type: 'After-hours' as const, time: ['16:00', '20:00'], room: 'ห้องตรวจ 3 (กุมารเวชกรรม)', max: 10, booked: 7, note: 'คลินิกกุมารเวชกรรมนอกเวลาช่วงเย็น' },
-        { day: 5, type: 'General Consultation' as const, time: ['08:00', '16:00'], room: 'ห้องตรวจ 3 (กุมารเวชกรรม)', max: 20, booked: 17, note: 'ตรวจรักษาโรคเด็กประจำวันศุกร์' },
-        { day: 6, type: 'General Consultation' as const, time: ['08:30', '12:30'], room: 'ห้องตรวจ 3 (กุมารเวชกรรม)', max: 15, booked: 13, note: 'ตรวจรักษาโรคเด็กวันหยุดเสาร์' },
+        { day: 1, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 3 (กุมารเวชกรรม)', max: 20, booked: 16, note: 'ตรวจรักษาโรคเด็กทั่วไปและทางเดินหายใจ (รอบเช้า)' },
+        { day: 2, type: 'Health Check-up' as const, time: ['07:00', '12:00'], room: 'คลินิกวัคซีนและพัฒนาการเด็ก', max: 15, booked: 14, note: 'คลินิกฉีดวัคซีนเด็กและประเมินพัฒนาการ' },
+        { day: 3, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 3 (กุมารเวชกรรม)', max: 20, booked: 15, note: 'คลินิกโรคภูมิแพ้และหอบหืดในเด็ก' },
+        { day: 4, type: 'After-hours' as const, time: ['13:00', '18:00'], room: 'ห้องตรวจ 3 (กุมารเวชกรรม)', max: 16, booked: 11, note: 'คลินิกกุมารเวชกรรมช่วงบ่าย' },
+        { day: 5, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 3 (กุมารเวชกรรม)', max: 20, booked: 17, note: 'ตรวจรักษาโรคเด็กประจำวันศุกร์ (รอบเช้า)' },
+        { day: 6, type: 'General Consultation' as const, time: ['07:00', '12:00'], room: 'ห้องตรวจ 3 (กุมารเวชกรรม)', max: 15, booked: 13, note: 'ตรวจรักษาโรคเด็กวันหยุดเสาร์ (รอบเช้า)' },
       ]
     }
   ];
@@ -357,6 +359,9 @@ function notifyScheduleUpdate() {
 
 /**
  * Synchronize an Officer schedule update into Doctor shifts
+ * Clinic operates in 2 shifts:
+ * - 'morning': 07:00 - 12:00
+ * - 'afternoon': 13:00 - 18:00
  */
 export function syncOfficerShiftToDoctorSchedule(
   doctorId: string,
@@ -372,29 +377,24 @@ export function syncOfficerShiftToDoctorSchedule(
   const filtered = currentShifts.filter(s => !(s.doctorName === doctor.name && s.date === dateStr));
 
   if (shiftType !== 'off') {
-    let startTime = '08:00';
-    let endTime = '16:00';
+    let startTime = '07:00';
+    let endTime = '12:00';
     let typeName: DoctorShift['shiftType'] = 'General Consultation';
     let room = doctor.roomLocation;
     let maxPatients = 20;
     let bookedPatients = Math.floor(Math.random() * 8) + 5;
-    let note = customNote || `เวรตรวจ${shiftType === 'morning' ? 'เช้า' : shiftType === 'afternoon' ? 'บ่าย' : 'ดึก'} (อัปเดตโดยเจ้าหน้าที่ธุรการ)`;
+    let note = customNote || `เวรตรวจ${shiftType === 'morning' ? 'เช้า (07:00 - 12:00)' : 'บ่าย (13:00 - 18:00)'} (อัปเดตโดยเจ้าหน้าที่ธุรการ)`;
 
     if (shiftType === 'morning') {
-      startTime = '08:00';
-      endTime = '16:00';
+      startTime = '07:00';
+      endTime = '12:00';
       typeName = 'General Consultation';
-    } else if (shiftType === 'afternoon') {
-      startTime = '16:00';
-      endTime = '00:00';
+    } else {
+      // afternoon or legacy night
+      startTime = '13:00';
+      endTime = '18:00';
       typeName = 'After-hours';
       maxPatients = 15;
-    } else if (shiftType === 'night') {
-      startTime = '00:00';
-      endTime = '08:00';
-      typeName = 'After-hours';
-      room = 'ห้องตรวจเวรดึก/ฉุกเฉิน';
-      maxPatients = 10;
     }
 
     let status: DoctorShift['status'] = 'Scheduled';
@@ -428,8 +428,8 @@ export function syncOfficerShiftToDoctorSchedule(
       doctorUsername: doctor.username,
       department: doctor.department,
       date: dateStr,
-      startTime: '08:00',
-      endTime: '16:00',
+      startTime: '07:00',
+      endTime: '12:00',
       shiftType: 'Leave / Off',
       roomLocation: '-',
       maxPatients: 0,

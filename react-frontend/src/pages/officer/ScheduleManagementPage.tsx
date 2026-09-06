@@ -46,8 +46,8 @@ import {
 } from '../../services/scheduleStorage';
 
 const initialSwapRequests: ShiftSwapItem[] = [
-  { id: 'SWP-2569-01', requesterName: 'พญ.สุดา สุขสมบูรณ์', requesterShift: 'เวรเช้า (08:00 - 16:00)', receiverName: 'นพ.วิชัย ชาญการแพทย์', receiverShift: 'เวรบ่าย (16:00 - 00:00)', date: '15 ก.ย. 2569', reason: 'ติดประชุมวิชาการแพทย์', status: 'pending' },
-  { id: 'SWP-2569-02', requesterName: 'นพ.วิชัย ชาญการแพทย์', requesterShift: 'เวรบ่าย (16:00 - 00:00)', receiverName: 'พญ.เกศรา รักษาดี', receiverShift: 'เวรเช้า (08:00 - 16:00)', date: '18 ก.ย. 2569', reason: 'ติดภารกิจครอบครัวต่างจังหวัด', status: 'pending' },
+  { id: 'SWP-2569-01', requesterName: 'พญ.สุดา สุขสมบูรณ์', requesterShift: 'เวรเช้า (07:00 - 12:00)', receiverName: 'นพ.วิชัย ชาญการแพทย์', receiverShift: 'เวรบ่าย (13:00 - 18:00)', date: '15 ก.ย. 2569', reason: 'ติดประชุมวิชาการแพทย์', status: 'pending' },
+  { id: 'SWP-2569-02', requesterName: 'นพ.วิชัย ชาญการแพทย์', requesterShift: 'เวรบ่าย (13:00 - 18:00)', receiverName: 'พญ.เกศรา รักษาดี', receiverShift: 'เวรเช้า (07:00 - 12:00)', date: '18 ก.ย. 2569', reason: 'ติดภารกิจครอบครัวต่างจังหวัด', status: 'pending' },
 ];
 
 export const ScheduleManagementPage: React.FC = () => {
@@ -70,13 +70,22 @@ export const ScheduleManagementPage: React.FC = () => {
   // Modals
   const [activeModal, setActiveModal] = useState<'swapRequests' | 'attendance' | 'filter' | 'addBatchSchedule' | null>(null);
 
-  // Batch Creation Form State (Use Case U2)
+  // Stats
+  const totalDoctors = schedules.length;
+  const morningShifts = schedules.reduce((acc, s) => acc + Object.values(s.shifts).filter(v => v === 'morning').length, 0);
+  const afternoonShifts = schedules.reduce((acc, s) => acc + Object.values(s.shifts).filter(v => v === 'afternoon').length, 0);
+  const pendingSwaps = swapRequests.filter(s => s.status === 'pending').length;
+
+  // Batch Assignment State (Use Case U2)
   const [batchForm, setBatchForm] = useState({
-    doctorId: 'DOC-1',
+    doctorId: schedules[0]?.id || 'DOC-1',
+    allDoctors: false,
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
-    weekdays: [1, 2, 3, 4, 5], // 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 0=Sun
+    weekdays: [1, 2, 3, 4, 5], // Mon-Fri default
     shiftType: 'morning' as 'morning' | 'afternoon' | 'night',
+    maxPatients: 20,
+    room: 'ห้องตรวจ 1'
   });
   const [previewDates, setPreviewDates] = useState<string[]>([]);
   const [hasPreviewed, setHasPreviewed] = useState(false);
@@ -153,11 +162,10 @@ export const ScheduleManagementPage: React.FC = () => {
   const renderShiftBadge = (shift: 'morning' | 'afternoon' | 'night' | 'off') => {
     switch (shift) {
       case 'morning':
-        return <span className="shift-badge morning">เวรเช้า (08:00 - 16:00)</span>;
+        return <span className="shift-badge morning">เวรเช้า (07:00 - 12:00)</span>;
       case 'afternoon':
-        return <span className="shift-badge afternoon">เวรบ่าย (16:00 - 00:00)</span>;
       case 'night':
-        return <span className="shift-badge night">เวรดึก (00:00 - 08:00)</span>;
+        return <span className="shift-badge afternoon">เวรบ่าย (13:00 - 18:00)</span>;
       case 'off':
         return <span className="shift-badge off">วันหยุด</span>;
       default:
@@ -769,7 +777,7 @@ export const ScheduleManagementPage: React.FC = () => {
                   <span className="section-step-title">เลือกกะเวรการทำงาน (Shift Type)</span>
                   <span className="text-required">*</span>
                 </div>
-                <div className="shift-options-grid">
+                <div className="shift-options-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
                   <label className={`shift-option-card ${batchForm.shiftType === 'morning' ? 'selected' : ''}`}>
                     <input
                       type="radio"
@@ -780,7 +788,7 @@ export const ScheduleManagementPage: React.FC = () => {
                     />
                     <div className="shift-option-info">
                       <span className="shift-title morning-text">เวรเช้า (Morning Shift)</span>
-                      <span className="shift-time">08:00 - 16:00 น.</span>
+                      <span className="shift-time">07:00 - 12:00 น.</span>
                     </div>
                   </label>
 
@@ -794,21 +802,7 @@ export const ScheduleManagementPage: React.FC = () => {
                     />
                     <div className="shift-option-info">
                       <span className="shift-title afternoon-text">เวรบ่าย (Afternoon Shift)</span>
-                      <span className="shift-time">16:00 - 00:00 น.</span>
-                    </div>
-                  </label>
-
-                  <label className={`shift-option-card ${batchForm.shiftType === 'night' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="shiftType"
-                      value="night"
-                      checked={batchForm.shiftType === 'night'}
-                      onChange={() => { setBatchForm({ ...batchForm, shiftType: 'night' }); setHasPreviewed(false); }}
-                    />
-                    <div className="shift-option-info">
-                      <span className="shift-title night-text">เวรดึก (Night Shift)</span>
-                      <span className="shift-time">00:00 - 08:00 น.</span>
+                      <span className="shift-time">13:00 - 18:00 น.</span>
                     </div>
                   </label>
                 </div>
@@ -827,7 +821,7 @@ export const ScheduleManagementPage: React.FC = () => {
                   <div className="preview-dates-tags">
                     {previewDates.map(dateStr => (
                       <span key={dateStr} className="preview-date-tag">
-                        {dateStr} ({batchForm.shiftType === 'morning' ? 'เช้า' : (batchForm.shiftType === 'afternoon' ? 'บ่าย' : 'ดึก')})
+                        {dateStr} ({batchForm.shiftType === 'morning' ? 'เช้า (07:00-12:00)' : 'บ่าย (13:00-18:00)'})
                       </span>
                     ))}
                   </div>
@@ -1038,9 +1032,8 @@ export const ScheduleManagementPage: React.FC = () => {
                             value={tempDayShifts[doc.id] || 'morning'}
                             onChange={e => setTempDayShifts({ ...tempDayShifts, [doc.id]: e.target.value as any })}
                           >
-                            <option value="morning">เวรเช้า (08:00 - 16:00)</option>
-                            <option value="afternoon">เวรบ่าย (16:00 - 00:00)</option>
-                            <option value="night">เวรดึก (00:00 - 08:00)</option>
+                            <option value="morning">เวรเช้า (07:00 - 12:00)</option>
+                            <option value="afternoon">เวรบ่าย (13:00 - 18:00)</option>
                             <option value="off">วันหยุด (Off)</option>
                           </select>
                         </td>

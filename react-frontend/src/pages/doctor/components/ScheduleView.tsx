@@ -102,8 +102,8 @@ export const ScheduleView: React.FC = () => {
   // Form Fields State (Doctor is locked to loggedInDoctor.name)
   const [formDepartment, setFormDepartment] = useState(loggedInDoctor.department);
   const [formDate, setFormDate] = useState(todayStr);
-  const [formStartTime, setFormStartTime] = useState('08:00');
-  const [formEndTime, setFormEndTime] = useState('16:00');
+  const [formStartTime, setFormStartTime] = useState('07:00');
+  const [formEndTime, setFormEndTime] = useState('12:00');
   const [formShiftType, setFormShiftType] = useState<DoctorShift['shiftType']>('General Consultation');
   const [formRoomLocation, setFormRoomLocation] = useState(loggedInDoctor.roomLocation);
   const [formMaxPatients, setFormMaxPatients] = useState(20);
@@ -260,8 +260,8 @@ export const ScheduleView: React.FC = () => {
     setEditingShift(null);
     setFormDepartment(loggedInDoctor.department);
     setFormDate(defaultDate || todayStr);
-    setFormStartTime('08:00');
-    setFormEndTime('16:00');
+    setFormStartTime('07:00');
+    setFormEndTime('12:00');
     setFormShiftType('General Consultation');
     setFormRoomLocation(loggedInDoctor.roomLocation);
     setFormMaxPatients(20);
@@ -1114,9 +1114,27 @@ export const ScheduleView: React.FC = () => {
 
                 {/* กลุ่ม 2 — วันและเวลา */}
                 <section className="rounded-2xl border border-slate-200 overflow-hidden">
-                  <header className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-slate-500 shrink-0" />
-                    <h4 className="text-xs font-bold text-slate-700">วันและเวลาปฏิบัติงาน</h4>
+                  <header className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-slate-500 shrink-0" />
+                      <h4 className="text-xs font-bold text-slate-700">วันและเวลาปฏิบัติงาน (2 กะมาตรฐาน)</h4>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => { setFormStartTime('07:00'); setFormEndTime('12:00'); }}
+                        className="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                      >
+                        ☀️ กะเช้า (07:00-12:00)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setFormStartTime('13:00'); setFormEndTime('18:00'); }}
+                        className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                      >
+                        🌤️ กะบ่าย (13:00-18:00)
+                      </button>
+                    </div>
                   </header>
                   <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
