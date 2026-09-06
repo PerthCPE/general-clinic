@@ -677,18 +677,20 @@ export const ScheduleView: React.FC = () => {
                               ? 'bg-blue-50 border-blue-300 text-blue-900 hover:bg-blue-100 font-bold shadow-2xs'
                               : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
                           }`}
-                          title={`${shift.doctorName} - ${shift.shiftType} (${shift.startTime}-${shift.endTime})`}
+                          title={`${shift.startTime} - ${shift.endTime} | ${shift.shiftType} (${shift.doctorName} - ${shift.roomLocation})`}
                         >
-                          <div className="truncate flex items-center gap-1">
+                          <div className="truncate flex items-center gap-1.5 min-w-0">
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${owner ? 'bg-blue-600' : 'bg-slate-400'}`} />
-                            <span className="truncate font-bold">
-                              {shift.doctorName.split(' ')[1] || shift.doctorName}:
+                            <span className="font-mono font-bold text-slate-900 shrink-0">
+                              {shift.startTime} - {shift.endTime}
                             </span>
-                            <span className="truncate text-slate-600">{shift.shiftType}</span>
+                            <span className="truncate text-slate-600 font-normal">
+                              {shift.shiftType}
+                            </span>
                           </div>
 
                           {!owner ? (
-                            <span title="Read only (Other doctor's schedule)">
+                            <span title={`ตารางของ ${shift.doctorName}`}>
                               <Lock className="w-3 h-3 text-slate-400 shrink-0" />
                             </span>
                           ) : (
