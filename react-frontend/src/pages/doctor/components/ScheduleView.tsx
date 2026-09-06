@@ -83,8 +83,9 @@ export const ScheduleView: React.FC = () => {
     };
   }, []);
 
-  // Filters
-  const [selectedDoctorFilter, setSelectedDoctorFilter] = useState<string>('All');
+  // Scope: 'mine' (default - logged-in doctor) vs 'all' (view other doctors / all)
+  const [scheduleScope, setScheduleScope] = useState<'mine' | 'all'>('mine');
+  const [selectedDoctorFilter, setSelectedDoctorFilter] = useState<string>(loggedInDoctor.name);
   const [filterShiftType, setFilterShiftType] = useState<string>('All');
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'list'>('month');
   const [searchQuery, setSearchQuery] = useState('');
@@ -109,11 +110,14 @@ export const ScheduleView: React.FC = () => {
   const [formStatus, setFormStatus] = useState<DoctorShift['status']>('Scheduled');
   const [formNote, setFormNote] = useState('');
 
-  // Update form defaults when loggedInDoctor changes
+  // Update form defaults and scope when loggedInDoctor changes
   useEffect(() => {
     setFormDepartment(loggedInDoctor.department);
     setFormRoomLocation(loggedInDoctor.roomLocation);
-  }, [loggedInDoctor]);
+    if (scheduleScope === 'mine') {
+      setSelectedDoctorFilter(loggedInDoctor.name);
+    }
+  }, [loggedInDoctor, scheduleScope]);
 
   // Toast Notification
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -135,7 +139,10 @@ export const ScheduleView: React.FC = () => {
   // Filtered shifts according to selection
   const filteredShifts = useMemo(() => {
     return shifts.filter((s) => {
-      const matchDoctor = selectedDoctorFilter === 'All' || s.doctorName === selectedDoctorFilter;
+      const matchDoctor =
+        scheduleScope === 'mine'
+          ? (s.doctorName === loggedInDoctor.name || s.doctorUsername === loggedInDoctor.username || s.doctorId === loggedInDoctor.id)
+          : (selectedDoctorFilter === 'All' || s.doctorName === selectedDoctorFilter);
       const matchType = filterShiftType === 'All' || s.shiftType === filterShiftType;
       const matchSearch =
         searchQuery.trim() === '' ||
@@ -145,7 +152,7 @@ export const ScheduleView: React.FC = () => {
 
       return matchDoctor && matchType && matchSearch;
     });
-  }, [shifts, selectedDoctorFilter, filterShiftType, searchQuery]);
+  }, [shifts, scheduleScope, selectedDoctorFilter, loggedInDoctor, filterShiftType, searchQuery]);
 
   // Dynamic Days of selected week
   const weekDays = useMemo(() => {
@@ -440,8 +447,10 @@ export const ScheduleView: React.FC = () => {
             <CalendarIcon className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('totalScheduledShifts')}</span>
-            <span className="text-lg font-extrabold text-slate-900">{totalShiftsCount} {language === 'th' ? 'กะ' : 'Shifts'}</span>
+            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">
+              {scheduleScope === 'mine' ? (language === 'th' ? 'เวรของคุณในเดือนนี้' : 'My Monthly Duties') : t('totalScheduledShifts')}
+            </span>
+            <span className="text-lg font-extrabold text-slate-900">{filteredShifts.length} {language === 'th' ? 'กะ' : 'Shifts'}</span>
           </div>
         </div>
 
@@ -478,21 +487,55 @@ export const ScheduleView: React.FC = () => {
 
       {/* Control Filter Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Doctor Filter Selector */}
-        <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
-          <span className="text-xs font-bold text-slate-600 whitespace-nowrap">{t('filterDoctor')}:</span>
-          <select
-            value={selectedDoctorFilter}
-            onChange={(e) => setSelectedDoctorFilter(e.target.value)}
-            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer"
+        {/* Doctor Scope Buttons (My Schedule vs Other Doctors) */}
+        <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              setScheduleScope('mine');
+              setSelectedDoctorFilter(loggedInDoctor.name);
+            }}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              scheduleScope === 'mine'
+                ? 'bg-[#2563eb] text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
           >
-            <option value="All">{t('allDoctors')}</option>
-            {SYSTEM_DOCTORS.map((doc) => (
-              <option key={doc.id} value={doc.name}>
-                {doc.name} — {doc.department} {doc.name === loggedInDoctor.name ? (language === 'th' ? '⭐ (บัญชีของคุณ)' : '⭐ (Your Account)') : ''}
-              </option>
-            ))}
-          </select>
+            <User className="w-3.5 h-3.5" />
+            <span>{language === 'th' ? `ตารางงานของฉัน (${loggedInDoctor.name})` : `My Schedule (${loggedInDoctor.name})`}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setScheduleScope('all');
+              setSelectedDoctorFilter('All');
+            }}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              scheduleScope === 'all'
+                ? 'bg-[#2563eb] text-white shadow-xs'
+                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>{language === 'th' ? 'ดูตารางแพทย์ท่านอื่น' : 'View Other Doctors'}</span>
+          </button>
+
+          {/* Doctor Filter Selector (Shown when viewing other doctors) */}
+          {scheduleScope === 'all' && (
+            <select
+              value={selectedDoctorFilter}
+              onChange={(e) => setSelectedDoctorFilter(e.target.value)}
+              className="p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer animate-in fade-in"
+            >
+              <option value="All">{t('allDoctors')}</option>
+              {SYSTEM_DOCTORS.map((doc) => (
+                <option key={doc.id} value={doc.name}>
+                  {doc.name} — {doc.department} {doc.name === loggedInDoctor.name ? (language === 'th' ? '⭐ (บัญชีของคุณ)' : '⭐ (Your Account)') : ''}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* Shift Type Filter */}
           <select
