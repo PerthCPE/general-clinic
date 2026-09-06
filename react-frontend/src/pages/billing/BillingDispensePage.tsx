@@ -783,7 +783,7 @@ export default function BillingDispensePage({
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
             </div>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: '800', color: '#0F172A', lineHeight: '38px' }}>{queueList.length}</div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: '38px' }}>{queueList.length}</div>
           <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>กำลังรับบริการระบบการเงิน</div>
         </div>
 
@@ -865,13 +865,13 @@ export default function BillingDispensePage({
           onClick={() => setIsSearchExpanded(!isSearchExpanded)}
           style={{ 
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-            padding: '18px 24px', background: '#F8FAFC', borderBottom: isSearchExpanded ? '1px solid #E2E8F0' : 'none',
+            padding: '18px 24px', background: 'var(--bg-card, #F8FAFC)', borderBottom: isSearchExpanded ? '1px solid #E2E8F0' : 'none',
             cursor: 'pointer', userSelect: 'none' 
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <h3 style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: '700', color: '#0F172A', lineHeight: '1.3' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.3' }}>
                 รายชื่อผู้ป่วยที่รอชำระเงินและประวัติที่ชำระแล้ว (Billing Queue & History)
               </h3>
               <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B', lineHeight: '1.4' }}>
@@ -1026,8 +1026,8 @@ export default function BillingDispensePage({
               }}
             >
               <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F8FAFC' }}>
-                  <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '46px', whiteSpace: 'nowrap' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-card, #F8FAFC)' }}>
+                  <tr style={{ color: 'var(--text-primary)', background: 'var(--bg-card, #F8FAFC)', borderBottom: '2px solid #E2E8F0', height: '46px', whiteSpace: 'nowrap' }}>
                     <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '90px' }}>ลำดับคิว</th>
                     <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '100px' }}>HN</th>
                     <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '100px' }}>VN</th>
@@ -1050,7 +1050,7 @@ export default function BillingDispensePage({
                           style={{ 
                             borderBottom: '1px solid #F1F5F9', 
                             whiteSpace: 'nowrap',
-                            background: isSelected ? '#EFF6FF' : (isCompleted ? '#F8FAFC' : undefined),
+                            background: isSelected ? '#EFF6FF' : (isCompleted ? 'var(--bg-card, #F8FAFC)' : undefined),
                             transition: 'background 0.15s ease'
                           }}
                         >
@@ -1070,7 +1070,7 @@ export default function BillingDispensePage({
                             <CopyableText value={(p.hn || '').replace(/[-]/g, '')} color={isCompleted ? '#64748B' : '#2563EB'} />
                           </td>
                           <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                            <span style={{ color: isCompleted ? '#94A3B8' : '#0F172A', fontWeight: '600', fontFamily: 'monospace', fontSize: '12.5px' }}>
+                            <span style={{ color: isCompleted ? '#94A3B8' : 'var(--text-primary)', fontWeight: '600', fontFamily: 'monospace', fontSize: '12.5px' }}>
                               <CopyableText value={p.vn || '-'} />
                             </span>
                           </td>
@@ -1078,7 +1078,7 @@ export default function BillingDispensePage({
                             {p.nationalId || '-'}
                           </td>
                           <td style={{ padding: '10px 14px 10px 30px', whiteSpace: 'nowrap', textAlign: 'left' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: '700', color: '#0F172A', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isCompleted ? '#64748B' : '#2563EB'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
                                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                                 <circle cx="12" cy="7" r="4"/>
@@ -1237,7 +1237,7 @@ export default function BillingDispensePage({
                     })
                   ) : (
                     <tr>
-                      <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: '#64748B', background: '#F8FAFC' }}>
+                      <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: '#64748B', background: 'var(--bg-card, #F8FAFC)' }}>
                         ไม่พบข้อมูลผู้ป่วยที่ตรงกับเงื่อนไขการค้นหา
                       </td>
                     </tr>
@@ -1303,21 +1303,21 @@ export default function BillingDispensePage({
                   </div>
                 </div>
                 <div className="patient-details" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center', fontSize: '0.95rem' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '600' }}>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>เพศ:</span> {activePatient.gender || 'ชาย'}
                   </span>
                   <span style={{ color: '#CBD5E1' }}>•</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '600' }}>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>อายุ:</span> {activePatient.age || 35} ปี
                   </span>
                   <span style={{ color: '#CBD5E1' }}>•</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '600' }}>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>เบอร์โทร:</span> {activePatient.phone || '081-999-8888'}
                   </span>
                   {activePatient.nationalId && (
                     <>
                       <span style={{ color: '#CBD5E1' }}>•</span>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '600' }}>
                         <CopyableText label="เลขบัตร ปชช." value={activePatient.nationalId} color="#0F172A" />
                       </span>
                     </>
@@ -1339,7 +1339,7 @@ export default function BillingDispensePage({
                 <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
                   เวลาเข้ารักษา (VISIT TIME)
                 </span>
-                <span className="info-val" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>
+                <span className="info-val" style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '14.5px' }}>
                   {activePatient.visitDate || 'วันนี้'} ({activePatient.visitTime || '08:45 น.'})
                 </span>
               </div>
@@ -1375,7 +1375,7 @@ export default function BillingDispensePage({
                 <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
                   โรคประจำตัว (CHRONIC DISEASES)
                 </span>
-                <span className="info-val" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>
+                <span className="info-val" style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '14.5px' }}>
                   {activePatient.chronicDiseases || 'ไม่มี'}
                 </span>
               </div>
@@ -1383,7 +1383,7 @@ export default function BillingDispensePage({
                 <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
                   สัญญาณชีพ (CURRENT VITALS)
                 </span>
-                <span className="info-val" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>
+                <span className="info-val" style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '14.5px' }}>
                   {activePatient.vitals || 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C'}
                 </span>
               </div>
@@ -1431,13 +1431,13 @@ export default function BillingDispensePage({
                     cursor: 'pointer',
                     position: 'relative',
                     userSelect: 'none',
-                    background: '#F8FAFC',
+                    background: 'var(--bg-card, #F8FAFC)',
                     padding: '3px 8px',
                     borderRadius: '6px',
                     border: '1px solid #E2E8F0'
                   }}
                 >
-                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', fontFamily: 'monospace' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-primary)', fontFamily: 'monospace' }}>
                     {(activePatient.hn || '').replace(/[-]/g, '')}
                   </span>
                   {copiedHn === (activePatient.hn || '').replace(/[-]/g, '') ? (
@@ -1456,7 +1456,7 @@ export default function BillingDispensePage({
                       top: '-24px',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      backgroundColor: '#0F172A',
+                      backgroundColor: 'var(--text-primary)',
                       color: '#FFFFFF',
                       fontSize: '10px',
                       fontWeight: 'bold',
@@ -1508,7 +1508,7 @@ export default function BillingDispensePage({
                         <td>{cleanDosage(med.dosage, med.name)}</td>
                         <td style={{ textAlign: 'right', color: '#64748B' }}>฿ {uPrice.toLocaleString()}</td>
                         <td style={{ textAlign: 'right', fontWeight: '600' }}>{qty}</td>
-                        <td style={{ textAlign: 'right', fontWeight: '700', color: '#0F172A' }}>฿ {lineTotal.toLocaleString()}</td>
+                        <td style={{ textAlign: 'right', fontWeight: '700', color: 'var(--text-primary)' }}>฿ {lineTotal.toLocaleString()}</td>
                       </tr>
                     );
                   })
@@ -1659,7 +1659,7 @@ export default function BillingDispensePage({
               </span>
             )}
           </div>
-          <div className="toast-message" style={{ fontWeight: '600', color: '#0F172A' }}>{toast.message}</div>
+          <div className="toast-message" style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{toast.message}</div>
         </div>
       )}
     </div>

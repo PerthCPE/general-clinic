@@ -657,7 +657,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
               <line x1="10" y1="9" x2="8" y2="9"></line>
             </svg>
           </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#1E293B', marginBottom: '8px' }}>ไม่มีบิลรอชำระเงินในขณะนี้</h2>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '8px' }}>ไม่มีบิลรอชำระเงินในขณะนี้</h2>
           <p style={{ color: '#64748B', fontSize: '1rem', marginBottom: '24px', lineHeight: '1.5' }}>
             ยังไม่มีข้อมูลใบสั่งยาที่ส่งมาจากการจ่ายยาของห้องยา กรุณารอห้องยากดยืนยันการจ่ายยา หรือไปที่หน้ารับชำระเงิน
           </p>
@@ -841,8 +841,8 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                   }
                 }}
                 style={{
-                  background: '#F8FAFC',
-                  color: '#0F172A',
+                  background: 'var(--bg-card, #F8FAFC)',
+                  color: 'var(--text-primary)',
                   border: '1.5px solid #CBD5E1',
                   borderRadius: '8px',
                   padding: '6px 12px',
@@ -1039,7 +1039,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                       
                       <div className="promptpay-number-row" style={{ marginTop: '8px' }}>
                         {isEditingPromptPay ? (
-                          <div className="edit-promptpay-box" style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', background: '#F8FAFC', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
+                          <div className="edit-promptpay-box" style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', background: 'var(--bg-card, #F8FAFC)', padding: '10px', borderRadius: '8px', border: '1px solid #CBD5E1' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', textAlign: 'left' }}>
                               <label style={{ fontSize: '11.5px', color: '#475569', fontWeight: '600' }}>เบอร์พร้อมเพย์ (สร้าง QR):</label>
                               <input
@@ -1107,7 +1107,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
 
                               }}>
                                 <span>เลขที่บัญชี:</span>
-                                <strong style={{ fontFamily: 'monospace', color: '#1E293B', fontSize: '13.5px', letterSpacing: '0.5px'   // 4. ความห่างระหว่างตัวเลขแต่ละตัว (ช่องไฟตัวเลข)
+                                <strong style={{ fontFamily: 'monospace', color: 'var(--text-primary)', fontSize: '13.5px', letterSpacing: '0.5px'   // 4. ความห่างระหว่างตัวเลขแต่ละตัว (ช่องไฟตัวเลข)
 
                                  }}>{bankAccountNumber}</strong>
                               </span>
@@ -1214,7 +1214,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
 
                     {/* Hidden Printable Receipt Template for html2pdf.js */}
                     <div style={{ display: 'none' }}>
-                      <div ref={receiptRef} style={{ padding: '24px', fontFamily: "'IBM Plex Sans Thai', sans-serif", color: '#0F172A', background: '#FFFFFF', width: '500px' }}>
+                      <div ref={receiptRef} style={{ padding: '24px', fontFamily: "'IBM Plex Sans Thai', sans-serif", color: 'var(--text-primary)', background: '#FFFFFF', width: '500px' }}>
                         <div style={{ textAlign: 'center', borderBottom: '2px solid #0F172A', paddingBottom: '12px', marginBottom: '16px' }}>
                           <h2 style={{ margin: 0, fontSize: '20px' }}>คลินิกเวชกรรมทั่วไป (General Clinic)</h2>
                           <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748B' }}>ใบเสร็จรับเงิน / Receipt</p>
@@ -1379,7 +1379,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
             <div style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               padding: '16px 24px', borderBottom: '1px solid #E2E8F0',
-              background: '#F8FAFC'
+              background: 'var(--bg-card, #F8FAFC)'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div style={{
@@ -1394,7 +1394,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                   </svg>
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: '#0F172A' }}>
+                  <h3 style={{ margin: 0, fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)' }}>
                     ตัวอย่างใบเสร็จรับเงิน (Receipt Preview)
                   </h3>
                   <span style={{ fontSize: '12.5px', color: '#64748B' }}>
@@ -1410,7 +1410,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: '6px',
                     padding: '8px 16px', borderRadius: '8px',
-                    background: '#FFFFFF', color: '#0F172A',
+                    background: '#FFFFFF', color: 'var(--text-primary)',
                     border: '1.5px solid #CBD5E1', fontSize: '13.5px',
                     fontWeight: '700', cursor: 'pointer', transition: 'all 0.15s ease'
                   }}
@@ -1476,7 +1476,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                   maxWidth: '680px',
                   margin: '0 auto',
                   fontFamily: "'IBM Plex Sans Thai', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-                  color: '#0F172A',
+                  color: 'var(--text-primary)',
                   position: 'relative'
                 }}
               >
@@ -1494,7 +1494,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                       </svg>
                     </div>
                     <div>
-                      <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#0F172A', letterSpacing: '0.2px' }}>
+                      <h1 style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: 'var(--text-primary)', letterSpacing: '0.2px' }}>
                         คลินิกเวชกรรมทั่วไป
                       </h1>
                       <div style={{ fontSize: '13px', fontWeight: '600', color: '#2563EB', marginTop: '2px' }}>
@@ -1518,7 +1518,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                     <div style={{ fontSize: '11.5px', fontWeight: '700', color: '#64748B', marginTop: '3px' }}>
                       RECEIPT / ORIGINAL
                     </div>
-                    <div style={{ fontSize: '12.5px', fontWeight: '700', color: '#0F172A', marginTop: '6px', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: '12.5px', fontWeight: '700', color: 'var(--text-primary)', marginTop: '6px', fontFamily: 'monospace' }}>
                       เลขที่: {activePatient?.visitId ? `REC-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(activePatient.visitId).padStart(4, '0')}` : 'REC-20260904-0001'}
                     </div>
                     <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>
@@ -1529,17 +1529,17 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
 
                 {/* Patient Information Box */}
                 <div style={{
-                  background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: '10px',
+                  background: 'var(--bg-card, #F8FAFC)', border: '1px solid #E2E8F0', borderRadius: '10px',
                   padding: '14px 18px', marginBottom: '20px', display: 'grid',
                   gridTemplateColumns: '1.2fr 1fr', gap: '10px 24px', fontSize: '13px'
                 }}>
                   <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>ชื่อ-นามสกุล ผู้ป่วย: </span>
-                    <strong style={{ color: '#0F172A', fontSize: '13.5px' }}>{activePatient.name}</strong>
+                    <strong style={{ color: 'var(--text-primary)', fontSize: '13.5px' }}>{activePatient.name}</strong>
                   </div>
                   <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>แพทย์ผู้ตรวจ: </span>
-                    <strong style={{ color: '#0F172A' }}>นพ. สมเกียรติ มั่นคง (ว.45892)</strong>
+                    <strong style={{ color: 'var(--text-primary)' }}>นพ. สมเกียรติ มั่นคง (ว.45892)</strong>
                   </div>
                   <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>เลขประจำตัว (HN): </span>
@@ -1556,7 +1556,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                   </div>
                   <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>สิทธิการรักษา: </span>
-                    <strong style={{ color: '#0F172A' }}>{currentRights}</strong>
+                    <strong style={{ color: 'var(--text-primary)' }}>{currentRights}</strong>
                   </div>
                   <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>ช่องทางชำระเงิน: </span>
@@ -1594,7 +1594,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                     <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
                       <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748B' }}>1</td>
                       <td style={{ padding: '8px 10px' }}>
-                        <div style={{ fontWeight: '600', color: '#0F172A' }}>ค่าตรวจวินิจฉัยและรักษาโดยแพทย์ (Medical Consultation)</div>
+                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>ค่าตรวจวินิจฉัยและรักษาโดยแพทย์ (Medical Consultation)</div>
                         <div style={{ fontSize: '11.5px', color: '#64748B' }}>ตรวจประเมินร่างกายและให้คำปรึกษาทางการแพทย์</div>
                       </td>
                       <td style={{ padding: '8px 10px', textAlign: 'center' }}>1</td>
@@ -1604,7 +1604,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                     <tr style={{ borderBottom: '1px solid #F1F5F9' }}>
                       <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748B' }}>2</td>
                       <td style={{ padding: '8px 10px' }}>
-                        <div style={{ fontWeight: '600', color: '#0F172A' }}>ค่าบริการทางการแพทย์และคลินิก (Clinic Service Fee)</div>
+                        <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>ค่าบริการทางการแพทย์และคลินิก (Clinic Service Fee)</div>
                         <div style={{ fontSize: '11.5px', color: '#64748B' }}>ค่าบริการพยาบาล คัดกรองและวัดสัญญาณชีพ</div>
                       </td>
                       <td style={{ padding: '8px 10px', textAlign: 'center' }}>1</td>
@@ -1619,7 +1619,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                         <tr key={idx} style={{ borderBottom: '1px solid #F1F5F9' }}>
                           <td style={{ padding: '8px 10px', textAlign: 'center', color: '#64748B' }}>{idx + 3}</td>
                           <td style={{ padding: '8px 10px' }}>
-                            <div style={{ fontWeight: '600', color: '#0F172A' }}>{med.name}</div>
+                            <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{med.name}</div>
                             {med.dosage && (
                               <div style={{ fontSize: '11.5px', color: '#64748B' }}>
                                 วิธีใช้: {cleanDosage(med.dosage, med.name)} {med.instructions ? `• ${cleanInstructions(med.instructions, med.name)}` : ''}
@@ -1662,7 +1662,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                     <div style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       borderTop: '2px solid #0F172A', paddingTop: '8px', fontSize: '15px',
-                      fontWeight: '800', color: '#0F172A'
+                      fontWeight: '800', color: 'var(--text-primary)'
                     }}>
                       <span>ยอดชำระสุทธิ (Net Total):</span>
                       <span style={{ fontFamily: 'monospace', fontSize: '18px', color: '#1E40AF' }}>฿ {grandTotal.toFixed(2)}</span>
@@ -1676,7 +1676,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                   borderTop: '1px dashed #CBD5E1', paddingTop: '16px', fontSize: '12px'
                 }}>
                   <div>
-                    <strong style={{ color: '#0F172A', display: 'block', marginBottom: '4px' }}>คำแนะนำจากแพทย์และการใช้ยา:</strong>
+                    <strong style={{ color: 'var(--text-primary)', display: 'block', marginBottom: '4px' }}>คำแนะนำจากแพทย์และการใช้ยา:</strong>
                     <p style={{ margin: 0, color: '#475569', lineHeight: '1.5' }}>
                       {activePatient.doctorAdvice || 'รับประทานยาตามที่ระบุบนฉลากอย่างเคร่งครัด หากมีอาการผิดปกติหรือแพ้ยาให้หยุดยาและติดต่อคลินิกทันที'}
                     </p>
@@ -1685,7 +1685,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                     <div style={{ height: '36px', borderBottom: '1px solid #94A3B8', marginBottom: '6px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
                       <span style={{ fontStyle: 'italic', fontFamily: 'serif', color: '#1E40AF', fontSize: '16px' }}>นภาพร สดใส</span>
                     </div>
-                    <div style={{ fontWeight: '700', color: '#0F172A' }}>( ภญ. นภาพร สดใส )</div>
+                    <div style={{ fontWeight: '700', color: 'var(--text-primary)' }}>( ภญ. นภาพร สดใส )</div>
                     <div style={{ color: '#64748B', fontSize: '11px' }}>เภสัชกรผู้จ่ายยา / ผู้รับเงิน</div>
                   </div>
                 </div>

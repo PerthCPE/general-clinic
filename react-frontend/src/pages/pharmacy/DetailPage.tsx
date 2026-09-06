@@ -566,6 +566,12 @@ export default function DetailPage({
 
     triggerToast(`จัดเก็บเอกสารเข้าแฟ้มเรียบร้อยแล้ว`, 'success');
 
+    // เลื่อนหน้าจอกลับขึ้นไปบนสุดอัตโนมัติ
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.querySelector('.detail-page-container')?.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
+
     // สลับไปยังผู้ป่วยคนถัดไปที่ยังรอจัดยา (ถ้ามี)
     const nextPending = queueList.find(p => p.id !== activePatient.id && p.status !== 'dispensed');
     if (nextPending) {
@@ -694,7 +700,7 @@ export default function DetailPage({
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
             </div>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: '800', color: '#0F172A', lineHeight: '38px' }}>{queueList.length}</div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary)', lineHeight: '38px' }}>{queueList.length}</div>
           <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>กำลังรับบริการระบบยาในคลัง</div>
         </div>
 
@@ -776,14 +782,14 @@ export default function DetailPage({
           onClick={() => setIsSearchExpanded(!isSearchExpanded)}
           style={{ 
             display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-            padding: '18px 24px', background: '#F8FAFC', borderBottom: isSearchExpanded ? '1px solid #E2E8F0' : 'none',
+            padding: '18px 24px', background: 'var(--bg-card, #F8FAFC)', borderBottom: isSearchExpanded ? '1px solid #E2E8F0' : 'none',
             cursor: 'pointer', userSelect: 'none' 
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <h3 style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: '700', color: '#0F172A', lineHeight: '1.3' }}>
+              <h3 style={{ margin: '0 0 2px 0', fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)', lineHeight: '1.3' }}>
                 รายชื่อผู้ป่วยที่ลงทะเบียนล่าสุด (Recent Patients)
               </h3>
               <p style={{ margin: 0, fontSize: '13.5px', color: '#64748B', lineHeight: '1.4' }}>
@@ -885,8 +891,8 @@ export default function DetailPage({
               }}
             >
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px', tableLayout: 'fixed' }}>
-                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#F8FAFC' }}>
-                  <tr style={{ color: '#0F172A', background: '#F8FAFC', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
+                <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-card, #F8FAFC)' }}>
+                  <tr style={{ color: 'var(--text-primary)', background: 'var(--bg-card, #F8FAFC)', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
                     <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '8%', textAlign: 'center' }}>ลำดับคิว</th>
                     <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '10%', textAlign: 'center' }}>HN</th>
                     <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '10%', textAlign: 'center' }}>VN</th>
@@ -923,7 +929,7 @@ export default function DetailPage({
                             borderBottom: '1px solid #F1F5F9', 
                             whiteSpace: 'nowrap', 
                             height: '56px',
-                            background: isCompleted ? '#F0FDF4' : (isDispensed ? '#F8FAFC' : undefined)
+                            
                           }}
                         >
                           <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
@@ -942,7 +948,7 @@ export default function DetailPage({
                             </div>
                           </td>
                           <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
-                            <span style={{ color: isCompleted ? '#64748B' : '#0F172A', fontWeight: '600', fontFamily: 'monospace', fontSize: '13.5px' }}>
+                            <span style={{ color: isCompleted ? '#64748B' : 'var(--text-primary)', fontWeight: '600', fontFamily: 'monospace', fontSize: '13.5px' }}>
                               <CopyableText value={p.vn || '-'} />
                             </span>
                           </td>
@@ -957,7 +963,7 @@ export default function DetailPage({
                           </td>
                           <td style={{ padding: '12px 16px 12px 30px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                              <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                              <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
                               {p.doctorAdvice && (
                                 <span style={{ fontSize: '12px', color: '#64748B', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {cleanDoctorAdvice(p.doctorAdvice)}
@@ -1094,21 +1100,21 @@ export default function DetailPage({
                 </div>
               </div>
               <div className="patient-details" style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '14px', alignItems: 'center', fontSize: '0.95rem' }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '600' }}>
                   <span style={{ color: '#64748B', fontWeight: '500' }}>เพศ:</span> {activePatient.gender}
                 </span>
                 <span style={{ color: '#CBD5E1' }}>•</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '600' }}>
                   <span style={{ color: '#64748B', fontWeight: '500' }}>อายุ:</span> {activePatient.age} ปี
                 </span>
                 <span style={{ color: '#CBD5E1' }}>•</span>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '600' }}>
                   <span style={{ color: '#64748B', fontWeight: '500' }}>เบอร์โทร:</span> {activePatient.phone || '-'}
                 </span>
                 {activePatient.nationalId && (
                   <>
                     <span style={{ color: '#CBD5E1' }}>•</span>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#1E293B', fontWeight: '600' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '600' }}>
                       <CopyableText label="เลขบัตร ปชช." value={activePatient.nationalId} color="#0F172A" />
                     </span>
                   </>
@@ -1130,7 +1136,7 @@ export default function DetailPage({
                 <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
                   เวลาเข้ารักษา (VISIT TIME)
                 </span>
-                <span className="info-val" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>
+                <span className="info-val" style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '14.5px' }}>
                   {activePatient.visitDate} ({activePatient.visitTime})
                 </span>
               </div>
@@ -1166,7 +1172,7 @@ export default function DetailPage({
                 <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
                   โรคประจำตัว (CHRONIC DISEASES)
                 </span>
-                <span className="info-val" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>
+                <span className="info-val" style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '14.5px' }}>
                   {activePatient.chronicDiseases || 'ไม่มี'}
                 </span>
               </div>
@@ -1174,7 +1180,7 @@ export default function DetailPage({
                 <span className="info-label" style={{ fontSize: '11.5px', fontWeight: '700', color: '#475569' }}>
                   สัญญาณชีพ (CURRENT VITALS)
                 </span>
-                <span className="info-val" style={{ color: '#0F172A', fontWeight: '700', fontSize: '14.5px' }}>
+                <span className="info-val" style={{ color: 'var(--text-primary)', fontWeight: '700', fontSize: '14.5px' }}>
                   {activePatient.vitals || 'ความดัน 120/80 mmHg, อุณหภูมิ 36.6 °C'}
                 </span>
               </div>
@@ -1207,12 +1213,12 @@ export default function DetailPage({
               onClick={() => setIsPrescriptionExpanded(!isPrescriptionExpanded)}
               style={{ 
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
-                padding: '18px 24px', background: '#F8FAFC', borderBottom: isPrescriptionExpanded ? '1px solid #E2E8F0' : 'none',
+                padding: '18px 24px', background: 'var(--bg-card, #F8FAFC)', borderBottom: isPrescriptionExpanded ? '1px solid #E2E8F0' : 'none',
                 cursor: 'pointer', userSelect: 'none' 
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#0F172A' }}>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: 'var(--text-primary)' }}>
                   รายละเอียดใบสั่งยา & ดำเนินการจ่ายยา
                 </h3>
               </div>
@@ -1233,7 +1239,7 @@ export default function DetailPage({
                       <h4 className="doctor-advice-title" style={{ margin: '0 0 8px 0', fontSize: '14px', fontWeight: '700', color: '#0369A1' }}>
                         คำแนะนำจากแพทย์ (Doctor's Note & Clinical Advice)
                       </h4>
-                      <p className="doctor-advice-text" style={{ margin: 0, fontSize: '14.5px', color: '#1E293B', lineHeight: '1.6' }}>
+                      <p className="doctor-advice-text" style={{ margin: 0, fontSize: '14.5px', color: 'var(--text-primary)', lineHeight: '1.6' }}>
                         {cleanDoctorAdvice(activePatient.doctorAdvice)}
                       </p>
                     </div>
@@ -1243,7 +1249,7 @@ export default function DetailPage({
                 {/* Medication + Stock Combined List Table */}
                 <div className="med-table-container" style={{ border: '1px solid #E2E8F0', borderRadius: '12px', padding: '20px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid #E2E8F0', paddingBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
-                    <h4 className="column-title" style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: '#0F172A' }}>
+                    <h4 className="column-title" style={{ margin: 0, fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)' }}>
                       รายการยาที่สั่งจ่าย ({activePatient.medications.length} รายการ)
                     </h4>
                     <span style={{ fontSize: '13px', color: '#64748B' }}>
@@ -1253,7 +1259,7 @@ export default function DetailPage({
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
                       <thead>
-                        <tr style={{ color: '#0F172A', background: '#F1F5F9', borderBottom: '2px solid #CBD5E1', height: '44px' }}>
+                        <tr style={{ color: 'var(--text-primary)', background: '#F1F5F9', borderBottom: '2px solid #CBD5E1', height: '44px' }}>
                           <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px', textAlign: 'center', width: '120px' }}>รหัสยา</th>
                           <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ชื่อรายการยา & สรรพคุณ</th>
                           <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '15px' }}>ขนาด / วิธีรับประทาน</th>
@@ -1286,14 +1292,14 @@ export default function DetailPage({
                                 </div>
                               </td>
                               <td style={{ padding: '12px' }}>
-                                <div style={{ fontWeight: '600', color: '#1E293B' }}>{cleanDosage(med.dosage, med.name)}</div>
+                                <div style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{cleanDosage(med.dosage, med.name)}</div>
                                 <div style={{ fontSize: '12.5px', color: '#64748B', marginTop: '2px' }}>คำแนะนำ: {cleanInstructions(med.instructions, med.name)}</div>
                               </td>
                               <td style={{ padding: '12px', textAlign: 'center' }}>
                                 <div style={{ 
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
-                                  background: '#F8FAFC', 
+                                  background: 'var(--bg-card, #F8FAFC)', 
                                   border: '1.5px solid #E2E8F0', 
                                   borderRadius: '9999px', 
                                   padding: '4px 6px', 
@@ -1354,7 +1360,7 @@ export default function DetailPage({
                                       fontFamily: 'ui-monospace, monospace',
                                       border: 'none',
                                       background: 'transparent',
-                                      color: '#0F172A',
+                                      color: 'var(--text-primary)',
                                       outline: 'none',
                                       padding: '0'
                                     }}
@@ -1401,7 +1407,7 @@ export default function DetailPage({
                                   </span>
                                 </div>
                               </td>
-                              <td style={{ padding: '12px', textAlign: 'center', fontWeight: '700', fontSize: '14.5px', color: '#0F172A' }}>
+                              <td style={{ padding: '12px', textAlign: 'center', fontWeight: '700', fontSize: '14.5px', color: 'var(--text-primary)' }}>
                                 ฿ {(unitPrice * qty).toLocaleString()}
                                 <div style={{ fontSize: '11px', color: '#94A3B8', fontWeight: 'normal' }}>
                                   (@ ฿{unitPrice})
@@ -1499,7 +1505,7 @@ export default function DetailPage({
               </span>
             )}
           </div>
-          <div className="toast-message" style={{ fontWeight: '600', color: '#0F172A' }}>{toast.message}</div>
+          <div className="toast-message" style={{ fontWeight: '600', color: 'var(--text-primary)' }}>{toast.message}</div>
         </div>
       )}
 
@@ -1527,7 +1533,7 @@ export default function DetailPage({
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div>
                   <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#64748B' }}>{selectedMedInfo.medId}</span>
-                  <h3 style={{ margin: 0, fontSize: '18px', color: '#0F172A', fontWeight: '700', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>{selectedMedInfo.name}</h3>
+                  <h3 style={{ margin: 0, fontSize: '18px', color: 'var(--text-primary)', fontWeight: '700', fontFamily: 'var(--font-heading, \'Kanit\', \'Plus Jakarta Sans\', sans-serif)' }}>{selectedMedInfo.name}</h3>
                 </div>
               </div>
               <button 
@@ -1547,7 +1553,7 @@ export default function DetailPage({
                 <h4 style={{ margin: '0 0 8px 0', fontSize: '15px', color: '#0284C7', fontWeight: '800' }}>
                   สรรพคุณและข้อมูลยา (Medication Properties & Indications):
                 </h4>
-                <p style={{ margin: 0, fontSize: '15px', color: '#0F172A', lineHeight: '1.65', fontWeight: '500' }}>
+                <p style={{ margin: 0, fontSize: '15px', color: 'var(--text-primary)', lineHeight: '1.65', fontWeight: '500' }}>
                   {selectedMedInfo.properties || 'ยารักษาโรคทั่วไปตามคำสั่งแพทย์ ควรรับประทานยาตามวิธีใช้ที่ระบุบนฉลากยาอย่างเคร่งครัด'}
                 </p>
               </div>

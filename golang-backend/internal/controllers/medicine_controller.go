@@ -27,7 +27,7 @@ func GetMedicines(c *gin.Context) {
 
 	allMeds := GetCachedMedicines()
 	if len(allMeds) == 0 {
-		if err := config.DB.Find(&allMeds).Error; err != nil {
+		if err := config.DB.Order("id DESC").Find(&allMeds).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch medicines: " + err.Error()})
 			return
 		}

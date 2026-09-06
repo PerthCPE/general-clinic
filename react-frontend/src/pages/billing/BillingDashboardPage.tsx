@@ -579,8 +579,24 @@ export default function BillingDashboardPage() {
       {/* Search Bar */}
       <div className="search-card card" style={{ marginBottom: '20px' }}>
         <div className="search-inputs" style={{ display: 'flex', gap: '16px', flex: 1, alignItems: 'flex-end' }}>
-          <div className="input-group" style={{ flex: 2 }}>
-            <label>ค้นหารหัสผู้ป่วย หรือ ชื่อผู้ป่วย (Patient ID / Name)</label>
+          <div className="input-group" style={{ flex: 2, position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label>ค้นหารหัสผู้ป่วย หรือ ชื่อผู้ป่วย (Patient ID / Name)</label>
+              {(patientId || statusFilter !== 'all' || methodFilter !== 'all') && (
+                <span 
+                  onClick={handleResetFilters} 
+                  style={{ 
+                    cursor: 'pointer', 
+                    fontSize: '12.5px', 
+                    fontWeight: '600',
+                    color: '#3B82F6', 
+                    textDecoration: 'underline' 
+                  }}
+                >
+                  ล้างการค้นหา
+                </span>
+              )}
+            </div>
             <input
               type="text"
               placeholder="ค้นหาด้วยรหัสใบเสร็จ, HN, หรือชื่อผู้ป่วย..."
@@ -620,18 +636,6 @@ export default function BillingDashboardPage() {
                </svg>
                ค้นหาข้อมูล
             </button>
-            {(patientId || statusFilter !== 'all' || methodFilter !== 'all') && (
-              <button 
-                className="search-btn" 
-                onClick={handleResetFilters} 
-                style={{ 
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  background: 'var(--bg-card, #F1F5F9)', color: 'var(--text-primary, #475569)', border: '1px solid #CBD5E1' 
-                }}
-              >
-                ล้างการค้นหา
-              </button>
-            )}
           </div>
         </div>
       </div>

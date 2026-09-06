@@ -1232,7 +1232,9 @@ export default function MedicinePage() {
             stock: stock,
             stock_quantity: stock,
             status: status,
-            dispensedToday: 0,
+            dispensedToday: m.dispensed_today || 0,
+            createdAt: m.created_at || new Date().toISOString(),
+            updatedAt: m.updated_at || m.created_at || new Date().toISOString(),
           };
         });
         setMedicines(formatted);
