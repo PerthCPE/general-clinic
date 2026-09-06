@@ -47,7 +47,28 @@ func getCachedMedicines() []models.Medicine {
 	}
 
 	var allMeds []models.Medicine
-	if config.DB != nil && config.DB.Find(&allMeds).Error == nil {
+	if config.DB != nil && config.DB.Order("id DESC").Find(&allMeds).Error == nil {
+		// คำนวณยอดจ่ายยาวันนี้ (dispensed_today)
+		type Result struct {
+			MedicineID uint
+			TotalQty   int
+		}
+		var results []Result
+		todayStr := time.Now().Format("2006-01-02")
+		config.DB.Model(&models.Dispensing{}).
+			Select("medicine_id, SUM(quantity) as total_qty").
+			Where("DATE(created_at) = ?", todayStr).
+			Group("medicine_id").
+			Scan(&results)
+
+		dispenseMap := make(map[uint]int)
+		for _, r := range results {
+			dispenseMap[r.MedicineID] = r.TotalQty
+		}
+		for i := range allMeds {
+			allMeds[i].DispensedToday = dispenseMap[allMeds[i].ID]
+		}
+
 		cachedMeds = allMeds
 		cachedMedsExpiry = time.Now().Add(60 * time.Second) // แคช 60 วินาที
 	}

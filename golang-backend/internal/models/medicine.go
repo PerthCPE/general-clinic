@@ -16,7 +16,8 @@ type Medicine struct {
 	ExpiryDate    string    `json:"expiry_date"`                               //วันหมดอายุ (เช่น "2027-12-31")
 	Manufacturer  string    `json:"manufacturer"`                              //ผู้ผลิต/บริษัท
 	StockQuantity int       `gorm:"not null;default:0" json:"stock_quantity"`  //คือจำนวนคงเหลือของยาในคลัง
-	UnitPrice     float64   `gorm:"not null" json:"unit_price"`                //คือราคาต่อหน่วยของยา
-	CreatedAt     time.Time `json:"created_at"`                                //คือเวลาที่ข้อมูลยาถูกสร้างขึ้น
-	UpdatedAt     time.Time `json:"updated_at"`                                //คือเวลาที่ข้อมูลยาถูกแก้ไขล่าสุด
+	UnitPrice      float64   `gorm:"not null" json:"unit_price"`                //คือราคาต่อหน่วยของยา
+	DispensedToday int       `gorm:"-" json:"dispensed_today"`                  //ยอดจ่ายยาวันนี้ (คำนวณแบบ on-the-fly)
+	CreatedAt      time.Time `json:"created_at"`                                //คือเวลาที่ข้อมูลยาถูกสร้างขึ้น
+	UpdatedAt      time.Time `json:"updated_at"`                                //คือเวลาที่ข้อมูลยาถูกแก้ไขล่าสุด
 }
