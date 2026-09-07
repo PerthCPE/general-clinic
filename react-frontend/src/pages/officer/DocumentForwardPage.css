@@ -1192,46 +1192,110 @@ body.dark-mode .dms-modal-footer {
   border-color: #059669 !important;
 }
 
-/* Forms in Modal */
-.send-mode-segmented {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  padding: 4px;
-  background: #F1F5F9;
+/* Empty System Docs Notice */
+.dms-empty-system-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 12px;
+  color: #92400E;
+  margin-bottom: 16px;
+}
+
+body.dark-mode .dms-empty-system-notice {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #FDE68A;
+}
+
+.empty-notice-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.empty-notice-text .notice-title {
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.empty-notice-text .notice-sub {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #B45309;
+}
+
+body.dark-mode .empty-notice-text .notice-sub {
+  color: #FCD34D;
+}
+
+/* Selected Document Info Preview Card */
+.selected-doc-preview-card {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
   border-radius: 10px;
+  padding: 14px 16px;
   margin-bottom: 18px;
 }
 
-body.dark-mode .send-mode-segmented {
-  background: #1C2230;
-  border: 1px solid #333F53;
+body.dark-mode .selected-doc-preview-card {
+  background: #1A2230;
+  border-color: #333F53;
 }
 
-.send-mode-btn {
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  color: #475569;
+.selected-doc-preview-card .preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.selected-doc-preview-card .preview-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: #0F172A;
+  margin-bottom: 4px;
+}
+
+body.dark-mode .selected-doc-preview-card .preview-title {
+  color: #F8FAFC;
+}
+
+.selected-doc-preview-card .preview-desc {
   font-size: 13px;
-  font-weight: 600;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  color: #64748B;
+  line-height: 1.4;
+  margin-bottom: 8px;
 }
 
-body.dark-mode .send-mode-btn {
+body.dark-mode .selected-doc-preview-card .preview-desc {
   color: #94A3B8;
 }
 
-.send-mode-btn.active {
-  background: #FFFFFF;
-  color: #2563EB;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+.selected-doc-preview-card .preview-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #64748B;
+  padding-top: 8px;
+  border-top: 1px dashed #E2E8F0;
 }
 
-body.dark-mode .send-mode-btn.active {
-  background: #2F3B4E;
+body.dark-mode .selected-doc-preview-card .preview-meta {
+  color: #94A3B8;
+  border-top-color: #333F53;
+}
+
+.selected-doc-preview-card .has-file-badge {
+  color: #2563EB;
+  font-weight: 600;
+}
+
+body.dark-mode .selected-doc-preview-card .has-file-badge {
   color: #60A5FA;
 }
 

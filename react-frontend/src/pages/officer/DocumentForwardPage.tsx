@@ -160,15 +160,18 @@ export const DocumentForwardPage: React.FC = () => {
   const [selectedDoc, setSelectedDoc] = useState<ForwardDoc | null>(null);
   const [activeMetricModal, setActiveMetricModal] = useState<'system_docs' | 'today' | 'pending' | 'completed' | 'recipients' | null>(null);
 
-  // Send Form State
-  const [sendMode, setSendMode] = useState<'custom' | 'from_system'>('custom');
+  // Send Form State (System Documents Forwarding ONLY)
   const [selectedSystemDocId, setSelectedSystemDocId] = useState<number | ''>('');
-  const [newDocTitle, setNewDocTitle] = useState('');
   const [newDocDescription, setNewDocDescription] = useState('');
   const [newDocRecipientId, setNewDocRecipientId] = useState<number>(6);
-  const [newDocType, setNewDocType] = useState('ผลการตรวจ');
   const [newDocPriority, setNewDocPriority] = useState<'normal' | 'urgent' | 'emergency'>('normal');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Selected system document preview
+  const selectedDocPreview = useMemo(() => {
+    if (!selectedSystemDocId) return null;
+    return systemDocuments.find(d => d.id === Number(selectedSystemDocId)) || null;
+  }, [selectedSystemDocId, systemDocuments]);
 
   // Load Real Data from DMS API
   const loadData = async () => {
@@ -229,23 +232,17 @@ export const DocumentForwardPage: React.FC = () => {
     loadData();
   }, []);
 
-  // When selecting an existing system document
-  useEffect(() => {
-    if (sendMode === 'from_system' && selectedSystemDocId) {
-      const doc = systemDocuments.find(d => d.id === Number(selectedSystemDocId));
-      if (doc) {
-        setNewDocTitle(doc.subject);
-        setNewDocDescription(doc.description || '');
-        setNewDocType(doc.doc_type || 'เอกสารทั่วไป');
-      }
-    }
-  }, [sendMode, selectedSystemDocId, systemDocuments]);
-
-  // Submit Forwarding
+  // Submit Forwarding (System Document Only)
   const handleSendDocument = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDocTitle.trim()) {
-      toast.error('กรุณาระบุชื่อเรื่องหรือหัวข้อเอกสาร');
+    if (!selectedSystemDocId) {
+      toast.error('กรุณาเลือกเอกสารจากคลังระบบที่ต้องการส่งต่อ');
+      return;
+    }
+
+    const selectedDocObj = systemDocuments.find(d => d.id === Number(selectedSystemDocId));
+    if (!selectedDocObj) {
+      toast.error('ไม่พบข้อมูลเอกสารที่เลือกในระบบ');
       return;
     }
 
@@ -253,25 +250,14 @@ export const DocumentForwardPage: React.FC = () => {
     const selectedRecipient = recipientsList.find(u => u.id === newDocRecipientId);
     const recipientName = selectedRecipient?.fullname || selectedRecipient?.username || 'เจ้าหน้าที่ปลายทาง';
     const recipientRole = getRoleLabel(selectedRecipient?.role);
+    const docTitle = selectedDocObj.subject;
+    const docType = selectedDocObj.doc_type || 'เอกสารทั่วไป';
+    const finalDescription = newDocDescription.trim() || selectedDocObj.description || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS';
 
     try {
-      let targetDocId = typeof selectedSystemDocId === 'number' ? selectedSystemDocId : undefined;
-
-      // If custom mode or no existing doc selected, create document record in DB
-      if (!targetDocId) {
-        const docRes = await dmsApi.createDocument({
-          external_doc_ref: `FWD-REF-${Date.now().toString().slice(-6)}`,
-          subject: newDocTitle.trim(),
-          description: newDocDescription.trim() || undefined,
-          doc_type: newDocType,
-          status: 'reviewing',
-        });
-        targetDocId = docRes.document.id;
-      }
-
       // Forward to recipient
       const fwdRes = await dmsApi.forwardDocument({
-        doc_id: targetDocId,
+        doc_id: selectedDocObj.id,
         forwarded_to: newDocRecipientId,
       });
 
@@ -279,9 +265,9 @@ export const DocumentForwardPage: React.FC = () => {
       const newDoc: ForwardDoc = {
         id: `FWD-${String(fwdRes.forward.id).padStart(4, '0')}`,
         forwardId: fwdRes.forward.id,
-        docId: targetDocId,
-        title: newDocTitle.trim(),
-        description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
+        docId: selectedDocObj.id,
+        title: docTitle,
+        description: finalDescription,
         sender: 'ธุรการ (คุณสมจิต ดีใจ)',
         senderRole: 'เจ้าหน้าที่ธุรการ',
         recipient: recipientName,
@@ -289,9 +275,10 @@ export const DocumentForwardPage: React.FC = () => {
         recipientId: newDocRecipientId,
         receivedDate: formatThaiDate(now),
         rawDate: now.toISOString(),
-        type: newDocType,
+        type: docType,
         priority: newDocPriority,
         status: 'processing',
+        fileUrl: selectedDocObj.file_url,
       };
 
       setForwardedDocs(prev => {
@@ -299,29 +286,32 @@ export const DocumentForwardPage: React.FC = () => {
         saveStoredForwardedDocs(next);
         return next;
       });
+
       sendDocumentMessage({
-        docId: targetDocId,
-        title: newDocTitle.trim(),
-        description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
+        docId: selectedDocObj.id,
+        title: docTitle,
+        description: finalDescription,
         sender: 'ธุรการ (คุณสมจิต ดีใจ)',
         senderRole: 'เจ้าหน้าที่ธุรการ',
         recipient: recipientName,
         recipientRole: recipientRole,
         recipientId: newDocRecipientId,
         recipientUsername: selectedRecipient?.username,
-        type: newDocType,
+        type: docType,
         priority: newDocPriority,
       });
+
       setIsSendModalOpen(false);
       resetSendForm();
-      toast.success(`ส่งต่อเอกสารไปยัง ${recipientName} เรียบร้อยแล้ว`);
+      toast.success(`ส่งต่อเอกสาร "${docTitle}" ไปยัง ${recipientName} เรียบร้อยแล้ว`);
     } catch {
       // Fallback for offline or local preview
       const now = new Date();
       const newDoc: ForwardDoc = {
         id: `FWD-2569-${String(2000 + forwardedDocs.length + 1)}`,
-        title: newDocTitle.trim(),
-        description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
+        docId: selectedDocObj.id,
+        title: docTitle,
+        description: finalDescription,
         sender: 'ธุรการ (คุณสมจิต ดีใจ)',
         senderRole: 'เจ้าหน้าที่ธุรการ',
         recipient: recipientName,
@@ -329,9 +319,10 @@ export const DocumentForwardPage: React.FC = () => {
         recipientId: newDocRecipientId,
         receivedDate: formatThaiDate(now),
         rawDate: now.toISOString(),
-        type: newDocType,
+        type: docType,
         priority: newDocPriority,
         status: 'processing',
+        fileUrl: selectedDocObj.file_url,
       };
 
       setForwardedDocs(prev => {
@@ -339,33 +330,33 @@ export const DocumentForwardPage: React.FC = () => {
         saveStoredForwardedDocs(next);
         return next;
       });
+
       sendDocumentMessage({
-        title: newDocTitle.trim(),
-        description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
+        docId: selectedDocObj.id,
+        title: docTitle,
+        description: finalDescription,
         sender: 'ธุรการ (คุณสมจิต ดีใจ)',
         senderRole: 'เจ้าหน้าที่ธุรการ',
         recipient: recipientName,
         recipientRole: recipientRole,
         recipientId: newDocRecipientId,
         recipientUsername: selectedRecipient?.username,
-        type: newDocType,
+        type: docType,
         priority: newDocPriority,
       });
+
       setIsSendModalOpen(false);
       resetSendForm();
-      toast.success(`ส่งต่อเอกสารไปยัง ${recipientName} สำเร็จ`);
+      toast.success(`ส่งต่อเอกสาร "${docTitle}" ไปยัง ${recipientName} สำเร็จ`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const resetSendForm = () => {
-    setNewDocTitle('');
-    setNewDocDescription('');
     setSelectedSystemDocId('');
-    setSendMode('custom');
+    setNewDocDescription('');
     setNewDocPriority('normal');
-    setNewDocType('ผลการตรวจ');
   };
 
   // View Document Details
@@ -660,10 +651,6 @@ export const DocumentForwardPage: React.FC = () => {
                             className="dms-btn-small"
                             onClick={() => {
                               setSelectedSystemDocId(doc.id);
-                              setSendMode('from_system');
-                              setNewDocTitle(doc.subject);
-                              setNewDocDescription(doc.description || '');
-                              setNewDocType(doc.doc_type || 'เอกสารทั่วไป');
                               setActiveMetricModal(null);
                               setIsSendModalOpen(true);
                             }}
@@ -1263,8 +1250,8 @@ export const DocumentForwardPage: React.FC = () => {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="dms-modal-title">ส่งต่อเอกสารใหม่</h3>
-                  <p className="dms-modal-subtitle">ระบุรายละเอียด แผนก หรือบุคลากรปลายทางที่ต้องการส่งมอบ</p>
+                  <h3 className="dms-modal-title">ส่งต่อเอกสารจากคลังระบบ</h3>
+                  <p className="dms-modal-subtitle">เลือกเอกสารที่มีในระบบเพื่อส่งมอบต่อให้บุคลากรหรือแผนกปลายทาง</p>
                 </div>
               </div>
               <button
@@ -1281,137 +1268,124 @@ export const DocumentForwardPage: React.FC = () => {
 
             <form onSubmit={handleSendDocument}>
               <div className="dms-modal-body">
-                {/* Send Mode Toggle */}
-                <div className="send-mode-segmented">
-                  <button
-                    type="button"
-                    className={`send-mode-btn ${sendMode === 'custom' ? 'active' : ''}`}
-                    onClick={() => setSendMode('custom')}
-                  >
-                    กรอกข้อมูลส่งต่อใหม่
-                  </button>
-                  <button
-                    type="button"
-                    className={`send-mode-btn ${sendMode === 'from_system' ? 'active' : ''}`}
-                    onClick={() => setSendMode('from_system')}
-                  >
-                    เลือกจากคลังเอกสารในระบบ ({systemDocuments.length})
-                  </button>
-                </div>
-
-                {sendMode === 'from_system' && (
-                  <div className="dms-form-group">
-                    <label className="dms-form-label">
-                      เลือกเอกสารที่มีในระบบ <span className="text-required">*</span>
-                    </label>
-                    <select
-                      className="dms-form-input"
-                      value={selectedSystemDocId}
-                      onChange={e => setSelectedSystemDocId(e.target.value ? Number(e.target.value) : '')}
-                    >
-                      <option value="">-- กรุณาเลือกเอกสารจากคลัง --</option>
-                      {systemDocuments.map(doc => (
-                        <option key={doc.id} value={doc.id}>
-                          [{doc.external_doc_ref || `DOC-${doc.id}`}] {doc.subject} ({doc.doc_type || 'ทั่วไป'})
-                        </option>
-                      ))}
-                    </select>
+                {/* Check if system documents exist */}
+                {systemDocuments.length === 0 ? (
+                  <div className="dms-empty-system-notice">
+                    <div className="empty-notice-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" width="24" height="24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                    </div>
+                    <div className="empty-notice-text">
+                      <div className="notice-title">ยังไม่มีเอกสารในคลังระบบที่พร้อมส่งต่อ</div>
+                      <div className="notice-sub">กรุณาเพิ่มหรืออัปโหลดเอกสารใหม่ในหน้า <strong>"จัดการเอกสาร (Document Management)"</strong> ก่อน จึงจะสามารถเลือกส่งต่อได้</div>
+                    </div>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {/* Document Selector */}
+                    <div className="dms-form-group">
+                      <label className="dms-form-label">
+                        เลือกเอกสารในระบบที่ต้องการส่งต่อ <span className="text-required">*</span>
+                      </label>
+                      <select
+                        className="dms-form-input"
+                        value={selectedSystemDocId}
+                        required
+                        onChange={e => setSelectedSystemDocId(e.target.value ? Number(e.target.value) : '')}
+                      >
+                        <option value="">-- กรุณาเลือกเอกสารจากคลัง ({systemDocuments.length} รายการ) --</option>
+                        {systemDocuments.map(doc => (
+                          <option key={doc.id} value={doc.id}>
+                            [{doc.external_doc_ref || `DOC-#${doc.id}`}] {doc.subject} ({doc.doc_type || 'ทั่วไป'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                {/* Subject Title */}
-                <div className="dms-form-group">
-                  <label className="dms-form-label">
-                    ชื่อเรื่อง / หัวข้อเอกสาร <span className="text-required">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="dms-form-input"
-                    required
-                    placeholder="เช่น ผลการตรวจเลือดผู้ป่วย OPD, ใบเบิกยาฉุกเฉิน หรือ ใบส่งตัว"
-                    value={newDocTitle}
-                    onChange={e => setNewDocTitle(e.target.value)}
-                  />
-                </div>
-
-                {/* Recipient Dropdown */}
-                <div className="dms-form-group">
-                  <label className="dms-form-label">
-                    บุคลากรหรือแผนกปลายทาง (ผู้รับ) <span className="text-required">*</span>
-                  </label>
-                  <select
-                    className="dms-form-input"
-                    value={newDocRecipientId}
-                    onChange={e => setNewDocRecipientId(Number(e.target.value))}
-                  >
-                    {recipientsList.length > 0 ? (
-                      recipientsList.map(u => (
-                        <option key={u.id} value={u.id}>
-                          {u.fullname || u.username} — {getRoleLabel(u.role)} (@{u.username})
-                        </option>
-                      ))
-                    ) : (
-                      <>
-                        {/* ปรับชื่อตาม DEMO_USERS อัตโนมัติ (Fallback) */}
-                        <option value="6">{DEMO_USERS.doctor?.fullName || 'พญ.สุดา สุขสมบูรณ์'} — แพทย์ (doctor1)</option>
-                        <option value="7">นพ.วิชัย ชาญการแพทย์ — แพทย์ (doctor2)</option>
-                        <option value="8">พญ.เกศรา รักษาดี — แพทย์ (doctor3)</option>
-                        <option value="3">{DEMO_USERS.nurse?.fullName || 'พว. กานดา คัดกรอง'} — พยาบาล (nurse1)</option>
-                        <option value="5">{DEMO_USERS.pharmacist?.fullName || 'ดร.บุญ สั่งยา'} — ห้องยา/เภสัชกร (pharmacist1)</option>
-                        <option value="9">{DEMO_USERS.cashier?.fullName || 'นส.รวย การเงิน'} — การเงิน (cashier1)</option>
-                        <option value="2">{DEMO_USERS.officer?.fullName || 'คุณสมจิต ดีใจ'} — ธุรการ (officer1)</option>
-                      </>
+                    {/* Selected Document Info Preview Card */}
+                    {selectedDocPreview && (
+                      <div className="selected-doc-preview-card">
+                        <div className="preview-header">
+                          <span className="code-pill">{selectedDocPreview.external_doc_ref || `DOC-#${selectedDocPreview.id}`}</span>
+                          <span className="doc-type-tag">{selectedDocPreview.doc_type || 'เอกสารทั่วไป'}</span>
+                        </div>
+                        <div className="preview-title">{selectedDocPreview.subject}</div>
+                        {selectedDocPreview.description && (
+                          <div className="preview-desc">{selectedDocPreview.description}</div>
+                        )}
+                        <div className="preview-meta">
+                          <span>ผู้จัดทำ: {selectedDocPreview.creator?.fullname || selectedDocPreview.creator?.username || 'ธุรการ'}</span>
+                          {selectedDocPreview.file_url && (
+                            <span className="has-file-badge">📎 มีไฟล์แนบต้นฉบับ</span>
+                          )}
+                        </div>
+                      </div>
                     )}
-                  </select>
-                </div>
 
-                {/* Type and Priority in Grid */}
-                <div className="form-two-cols">
-                  <div className="dms-form-group">
-                    <label className="dms-form-label">ประเภทเอกสาร</label>
-                    <select
-                      className="dms-form-input"
-                      value={newDocType}
-                      onChange={e => setNewDocType(e.target.value)}
-                    >
-                      <option value="ผลการตรวจ">ผลการตรวจ (Lab/X-Ray)</option>
-                      <option value="ใบส่งตัวผู้ป่วย">ใบส่งตัวผู้ป่วย (Referral)</option>
-                      <option value="ใบสั่งยาและเวชภัณฑ์">ใบสั่งยาและเวชภัณฑ์</option>
-                      <option value="รายงานทางการแพทย์">รายงานทางการแพทย์</option>
-                      <option value="บันทึกข้อความภายใน">บันทึกข้อความภายใน</option>
-                      <option value="เอกสารการเงิน">เอกสารการเงิน/เบิกจ่าย</option>
-                      <option value="เอกสารทั่วไป">เอกสารทั่วไป</option>
-                      <option value="อื่นๆ">อื่นๆ</option>
-                    </select>
-                  </div>
+                    {/* Recipient Dropdown */}
+                    <div className="dms-form-group">
+                      <label className="dms-form-label">
+                        บุคลากรหรือแผนกปลายทาง (ผู้รับ) <span className="text-required">*</span>
+                      </label>
+                      <select
+                        className="dms-form-input"
+                        value={newDocRecipientId}
+                        onChange={e => setNewDocRecipientId(Number(e.target.value))}
+                        required
+                      >
+                        {recipientsList.length > 0 ? (
+                          recipientsList.map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.fullname || u.username} — {getRoleLabel(u.role)} (@{u.username})
+                            </option>
+                          ))
+                        ) : (
+                          <>
+                            {/* ปรับชื่อตาม DEMO_USERS อัตโนมัติ (Fallback) */}
+                            <option value="6">{DEMO_USERS.doctor?.fullName || 'พญ.สุดา สุขสมบูรณ์'} — แพทย์ (doctor1)</option>
+                            <option value="7">นพ.วิชัย ชาญการแพทย์ — แพทย์ (doctor2)</option>
+                            <option value="8">พญ.เกศรา รักษาดี — แพทย์ (doctor3)</option>
+                            <option value="3">{DEMO_USERS.nurse?.fullName || 'พว. กานดา คัดกรอง'} — พยาบาล (nurse1)</option>
+                            <option value="5">{DEMO_USERS.pharmacist?.fullName || 'ดร.บุญ สั่งยา'} — ห้องยา/เภสัชกร (pharmacist1)</option>
+                            <option value="9">{DEMO_USERS.cashier?.fullName || 'นส.รวย การเงิน'} — การเงิน (cashier1)</option>
+                            <option value="2">{DEMO_USERS.officer?.fullName || 'คุณสมจิต ดีใจ'} — ธุรการ (officer1)</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
 
-                  <div className="dms-form-group">
-                    <label className="dms-form-label">ระดับความเร่งด่วน</label>
-                    <select
-                      className="dms-form-input"
-                      value={newDocPriority}
-                      onChange={e => setNewDocPriority(e.target.value as any)}
-                    >
-                      <option value="normal">ปกติ (Normal)</option>
-                      <option value="urgent">ด่วน (Urgent ⚡)</option>
-                      <option value="emergency">ด่วนที่สุด (Emergency 🚨)</option>
-                    </select>
-                  </div>
-                </div>
+                    {/* Priority */}
+                    <div className="dms-form-group">
+                      <label className="dms-form-label">ระดับความเร่งด่วน</label>
+                      <select
+                        className="dms-form-input"
+                        value={newDocPriority}
+                        onChange={e => setNewDocPriority(e.target.value as any)}
+                      >
+                        <option value="normal">ปกติ (Normal)</option>
+                        <option value="urgent">ด่วน (Urgent ⚡)</option>
+                        <option value="emergency">ด่วนที่สุด (Emergency 🚨)</option>
+                      </select>
+                    </div>
 
-                {/* Description & Note */}
-                <div className="dms-form-group">
-                  <label className="dms-form-label">
-                    บันทึกข้อความ / รายละเอียดถึงผู้รับ (ไม่บังคับ)
-                  </label>
-                  <textarea
-                    className="dms-form-textarea"
-                    rows={3}
-                    placeholder="ระบุข้อความคำสั่ง บันทึกส่งมอบ หรือรายละเอียดเพิ่มเติม..."
-                    value={newDocDescription}
-                    onChange={e => setNewDocDescription(e.target.value)}
-                  />
-                </div>
+                    {/* Description & Note */}
+                    <div className="dms-form-group">
+                      <label className="dms-form-label">
+                        บันทึกข้อความ / คำสั่งเพิ่มเติมถึงผู้รับ (ไม่บังคับ)
+                      </label>
+                      <textarea
+                        className="dms-form-textarea"
+                        rows={3}
+                        placeholder="ระบุข้อความคำสั่ง บันทึกส่งมอบ หรือรายละเอียดเพิ่มเติม..."
+                        value={newDocDescription}
+                        onChange={e => setNewDocDescription(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="dms-modal-footer">
@@ -1423,22 +1397,24 @@ export const DocumentForwardPage: React.FC = () => {
                 >
                   ยกเลิก
                 </button>
-                <button
-                  type="submit"
-                  className="dms-btn-primary"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <span>กำลังบันทึกส่งต่อ...</span>
-                  ) : (
-                    <>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      <span>ยืนยันการส่งต่อเอกสาร</span>
-                    </>
-                  )}
-                </button>
+                {systemDocuments.length > 0 && (
+                  <button
+                    type="submit"
+                    className="dms-btn-primary"
+                    disabled={isSubmitting || !selectedSystemDocId}
+                  >
+                    {isSubmitting ? (
+                      <span>กำลังส่งต่อ...</span>
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                          <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>ยืนยันการส่งต่อเอกสาร</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </form>
           </div>
