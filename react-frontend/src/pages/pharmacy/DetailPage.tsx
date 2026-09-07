@@ -614,18 +614,21 @@ export default function DetailPage({
       });
 
       if (!res.ok) {
-        await fetch('/api/system/dispense', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Dispense failed');
+      } else {
+        const data = await res.json();
+        if (data.warnings && data.warnings.length > 0) {
+           let msg = 'มียาบางรายการจ่ายได้ไม่ครบตามจำนวน:\n';
+           data.warnings.forEach((w: any) => {
+             msg += `- ${w.name}: สั่ง ${w.requested} จ่ายจริง ${w.dispensed}\n`;
+           });
+           alert(msg);
+        }
       }
-    } catch {
-      await fetch('/api/system/dispense', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).catch(() => {});
+    } catch (err) {
+       console.error('Dispense failed:', err);
+       alert('ไม่สามารถยืนยันการจ่ายยาได้: ' + (err as Error).message);
     } finally {
       // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;

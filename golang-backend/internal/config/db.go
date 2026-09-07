@@ -100,7 +100,7 @@ func ConnectDB() {
 		log.Println("Database Migration Complete.")
 	} else {
 		// Always ensure new models are migrated
-		database.AutoMigrate(&models.Medicine{}, &models.PatientMedicine{}, &models.BillingQueue{}, &models.MedicineQueue{}, &models.QueueCounter{}, &models.Appointment{}, &models.SystemAccess{}, &models.TreatmentRight{})
+		database.AutoMigrate(&models.Medicine{}, &models.PatientMedicine{}, &models.BillingQueue{}, &models.MedicineQueue{}, &models.QueueCounter{}, &models.Appointment{}, &models.SystemAccess{}, &models.TreatmentRight{}, &models.Billing{}, &models.BillingHistory{}, &models.QRPayment{}, &models.Dispensing{})
 		log.Println("Database schema already up to date. Skipped redundant AutoMigrate.")
 	}
 
@@ -126,6 +126,9 @@ func ConnectDB() {
 	database.Exec("ALTER TABLE examinations ADD COLUMN IF NOT EXISTS prescription_detail text DEFAULT ''")
 	database.Exec("ALTER TABLE dispensings DROP CONSTRAINT IF EXISTS fk_dispensings_doctor")
 	database.Exec("ALTER TABLE dispensings ALTER COLUMN doctor_id DROP NOT NULL")
+	database.Exec("ALTER TABLE billings DROP CONSTRAINT IF EXISTS fk_billings_visit_record")
+	database.Exec("ALTER TABLE billings ALTER COLUMN visit_id DROP NOT NULL")
+	database.Exec("ALTER TABLE dispensings DROP CONSTRAINT IF EXISTS fk_dispensings_visit_record")
 
 	// เอกสารที่แพทย์ออกให้ผู้ป่วย (ใบรับรองแพทย์ / ใบรับรองยานอกบัญชี) เก็บเป็น JSON
 	database.Exec("ALTER TABLE examinations ADD COLUMN IF NOT EXISTS issued_documents text DEFAULT ''")

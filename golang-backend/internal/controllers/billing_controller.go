@@ -664,33 +664,46 @@ func ConfirmPayment(c *gin.Context) {
 		totalAmt = 1175.0
 	}
 
-	var billing models.Billing
-	if req.VisitID > 0 {
-		config.DB.Where("visit_id = ?", req.VisitID).First(&billing)
+	visit, patient := ResolveOrCreateVisit(req.HN, req.PatientName, req.NationalID, req.VisitID)
+	visitID := visit.ID
+
+	if req.PaymentMethod == "Cash" || req.PaymentMethod == "cash" {
+		req.PaymentMethod = "เงินสด"
 	}
+	if req.PaymentMethod == "QR" || req.PaymentMethod == "promptpay" || req.PaymentMethod == "QR Code (พร้อมเพย์)" {
+		req.PaymentMethod = "QR Code"
+	}
+
+	tx := config.DB.Begin()
+
+	var billing models.Billing
+	if visitID > 0 {
+		tx.Where("visit_id = ?", visitID).First(&billing)
+	}
+	
 	if billing.ID == 0 {
 		billing = models.Billing{
-			VisitID:       req.VisitID,
+			VisitID:       visitID,
 			TotalAmount:   totalAmt,
 			NetAmount:     totalAmt,
 			PaymentStatus: "pending",
 		}
-		// If VisitID doesn't exist in visit_records, this might fail, but we'll handle it gracefully
-		config.DB.Create(&billing)
+		if err := tx.Create(&billing).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing record: " + err.Error()})
+			return
+		}
 	}
 
-	if req.PaymentMethod == "Cash" && req.CashReceived > 0 && req.CashReceived < billing.NetAmount {
+	if req.PaymentMethod == "เงินสด" && req.CashReceived > 0 && req.CashReceived < billing.NetAmount {
+		tx.Rollback()
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Cash received is less than net amount"})
 		return
 	}
 
-	// ออกหมายเลขใบเสร็จแบบ Unique (เช่น REC-YYYYMMDD-XXXX)
-	var receiptNo string
-	if billing.ID > 0 {
-		receiptNo = fmt.Sprintf("REC-%s-%04d", time.Now().Format("20060102"), billing.ID)
-	} else {
-		receiptNo = fmt.Sprintf("REC-%s-SIM%d", time.Now().Format("20060102"), time.Now().UnixMilli()%10000)
-	}
+	var count int64
+	tx.Model(&models.Billing{}).Count(&count)
+	receiptNo := fmt.Sprintf("REC-%s-%04d", time.Now().Format("20060102"), count+1)
 
 	billing.PaymentMethod = req.PaymentMethod
 	billing.PaymentStatus = "paid"
@@ -700,135 +713,55 @@ func ConfirmPayment(c *gin.Context) {
 		billing.NetAmount = totalAmt
 	}
 
-	if billing.ID > 0 {
-		config.DB.Save(&billing)
+	if err := tx.Save(&billing).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update billing: " + err.Error()})
+		return
 	}
 
-	// หากชำระผ่าน QR ให้ปรับสถานะ QRPayment เป็น completed
-	if req.PaymentMethod == "QR Code" || req.PaymentMethod == "QR Code (พร้อมเพย์)" {
-		config.DB.Model(&models.QRPayment{}).Where("billing_id = ?", billing.ID).Update("status", "completed")
+	if req.PaymentMethod == "QR Code" {
+		tx.Model(&models.QRPayment{}).Where("billing_id = ?", billing.ID).Update("status", "completed")
 	}
 
-	// ปรับสถานะในตาราง billing_queues การเงินเป็น completed
-	if req.VisitID > 0 {
-		config.DB.Model(&models.BillingQueue{}).Where("visit_id = ?", req.VisitID).Update("status", "completed")
-	}
-	if req.HN != "" {
-		config.DB.Model(&models.BillingQueue{}).Where("hn = ?", req.HN).Update("status", "completed")
-	}
-
-	// ปรับสถานะในตาราง queues ของคลินิกเป็น เสร็จสิ้น (completed)
-	if req.VisitID > 0 {
-		config.DB.Model(&models.Queue{}).Where("visit_id = ?", req.VisitID).Update("status", "เสร็จสิ้น")
-	} else if req.HN != "" {
-		var pat models.Patient
-		if config.DB.Where("hn = ? OR hn = ?", req.HN, "HN"+req.HN).First(&pat).Error == nil {
-			config.DB.Model(&models.Queue{}).Where("patient_id = ?", pat.ID).Update("status", "เสร็จสิ้น")
-		}
-	}
-
-	// ปรับสถานะในตาราง medicine_queues เป็น completed
-	if req.VisitID > 0 {
-		config.DB.Model(&models.MedicineQueue{}).Where("visit_id = ?", req.VisitID).Update("status", "completed")
-	}
-	if req.HN != "" {
-		config.DB.Model(&models.MedicineQueue{}).Where("hn = ?", req.HN).Update("status", "completed")
+	if err := MarkVisitPaid(tx, visitID, patient.HN, patient.ID); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update queue statuses: " + err.Error()})
+		return
 	}
 
 	changeAmount := 0.0
-	if req.PaymentMethod == "Cash" || req.PaymentMethod == "เงินสด" {
+	if req.PaymentMethod == "เงินสด" {
 		if req.CashReceived > billing.NetAmount {
 			changeAmount = req.CashReceived - billing.NetAmount
 		}
 	}
 
-	// ดึงข้อมูลผู้ป่วยและยามาสร้างประวัติการชำระเงิน BillingHistory
-	var bQueue models.BillingQueue
-	if req.VisitID > 0 {
-		config.DB.Where("visit_id = ?", req.VisitID).Order("id desc").First(&bQueue)
-	}
-	if bQueue.ID == 0 && req.HN != "" {
-		config.DB.Where("hn = ? OR hn = ?", req.HN, "HN"+req.HN).Order("id desc").First(&bQueue)
-	}
-
-	// 1. ระบุชื่อผู้ป่วยให้ตรงกับระบบห้องตรวจและจัดลำดับคิว
-	patName := req.PatientName
-	if patName == "" || patName == "ผู้ป่วย" {
-		if bQueue.PatientName != "" && bQueue.PatientName != "ผู้ป่วย" {
-			patName = bQueue.PatientName
-		}
-	}
-	if patName == "" || patName == "ผู้ป่วย" {
-		var pat models.Patient
-		var vr models.VisitRecord
-		if req.VisitID > 0 && config.DB.First(&vr, req.VisitID).Error == nil {
-			if config.DB.First(&pat, vr.PatientID).Error == nil && pat.FullName != "" {
-				patName = pat.FullName
-			}
-		}
-	}
-	if patName == "" || patName == "ผู้ป่วย" {
-		if req.HN != "" {
-			var pat models.Patient
-			if config.DB.Where("hn = ? OR hn = ?", req.HN, "HN"+req.HN).First(&pat).Error == nil && pat.FullName != "" {
-				patName = pat.FullName
-			}
-		}
-	}
+	patName := patient.FullName
 	if patName == "" || patName == "ผู้ป่วย" {
 		patName = "นาย ธีรภัทร สว่างแดน"
 	}
 
-	// 2. ระบุเลข HN ให้ตรงกับระบบจัดลำดับคิวของแพทย์ (เช่น HN0001, HN0045)
-	hn := req.HN
-	if hn == "" || hn == "HN-0001" {
-		if bQueue.HN != "" {
-			hn = bQueue.HN
-		}
-	}
-	if hn == "" || hn == "HN-0001" {
-		var pat models.Patient
-		var vr models.VisitRecord
-		if req.VisitID > 0 && config.DB.First(&vr, req.VisitID).Error == nil {
-			if config.DB.First(&pat, vr.PatientID).Error == nil && pat.HN != "" {
-				hn = pat.HN
-			}
-		}
-	}
+	hn := patient.HN
 	if hn == "" || hn == "HN-0001" {
 		hn = "HN0001"
 	}
 
 	docName := req.DoctorName
 	if docName == "" || docName == "แพทย์ประจำคลินิก" {
-		var vr models.VisitRecord
-		if req.VisitID > 0 && config.DB.Preload("Doctor").First(&vr, req.VisitID).Error == nil && vr.Doctor.FullName != "" {
-			docName = vr.Doctor.FullName
-		}
-	}
-	if docName == "" {
 		docName = "นพ.สมเกียรติ มั่นคง"
 	}
 
-	meds := bQueue.Medications
-	if meds == "" || meds == "[]" {
-		meds = req.Medications
-	}
+	meds := req.Medications
 	if meds == "" {
 		meds = "[]"
 	}
 
-	nationalID := req.NationalID
-	if nationalID == "" {
-		nationalID = bQueue.NationalID
-	}
-
 	history := models.BillingHistory{
 		ReceiptNumber: receiptNo,
-		VisitID:       req.VisitID,
+		VisitID:       visitID,
 		HN:            hn,
 		PatientName:   patName,
-		NationalID:    nationalID,
+		NationalID:    patient.NationalID,
 		DoctorName:    docName,
 		TotalAmount:   billing.TotalAmount,
 		Discount:      billing.DiscountFromEligibility,
@@ -840,16 +773,24 @@ func ConfirmPayment(c *gin.Context) {
 		ChangeAmount:  changeAmount,
 		CreatedAt:     time.Now(),
 	}
-	config.DB.Create(&history)
+	
+	if err := tx.Create(&history).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing history: " + err.Error()})
+		return
+	}
 
-	// ล้างแคชในหน่วยความจำทันทีเพื่อให้คิวอัปเดตแบบเรียลไทม์
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction: " + err.Error()})
+		return
+	}
+
 	InvalidateBillingQueueCache()
 	InvalidatePharmacyQueueCache()
 
-	// Broadcast Event ให้ทุกแผนกทราบแบบ Real-time
 	ws.BroadcastEvent("PAYMENT_CONFIRMED", billing)
 	ws.BroadcastEvent("BILLING_HISTORY_CREATED", history)
-	ws.BroadcastEvent("QUEUE_UPDATED", gin.H{"action": "payment_completed", "status": "เสร็จสิ้น", "visit_id": req.VisitID})
+	ws.BroadcastEvent("QUEUE_UPDATED", gin.H{"action": "payment_completed", "status": "เสร็จสิ้น", "visit_id": visitID})
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":         "success",
