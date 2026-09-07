@@ -80,8 +80,19 @@ const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
     }
   }
 
-  const birthYear = q.patient?.birthdate ? new Date(q.patient.birthdate).getFullYear() : 1990;
-  const age = new Date().getFullYear() - birthYear;
+  let age = 0;
+  if (q.patient?.birthdate) {
+    try {
+      const d = new Date(q.patient.birthdate);
+      if (!isNaN(d.getTime())) {
+        const bYear = d.getFullYear() >= 2400 ? d.getFullYear() - 543 : d.getFullYear();
+        const calcAge = new Date().getFullYear() - bYear;
+        age = calcAge >= 0 ? calcAge : 0;
+      }
+    } catch {
+      // ignore
+    }
+  }
   const queueFormatted = formatQueueNo(q.queue_number || q.id);
   const hnFormatted = q.patient?.hn ? formatHN(q.patient.hn) : formatHN(q.patient_id || q.id || 1);
 
@@ -94,7 +105,7 @@ const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
     fullName: q.patient?.fullname || `ผู้ป่วยคิว ${queueFormatted}`,
     nationalId: formatNationalId(q.patient?.national_id),
     gender: (q.patient?.gender as 'ชาย' | 'หญิง' | 'อื่นๆ') || 'ชาย',
-    age: age > 0 ? age : 35,
+    age: age,
     phone: formatPhone(q.patient?.phone_number),
     schemeType: q.patient?.scheme_type || 'บัตรทอง (สปสช.)',
     allergies: q.patient?.allergies || 'ปฏิเสธการแพ้ยา',

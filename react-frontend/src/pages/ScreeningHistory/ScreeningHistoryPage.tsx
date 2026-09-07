@@ -49,8 +49,19 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
   }
 
   const patient = s.visit_record?.patient;
-  const birthYear = patient?.birthdate ? new Date(patient.birthdate).getFullYear() : 1990;
-  const age = new Date().getFullYear() - birthYear;
+  let age = 0;
+  if (patient?.birthdate) {
+    try {
+      const d = new Date(patient.birthdate);
+      if (!isNaN(d.getTime())) {
+        const bYear = d.getFullYear() >= 2400 ? d.getFullYear() - 543 : d.getFullYear();
+        const calcAge = new Date().getFullYear() - bYear;
+        age = calcAge >= 0 ? calcAge : 0;
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   let bmiCat: 'ผอม' | 'ปกติ' | 'ท้วม (น้ำหนักเกิน)' | 'อ้วนระดับ 1' | 'อ้วนระดับ 2' = 'ปกติ';
   if (s.bmi < 18.5) bmiCat = 'ผอม';

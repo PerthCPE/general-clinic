@@ -215,6 +215,16 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
     }
     if (!formData.phone.trim()) errors.phone = 'กรุณาระบุเบอร์โทรศัพท์';
 
+    // Birth Date validation (Strict: required & valid date)
+    if (!formData.dob.trim()) {
+      errors.dob = 'กรุณาระบุวันเกิด';
+    } else {
+      const parsed = parseDateAndCalculateAge(formData.dob);
+      if (!parsed.valid) {
+        errors.dob = 'รูปแบบวันเกิดไม่ถูกต้อง (กรุณาใช้ วว/ดด/ปปปป เช่น 12/05/2549)';
+      }
+    }
+
     // Address validation (Sprint 3)
     if (!formData.province.trim()) {
       errors.province = 'กรุณาระบุจังหวัด';
@@ -245,8 +255,12 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
         : `${formData.title}${formData.fullName}`;
 
     const parsed = parseDateAndCalculateAge(formData.dob);
-    const birthDateISO = parsed.valid ? parsed.birthdateISO : formData.dob;
-    const finalAge = parsed.valid ? parseInt(parsed.ageStr, 10) : parseInt(formData.age, 10) || 25;
+    if (!parsed.valid) {
+      setFormErrors((prev) => ({ ...prev, dob: 'รูปแบบวันเกิดไม่ถูกต้อง' }));
+      return;
+    }
+    const birthDateISO = parsed.birthdateISO;
+    const finalAge = parseInt(parsed.ageStr, 10);
 
     const composedAddr = composeAddressPreview(formData);
 
@@ -254,7 +268,7 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
       fullName: fullPatientName,
       nationalId: formData.nationalId,
       gender: formData.gender,
-      dob: birthDateISO || '2000-01-01',
+      dob: birthDateISO,
       age: finalAge,
       phone: formData.phone,
       emergencyContact: formData.emergencyContact,

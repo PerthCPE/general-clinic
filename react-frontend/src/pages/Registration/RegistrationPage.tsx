@@ -11,8 +11,8 @@ import './RegistrationPage.css';
 export { formatHN, formatQueueNo, formatNationalId, formatPhone };
 
 const mapBackendPatientToUI = (p: BackendPatient): Patient => {
-  let age = 30;
-  let formattedDob = '01/01/2543';
+  let age = 0;
+  let formattedDob = '-';
 
   if (p.birthdate) {
     try {
@@ -21,7 +21,7 @@ const mapBackendPatientToUI = (p: BackendPatient): Patient => {
         const birthYear = d.getFullYear() >= 2400 ? d.getFullYear() - 543 : d.getFullYear();
         const currentYear = new Date().getFullYear();
         const calcAge = currentYear - birthYear;
-        age = calcAge > 0 ? calcAge : 1;
+        age = calcAge >= 0 ? calcAge : 0;
         formattedDob = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${birthYear + 543}`;
       }
     } catch {
@@ -48,8 +48,8 @@ const mapBackendPatientToUI = (p: BackendPatient): Patient => {
     hn: formatHN(p.hn || patientSeq),
     fullName: p.fullname,
     nationalId: formatNationalId(p.national_id),
-    dob: formattedDob || '01/01/2000',
-    age: age > 0 ? age : 30,
+    dob: formattedDob,
+    age: age,
     gender: (p.gender as 'ชาย' | 'หญิง' | 'อื่นๆ') || 'ชาย',
     phone: formatPhone(p.phone_number),
     emergencyContact: p.emergency_contact || '-',
@@ -85,6 +85,7 @@ function RegistrationPage() {
   const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
   const [regSuccessModal, setRegSuccessModal] = useState<RegSuccessResult | null>(null);
+  const [errorToast, setErrorToast] = useState<string | null>(null);
   const [isRecentOpen, setIsRecentOpen] = useState(true);
   const { subscribe } = useWebSocket();
 
@@ -352,17 +353,24 @@ function RegistrationPage() {
 
   // ลงทะเบียนผู้ป่วยใหม่ บันทึกลง Database จริง (Sprint 3.2: รองรับ issueQueue flag)
   const handleFormSubmit = async (formData: Partial<Patient> & { issueQueue?: boolean }) => {
+    setErrorToast(null);
+
+    if (!formData.dob || !formData.dob.trim()) {
+      setErrorToast('กรุณาระบุวันเกิดของผู้ป่วย');
+      return;
+    }
+
     try {
       // แปลงวันเกิด DD/MM/YYYY (พ.ศ. หรือ ค.ศ.) เป็น YYYY-MM-DD
-      let birthDateStr = formData.dob || '2000-01-01';
-      if (formData.dob && formData.dob.includes('/')) {
+      let birthDateStr = formData.dob;
+      if (formData.dob.includes('/')) {
         const parts = formData.dob.split('/');
         if (parts.length === 3) {
           let yr = parseInt(parts[2], 10);
           if (yr >= 2400) yr = yr - 543;
           birthDateStr = `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
         }
-      } else if (formData.dob && formData.dob.includes('-')) {
+      } else if (formData.dob.includes('-')) {
         const parts = formData.dob.split('-');
         if (parts.length === 3 && parts[0].length === 4) {
           let yr = parseInt(parts[0], 10);
@@ -375,7 +383,7 @@ function RegistrationPage() {
 
       const payload = {
         national_id: (formData.nationalId || '').replace(/[-\s]/g, ''),
-        fullname: formData.fullName || 'ผู้ป่วยใหม่',
+        fullname: formData.fullName || '',
         gender: formData.gender || 'ชาย',
         birthdate: birthDateStr,
         house_no: formData.houseNo || '',
@@ -387,7 +395,7 @@ function RegistrationPage() {
         district: formData.district || '',
         province: formData.province || '',
         postal_code: formData.postalCode || '',
-        address: formData.address || 'กรุงเทพมหานคร',
+        address: formData.address || '',
         phone_number: (formData.phone || '').replace(/[-\s]/g, ''),
         emergency_contact: formData.emergencyContact || '-',
         scheme_type: formData.schemeType || 'บัตรทอง (สปสช.)',
@@ -413,41 +421,13 @@ function RegistrationPage() {
         return;
       }
     } catch (err: any) {
-      console.warn('Register error:', err);
+      console.error('Register error:', err);
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.message ||
+        'เกิดข้อผิดพลาดในการลงทะเบียนผู้ป่วย กรุณาตรวจสอบข้อมูลหรือการเชื่อมต่อระบบ';
+      setErrorToast(errMsg);
     }
-
-    // Fallback UI
-    const now = new Date();
-    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} น.`;
-    const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear() + 543}`;
-
-    const newPatient: Patient = {
-      hn: formatHN(patients.length + 1),
-      fullName: formData.fullName || 'ผู้ป่วยใหม่',
-      nationalId: formData.nationalId || '0-0000-00000-00-0',
-      dob: formData.dob || '01/01/2000',
-      age: formData.age || 30,
-      gender: formData.gender || 'ชาย',
-      phone: formData.phone || '-',
-      emergencyContact: formData.emergencyContact || '-',
-      houseNo: formData.houseNo || '',
-      villageNo: formData.villageNo || '',
-      villageName: formData.villageName || '',
-      alley: formData.alley || '',
-      road: formData.road || '',
-      subDistrict: formData.subDistrict || '',
-      district: formData.district || '',
-      province: formData.province || '',
-      postalCode: formData.postalCode || '',
-      address: formData.address || 'กรุงเทพมหานคร',
-      schemeType: (formData.schemeType as SchemeType) || 'บัตรทอง (สปสช.)',
-      chronicDiseases: '',
-      allergies: '',
-      registeredAt: `${dateStr} ${timeStr}`,
-    };
-
-    setPatients((prev) => [newPatient, ...prev]);
-    setSearchResult(null);
   };
 
   const scrollToForm = () => {
@@ -480,6 +460,54 @@ function RegistrationPage() {
           ค้นหาประวัติผู้ป่วยเดิมเพื่อส่งเข้าคิว หรือลงทะเบียนออกรหัส HN ผู้ป่วยใหม่เข้าสู่ระบบคลินิก
         </p>
       </div>
+
+      {/* Error Alert Banner (Strict Error Feedback) */}
+      {errorToast && (
+        <div
+          role="alert"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            marginBottom: '16px',
+            borderRadius: '8px',
+            backgroundColor: '#FEF2F2',
+            border: '1px solid #FECACA',
+            color: '#DC2626',
+            fontSize: '14px',
+            fontWeight: 500,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>{errorToast}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setErrorToast(null)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#DC2626',
+              cursor: 'pointer',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            aria-label="ปิดแจ้งเตือน"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
 
       {/* Stats Summary Grid */}
       <div className="reg-stats-grid">
