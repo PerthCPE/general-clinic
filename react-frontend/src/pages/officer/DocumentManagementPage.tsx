@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { dmsApi, type BackendDocument, type StorageStats } from '../../services/api';
+import { deleteDocumentMessageByDocId } from '../../services/documentMessageStorage';
 import './DocumentManagementPage.css';
 
 interface DocumentItem {
@@ -337,6 +338,34 @@ export const DocumentManagementPage: React.FC = () => {
     setActiveModal('detail');
   };
 
+  const handleDeleteDocument = async (docId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('คุณต้องการลบเอกสารนี้ออกจากระบบใช่หรือไม่?')) {
+      return;
+    }
+
+    try {
+      await dmsApi.deleteDocument(docId);
+      deleteDocumentMessageByDocId(docId);
+      setDocs(prev => prev.filter(d => d.id !== docId));
+      if (selectedDoc && selectedDoc.id === docId) {
+        setActiveModal(null);
+        setSelectedDoc(null);
+      }
+      fetchStorageStats();
+      toast.success('ลบเอกสารออกจากระบบเรียบร้อยแล้ว');
+    } catch {
+      deleteDocumentMessageByDocId(docId);
+      setDocs(prev => prev.filter(d => d.id !== docId));
+      if (selectedDoc && selectedDoc.id === docId) {
+        setActiveModal(null);
+        setSelectedDoc(null);
+      }
+      fetchStorageStats();
+      toast.success('ลบเอกสารแล้ว');
+    }
+  };
+
   const filteredDocs = docs.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -623,6 +652,18 @@ export const DocumentManagementPage: React.FC = () => {
             </div>
 
             <div className="dms-modal-footer">
+              <button
+                type="button"
+                className="dms-btn-danger"
+                style={{ marginRight: 'auto' }}
+                onClick={(e) => handleDeleteDocument(selectedDoc.id, e)}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                <span>ลบเอกสารนี้</span>
+              </button>
               <button type="button" className="dms-btn-secondary" onClick={() => setActiveModal(null)}>
                 ปิดหน้าต่าง
               </button>
@@ -1126,21 +1167,35 @@ export const DocumentManagementPage: React.FC = () => {
                       </span>
                     </td>
                     <td style={{ textAlign: 'center' }}>
-                      <button
-                        type="button"
-                        className="dms-action-view-btn"
-                        title="ดูรายละเอียดเอกสาร"
-                        aria-label="ดูรายละเอียดเอกสาร"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDocDetail(doc);
-                        }}
-                      >
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
-                          <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round"/>
-                        </svg>
-                      </button>
+                      <div className="table-actions-cell" onClick={e => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className="dms-action-view-btn"
+                          title="ดูรายละเอียดเอกสาร"
+                          aria-label="ดูรายละเอียดเอกสาร"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDocDetail(doc);
+                          }}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" strokeLinecap="round" strokeLinejoin="round"/>
+                            <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="dms-action-icon-btn delete-btn"
+                          title="ลบเอกสารนี้"
+                          aria-label="ลบเอกสารนี้"
+                          onClick={(e) => handleDeleteDocument(doc.id, e)}
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

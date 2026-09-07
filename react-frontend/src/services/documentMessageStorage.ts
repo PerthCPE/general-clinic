@@ -20,7 +20,7 @@ export interface DocumentMessage {
   fileUrl?: string;
 }
 
-const STORAGE_KEY_DOC_MESSAGES = 'clinic_document_messages_v3';
+const STORAGE_KEY_DOC_MESSAGES = 'clinic_document_messages_v4';
 
 const MONTH_NAMES = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
 
@@ -33,129 +33,30 @@ export const formatThaiMessageTime = (dateObj: Date): string => {
 };
 
 export const generateInitialDocumentMessages = (): DocumentMessage[] => {
-  const now = new Date();
-
-  return [
-    // === สำหรับ แพทย์คนที่ 1: พญ.สุดา สุขสมบูรณ์ (doctor1) เท่านั้น ===
-    {
-      id: 'MSG-2569-D1-01',
-      docId: 1001,
-      title: 'ใบส่งตัวผู้ป่วยตรวจครรภ์พิเศษ (ANC) - คุณสมหญิง มีสุข',
-      description: 'ส่งตัวคุณสมหญิง มีสุข เพื่อฝากครรภ์ความเสี่ยงสูงและตรวจอัลตราซาวด์ 4 มิติ',
-      sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-      senderRole: 'เจ้าหน้าที่ธุรการ/เวชระเบียน',
-      recipient: 'พญ.สุดา สุขสมบูรณ์',
-      recipientUsername: 'doctor1',
-      recipientId: 7,
-      type: 'ใบส่งตัว',
-      priority: 'urgent',
-      createdAt: new Date(now.getTime() - 25 * 60 * 1000).toISOString(),
-      timeDisplay: '25 นาทีที่แล้ว',
-      isUnread: true,
-    },
-    {
-      id: 'MSG-2569-D1-02',
-      docId: 1002,
-      title: 'รายงานผลการตรวจคัดกรองมะเร็งปากมดลูก (Pap Smear)',
-      description: 'ผลตรวจเซลล์วิทยาของคนไข้สูตินรีเวชประจำวันพุธ โปรดแพทย์เจ้าของไข้ตรวจสอบและลงนาม',
-      sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-      senderRole: 'เจ้าหน้าที่ธุรการ/เวชระเบียน',
-      recipient: 'พญ.สุดา สุขสมบูรณ์',
-      recipientUsername: 'doctor1',
-      recipientId: 7,
-      type: 'ผลตรวจ',
-      priority: 'normal',
-      createdAt: new Date(now.getTime() - 90 * 60 * 1000).toISOString(),
-      timeDisplay: '1 ชั่วโมงที่แล้ว',
-      isUnread: false,
-    },
-
-    // === สำหรับ แพทย์คนที่ 2: นพ.วิชัย ชาญการแพทย์ (doctor2) เท่านั้น ===
-    {
-      id: 'MSG-2569-D2-01',
-      docId: 1003,
-      title: 'ผลการตรวจเลือด CBC และระดับน้ำตาลสะสม (HbA1c) - นายสมหวัง ใจดี',
-      description: 'พบค่าเม็ดเลือดขาวสูงผิดปกติ (WBC 18,500) โปรดแพทย์อายุรกรรมตรวจสอบและปรับแผนการรักษา',
-      sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-      senderRole: 'เจ้าหน้าที่ธุรการ/เวชระเบียน',
-      recipient: 'นพ.วิชัย ชาญการแพทย์',
-      recipientUsername: 'doctor2',
-      recipientId: 8,
-      type: 'ผลตรวจ',
-      priority: 'emergency',
-      createdAt: new Date(now.getTime() - 15 * 60 * 1000).toISOString(),
-      timeDisplay: '15 นาทีที่แล้ว',
-      isUnread: true,
-    },
-    {
-      id: 'MSG-2569-D2-02',
-      docId: 1004,
-      title: 'ผลการตรวจคลื่นไฟฟ้าหัวใจ (EKG 12 Leads) - ผู้ป่วยเคสหัวใจ',
-      description: 'บันทึกภาพกราฟคลื่นไฟฟ้าหัวใจ EKG เพื่อให้อายุรแพทย์วิเคราะห์ผลก่อนนัดหมาย',
-      sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-      senderRole: 'เจ้าหน้าที่ธุรการ/เวชระเบียน',
-      recipient: 'นพ.วิชัย ชาญการแพทย์',
-      recipientUsername: 'doctor2',
-      recipientId: 8,
-      type: 'รายงาน',
-      priority: 'urgent',
-      createdAt: new Date(now.getTime() - 120 * 60 * 1000).toISOString(),
-      timeDisplay: '2 ชั่วโมงที่แล้ว',
-      isUnread: false,
-    },
-
-    // === สำหรับ แพทย์คนที่ 3: พญ.เกศรา รักษาดี (doctor3) เท่านั้น ===
-    {
-      id: 'MSG-2569-D3-01',
-      docId: 1005,
-      title: 'รายงานสรุปผลวัคซีนและพัฒนาการเด็กประจำสัปดาห์ - ด.ช.แทนคุณ',
-      description: 'สรุปรายชื่อเด็กที่นัดหมายรับวัคซีนรวม 5 โรค (DTP-HB-Hib) ประจำวันศุกร์นี้',
-      sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-      senderRole: 'เจ้าหน้าที่ธุรการ/เวชระเบียน',
-      recipient: 'พญ.เกศรา รักษาดี',
-      recipientUsername: 'doctor3',
-      recipientId: 9,
-      type: 'รายงาน',
-      priority: 'normal',
-      createdAt: new Date(now.getTime() - 40 * 60 * 1000).toISOString(),
-      timeDisplay: '40 นาทีที่แล้ว',
-      isUnread: true,
-    },
-    {
-      id: 'MSG-2569-D3-02',
-      docId: 1006,
-      title: 'ผลการตรวจภูมิแพ้ทางผิวหนัง (Skin Prick Test) ในเด็ก',
-      description: 'รายงานผลการทดสอบการแพ้อาหารและสารก่อภูมิแพ้ในทางเดินหายใจของเด็กอายุ 5 ขวบ',
-      sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-      senderRole: 'เจ้าหน้าที่ธุรการ/เวชระเบียน',
-      recipient: 'พญ.เกศรา รักษาดี',
-      recipientUsername: 'doctor3',
-      recipientId: 9,
-      type: 'ผลตรวจ',
-      priority: 'normal',
-      createdAt: new Date(now.getTime() - 180 * 60 * 1000).toISOString(),
-      timeDisplay: '3 ชั่วโมงที่แล้ว',
-      isUnread: false,
-    },
-  ];
+  return [];
 };
 
 export function getStoredDocumentMessages(): DocumentMessage[] {
-  if (typeof window === 'undefined') return generateInitialDocumentMessages();
+  if (typeof window === 'undefined') return [];
+  try {
+    localStorage.removeItem('clinic_document_messages_v1');
+    localStorage.removeItem('clinic_document_messages_v2');
+    localStorage.removeItem('clinic_document_messages_v3');
+  } catch {
+    // ignore
+  }
   const raw = localStorage.getItem(STORAGE_KEY_DOC_MESSAGES);
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     } catch {
       // fallback
     }
   }
-  const initial = generateInitialDocumentMessages();
-  localStorage.setItem(STORAGE_KEY_DOC_MESSAGES, JSON.stringify(initial));
-  return initial;
+  return [];
 }
 
 export function saveStoredDocumentMessages(messages: DocumentMessage[]) {
@@ -163,6 +64,31 @@ export function saveStoredDocumentMessages(messages: DocumentMessage[]) {
     localStorage.setItem(STORAGE_KEY_DOC_MESSAGES, JSON.stringify(messages));
     window.dispatchEvent(new CustomEvent('clinic_document_message_sent'));
   }
+}
+
+/**
+ * Delete a single message by ID
+ */
+export function deleteDocumentMessage(id: string) {
+  const current = getStoredDocumentMessages();
+  const updated = current.filter(msg => msg.id !== id);
+  saveStoredDocumentMessages(updated);
+}
+
+/**
+ * Delete a message associated with a specific Document ID
+ */
+export function deleteDocumentMessageByDocId(docId: number | string) {
+  const current = getStoredDocumentMessages();
+  const updated = current.filter(msg => String(msg.docId) !== String(docId));
+  saveStoredDocumentMessages(updated);
+}
+
+/**
+ * Clear all document messages
+ */
+export function clearAllDocumentMessages() {
+  saveStoredDocumentMessages([]);
 }
 
 /**

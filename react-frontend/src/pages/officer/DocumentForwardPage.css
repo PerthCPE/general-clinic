@@ -898,6 +898,57 @@ body.dark-mode .archive-btn {
   border-color: #475569;
 }
 
+.delete-btn {
+  background: #FEF2F2;
+  color: #DC2626;
+  border-color: #FECACA;
+}
+
+body.dark-mode .delete-btn {
+  background: rgba(220, 38, 38, 0.18);
+  border-color: #7F1D1D;
+  color: #F87171;
+}
+
+.delete-btn:hover {
+  background: #DC2626;
+  color: #FFFFFF;
+  border-color: #DC2626;
+}
+
+.dms-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dms-btn-danger:hover {
+  background: #DC2626;
+  color: #FFFFFF;
+  border-color: #DC2626;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+body.dark-mode .dms-btn-danger {
+  background: #7F1D1D;
+  border-color: #991B1B;
+  color: #FCA5A5;
+}
+
+body.dark-mode .dms-btn-danger:hover {
+  background: #DC2626;
+  color: #FFFFFF;
+}
+
 /* No data cell */
 .no-data-cell {
   text-align: center;
@@ -1117,6 +1168,12 @@ body.dark-mode .dms-modal-footer {
 
 .detail-modal-footer {
   justify-content: space-between;
+}
+
+.footer-left-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .footer-right-buttons {

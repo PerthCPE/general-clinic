@@ -9,6 +9,8 @@ import {
   getDocumentMessagesForUser,
   markDocumentMessageAsRead,
   markAllDocumentMessagesAsRead,
+  deleteDocumentMessage,
+  clearAllDocumentMessages,
 } from '../../services/documentMessageStorage';
 
 interface TopbarProps {
@@ -76,6 +78,24 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     setDocMessages(getDocumentMessagesForUser(currentUser));
     setSelectedDocMessageModal(msg);
     setIsDocMessagesOpen(false);
+  };
+
+  const handleDeleteMessage = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    deleteDocumentMessage(id);
+    setDocMessages(getDocumentMessagesForUser(currentUser));
+    if (selectedDocMessageModal && selectedDocMessageModal.id === id) {
+      setSelectedDocMessageModal(null);
+    }
+  };
+
+  const handleClearAllMessages = () => {
+    if (window.confirm('คุณต้องการล้างข้อความเอกสารทั้งหมดใช่หรือไม่?')) {
+      clearAllDocumentMessages();
+      setDocMessages([]);
+      setIsAllDocsModalOpen(false);
+      setSelectedDocMessageModal(null);
+    }
   };
 
   const [isAllDocsModalOpen, setIsAllDocsModalOpen] = useState(false);
@@ -705,7 +725,18 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                           <span className={`doc-message-tag ${msg.priority}`}>
                             {msg.type}
                           </span>
-                          <span className="doc-message-time">{msg.timeDisplay}</span>
+                          <div className="doc-message-top-right">
+                            <span className="doc-message-time">{msg.timeDisplay}</span>
+                            <button
+                              type="button"
+                              className="doc-message-item-delete-btn"
+                              onClick={(e) => handleDeleteMessage(e, msg.id)}
+                              title="ลบข้อความนี้"
+                              aria-label="ลบข้อความนี้"
+                            >
+                              ✕
+                            </button>
+                          </div>
                         </div>
                         <h5 className="doc-message-item-title">{msg.title}</h5>
                         {msg.description && (
@@ -1138,6 +1169,16 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             <div className="doc-msg-modal-footer">
               <button
                 type="button"
+                className="doc-msg-btn-danger"
+                onClick={(e) => {
+                  handleDeleteMessage(e, selectedDocMessageModal.id);
+                  setSelectedDocMessageModal(null);
+                }}
+              >
+                🗑️ ลบข้อความนี้
+              </button>
+              <button
+                type="button"
                 className="doc-msg-btn-primary"
                 onClick={() => setSelectedDocMessageModal(null)}
               >
@@ -1201,16 +1242,28 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                   </button>
                 </div>
 
-                {unreadDocMessageCount > 0 && (
-                  <button
-                    type="button"
-                    className="doc-all-quick-readall-btn"
-                    onClick={handleMarkAllMessagesRead}
-                    title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด"
-                  >
-                    ✓ ทำเครื่องหมายอ่านแล้วทั้งหมด
-                  </button>
-                )}
+                <div className="doc-all-toolbar-actions">
+                  {unreadDocMessageCount > 0 && (
+                    <button
+                      type="button"
+                      className="doc-all-quick-readall-btn"
+                      onClick={handleMarkAllMessagesRead}
+                      title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด"
+                    >
+                      ✓ อ่านแล้วทั้งหมด
+                    </button>
+                  )}
+                  {docMessages.length > 0 && (
+                    <button
+                      type="button"
+                      className="doc-all-quick-clearall-btn"
+                      onClick={handleClearAllMessages}
+                      title="ล้างข้อความทั้งหมดในกล่องข้อความ"
+                    >
+                      🗑️ ล้างทั้งหมด
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Search Bar */}
@@ -1243,8 +1296,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
               {filteredAllDocs.length === 0 ? (
                 <div className="doc-all-empty">
                   <div className="doc-all-empty-icon">📭</div>
-                  <h4>{allDocsFilter === 'unread' ? 'ไม่มีเอกสารที่ยังไม่ได้อ่าน' : 'ไม่พบเอกสารที่ค้นหา'}</h4>
-                  <p>{allDocsFilter === 'unread' ? 'คุณได้อ่านเอกสารทั้งหมดครบถ้วนแล้ว' : 'ลองเปลี่ยนคำค้นหาใหม่อีกครั้ง'}</p>
+                  <h4>{allDocsFilter === 'unread' ? 'ไม่มีเอกสารที่ยังไม่ได้อ่าน' : 'ไม่มีเอกสารในคลังขณะนี้'}</h4>
+                  <p>{allDocsFilter === 'unread' ? 'คุณได้อ่านเอกสารทั้งหมดครบถ้วนแล้ว' : 'ยังไม่มีข้อความหรือเอกสารส่งต่อในระบบ'}</p>
                 </div>
               ) : (
                 <div className="doc-all-grid">
@@ -1276,16 +1329,27 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                           <span className="doc-all-sender-label">จาก:</span>
                           <span className="doc-all-sender-name">{msg.sender}</span>
                         </div>
-                        <button
-                          type="button"
-                          className="doc-all-view-detail-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenMessageItem(msg);
-                          }}
-                        >
-                          เปิดดูเอกสาร &rarr;
-                        </button>
+                        <div className="doc-all-card-actions">
+                          <button
+                            type="button"
+                            className="doc-all-delete-btn"
+                            title="ลบข้อความนี้"
+                            aria-label="ลบข้อความนี้"
+                            onClick={(e) => handleDeleteMessage(e, msg.id)}
+                          >
+                            🗑️
+                          </button>
+                          <button
+                            type="button"
+                            className="doc-all-view-detail-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenMessageItem(msg);
+                            }}
+                          >
+                            เปิดดูเอกสาร &rarr;
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

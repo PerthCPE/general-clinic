@@ -464,6 +464,14 @@ export const dmsApi = {
     request<{ message: string; forward: BackendDocumentForward }>(`/api/officer/documents/forwards/${id}/ack`, {
       method: 'PUT',
     }),
+  deleteForward: (id: number | string) =>
+    request<{ message: string }>(`/api/officer/documents/forwards/${id}`, {
+      method: 'DELETE',
+    }),
+  deleteDocument: (id: number | string) =>
+    request<{ message: string }>(`/api/officer/documents/${id}`, {
+      method: 'DELETE',
+    }),
   getRecipients: () => request<BackendUser[]>('/api/officer/recipients'),
 };
 

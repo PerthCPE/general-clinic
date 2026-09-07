@@ -2722,3 +2722,136 @@ body.dark-mode .doc-all-footer-close-btn:hover {
   background: #475569;
 }
 
+/* Delete Buttons & Danger Actions */
+.doc-message-top-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.doc-message-item-delete-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: all 0.15s ease;
+}
+
+.doc-message-item:hover .doc-message-item-delete-btn {
+  opacity: 1;
+}
+
+.doc-message-item-delete-btn:hover {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+body.dark-mode .doc-message-item-delete-btn:hover {
+  background: #7F1D1D;
+  color: #FCA5A5;
+}
+
+.doc-msg-btn-danger {
+  padding: 8px 16px;
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1px solid #FECACA;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-right: auto;
+  transition: all 0.2s ease;
+}
+
+.doc-msg-btn-danger:hover {
+  background: #DC2626;
+  color: #FFFFFF;
+  border-color: #DC2626;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+body.dark-mode .doc-msg-btn-danger {
+  background: #7F1D1D;
+  border-color: #991B1B;
+  color: #FCA5A5;
+}
+
+body.dark-mode .doc-msg-btn-danger:hover {
+  background: #DC2626;
+  color: #FFFFFF;
+}
+
+.doc-all-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-all-quick-clearall-btn {
+  padding: 6px 12px;
+  background: #FFF1F2;
+  border: 1px solid #FECDD3;
+  color: #E11D48;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.doc-all-quick-clearall-btn:hover {
+  background: #E11D48;
+  color: #FFFFFF;
+  border-color: #E11D48;
+}
+
+body.dark-mode .doc-all-quick-clearall-btn {
+  background: #4C0519;
+  border-color: #881337;
+  color: #FDA4AF;
+}
+
+body.dark-mode .doc-all-quick-clearall-btn:hover {
+  background: #E11D48;
+  color: #FFFFFF;
+}
+
+.doc-all-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-all-delete-btn {
+  padding: 6px 9px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 7px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.doc-all-delete-btn:hover {
+  background: #FEE2E2;
+  border-color: #FECACA;
+  transform: scale(1.05);
+}
+
+body.dark-mode .doc-all-delete-btn {
+  background: #1E293B;
+  border-color: #334155;
+}
+
+body.dark-mode .doc-all-delete-btn:hover {
+  background: #7F1D1D;
+  border-color: #991B1B;
+}
+
+

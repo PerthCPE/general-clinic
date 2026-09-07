@@ -6,7 +6,11 @@ import {
   type BackendUser,
   type BackendDocument,
 } from '../../services/api';
-import { sendDocumentMessage } from '../../services/documentMessageStorage';
+import {
+  sendDocumentMessage,
+  deleteDocumentMessage,
+  deleteDocumentMessageByDocId,
+} from '../../services/documentMessageStorage';
 import { DEMO_USERS } from '../../config/roles';
 import './DocumentForwardPage.css';
 
@@ -61,185 +65,17 @@ const getRoleLabel = (role?: string): string => {
 };
 
 const generateInitialIncomingDocs = (): ForwardDoc[] => {
-  const now = new Date();
-  const sampleItems: Array<{
-    title: string;
-    sender: string;
-    senderRole: string;
-    type: string;
-    priority: 'normal' | 'urgent' | 'emergency';
-    status: 'unread' | 'processing' | 'completed';
-    hoursAgo: number;
-    description: string;
-  }> = [
-    {
-      title: 'ผลการตรวจเลือด CBC (ฉุกเฉิน)',
-      sender: 'ห้องปฏิบัติการกลาง (Lab)',
-      senderRole: 'นักเทคนิคการแพทย์',
-      type: 'ผลตรวจ',
-      priority: 'emergency',
-      status: 'unread',
-      hoursAgo: 0.5,
-      description: 'พบค่าเม็ดเลือดขาวสูงผิดปกติ โปรดแพทย์เจ้าของไข้ตรวจสอบด่วน',
-    },
-    {
-      title: 'ใบส่งตัวผู้ป่วยส่งต่อรับการผ่าตัด',
-      sender: 'แผนกอายุรกรรม',
-      senderRole: 'พยาบาลวิชาชีพ',
-      type: 'ใบส่งตัว',
-      priority: 'urgent',
-      status: 'unread',
-      hoursAgo: 1.5,
-      description: 'ส่งตัวผู้ป่วยนายสมบัติ มีสุข เพื่อประเมินสิทธิการรักษาและเตียงผ่าตัด',
-    },
-    {
-      title: 'ใบเบิกเวชภัณฑ์และอุปกรณ์ทำแผล',
-      sender: 'แผนกฉุกเฉินและอุบัติเหตุ (ER)',
-      senderRole: 'พยาบาลหัวหน้าเวร',
-      type: 'ใบเบิก',
-      priority: 'normal',
-      status: 'processing',
-      hoursAgo: 3,
-      description: 'ขอเบิกสำลี, ผ้าก๊อซปลอดเชื้อ, และน้ำเกลือล้างแผล (NSS 0.9%)',
-    },
-    {
-      title: 'รายงานผลเอกซเรย์ทรวงอก (Chest X-Ray)',
-      sender: 'แผนกรังสีวินิจฉัย (X-Ray)',
-      senderRole: 'นักรังสีการแพทย์',
-      type: 'รายงาน',
-      priority: 'normal',
-      status: 'processing',
-      hoursAgo: 5,
-      description: 'ภาพถ่ายรังสีทรวงอกระบบดิจิทัล ส่งมอบให้แพทย์อายุรกรรม',
-    },
-    {
-      title: 'บันทึกข้อความสรุปการประชุมคลินิก',
-      sender: 'สำนักงานผู้อำนวยการ',
-      senderRole: 'ธุรการกลาง',
-      type: 'บันทึกข้อความ',
-      priority: 'normal',
-      status: 'completed',
-      hoursAgo: 24,
-      description: 'มติที่ประชุมเรื่องการปรับปรุงระบบคัดกรองผู้ป่วยรอบเดือนกันยายน',
-    },
-    {
-      title: 'ใบแจ้งยอดค่ารักษาพยาบาลและประกันสังคม',
-      sender: 'ฝ่ายการเงินและบัญชี',
-      senderRole: 'เจ้าหน้าที่การเงิน',
-      type: 'การเงิน',
-      priority: 'normal',
-      status: 'completed',
-      hoursAgo: 48,
-      description: 'สรุปรายการเบิกจ่ายค่ารักษาพยาบาลสิทธิประกันสังคม',
-    },
-  ];
-
-  return sampleItems.map((item, idx) => {
-    const docDate = new Date(now.getTime() - item.hoursAgo * 60 * 60 * 1000);
-    return {
-      id: `DOC-2569-${String(1001 + idx)}`,
-      title: item.title,
-      description: item.description,
-      sender: item.sender,
-      senderRole: item.senderRole,
-      recipient: 'ธุรการ (คุณสมจิต ดีใจ)',
-      recipientRole: 'เจ้าหน้าที่ธุรการ',
-      receivedDate: formatThaiDate(docDate),
-      rawDate: docDate.toISOString(),
-      type: item.type,
-      priority: item.priority,
-      status: item.status,
-    };
-  });
+  return [];
 };
 
 const generateInitialForwardedDocs = (): ForwardDoc[] => {
-  const now = new Date();
-  const sampleItems: Array<{
-    title: string;
-    recipient: string;
-    recipientRole: string;
-    type: string;
-    priority: 'normal' | 'urgent' | 'emergency';
-    status: 'unread' | 'processing' | 'completed';
-    hoursAgo: number;
-    description: string;
-  }> = [
-    {
-      title: 'รายงานสรุปยอดผู้ป่วยประจำเดือน',
-      recipient: 'ผู้อำนวยการคลินิก',
-      recipientRole: 'ผู้บริหาร',
-      type: 'รายงาน',
-      priority: 'normal',
-      status: 'completed',
-      hoursAgo: 2,
-      description: 'สถิติยอดผู้ป่วยนอก (OPD) ยอดผู้ป่วยฉุกเฉิน และรายได้รวมประจำเดือน',
-    },
-    {
-      title: 'ใบส่งตัวผู้ป่วยส่งโรงพยาบาลศูนย์',
-      recipient: 'พญ.สุดา สุขสมบูรณ์',
-      recipientRole: 'สูตินรีแพทย์',
-      type: 'ใบส่งตัว',
-      priority: 'emergency',
-      status: 'completed',
-      hoursAgo: 4,
-      description: 'ส่งตัวเคสฝากครรภ์เสี่ยงสูงเพื่อรับคำปรึกษาและตรวจวินิจฉัยเฉพาะทาง',
-    },
-    {
-      title: 'ใบเบิกจ่ายงบประมาณจัดซื้อเวชภัณฑ์ยา',
-      recipient: 'ฝ่ายการเงินและบัญชี',
-      recipientRole: 'การเงิน',
-      type: 'การเงิน',
-      priority: 'urgent',
-      status: 'processing',
-      hoursAgo: 6,
-      description: 'ขออนุมัติจัดซื้อยาจำเป็นเร่งด่วนสำหรับห้องยาคลินิก',
-    },
-    {
-      title: 'เอกสารประเมินประสิทธิภาพบุคลากร',
-      recipient: 'ฝ่ายทรัพยากรบุคคล (HR)',
-      recipientRole: 'บุคคล',
-      type: 'เอกสารทั่วไป',
-      priority: 'normal',
-      status: 'completed',
-      hoursAgo: 30,
-      description: 'สรุปผลการประเมินการปฏิบัติงานแพทย์และพยาบาล',
-    },
-    {
-      title: 'ผลการตรวจเพาะเชื้อทางจุลชีววิทยา',
-      recipient: 'นพ.วิชัย ชาญการแพทย์',
-      recipientRole: 'อายุรแพทย์',
-      type: 'ผลตรวจ',
-      priority: 'urgent',
-      status: 'processing',
-      hoursAgo: 8,
-      description: 'ผลเพาะเชื้อและค่าความไวต่อยาปฏิชีวนะของคนไข้ในคลินิก',
-    },
-  ];
-
-  return sampleItems.map((item, idx) => {
-    const docDate = new Date(now.getTime() - item.hoursAgo * 60 * 60 * 1000);
-    return {
-      id: `FWD-2569-${String(2001 + idx)}`,
-      title: item.title,
-      description: item.description,
-      sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-      senderRole: 'เจ้าหน้าที่ธุรการ',
-      recipient: item.recipient,
-      recipientRole: item.recipientRole,
-      receivedDate: formatThaiDate(docDate),
-      rawDate: docDate.toISOString(),
-      type: item.type,
-      priority: item.priority,
-      status: item.status,
-    };
-  });
+  return [];
 };
 
 export const DocumentForwardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'incoming' | 'forwarded'>('incoming');
-  const [incomingDocs, setIncomingDocs] = useState<ForwardDoc[]>(generateInitialIncomingDocs());
-  const [forwardedDocs, setForwardedDocs] = useState<ForwardDoc[]>(generateInitialForwardedDocs());
+  const [incomingDocs, setIncomingDocs] = useState<ForwardDoc[]>([]);
+  const [forwardedDocs, setForwardedDocs] = useState<ForwardDoc[]>([]);
   const [recipientsList, setRecipientsList] = useState<BackendUser[]>([]);
   const [systemDocuments, setSystemDocuments] = useState<BackendDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -503,6 +339,56 @@ export const DocumentForwardPage: React.FC = () => {
     if (e) e.stopPropagation();
     setIncomingDocs(prev => prev.filter(d => d.id !== docId));
     toast.success('จัดเก็บเอกสารเข้าแฟ้มถาวรเรียบร้อยแล้ว');
+  };
+
+  // Delete Forwarded Document
+  const handleDeleteForward = async (doc: ForwardDoc, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm(`คุณต้องการลบรายการส่งต่อเอกสาร "${doc.title}" ใช่หรือไม่?`)) {
+      return;
+    }
+
+    try {
+      if (doc.forwardId) {
+        await dmsApi.deleteForward(doc.forwardId);
+      }
+      if (doc.docId) {
+        deleteDocumentMessageByDocId(doc.docId);
+      }
+      deleteDocumentMessage(doc.id);
+
+      setForwardedDocs(prev => prev.filter(d => d.id !== doc.id && (!doc.forwardId || d.forwardId !== doc.forwardId)));
+      if (selectedDoc && (selectedDoc.id === doc.id || (doc.forwardId && selectedDoc.forwardId === doc.forwardId))) {
+        setIsDetailModalOpen(false);
+        setSelectedDoc(null);
+      }
+      toast.success('ลบรายการส่งต่อเอกสารเรียบร้อยแล้ว');
+    } catch {
+      if (doc.docId) {
+        deleteDocumentMessageByDocId(doc.docId);
+      }
+      deleteDocumentMessage(doc.id);
+      setForwardedDocs(prev => prev.filter(d => d.id !== doc.id));
+      if (selectedDoc && selectedDoc.id === doc.id) {
+        setIsDetailModalOpen(false);
+        setSelectedDoc(null);
+      }
+      toast.success('ลบรายการเอกสารแล้ว');
+    }
+  };
+
+  // Delete Incoming Document
+  const handleDeleteIncoming = (docId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('คุณต้องการลบเอกสารนี้ใช่หรือไม่?')) {
+      return;
+    }
+    setIncomingDocs(prev => prev.filter(d => d.id !== docId));
+    if (selectedDoc && selectedDoc.id === docId) {
+      setIsDetailModalOpen(false);
+      setSelectedDoc(null);
+    }
+    toast.success('ลบเอกสารเรียบร้อยแล้ว');
   };
 
   // Print Document Delivery Slip
@@ -1145,6 +1031,19 @@ export const DocumentForwardPage: React.FC = () => {
                           </svg>
                         </button>
                       )}
+
+                      <button
+                        type="button"
+                        className="dms-action-icon-btn delete-btn"
+                        onClick={(e) => activeTab === 'forwarded' ? handleDeleteForward(doc, e) : handleDeleteIncoming(doc.id, e)}
+                        title="ลบเอกสารนี้"
+                        aria-label="ลบเอกสารนี้"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1528,18 +1427,31 @@ export const DocumentForwardPage: React.FC = () => {
             </div>
 
             <div className="dms-modal-footer detail-modal-footer">
-              <button
-                type="button"
-                className="dms-btn-secondary"
-                onClick={() => handlePrintSlip(selectedDoc)}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                  <rect x="6" y="14" width="12" height="8"></rect>
-                </svg>
-                <span>พิมพ์ใบนำส่ง</span>
-              </button>
+              <div className="footer-left-buttons">
+                <button
+                  type="button"
+                  className="dms-btn-secondary"
+                  onClick={() => handlePrintSlip(selectedDoc)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                  </svg>
+                  <span>พิมพ์ใบนำส่ง</span>
+                </button>
+                <button
+                  type="button"
+                  className="dms-btn-danger"
+                  onClick={(e) => activeTab === 'forwarded' || selectedDoc.forwardId ? handleDeleteForward(selectedDoc, e) : handleDeleteIncoming(selectedDoc.id, e)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                  <span>ลบเอกสารนี้</span>
+                </button>
+              </div>
 
               <div className="footer-right-buttons">
                 {selectedDoc.status !== 'completed' && (
