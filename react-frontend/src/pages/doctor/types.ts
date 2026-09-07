@@ -6,8 +6,33 @@ export type QueueStatus =
   | 'Completed' 
   | 'Cancelled';
 
+/** เอกสารหนึ่งชนิดที่แพทย์สั่งออกให้ผู้ป่วย */
+export interface IssuedDocument {
+  /**
+   * ชนิดเอกสาร
+   *   medical-certificate | non-formulary   มีจำนวน + พิมพ์ได้
+   *   insurance-claim | referral-opinion | dental | other   ติ๊กอย่างเดียว
+   */
+  type: string;
+  quantity: number;
+  /** ชื่อเอกสารที่แพทย์พิมพ์เอง ใช้เฉพาะ type = 'other' */
+  name?: string;
+  /** เวลาที่กดพิมพ์ครั้งล่าสุด ว่าง = ติ๊กไว้แต่ยังไม่ได้พิมพ์ */
+  printedAt?: string;
+}
+
 export interface PrescriptionItem {
   id: string;
+
+  // รหัสยาจริงจากตาราง medicines ของห้องยา
+  // เก็บไว้ตั้งแต่ตอนที่แพทย์เลือกยาจากรายการ จะได้ไม่ต้องให้ backend เดาจากชื่ออีก
+  // (ชื่อยาสองฝั่งสะกดไม่เหมือนกันได้ เช่น "Paracetamol 500mg tab" กับ "Paracetamol 500mg"
+  //  ถ้าเดาจากชื่อแล้วพลาด ผู้ป่วยอาจได้ยาผิดตัวโดยไม่มีใครรู้)
+  // เป็น optional เพราะรายการยาเก่าที่บันทึกไว้ก่อนหน้านี้ยังไม่มีรหัส
+  medicineId?: number;
+  medicineCode?: string;
+  unitPrice?: number;
+
   medicineName: string;
   dosage: string;
   frequency: string;
@@ -74,6 +99,59 @@ export interface PastVisitRecord {
   doctorNotes?: string;
   followUpDate?: string;
   status?: string;
+
+  // ---- ข้อมูลเพิ่มเติมของการมาตรวจครั้งนั้น ----
+  // ใช้ตอนผู้ป่วยกลับมาตรวจซ้ำ แพทย์จะได้รู้ว่าครั้งก่อนรักษาอย่างไร
+  /** การวินิจฉัยรอง นอกเหนือจากโรคหลัก */
+  secondaryDiagnoses?: { code: string; name: string }[];
+  /** แผนการรักษาที่แพทย์วางไว้ครั้งนั้น */
+  treatmentPlan?: string;
+  /** หัตถการที่ทำในครั้งนั้น */
+  proceduresPerformed?: string;
+  /** เหตุผลทางการแพทย์และการประเมิน */
+  assessmentNotes?: string;
+  /** บันทึกทางคลินิกเพิ่มเติม */
+  clinicalNotes?: string;
+  /** คำแนะนำที่ให้ผู้ป่วย แยกเป็น 5 ด้านตามฟอร์มหน้าบันทึกการตรวจ */
+  counseling?: {
+    medicationAdvice?: string;
+    dietAdvice?: string;
+    exerciseAdvice?: string;
+    lifestyleAdvice?: string;
+    diseaseEducation?: string;
+  };
+  /** เหตุผลที่นัดติดตามอาการ */
+  followUpReason?: string;
+  /** คำแนะนำเพิ่มเติมสำหรับการนัดครั้งถัดไป */
+  followUpInstructions?: string;
+  /** เหตุผลการยกเลิก มีเฉพาะครั้งที่ถูกยกเลิกการรับบริการ */
+  cancelReason?: string;
+
+  /**
+   * สถานะรวมของการมาตรวจครั้งนั้นในมุมผู้ป่วย
+   * completed = จบครบทุกขั้นรวมชำระเงินแล้ว
+   * in_progress = ยังอยู่ระหว่างดำเนินการของวันนี้
+   * cancelled = ยกเลิก หรือค้างข้ามวันจนถือว่าตกหล่น
+   */
+  progress?: 'completed' | 'in_progress' | 'cancelled';
+  /** เหตุผลที่ถูกจัดเป็น cancelled ใช้เลือกข้อความบนป้ายสถานะ */
+  progressReason?: 'doctor_cancelled' | 'expired' | 'no_medicine' | 'unpaid' | string;
+
+  /** ประวัติการเจ็บป่วยปัจจุบันที่แพทย์ซักในวันนั้น */
+  presentIllness?: string;
+  /** เป็นมานานเท่าไรก่อนมาพบแพทย์ */
+  complaintDuration?: string;
+  /** ผลตรวจร่างกาย 8 ระบบ ช่องที่แพทย์ไม่ได้กรอกจะเป็นค่าว่าง */
+  physicalExam?: {
+    generalAppearance?: string;
+    heent?: string;
+    cardiovascular?: string;
+    respiratory?: string;
+    abdomen?: string;
+    musculoskeletal?: string;
+    neurological?: string;
+    skin?: string;
+  };
 }
 
 export interface AttachmentItem {
@@ -87,6 +165,16 @@ export interface AttachmentItem {
 
 export interface Patient {
   id: string;
+
+  // รหัสจากฐานข้อมูลจริง ใช้ตอนเรียก API ของแพทย์
+  // (id ด้านบนเป็นสตริงสำหรับ React key เท่านั้น เช่น "q-2")
+  visitId?: number;
+  queueId?: number;
+  patientId?: number;
+
+  // จำนวนครั้งที่เคยมาตรวจ 0 = ผู้ป่วยใหม่ที่ยังไม่เคยเข้าตรวจ
+  visitCount?: number;
+
   queueNo: string;
   hn: string;
   vn: string;
@@ -160,6 +248,52 @@ export interface Patient {
     dosage: string;
     frequency: string;
   }[];
+
+  /**
+   * ผลคัดกรองอาการติดเชื้อทางเดินหายใจส่วนบน (URI) จากจุดคัดกรอง
+   * undefined = ยังไม่ได้ประเมิน / false = ไม่มี / true = มี
+   */
+  hasURI?: boolean;
+  /** ผลคัดกรองวัณโรค undefined = ยังไม่ได้ประเมิน */
+  hasTB?: boolean;
+  /** ผู้ป่วยใช้ยาละลายลิ่มเลือดอยู่หรือไม่ undefined = ยังไม่ได้ประเมิน */
+  onAnticoagulant?: boolean;
+
+  /**
+   * คัดกรองเฉพาะผู้ป่วยหญิง — แสดงบนหน้าจอเฉพาะเมื่อ gender === 'Female'
+   * undefined = ยังไม่ได้ถาม / false = ถามแล้วไม่ใช่ / true = ใช่
+   */
+  isPregnant?: boolean;
+  isBreastfeeding?: boolean;
+  /** ประจำเดือนครั้งสุดท้าย (LMP) เก็บเป็นข้อความตามที่ผู้ป่วยบอก */
+  lastMenstrualPeriod?: string;
+
+  /** ข้อควรระวังในการดูแล: '' | Standard | Contact | Droplet | Airborne */
+  precautionType?: string;
+
+  /**
+   * เอกสารที่แพทย์สั่งออกให้ผู้ป่วยในการตรวจครั้งนี้
+   * เก็บลง examinations.issued_documents เป็น JSON
+   */
+  issuedDocuments?: IssuedDocument[];
+
+  /**
+   * สถานะผู้ป่วยหลังตรวจเสร็จ
+   * '' = ยังไม่ได้ระบุ | 'home' = กลับบ้าน | 'refer' = ส่งต่อ
+   */
+  disposition?: string;
+
+  /** สมุนไพร / อาหารเสริมที่ใช้อยู่ แยกจาก currentMedications เพราะตีกับยาจริงได้ */
+  herbalMedicines?: string;
+  dietarySupplements?: string;
+
+  /**
+   * แบบคัดกรองภาวะซึมเศร้า 2Q (ช่วง 2 สัปดาห์ที่ผ่านมา)
+   * undefined = ยังไม่ได้ถาม / false = ไม่มี / true = มี
+   * ตอบใช่ข้อใดข้อหนึ่ง = ผลบวก ต้องประเมินต่อด้วย 9Q
+   */
+  q2Depressed?: boolean;
+  q2Anhedonia?: boolean;
 
   // Nursing Assessment
   nursingAssessment?: {

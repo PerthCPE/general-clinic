@@ -3,7 +3,6 @@ import { eligibilityApi, patientApi, type BackendEligibility } from '../../servi
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatNationalId } from '../../utils/formatters';
 import { validateThaiNationalID } from '../../utils/thaiIdValidator';
-import toast from 'react-hot-toast';
 import './EligibilityPage.css';
 
 export type SchemeType =
@@ -71,7 +70,6 @@ const EligibilityPage: React.FC = () => {
   const [historyList, setHistoryList] = useState<EligibilityHistoryItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Accordion Dropdown States สำหรับการ์ดทั้ง 2 ใบ
   const [isCheckCardOpen, setIsCheckCardOpen] = useState(true);
@@ -230,7 +228,6 @@ const EligibilityPage: React.FC = () => {
     };
 
     setHistoryList((prev) => [newHistoryItem, ...prev]);
-    showToast(`บันทึกสิทธิ์การรักษาของ "${currentResult.patientName}" เรียบร้อยแล้ว`);
     setCurrentResult(null);
     setSearchNationalId('');
   };
@@ -240,14 +237,6 @@ const EligibilityPage: React.FC = () => {
     setCurrentResult(null);
     setSearchNationalId('');
     setErrorMessage(null);
-  };
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    toast.success(msg, { id: msg });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
   };
 
   // Filter ตารางประวัติ
@@ -274,19 +263,7 @@ const EligibilityPage: React.FC = () => {
 
   return (
     <div className="eligibility-page">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="eligibility-toast">
-          <svg className="toast-icon" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      {/* Page Header (Consistent with Queue Management Header) */}
 
       {/* Page Header (Consistent with Queue Management Header) */}
       <div className="eligibility-page-header">

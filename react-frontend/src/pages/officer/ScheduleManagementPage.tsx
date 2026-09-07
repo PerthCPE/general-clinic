@@ -5,6 +5,7 @@ import './ScheduleManagementPage.css';
 interface ShiftSchedule {
   id: string;
   doctorCode: string;
+  username?: string;
   name: string;
   department: string;
   avatarText: string;
@@ -33,46 +34,25 @@ interface ShiftSwapItem {
   status: 'pending' | 'approved' | 'rejected';
 }
 
-const generateMockSchedules = (): ShiftSchedule[] => {
-  const doctors = [
-    { code: 'DOC-0001', name: 'นพ. อานนท์ ศรีตรวจ', dept: 'อายุรกรรมทั่วไป', specialty: 'โรคหัวใจและหลอดเลือด', phone: '081-445-9821', email: 'arnon.s@clinic.local', avatar: 'AS' },
-    { code: 'DOC-0002', name: 'พญ. วิภาดา รักดี', dept: 'กุมารเวชกรรม', specialty: 'กุมารเวชศาสตร์โรคภูมิแพ้', phone: '089-223-1144', email: 'wiphada.r@clinic.local', avatar: 'WR' },
-    { code: 'DOC-0003', name: 'นพ. สมชาย ใจเย็น', dept: 'ศัลยกรรมกระดูก', specialty: 'ศัลยกรรมกระดูกและข้อ', phone: '084-551-8790', email: 'somchai.j@clinic.local', avatar: 'SJ' },
-    { code: 'DOC-0004', name: 'พญ. พิมผกา มีชัย', dept: 'สูตินรีเวช', specialty: 'เวชศาสตร์มารดาและทารก', phone: '086-778-9900', email: 'pimpaka.m@clinic.local', avatar: 'PM' },
-    { code: 'DOC-0005', name: 'นพ. นิธิ เจริญยิ่ง', dept: 'จักษุวิทยา', specialty: 'กระจกตาและการแก้ไขสายตา', phone: '082-334-5566', email: 'nithi.c@clinic.local', avatar: 'NC' },
-    { code: 'DOC-0006', name: 'ทพญ. สุดา ตั้งมั่น', dept: 'ทันตกรรม', specialty: 'ทันตกรรมประดิษฐ์', phone: '085-112-3344', email: 'suda.t@clinic.local', avatar: 'ST' },
-  ];
-
-  return doctors.map((doc, idx) => ({
-    id: `EMP-${101 + idx}`,
-    doctorCode: doc.code,
-    name: doc.name,
-    department: doc.dept,
-    avatarText: doc.avatar,
-    specialty: doc.specialty,
-    phone: doc.phone,
-    email: doc.email,
-    shifts: {
-      mon: idx % 2 === 0 ? 'morning' : 'afternoon',
-      tue: idx % 3 === 0 ? 'morning' : 'afternoon',
-      wed: 'morning',
-      thu: idx % 2 === 1 ? 'afternoon' : 'morning',
-      fri: 'morning',
-      sat: idx % 2 === 0 ? 'morning' : 'off',
-      sun: idx % 3 === 0 ? 'afternoon' : 'off',
-    }
-  }));
-};
+import { vitalsApi, type BackendDoctor } from '../../services/api';
+import {
+  SYSTEM_DOCTORS,
+  getStoredCalendarOverrides,
+  getStoredOfficerSchedules,
+  saveStoredCalendarOverrides,
+  saveStoredOfficerSchedules,
+  applyOfficerBatchSchedule,
+  applyOfficerDayEdit,
+} from '../../services/scheduleStorage';
 
 const initialSwapRequests: ShiftSwapItem[] = [
-  { id: 'SWP-2569-01', requesterName: 'นพ. อานนท์ ศรีตรวจ', requesterShift: 'เวรเช้า (08:00 - 16:00)', receiverName: 'พญ. วิภาดา รักดี', receiverShift: 'เวรบ่าย (16:00 - 00:00)', date: '15 ก.ย. 2569', reason: 'ติดประชุมวิชาการแพทย์', status: 'pending' },
-  { id: 'SWP-2569-02', requesterName: 'นพ. สมชาย ใจเย็น', requesterShift: 'เวรบ่าย (16:00 - 00:00)', receiverName: 'นพ. นิธิ เจริญยิ่ง', receiverShift: 'เวรเช้า (08:00 - 16:00)', date: '18 ก.ย. 2569', reason: 'ติดภารกิจครอบครัวต่างจังหวัด', status: 'pending' },
-  { id: 'SWP-2569-03', requesterName: 'พญ. พิมผกา มีชัย', requesterShift: 'เวรเช้า (08:00 - 16:00)', receiverName: 'ทพญ. สุดา ตั้งมั่น', receiverShift: 'วันหยุด (Off)', date: '22 ก.ย. 2569', reason: 'ขอสลับวันหยุดประจำสัปดาห์', status: 'pending' },
+  { id: 'SWP-2569-01', requesterName: 'พญ.สุดา สุขสมบูรณ์', requesterShift: 'เวรเช้า (07:00 - 12:00)', receiverName: 'นพ.วิชัย ชาญการแพทย์', receiverShift: 'เวรบ่าย (13:00 - 18:00)', date: '15 ก.ย. 2569', reason: 'ติดประชุมวิชาการแพทย์', status: 'pending' },
+  { id: 'SWP-2569-02', requesterName: 'นพ.วิชัย ชาญการแพทย์', requesterShift: 'เวรบ่าย (13:00 - 18:00)', receiverName: 'พญ.เกศรา รักษาดี', receiverShift: 'เวรเช้า (07:00 - 12:00)', date: '18 ก.ย. 2569', reason: 'ติดภารกิจครอบครัวต่างจังหวัด', status: 'pending' },
 ];
 
 export const ScheduleManagementPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'calendar' | 'weekly' | 'employees'>('calendar');
-  const [schedules, setSchedules] = useState<ShiftSchedule[]>(generateMockSchedules());
+  const [schedules, setSchedules] = useState<ShiftSchedule[]>(() => getStoredOfficerSchedules());
   const [swapRequests, setSwapRequests] = useState<ShiftSwapItem[]>(initialSwapRequests);
   
   const [viewMode, setViewMode] = useState<'monthly' | 'weekly' | 'daily'>('monthly');
@@ -80,7 +60,7 @@ export const ScheduleManagementPage: React.FC = () => {
 
   // Edit / Details state
   const [editingSchedule, setEditingSchedule] = useState<ShiftSchedule | null>(null);
-  const [calendarOverrides, setCalendarOverrides] = useState<Record<string, Record<string, 'morning' | 'afternoon' | 'night' | 'off'>>>({});
+  const [calendarOverrides, setCalendarOverrides] = useState<Record<string, Record<string, 'morning' | 'afternoon' | 'night' | 'off'>>>(() => getStoredCalendarOverrides());
   const [editingCalendarDate, setEditingCalendarDate] = useState<string | null>(null);
   const [tempDayShifts, setTempDayShifts] = useState<Record<string, 'morning' | 'afternoon' | 'night' | 'off'>>({});
   
@@ -90,16 +70,79 @@ export const ScheduleManagementPage: React.FC = () => {
   // Modals
   const [activeModal, setActiveModal] = useState<'swapRequests' | 'attendance' | 'filter' | 'addBatchSchedule' | null>(null);
 
-  // Batch Creation Form State (Use Case U2)
+  // Stats
+  const totalDoctors = schedules.length;
+  const morningShifts = schedules.reduce((acc, s) => acc + Object.values(s.shifts).filter(v => v === 'morning').length, 0);
+  const afternoonShifts = schedules.reduce((acc, s) => acc + Object.values(s.shifts).filter(v => v === 'afternoon').length, 0);
+  const pendingSwaps = swapRequests.filter(s => s.status === 'pending').length;
+
+  // Batch Assignment State (Use Case U2)
   const [batchForm, setBatchForm] = useState({
-    doctorId: 'EMP-101',
+    doctorId: schedules[0]?.id || 'DOC-1',
+    allDoctors: false,
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0],
-    weekdays: [1, 2, 3, 4, 5], // 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat, 0=Sun
+    weekdays: [1, 2, 3, 4, 5], // Mon-Fri default
     shiftType: 'morning' as 'morning' | 'afternoon' | 'night',
+    maxPatients: 20,
+    room: 'ห้องตรวจ 1'
   });
   const [previewDates, setPreviewDates] = useState<string[]>([]);
   const [hasPreviewed, setHasPreviewed] = useState(false);
+
+  // Sync with storage on mount and events
+  React.useEffect(() => {
+    const handleUpdate = () => {
+      setCalendarOverrides(getStoredCalendarOverrides());
+      setSchedules(getStoredOfficerSchedules());
+    };
+    window.addEventListener('clinic_schedule_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+    return () => {
+      window.removeEventListener('clinic_schedule_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
+  }, []);
+
+  // Fetch real doctors from backend if available and merge
+  React.useEffect(() => {
+    vitalsApi.getDoctors()
+      .then((data: BackendDoctor[]) => {
+        if (data && Array.isArray(data) && data.length > 0) {
+          const mapped: ShiftSchedule[] = data.map((doc, idx) => {
+            const name = doc.fullname || doc.username;
+            const initials = name.replace(/^(นพ\.|พญ\.|ทพญ\.|ทพ\.|ดร\.)\s*/, '').slice(0, 2).toUpperCase();
+            return {
+              id: `DOC-${idx + 1}`,
+              doctorCode: `DOC-${String(doc.id || idx + 1).padStart(4, '0')}`,
+              name: name,
+              department: idx % 3 === 0 ? 'สูตินรีเวช' : idx % 3 === 1 ? 'อายุรกรรมทั่วไป' : 'กุมารเวชกรรม',
+              avatarText: initials || 'DR',
+              specialty: idx % 3 === 0 ? 'เวชศาสตร์มารดาและทารก' : idx % 3 === 1 ? 'โรคหัวใจและหลอดเลือด' : 'กุมารเวชศาสตร์โรคภูมิแพ้',
+              phone: doc.phone || '081-222-0000',
+              email: `${doc.username}@clinic.local`,
+              shifts: {
+                mon: idx === 0 ? 'morning' : idx === 1 ? 'afternoon' : 'morning',
+                tue: idx === 1 ? 'morning' : 'afternoon',
+                wed: 'morning',
+                thu: idx === 2 ? 'afternoon' : 'morning',
+                fri: 'morning',
+                sat: idx === 0 ? 'morning' : 'off',
+                sun: idx === 1 ? 'afternoon' : 'off',
+              }
+            };
+          });
+          setSchedules(mapped);
+          saveStoredOfficerSchedules(mapped);
+          if (mapped.length > 0) {
+            setBatchForm(prev => ({ ...prev, doctorId: mapped[0].id }));
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback to stored schedules
+      });
+  }, []);
 
   const thaiMonths = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
   const buddhistYear = currentDate.getFullYear() + 543;
@@ -119,11 +162,10 @@ export const ScheduleManagementPage: React.FC = () => {
   const renderShiftBadge = (shift: 'morning' | 'afternoon' | 'night' | 'off') => {
     switch (shift) {
       case 'morning':
-        return <span className="shift-badge morning">เวรเช้า (08:00 - 16:00)</span>;
+        return <span className="shift-badge morning">เวรเช้า (07:00 - 12:00)</span>;
       case 'afternoon':
-        return <span className="shift-badge afternoon">เวรบ่าย (16:00 - 00:00)</span>;
       case 'night':
-        return <span className="shift-badge night">เวรดึก (00:00 - 08:00)</span>;
+        return <span className="shift-badge afternoon">เวรบ่าย (13:00 - 18:00)</span>;
       case 'off':
         return <span className="shift-badge off">วันหยุด</span>;
       default:
@@ -196,17 +238,13 @@ export const ScheduleManagementPage: React.FC = () => {
       return;
     }
 
-    // Apply to calendar overrides
-    setCalendarOverrides(prev => {
-      const updated = { ...prev };
-      previewDates.forEach(dateStr => {
-        if (!updated[dateStr]) updated[dateStr] = {};
-        updated[dateStr][batchForm.doctorId] = batchForm.shiftType;
-      });
-      return updated;
-    });
+    // Apply to shared storage and sync to doctor shifts
+    applyOfficerBatchSchedule(batchForm.doctorId, previewDates, batchForm.shiftType);
+    setCalendarOverrides(getStoredCalendarOverrides());
 
-    toast.success(`สร้างตารางงานสำเร็จจำนวน ${previewDates.length} วัน`);
+    const docObj = schedules.find(s => s.id === batchForm.doctorId);
+    const docName = docObj ? docObj.name : 'แพทย์';
+    toast.success(`สร้างตารางงานของ ${docName} สำเร็จจำนวน ${previewDates.length} วัน (อัปเดตไปยังตารางแพทย์แล้ว)`);
     setActiveModal(null);
     setHasPreviewed(false);
     setPreviewDates([]);
@@ -234,11 +272,9 @@ export const ScheduleManagementPage: React.FC = () => {
 
   const handleSaveDayEdit = () => {
     if (editingCalendarDate) {
-      setCalendarOverrides(prev => ({
-        ...prev,
-        [editingCalendarDate]: tempDayShifts
-      }));
-      toast.success('บันทึกการปรับเปลี่ยนเวรประจำวันเรียบร้อยแล้ว');
+      applyOfficerDayEdit(editingCalendarDate, tempDayShifts);
+      setCalendarOverrides(getStoredCalendarOverrides());
+      toast.success(`บันทึกการปรับเปลี่ยนเวรประจำวัน (${editingCalendarDate}) เรียบร้อยแล้ว`);
       setEditingCalendarDate(null);
     }
   };
@@ -741,7 +777,7 @@ export const ScheduleManagementPage: React.FC = () => {
                   <span className="section-step-title">เลือกกะเวรการทำงาน (Shift Type)</span>
                   <span className="text-required">*</span>
                 </div>
-                <div className="shift-options-grid">
+                <div className="shift-options-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
                   <label className={`shift-option-card ${batchForm.shiftType === 'morning' ? 'selected' : ''}`}>
                     <input
                       type="radio"
@@ -752,7 +788,7 @@ export const ScheduleManagementPage: React.FC = () => {
                     />
                     <div className="shift-option-info">
                       <span className="shift-title morning-text">เวรเช้า (Morning Shift)</span>
-                      <span className="shift-time">08:00 - 16:00 น.</span>
+                      <span className="shift-time">07:00 - 12:00 น.</span>
                     </div>
                   </label>
 
@@ -766,21 +802,7 @@ export const ScheduleManagementPage: React.FC = () => {
                     />
                     <div className="shift-option-info">
                       <span className="shift-title afternoon-text">เวรบ่าย (Afternoon Shift)</span>
-                      <span className="shift-time">16:00 - 00:00 น.</span>
-                    </div>
-                  </label>
-
-                  <label className={`shift-option-card ${batchForm.shiftType === 'night' ? 'selected' : ''}`}>
-                    <input
-                      type="radio"
-                      name="shiftType"
-                      value="night"
-                      checked={batchForm.shiftType === 'night'}
-                      onChange={() => { setBatchForm({ ...batchForm, shiftType: 'night' }); setHasPreviewed(false); }}
-                    />
-                    <div className="shift-option-info">
-                      <span className="shift-title night-text">เวรดึก (Night Shift)</span>
-                      <span className="shift-time">00:00 - 08:00 น.</span>
+                      <span className="shift-time">13:00 - 18:00 น.</span>
                     </div>
                   </label>
                 </div>
@@ -799,7 +821,7 @@ export const ScheduleManagementPage: React.FC = () => {
                   <div className="preview-dates-tags">
                     {previewDates.map(dateStr => (
                       <span key={dateStr} className="preview-date-tag">
-                        {dateStr} ({batchForm.shiftType === 'morning' ? 'เช้า' : (batchForm.shiftType === 'afternoon' ? 'บ่าย' : 'ดึก')})
+                        {dateStr} ({batchForm.shiftType === 'morning' ? 'เช้า (07:00-12:00)' : 'บ่าย (13:00-18:00)'})
                       </span>
                     ))}
                   </div>
@@ -1010,9 +1032,8 @@ export const ScheduleManagementPage: React.FC = () => {
                             value={tempDayShifts[doc.id] || 'morning'}
                             onChange={e => setTempDayShifts({ ...tempDayShifts, [doc.id]: e.target.value as any })}
                           >
-                            <option value="morning">เวรเช้า (08:00 - 16:00)</option>
-                            <option value="afternoon">เวรบ่าย (16:00 - 00:00)</option>
-                            <option value="night">เวรดึก (00:00 - 08:00)</option>
+                            <option value="morning">เวรเช้า (07:00 - 12:00)</option>
+                            <option value="afternoon">เวรบ่าย (13:00 - 18:00)</option>
                             <option value="off">วันหยุด (Off)</option>
                           </select>
                         </td>

@@ -13,119 +13,10 @@ import { PatientVitalsTrendCard } from './components/PatientVitalsTrendCard';
 import { ScreeningDetailModal } from './components/ScreeningDetailModal';
 import { vitalsApi, type BackendScreening } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
-import { formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
-import toast from 'react-hot-toast';
+import { formatQueueNo, formatNationalId, formatPhone, formatHN } from '../../utils/formatters';
 import './ScreeningHistoryPage.css';
 
 export { formatQueueNo };
-
-const DEFAULT_INITIAL_RECORDS: ScreeningHistoryItem[] = [
-  {
-    id: '1',
-    visitId: 1,
-    visitDate: '06/08/2569 08:35 น.',
-    dateOnly: '06/08/2569',
-    timeOnly: '08:35 น.',
-    queueNo: 'Q0001',
-    patientId: 1,
-    nationalId: '0-1234-56789-01-2',
-    patientName: 'นายรักดี สีสมจิตร',
-    gender: 'ชาย',
-    age: 36,
-    phoneNumber: '081-234-5678',
-    schemeType: 'บัตรทอง (สปสช.)',
-    weight: 65.5,
-    height: 170,
-    bmi: 22.66,
-    bmiCategory: 'ปกติ',
-    temperature: 36.8,
-    systolicBP: 120,
-    diastolicBP: 80,
-    heartRate: 75,
-    respiratoryRate: 18,
-    spo2: 98,
-    triageLevel: 'ปกติ (Normal)',
-    chiefComplaint: 'มีไข้ต่ำ ไอ เจ็บคอ 2 วัน',
-    allergies: 'ปฏิเสธการแพ้ยา',
-    medicalHistory: 'ไม่มี',
-    nurseNotes: 'สัญญาณชีพปกติ ส่งตรวจห้องตรวจ 1',
-    screenedByUserName: 'พว. กานดา คัดกรอง',
-    screenedByRole: 'พยาบาลคัดกรอง',
-    assignedDoctorId: 1,
-    assignedDoctorName: 'พญ.สุดา สุขสมบูรณ์',
-    assignedRoom: 'ห้องตรวจ 1',
-  },
-  {
-    id: '2',
-    visitId: 2,
-    visitDate: '06/08/2569 08:45 น.',
-    dateOnly: '06/08/2569',
-    timeOnly: '08:45 น.',
-    queueNo: 'Q0002',
-    patientId: 2,
-    nationalId: '3-1005-98765-43-2',
-    patientName: 'นางสาววิมล แสนสุข',
-    gender: 'หญิง',
-    age: 29,
-    phoneNumber: '089-876-5432',
-    schemeType: 'ประกันสังคม (ม.33)',
-    weight: 52.0,
-    height: 160,
-    bmi: 20.31,
-    bmiCategory: 'ปกติ',
-    temperature: 37.2,
-    systolicBP: 115,
-    diastolicBP: 75,
-    heartRate: 82,
-    respiratoryRate: 16,
-    spo2: 99,
-    triageLevel: 'ปกติ (Normal)',
-    chiefComplaint: 'ปวดศีรษะ ไมเกรน',
-    allergies: 'แพ้ยาเพนิซิลลิน (Penicillin)',
-    medicalHistory: 'ไมเกรน',
-    nurseNotes: 'สัญญาณชีพปกติ ส่งตรวจห้องตรวจ 2',
-    screenedByUserName: 'พว. กานดา คัดกรอง',
-    screenedByRole: 'พยาบาลคัดกรอง',
-    assignedDoctorId: 2,
-    assignedDoctorName: 'นพ.วิชัย ชาญการแพทย์',
-    assignedRoom: 'ห้องตรวจ 2',
-  },
-  {
-    id: '3',
-    visitId: 3,
-    visitDate: '06/08/2569 09:00 น.',
-    dateOnly: '06/08/2569',
-    timeOnly: '09:00 น.',
-    queueNo: 'Q0003',
-    patientId: 3,
-    nationalId: '1-1014-55443-21-9',
-    patientName: 'นายสมชาย ใจดี',
-    gender: 'ชาย',
-    age: 52,
-    phoneNumber: '086-555-4321',
-    schemeType: 'สิทธิ์ข้าราชการ',
-    weight: 78.0,
-    height: 168,
-    bmi: 27.64,
-    bmiCategory: 'อ้วนระดับ 1',
-    temperature: 36.6,
-    systolicBP: 148,
-    diastolicBP: 95,
-    heartRate: 88,
-    respiratoryRate: 18,
-    spo2: 97,
-    triageLevel: 'กึ่งฉุกเฉิน (Semi-Urgent)',
-    chiefComplaint: 'ความดันโลหิตสูง มึนศีรษะ',
-    allergies: 'อาหารทะเล, แอสไพริน',
-    medicalHistory: 'เบาหวาน, ความดันโลหิตสูง',
-    nurseNotes: 'ความดันโลหิตสูง แนะนำพบแพทย์ด่วน',
-    screenedByUserName: 'พว. กานดา คัดกรอง',
-    screenedByRole: 'พยาบาลคัดกรอง',
-    assignedDoctorId: 1,
-    assignedDoctorName: 'พญ.สุดา สุขสมบูรณ์',
-    assignedRoom: 'ห้องตรวจ 1',
-  },
-];
 
 const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
   let dateOnly = 'วันนี้';
@@ -153,9 +44,27 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
   else if (s.bmi <= 29.9) bmiCat = 'อ้วนระดับ 1';
   else bmiCat = 'อ้วนระดับ 2';
 
-  const docName = s.assigned_doctor?.fullname || (s.assigned_doctor_id === 1 ? 'พญ.สุดา สุขสมบูรณ์' : s.assigned_doctor_id === 2 ? 'นพ.วิชัย ชาญการแพทย์' : 'พญ.เกศรา รักษาดี');
-  const roomName = `ห้องตรวจ ${s.assigned_doctor_id || 1}`;
+  const rawDocId = s.assigned_doctor_id || s.assigned_doctor?.id || 1;
+  let roomNum = 1;
+  let defaultDocName = 'พญ.สุดา สุขสมบูรณ์';
+  if (rawDocId === 1 || rawDocId === 4) {
+    roomNum = 1;
+    defaultDocName = 'พญ.สุดา สุขสมบูรณ์';
+  } else if (rawDocId === 2 || rawDocId === 5) {
+    roomNum = 2;
+    defaultDocName = 'นพ.วิชัย ชาญการแพทย์';
+  } else if (rawDocId === 3 || rawDocId === 6) {
+    roomNum = 3;
+    defaultDocName = 'พญ.เกศรา รักษาดี';
+  } else {
+    roomNum = ((rawDocId - 1) % 3) + 1;
+    defaultDocName = roomNum === 1 ? 'พญ.สุดา สุขสมบูรณ์' : roomNum === 2 ? 'นพ.วิชัย ชาญการแพทย์' : 'พญ.เกศรา รักษาดี';
+  }
+
+  const docName = s.assigned_doctor?.fullname || defaultDocName;
+  const roomName = `ห้องตรวจ ${roomNum}`;
   const queueFormatted = formatQueueNo(s.visit_id || s.id || 1);
+  const hnFormatted = patient?.hn ? formatHN(patient.hn) : formatHN(s.visit_record?.patient_id || s.id || 1);
 
   return {
     id: String(s.id),
@@ -165,6 +74,7 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
     timeOnly,
     queueNo: queueFormatted,
     patientId: patient?.id || 1,
+    hn: hnFormatted,
     nationalId: formatNationalId(patient?.national_id),
     patientName: patient?.fullname || 'ผู้ป่วย',
     gender: (patient?.gender as 'ชาย' | 'หญิง') || 'ชาย',
@@ -181,10 +91,16 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
     heartRate: s.heart_rate,
     respiratoryRate: s.respiratory_rate || 18,
     spo2: s.spo2 || 98,
+    painScore: s.pain_score !== undefined ? s.pain_score : 0,
+    bloodSugar: s.blood_sugar !== undefined ? s.blood_sugar : 0,
     triageLevel: (s.triage_level as TriageLevelKey) || 'ปกติ (Normal)',
     chiefComplaint: s.chief_complaint || 'ตรวจสุขภาพทั่วไป',
     allergies: s.allergies || 'ปฏิเสธการแพ้ยา',
+    foodAllergies: s.food_allergies || 'ปฏิเสธการแพ้อาหาร',
     medicalHistory: s.medical_history || 'ไม่มี',
+    currentMedications: s.current_medications || 'ไม่มี',
+    smokingHistory: s.smoking_history || 'ไม่สูบ',
+    alcoholHistory: s.alcohol_history || 'ไม่ดื่ม',
     nurseNotes: s.nurse_notes || 'สัญญาณชีพและประวัติได้รับการบันทึกเรียบร้อย',
     screenedByUserName: s.screened_by?.fullname || 'พว. กานดา คัดกรอง',
     screenedByRole: s.screened_by?.role === 'nurse' ? 'พยาบาลคัดกรอง' : 'ผู้ช่วยพยาบาล',
@@ -224,7 +140,6 @@ export const ScreeningHistoryPage: React.FC = () => {
     // ดักฟัง Real-time เมื่อมีการบันทึกคัดกรองหรือสัญญาณชีพใหม่
     const unsubVitals = subscribe('VITALS_RECORDED', () => {
       fetchHistory();
-      toast.success('มีรายการคัดกรองสัญญาณชีพใหม่ถูกบันทึกเข้าระบบ', { id: 'vitals-recorded-toast' });
     });
 
     return () => {
@@ -705,28 +620,20 @@ export const ScreeningHistoryPage: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* Systolic BP (Centered) */}
+                      {/* Systolic BP (Centered Mono Text) */}
                       <td style={{ textAlign: 'center' }}>
                         <div className="scr-bp-cell centered">
-                          <span
-                            className={`bp-val-chip ${
-                              isCrisis ? 'bp-crisis-chip' : isHighSys ? 'bp-high-chip' : 'bp-normal-chip'
-                            }`}
-                          >
-                            {item.systolicBP} mmHg
+                          <span className="bp-mono-val">
+                            {item.systolicBP} <span className="bp-mono-unit">mmHg</span>
                           </span>
                         </div>
                       </td>
 
-                      {/* Diastolic BP (Centered) */}
+                      {/* Diastolic BP (Centered Mono Text) */}
                       <td style={{ textAlign: 'center' }}>
                         <div className="scr-bp-cell centered">
-                          <span
-                            className={`bp-val-chip ${
-                              isCrisis ? 'bp-crisis-chip' : isHighDia ? 'bp-high-chip' : 'bp-normal-chip'
-                            }`}
-                          >
-                            {item.diastolicBP} mmHg
+                          <span className="bp-mono-val">
+                            {item.diastolicBP} <span className="bp-mono-unit">mmHg</span>
                           </span>
                         </div>
                       </td>

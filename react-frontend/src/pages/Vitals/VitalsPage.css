@@ -202,6 +202,26 @@
   flex-shrink: 0;
 }
 
+.vitals-draft-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: #EFF6FF;
+  color: #2563EB;
+  border: 1px solid #BFDBFE;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+body.dark-mode .vitals-draft-badge {
+  background: #1e293b;
+  color: #60a5fa;
+  border-color: #3b82f6;
+}
+
 /* ================================================================
    ===== 3. TOP QUEUE SELECTOR CARD =====
    ================================================================ */
@@ -1038,20 +1058,21 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
   transition: all 0.2s ease;
 }
 
 .vitals-btn-submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
 }
 
 .vitals-btn-submit:disabled {
@@ -2309,17 +2330,17 @@ body.dark-mode .vitals-form-actions {
 }
 
 body.dark-mode .vitals-btn-submit {
-  background: #2563EB;
-  border: 1.5px solid #60A5FA;
+  background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  border: 1.5px solid #34D399;
   color: #FFFFFF;
   font-weight: 700;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
 }
 
 body.dark-mode .vitals-btn-submit:hover:not(:disabled) {
-  background: #1D4ED8;
-  border-color: #93C5FD;
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.6);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border-color: #6EE7B7;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5);
 }
 
 body.dark-mode .vitals-btn-reset {

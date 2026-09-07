@@ -16,6 +16,6 @@ type Dispensing struct {
 	VisitRecord VisitRecord `gorm:"foreignKey:VisitID;references:ID" json:"visit_record"`
 	Medicine    Medicine    `gorm:"foreignKey:MedicineID;references:ID" json:"medicine"`
 
-	DoctorID uint   `json:"doctor_id"`
-	Doctor   Doctor `gorm:"foreignKey:DoctorID;references:ID" json:"doctor"`
+	DoctorID uint    `json:"doctor_id"`
+	Doctor   *Doctor `gorm:"foreignKey:DoctorID;references:ID;constraint:false" json:"doctor,omitempty"`
 }

@@ -169,6 +169,60 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
               </button>
             ))}
           </div>
+
+          {/* Quick Doctor Accounts to test individual doctor schedules */}
+          <div style={{ marginTop: '12px', padding: '10px 12px', background: '#FEF2F2', borderRadius: '12px', border: '1px solid #FECACA' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#991B1B', display: 'block', marginBottom: '6px' }}>
+              🩺 เลือกแพทย์ในระบบเข้าสู่ระบบโดยตรง (ทดสอบตารางงานเฉพาะบุคคล):
+            </span>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsLoading(true);
+                  try {
+                    const ok = await login('doctor1');
+                    if (ok) onLoginSuccess();
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, background: '#FFFFFF', color: '#B91C1C', border: '1px solid #FCA5A5', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                พญ.สุดา (doctor1 - สูติ)
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsLoading(true);
+                  try {
+                    const ok = await login('doctor2');
+                    if (ok) onLoginSuccess();
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, background: '#FFFFFF', color: '#B91C1C', border: '1px solid #FCA5A5', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                นพ.วิชัย (doctor2 - อายุรกรรม)
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsLoading(true);
+                  try {
+                    const ok = await login('doctor3');
+                    if (ok) onLoginSuccess();
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }}
+                style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, background: '#FFFFFF', color: '#B91C1C', border: '1px solid #FCA5A5', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                พญ.เกศรา (doctor3 - กุมาร)
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="login-divider">

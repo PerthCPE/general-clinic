@@ -58,14 +58,14 @@ export const DEMO_USERS: Record<UserRole, User> = {
     avatarColor: '#F59E0B',
   },
   doctor: {
-    id: 'user-doc-01',
+    id: 'DOC-1',
     username: 'doctor1',
-    fullName: 'นพ.อานนท์ ศรีตรวจ',
+    fullName: 'พญ.สุดา สุขสมบูรณ์',
     role: 'doctor',
-    roleTitleTh: 'แพทย์ผู้ตรวจ',
+    roleTitleTh: 'แพทย์ผู้ตรวจ (สูตินรีเวช)',
     roleTitleEn: 'Doctor',
-    department: 'แผนกตรวจโรคทั่วไป',
-    avatarText: 'AS',
+    department: 'แผนกสูตินรีเวช',
+    avatarText: 'SS',
     avatarColor: '#DC2626',
   },
   admin: {
@@ -91,7 +91,6 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'registration', title: 'ลงทะเบียนผู้ป่วย', iconType: 'registration', path: '/registration' },
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
     { id: 'eligibility', title: 'ตรวจสอบสิทธิ์การรักษา', iconType: 'eligibility', path: '/eligibility' },
-    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' }, // เพิ่มให้ registrar
   ],
   nurse: [
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
@@ -114,8 +113,6 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'billing-dashboard', title: 'แดชบอร์ด', iconType: 'dashboard', path: '/billing-dashboard' },
   ],
   doctor: [
-    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' },
-    { id: 'appointment-form', title: 'สร้างนัดหมายใหม่', iconType: 'appointment', path: '/appointment-form' },
     { id: 'doctor-dashboard', title: 'แดชบอร์ด', iconType: 'dashboard', path: '/doctor-dashboard' },
     { id: 'doctor-queue', title: 'คิวผู้ป่วย', iconType: 'queue', path: '/doctor-queue' },
     { id: 'doctor-examination', title: 'บันทึกการตรวจ', iconType: 'examination', path: '/doctor-examination' },
@@ -162,7 +159,7 @@ export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'billing-invoice': ['cashier'],
   'billing-dashboard': ['cashier'],
   'appointment-form': ['doctor'],
-  'appointment-dashboard': ['registrar', 'doctor', 'nurse', 'nurse_assistant', 'pharmacist', 'cashier'],
+  'appointment-dashboard': ['doctor'],
   'admin-users': ['admin'],
   'admin-access': ['admin'],
   'doctor-dashboard': ['doctor'],

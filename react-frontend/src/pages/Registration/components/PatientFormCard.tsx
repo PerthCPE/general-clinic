@@ -104,12 +104,83 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
 
   const thaiIdValidation = validateThaiNationalID(formData.nationalId);
 
+  const parseDateAndCalculateAge = (val: string): { ageStr: string; valid: boolean; birthdateISO: string } => {
+    if (!val || !val.trim()) return { ageStr: '', valid: false, birthdateISO: '' };
+    const str = val.trim();
+    let y = 0, m = 0, d = 0;
+
+    if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(str)) {
+      const p = str.split(/[-/]/).map((n) => parseInt(n, 10));
+      y = p[0];
+      m = p[1];
+      d = p[2];
+    } else if (/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(str)) {
+      const p = str.split(/[-/]/).map((n) => parseInt(n, 10));
+      d = p[0];
+      m = p[1];
+      y = p[2];
+    } else {
+      return { ageStr: '', valid: false, birthdateISO: '' };
+    }
+
+    // หากกรอกเป็น พ.ศ. (>= 2400) ให้แปลงเป็น ค.ศ.
+    if (y >= 2400) {
+      y = y - 543;
+    }
+
+    if (y < 1900 || y > 2100 || m < 1 || m > 12 || d < 1 || d > 31) {
+      return { ageStr: '', valid: false, birthdateISO: '' };
+    }
+
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth() + 1;
+    const todayDay = today.getDate();
+
+    let age = todayYear - y;
+    if (todayMonth < m || (todayMonth === m && todayDay < d)) {
+      age--;
+    }
+
+    if (age < 0) age = 0;
+    const birthdateISO = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    return { ageStr: String(age), valid: true, birthdateISO };
+  };
+
+  const formatDobInput = (val: string): string => {
+    // If it's an ISO date from calendar picker (YYYY-MM-DD)
+    if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(val)) {
+      const [yr, mo, dy] = val.split('-');
+      const yrNum = parseInt(yr, 10);
+      const beYear = yrNum >= 2400 ? yrNum : yrNum + 543;
+      return `${dy.padStart(2, '0')}/${mo.padStart(2, '0')}/${beYear}`;
+    }
+    const digits = val.replace(/\D/g, '').slice(0, 8);
+    if (digits.length <= 2) return digits;
+    if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+    return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+  };
+
   const handleChange = (field: string, value: string) => {
     let processedValue = value;
     if (field === 'nationalId') {
       processedValue = formatNationalIdInput(value);
     } else if (field === 'phone') {
       processedValue = formatPhoneInput(value);
+    } else if (field === 'dob') {
+      processedValue = formatDobInput(value);
+      const { ageStr, valid } = parseDateAndCalculateAge(processedValue);
+      if (valid) {
+        setFormData((prev) => ({ ...prev, dob: processedValue, age: ageStr }));
+        if (formErrors.dob) {
+          setFormErrors((prev) => {
+            const next = { ...prev };
+            delete next.dob;
+            return next;
+          });
+        }
+        return;
+      }
     }
 
     setFormData((prev) => ({ ...prev, [field]: processedValue }));
@@ -119,26 +190,6 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
         delete next[field];
         return next;
       });
-    }
-
-    // คำนวณอายุอัตโนมัติหากใส่วันเกิด
-    if (field === 'dob' && value) {
-      try {
-        const birthDate = new Date(value);
-        if (!isNaN(birthDate.getTime())) {
-          const today = new Date();
-          let calculatedAge = today.getFullYear() - birthDate.getFullYear();
-          const m = today.getMonth() - birthDate.getMonth();
-          if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-            calculatedAge--;
-          }
-          if (calculatedAge >= 0) {
-            setFormData((prev) => ({ ...prev, age: calculatedAge.toString() }));
-          }
-        }
-      } catch {
-        // ignore date parse error
-      }
     }
   };
 
@@ -169,12 +220,16 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
         ? formData.fullName
         : `${formData.title}${formData.fullName}`;
 
+    const parsed = parseDateAndCalculateAge(formData.dob);
+    const birthDateISO = parsed.valid ? parsed.birthdateISO : formData.dob;
+    const finalAge = parsed.valid ? parseInt(parsed.ageStr, 10) : parseInt(formData.age, 10) || 25;
+
     onSubmit({
       fullName: fullPatientName,
       nationalId: formData.nationalId,
       gender: formData.gender,
-      dob: formData.dob || '01/01/2000',
-      age: parseInt(formData.age, 10) || 25,
+      dob: birthDateISO || '2000-01-01',
+      age: finalAge,
       phone: formData.phone,
       emergencyContact: formData.emergencyContact,
       address: formData.address || 'กรุงเทพมหานคร',
@@ -350,9 +405,9 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
                     }}
                   >
                     {thaiIdValidation.isValid
-                      ? '✓ เลขบัตรถูกต้อง (Mod 11)'
+                      ? 'เลขบัตรถูกต้อง (Mod 11)'
                       : thaiIdValidation.isComplete
-                      ? '✕ Checksum ไม่ตรง'
+                      ? 'Checksum ไม่ตรง'
                       : `พิมพ์แล้ว ${formData.nationalId.replace(/\D/g, '').length}/13 หลัก`}
                   </span>
                 )}
@@ -369,15 +424,45 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
 
             <div className="reg-form-group span-2">
               <label className="reg-form-label">วัน/เดือน/ปีเกิด (พ.ศ. หรือ ค.ศ.)</label>
-              <div className="reg-date-input-wrap">
+              <div className="reg-date-input-wrap" style={{ position: 'relative' }}>
                 <input
                   id="dob-input"
-                  type="date"
+                  type="text"
+                  maxLength={10}
                   className="reg-form-input"
+                  placeholder="เช่น 05/05/2549 หรือ 05/05/2000"
                   value={formData.dob}
                   onChange={(e) => handleChange('dob', e.target.value)}
                 />
-                <span className="reg-calendar-svg-btn" title="เลือกวันเกิด">
+                <input
+                  type="date"
+                  style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0, bottom: 0, right: 0 }}
+                  id="hidden-dob-picker"
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      const [yr, mo, dy] = e.target.value.split('-');
+                      const yrNum = parseInt(yr, 10);
+                      const beYear = yrNum >= 2400 ? yrNum : yrNum + 543;
+                      const formattedDisplay = `${dy}/${mo}/${beYear}`;
+                      handleChange('dob', formattedDisplay);
+                    }
+                  }}
+                />
+                <span
+                  className="reg-calendar-svg-btn"
+                  title="เลือกวันเกิดจากปฏิทิน"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => {
+                    const picker = document.getElementById('hidden-dob-picker') as HTMLInputElement;
+                    if (picker) {
+                      if ('showPicker' in HTMLInputElement.prototype) {
+                        picker.showPicker();
+                      } else {
+                        picker.click();
+                      }
+                    }
+                  }}
+                >
                   <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                     <line x1="16" y1="2" x2="16" y2="6" />
@@ -493,6 +578,10 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
             className="reg-btn-reset-form"
             onClick={handleReset}
           >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="btn-icon-svg">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
             <span>ล้างข้อมูล</span>
           </button>
         </div>

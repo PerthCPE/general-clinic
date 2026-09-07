@@ -3,7 +3,6 @@ import { queueApi, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatQueueNo, formatNationalId } from '../../utils/formatters';
 import { callQueueAudio, getSpokenDepartmentText } from '../../utils/audioQueue';
-import toast from 'react-hot-toast';
 import './QueuePage.css';
 
 export { formatQueueNo };
@@ -147,7 +146,6 @@ const QueuePage: React.FC = () => {
   const [newStatus, setNewStatus] = useState<QueueStatus>('รอคัดกรอง');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [statusNote, setStatusNote] = useState('');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // State สำหรับดูข้อความเต็มของจุดบริการ & การคัดกรอง
   const [detailModalQueue, setDetailModalQueue] = useState<QueueItem | null>(null);
@@ -336,23 +334,11 @@ const QueuePage: React.FC = () => {
     );
 
     setIsModalOpen(false);
-    const shortDept = selectedDepartment.split(' (')[0];
-    showToast(`อัปเดตสถานะคิว ${selectedQueue.queueNo} เป็น "${newStatus}" (${shortDept}) เรียบร้อยแล้ว`);
   };
 
   const handleCallQueue = (item: QueueItem, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     callQueueAudio(item.queueNo, item.department, item.status);
-    const spokenDept = getSpokenDepartmentText(item.department, item.status).replace('ค่ะ', '').trim();
-    toast.success(`กำลังเรียกคิว ${item.queueNo} (${item.patientName}) ${spokenDept}`);
-  };
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    toast.success(msg, { id: msg });
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
   };
 
   // คืนค่า class สีของ Status Pill
@@ -381,19 +367,7 @@ const QueuePage: React.FC = () => {
 
   return (
     <div className="queue-page">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="queue-toast">
-          <svg className="toast-icon" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <span>{toastMessage}</span>
-        </div>
-      )}
+      {/* Page Header */}
 
       {/* Page Header */}
       <div className="queue-page-header">
@@ -537,102 +511,9 @@ const QueuePage: React.FC = () => {
             )}
           </div>
 
-          <div className="status-filter-pills-bar">
-            {selectedCategory === 'all' && (
-              <>
-                <button
-                  type="button"
-                  className={`filter-pill-btn ${statusFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('all');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span>ทั้งหมดในระบบ</span>
-                  <span className="pill-count">{stats.active}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-screening ${statusFilter === 'รอคัดกรอง' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอคัดกรอง');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-screening"></span>
-                  <span>รอคัดกรอง</span>
-                  <span className="pill-count">{stats.waitingScreening}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-doctor ${statusFilter === 'รอพบแพทย์' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอพบแพทย์');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-doctor"></span>
-                  <span>รอพบแพทย์</span>
-                  <span className="pill-count">{stats.waitingDoctor}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-examination ${statusFilter === 'กำลังตรวจ' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('กำลังตรวจ');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-examination"></span>
-                  <span>กำลังตรวจ</span>
-                  <span className="pill-count">{stats.inExamination}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-treatment ${statusFilter === 'รอทำหัตถการ' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอทำหัตถการ');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-treatment"></span>
-                  <span>รอทำหัตถการ</span>
-                  <span className="pill-count">{stats.waitingTreatment}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-billing ${statusFilter === 'รอชำระเงิน' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอชำระเงิน');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-billing"></span>
-                  <span>รอชำระเงิน</span>
-                  <span className="pill-count">{stats.waitingBilling}</span>
-                </button>
-
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-pharmacy ${statusFilter === 'รอรับยา' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอรับยา');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-pharmacy"></span>
-                  <span>รอรับยา</span>
-                  <span className="pill-count">{stats.waitingPharmacy}</span>
-                </button>
-              </>
-            )}
-
-            {selectedCategory === 'in_service' && (
+          {selectedCategory !== 'all' && (
+            <div className="status-filter-pills-bar">
+              {selectedCategory === 'in_service' && (
               <>
                 <button
                   type="button"
@@ -786,7 +667,8 @@ const QueuePage: React.FC = () => {
               </>
             )}
           </div>
-        </div>
+        )}
+      </div>
 
         {/* Responsive Queue Table */}
         <div className="table-responsive">

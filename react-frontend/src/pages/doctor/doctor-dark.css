@@ -1,0 +1,138 @@
+/* ==========================================================================
+   โหมดมืดของหน้าจอ Role แพทย์
+   ==========================================================================
+   หน้าอื่นในระบบเขียน CSS เองและมีกฎ body.dark-mode รองรับอยู่แล้ว
+   แต่หน้าจอแพทย์ย้ายมาจากระบบ clinicms ซึ่งใช้ Tailwind ล้วน
+   คลาสอย่าง bg-white / text-slate-800 จึงยังเป็นสีของโหมดสว่างเสมอ
+   ผลคือเปิดโหมดมืดแล้วหน้าแพทย์ยังขาวโพลนอยู่หน้าเดียว ต่างจาก role อื่น
+
+   วิธีแก้: ไม่ไล่แก้คลาสทีละตัวในไฟล์ .tsx (มีเป็นพันจุด และจะพังตอน merge)
+   แต่เขียนทับ "ตัวแปรสี" ของ Tailwind เฉพาะตอนอยู่ในโหมดมืดและอยู่ในหน้าแพทย์
+   Tailwind v4 คอมไพล์ยูทิลิตี้เป็น var(--color-xxx) อยู่แล้ว
+   พอเปลี่ยนค่าตัวแปร ทุกคลาสที่อ้างถึงมันจึงเปลี่ยนตามทันทีทั้งหน้า
+
+   ค่าสีอ้างอิงจากโหมดมืดของ role อื่นใน index.css เพื่อให้กลมกลืนกัน
+     พื้นหลังหน้า  #0F172A
+     พื้นการ์ด     #1E293B
+     เส้นขอบ       #334155
+     ตัวอักษรหลัก  #FFFFFF
+   ========================================================================== */
+
+body.dark-mode .doctor-module {
+  /* ระดับสีเทา สลับหัวท้าย: เฉดอ่อนกลายเป็นพื้นเข้ม เฉดเข้มกลายเป็นตัวอักษรสว่าง
+     ใช้ได้ทั้งกรณีเป็นพื้นหลังและเป็นสีตัวอักษร เพราะสลับทั้งสเกลพร้อมกัน */
+  --color-slate-50: #182236;
+  --color-slate-100: #24324a;
+  --color-slate-200: #334155;
+  --color-slate-300: #64748b;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #aab6c6;
+  --color-slate-600: #cbd5e1;
+  --color-slate-700: #e2e8f0;
+  --color-slate-800: #f1f5f9;
+  --color-slate-900: #ffffff;
+  --color-slate-950: #ffffff;
+
+  /* สีพื้นอ่อนของป้ายและกล่องเน้น ทำให้เข้มลงแต่ยังคงโทนสีเดิมไว้
+     ถ้าปล่อยเป็นพาสเทลตามเดิม จะสว่างจ้าตัดกับการ์ดสีเข้มจนแสบตา */
+  --color-blue-50: #17233f;
+  --color-blue-100: #1d3055;
+  --color-sky-50: #10263a;
+  --color-emerald-50: #10291f;
+  --color-emerald-100: #14392a;
+  --color-green-50: #12291a;
+  --color-amber-50: #2b2110;
+  --color-amber-100: #3a2c15;
+  --color-red-50: #331819;
+  --color-red-100: #45201f;
+  --color-rose-50: #331821;
+  --color-rose-100: #45202c;
+  --color-purple-50: #241a3a;
+  --color-purple-100: #2f2150;
+  --color-indigo-50: #1a1f3d;
+  --color-indigo-100: #232a55;
+
+  /* สีตัวอักษรเฉดเข้ม ถูกออกแบบมาให้อ่านบนพื้นอ่อน พอพื้นกลายเป็นเข้มจึงจมหาย
+     ดันให้สว่างขึ้นเพื่อให้ยังอ่านออก */
+  --color-blue-600: #7fb0ff;
+  --color-blue-700: #9cc3ff;
+  --color-blue-800: #b9d5ff;
+  --color-blue-900: #d6e6ff;
+  --color-emerald-600: #6ee7b7;
+  --color-emerald-700: #8ef0c8;
+  --color-emerald-800: #b3f5db;
+  --color-emerald-900: #d1fae5;
+  --color-amber-600: #fbbf24;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+  --color-red-600: #fca5a5;
+  --color-red-700: #fdb8b8;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+  --color-rose-600: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+  --color-purple-600: #c4b5fd;
+  --color-purple-700: #d3c7fe;
+}
+
+/* --------------------------------------------------------------------------
+   ข้อยกเว้นที่สลับตัวแปรเฉยๆ ไม่พอ
+   -------------------------------------------------------------------------- */
+
+/* bg-white คือพื้นการ์ดเกือบทั้งหมดของหน้าแพทย์ ต้องเป็นสีพื้นการ์ดโหมดมืด
+   แต่ห้ามแตะ --color-white เพราะ text-white ใช้ตัวแปรเดียวกัน
+   ถ้าเปลี่ยนที่ตัวแปร ตัวหนังสือบนปุ่มสีน้ำเงินจะกลายเป็นสีเข้มจนอ่านไม่ออก */
+body.dark-mode .doctor-module .bg-white,
+body.dark-mode .doctor-module .hover\:bg-white:hover,
+body.dark-mode .doctor-module .focus\:bg-white:focus {
+  background-color: #1e293b;
+}
+
+/* กล่องหัวข้อสีกรมท่าเข้ม (เช่น หัวปฏิทินในหน้าตารางเวร)
+   สเกลเทาถูกสลับไปแล้ว ถ้าไม่ดักไว้ กล่องพวกนี้จะกลายเป็นสีขาวสว่าง
+   แล้วตัวหนังสือสีขาวข้างในจะหายไปทั้งก้อน */
+body.dark-mode .doctor-module .bg-slate-900,
+body.dark-mode .doctor-module .hover\:bg-slate-900:hover {
+  background-color: #070d1a;
+}
+
+body.dark-mode .doctor-module .bg-slate-800,
+body.dark-mode .doctor-module .hover\:bg-slate-800:hover {
+  background-color: #0f172a;
+}
+
+body.dark-mode .doctor-module .bg-slate-700,
+body.dark-mode .doctor-module .hover\:bg-slate-700:hover {
+  background-color: #1b2537;
+}
+
+/* พื้นหลังของทั้งหน้า ให้เป็นสีเดียวกับ role อื่น */
+body.dark-mode .doctor-module {
+  background-color: #0f172a;
+  color: #ffffff;
+}
+
+/* ช่องกรอกข้อมูล ใช้โทนเดียวกับหน้าอื่นในระบบ
+   (index.css ตั้ง body.dark-mode input ไว้แล้ว แต่ยูทิลิตี้ของ Tailwind
+   อยู่นอก layer จึงชนะกฎนั้น ต้องเขียนทับด้วย specificity ที่สูงกว่า) */
+body.dark-mode .doctor-module input,
+body.dark-mode .doctor-module textarea,
+body.dark-mode .doctor-module select {
+  background-color: #16203a;
+  color: #ffffff;
+  border-color: #334155;
+}
+
+body.dark-mode .doctor-module input::placeholder,
+body.dark-mode .doctor-module textarea::placeholder {
+  color: #7d8ba0;
+}
+
+/* เงาแบบโหมดสว่างมองไม่เห็นบนพื้นเข้ม ใช้เส้นขอบจางแทนเพื่อให้การ์ดยังแยกชั้นได้ */
+body.dark-mode .doctor-module .shadow-2xs,
+body.dark-mode .doctor-module .shadow-xs,
+body.dark-mode .doctor-module .shadow-sm {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}

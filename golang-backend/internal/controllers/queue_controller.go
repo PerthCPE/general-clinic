@@ -25,12 +25,11 @@ type UpdateQueueStatusReq struct {
 	Note       string `json:"note"`
 }
 
-// GetQueueList - ดึงรายการคิวทั้งหมด พร้อมข้อมูลผู้ป่วย
+// GetQueueList - ดึงรายการคิวทั้งหมด พร้อมข้อมูลผู้ป่วย (Optimize Query)
 func GetQueueList(c *gin.Context) {
 	var queues []models.Queue
 
 	err := config.DB.Preload("Patient").
-		Preload("CreatedBy").
 		Order("created_at asc").
 		Find(&queues).Error
 

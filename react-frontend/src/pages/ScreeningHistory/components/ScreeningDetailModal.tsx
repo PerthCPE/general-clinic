@@ -28,24 +28,36 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
       : 'modal-triage-green';
 
   const handleCopySummary = () => {
-    const text = `[ใบคัดกรองสัญญาณชีพ คลินิกเวชกรรม]
-วันที่: ${record.visitDate}
+    const text = `[ใบคัดกรองสัญญาณชีพและประวัติ คลินิกเวชกรรม]
+วันที่-เวลา: ${record.visitDate}
+คิว: ${record.queueNo} (Visit #${record.visitId})
+HN: ${record.hn || `HN${String(record.patientId).padStart(4, '0')}`}
 ผู้ป่วย: ${record.patientName} (อายุ ${record.age} ปี, ${record.gender})
 เลขบัตรประชาชน: ${record.nationalId}
+เบอร์โทรศัพท์: ${record.phoneNumber || '-'}
 สิทธิการรักษา: ${record.schemeType}
 ระดับความเร่งด่วน (Triage): ${record.triageLevel}
 ----------------------------------------
 สัญญาณชีพ (Vital Signs):
 - ความดันโลหิต (BP): ${record.systolicBP}/${record.diastolicBP} mmHg
-- ชีพจร (Pulse): ${record.heartRate} bpm
-- อุณหภูมิ (Temp): ${record.temperature} °C
-- น้ำหนัก/ส่วนสูง: ${record.weight} kg / ${record.height} cm (BMI: ${record.bmi} - ${record.bmiCategory})
+- ชีพจร (Heart Rate): ${record.heartRate} bpm
+- อุณหภูมิร่างกาย (Temp): ${record.temperature.toFixed(1)} °C
+- น้ำหนัก / ส่วนสูง: ${record.weight} kg / ${record.height} cm (BMI: ${record.bmi} - ${record.bmiCategory})
 - ออกซิเจนในเลือด (SpO2): ${record.spo2 || '-'}%
 - อัตราการหายใจ (RR): ${record.respiratoryRate || '-'} ครั้ง/นาที
+- ระดับความเจ็บปวด (Pain Score): ${record.painScore !== undefined ? record.painScore : 0}/10
+- ระดับน้ำตาลในเลือด (Blood Sugar / DTX): ${record.bloodSugar ? `${record.bloodSugar} mg/dL` : '-'}
 ----------------------------------------
-อาการสำคัญ (Chief Complaint): ${record.chiefComplaint}
-ประวัติการแพ้ยา: ${record.allergies}
-โรคประจำตัว: ${record.medicalHistory}
+ประวัติทางการแพทย์และพฤติกรรมสุขภาพ:
+- อาการสำคัญ (Chief Complaint): ${record.chiefComplaint}
+- ประวัติการแพ้ยา (Drug Allergies): ${record.allergies || 'ปฏิเสธการแพ้ยา'}
+- ประวัติการแพ้อาหาร (Food Allergies): ${record.foodAllergies || 'ปฏิเสธการแพ้อาหาร'}
+- โรคประจำตัว (Chronic Diseases): ${record.medicalHistory || 'ไม่มี'}
+- ยาที่รับประทานประจำ (Current Medications): ${record.currentMedications || 'ไม่มี'}
+- ประวัติการสูบบุหรี่ (Smoking History): ${record.smokingHistory || 'ไม่สูบ'}
+- ประวัติการดื่มแอลกอฮอล์ (Alcohol History): ${record.alcoholHistory || 'ไม่ดื่ม'}
+- บันทึกเพิ่มเติมของพยาบาล (Nurse Notes): ${record.nurseNotes || '-'}
+----------------------------------------
 ผู้คัดกรอง: ${record.screenedByUserName} (${record.screenedByRole})
 ส่งต่อห้องตรวจ: ${record.assignedRoom} (${record.assignedDoctorName})`;
 
@@ -99,6 +111,11 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
           {/* Patient Identity Strip */}
           <div className="modal-patient-strip">
             <div className="modal-pt-item">
+              <span className="pt-lbl">HN</span>
+              <span className="pt-val hn-code">{record.hn || `HN${String(record.patientId).padStart(4, '0')}`}</span>
+            </div>
+            <div className="modal-pt-divider"></div>
+            <div className="modal-pt-item">
               <span className="pt-lbl">ชื่อ-นามสกุล</span>
               <span className="pt-val name">{record.patientName}</span>
             </div>
@@ -111,6 +128,11 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
             <div className="modal-pt-item">
               <span className="pt-lbl">เลขบัตรประชาชน</span>
               <span className="pt-val code">{record.nationalId}</span>
+            </div>
+            <div className="modal-pt-divider"></div>
+            <div className="modal-pt-item">
+              <span className="pt-lbl">เบอร์โทรศัพท์</span>
+              <span className="pt-val">{record.phoneNumber || '-'}</span>
             </div>
             <div className="modal-pt-divider"></div>
             <div className="modal-pt-item">
@@ -218,17 +240,45 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
               </div>
               <span className="vital-standard-note">เกณฑ์ปกติ: 12 - 20 ครั้ง/นาที</span>
             </div>
+
+            {/* Pain Score */}
+            <div className="modal-vital-card vital-normal">
+              <div className="vital-card-header">
+                <span className="vital-card-title">ระดับความเจ็บปวด (Pain Score)</span>
+                <span className="vital-status-pill pill-normal">{record.painScore !== undefined ? `${record.painScore}/10` : '0/10'}</span>
+              </div>
+              <div className="vital-card-val-row">
+                <span className="vital-big-num">{record.painScore !== undefined ? record.painScore : 0}</span>
+                <span className="vital-unit-text">/10</span>
+              </div>
+              <span className="vital-standard-note">คะแนนความเจ็บปวด (0-10)</span>
+            </div>
+
+            {/* Blood Sugar (DTX) */}
+            <div className="modal-vital-card vital-normal">
+              <div className="vital-card-header">
+                <span className="vital-card-title">ระดับน้ำตาลในเลือด (DTX)</span>
+                <span className="vital-status-pill pill-normal">
+                  {record.bloodSugar && record.bloodSugar > 140 ? 'สูง' : 'ปกติ'}
+                </span>
+              </div>
+              <div className="vital-card-val-row">
+                <span className="vital-big-num">{record.bloodSugar || '-'}</span>
+                <span className="vital-unit-text">mg/dL</span>
+              </div>
+              <span className="vital-standard-note">เกณฑ์ปกติ: 70 - 140 mg/dL</span>
+            </div>
           </div>
 
           {/* Clinical Symptoms & Medical History */}
           <div className="modal-clinical-details-grid">
-            <div className="clinical-detail-box">
+            <div className="clinical-detail-box full-width">
               <span className="box-title">อาการสำคัญ ณ วันที่เข้ารับบริการ (Chief Complaint)</span>
               <p className="box-content cc-text">{record.chiefComplaint}</p>
             </div>
 
             <div className="clinical-detail-box">
-              <span className="box-title">ประวัติการแพ้ยา (Allergies)</span>
+              <span className="box-title">ประวัติการแพ้ยา (Drug Allergies)</span>
               <div className="box-content">
                 {hasAllergy ? (
                   <span className="allergy-alert-tag">{record.allergies}</span>
@@ -244,11 +294,36 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
             </div>
 
             <div className="clinical-detail-box">
-              <span className="box-title">โรคประจำตัว (Medical History)</span>
+              <span className="box-title">ประวัติการแพ้อาหาร (Food Allergies)</span>
+              <p className="box-content">{record.foodAllergies || 'ปฏิเสธการแพ้อาหาร'}</p>
+            </div>
+
+            <div className="clinical-detail-box">
+              <span className="box-title">โรคประจำตัว (Chronic Diseases)</span>
               <p className="box-content">{record.medicalHistory || 'ไม่มี'}</p>
             </div>
 
-            <div className="clinical-detail-box doc-transfer-box">
+            <div className="clinical-detail-box">
+              <span className="box-title">ยาที่รับประทานประจำ (Current Medications)</span>
+              <p className="box-content">{record.currentMedications || 'ไม่มี'}</p>
+            </div>
+
+            <div className="clinical-detail-box">
+              <span className="box-title">ประวัติการสูบบุหรี่ (Smoking History)</span>
+              <p className="box-content">{record.smokingHistory || 'ไม่สูบ'}</p>
+            </div>
+
+            <div className="clinical-detail-box">
+              <span className="box-title">ประวัติการดื่มแอลกอฮอล์ (Alcohol History)</span>
+              <p className="box-content">{record.alcoholHistory || 'ไม่ดื่ม'}</p>
+            </div>
+
+            <div className="clinical-detail-box full-width">
+              <span className="box-title">บันทึกเพิ่มเติมของพยาบาล (Nurse Notes & Observations)</span>
+              <p className="box-content">{record.nurseNotes || 'สัญญาณชีพและประวัติได้รับการบันทึกเรียบร้อย'}</p>
+            </div>
+
+            <div className="clinical-detail-box doc-transfer-box full-width">
               <span className="box-title">แพทย์และห้องตรวจที่ส่งต่อ</span>
               <p className="box-content doc-name">
                 <strong>{record.assignedRoom}</strong> — {record.assignedDoctorName}
@@ -283,10 +358,6 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
               พิมพ์ใบคัดกรอง
             </button>
           </div>
-
-          <button type="button" className="btn-modal-action btn-close" onClick={onClose}>
-            ปิดหน้าต่าง
-          </button>
         </div>
       </div>
     </div>

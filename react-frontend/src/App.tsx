@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { WebSocketProvider } from './context/WebSocketContext';
 import Sidebar from './components/Sidebar/Sidebar';
 import Topbar from './components/Topbar/Topbar';
+import { GlobalAudioListener } from './components/GlobalAudioListener/GlobalAudioListener';
 
 import LoginPage from './pages/Login/LoginPage';
 import UnauthorizedPage from './pages/Unauthorized/UnauthorizedPage';
@@ -30,7 +31,6 @@ import { ScheduleManagementPage } from './pages/officer/ScheduleManagementPage';
 import { DocumentForwardPage } from './pages/officer/DocumentForwardPage';
 import { ROLE_DEFAULT_PAGES } from './config/roles';
 
-// โค้ดฝั่งของคุณ
 import AppointmentForm from './pages/Appointment/AppointmentForm';
 import AppointmentDashboard from './pages/Appointment/AppointmentDashboard';
 import UserManagement from './pages/Admin/UserManagement'; 
@@ -143,11 +143,12 @@ function MainApp() {
           onSelectPatientId={setSelectedPatientId}
           patientRightsMap={patientRightsMap}
           onUpdatePatientRights={handleUpdatePatientRights}
+          onNavigateToDashboard={() => setActivePage('billing-dashboard')}
         />;
       case 'billing-dashboard':
         return <BillingDashboardPage />;
 
-      // ===== Appointment Pages (ของคุณ) =====
+      // ===== Appointment Pages =====
       case 'appointment-form':
         return <AppointmentForm />;
       case 'appointment-dashboard':
@@ -255,6 +256,7 @@ function App() {
   return (
     <AuthProvider>
       <WebSocketProvider>
+        <GlobalAudioListener />
         <MainApp />
       </WebSocketProvider>
     </AuthProvider>

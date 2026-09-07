@@ -5,6 +5,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/routes"
+	"clinic-backend/internal/simulator"
 	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
@@ -19,6 +20,9 @@ func main() {
 
 	// Start WebSocket Hub in background
 	go ws.GlobalHub.Run()
+
+	// Start Auto-Emitter Simulator in background (ยิงคิว & คนไข้ลงทะเบียนอัตโนมัติ)
+	simulator.StartAutoEmitter()
 
 	// Start Gin API Router
 	r := gin.Default()

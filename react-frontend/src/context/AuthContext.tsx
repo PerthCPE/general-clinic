@@ -62,12 +62,24 @@ const initialDefaultQueue: PatientQueueItem[] = [
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   
-  // ของเพื่อน: ดึงข้อมูล User
+  // ของเพื่อน: ดึงข้อมูล User (ซิงค์ชื่อและข้อมูลล่าสุดตาม DEMO_USERS เสมอ ไม่ให้ติดแคชเก่า)
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const saved = localStorage.getItem(AUTH_STORAGE_KEY);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed: User = JSON.parse(saved);
+        if (parsed && parsed.role && DEMO_USERS[parsed.role as UserRole]) {
+          const latest = DEMO_USERS[parsed.role as UserRole];
+          return {
+            ...parsed,
+            fullName: latest.fullName,
+            roleTitleTh: latest.roleTitleTh,
+            roleTitleEn: latest.roleTitleEn,
+            avatarText: latest.avatarText,
+            avatarColor: latest.avatarColor,
+          };
+        }
+        return parsed;
       } catch {
         return null;
       }
@@ -82,6 +94,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (currentUser) {
+      // ตรวจสอบว่าชื่อหรือตำแหน่งใน DEMO_USERS เปลี่ยนไปหรือไม่ ถ้าเปลี่ยน ให้อัปเดตทันที
+      if (currentUser.role && DEMO_USERS[currentUser.role]) {
+        const latest = DEMO_USERS[currentUser.role];
+        if (
+          currentUser.fullName !== latest.fullName ||
+          currentUser.roleTitleTh !== latest.roleTitleTh ||
+          currentUser.roleTitleEn !== latest.roleTitleEn ||
+          currentUser.avatarText !== latest.avatarText ||
+          currentUser.avatarColor !== latest.avatarColor
+        ) {
+          setCurrentUser(prev => prev ? ({
+            ...prev,
+            fullName: latest.fullName,
+            roleTitleTh: latest.roleTitleTh,
+            roleTitleEn: latest.roleTitleEn,
+            avatarText: latest.avatarText,
+            avatarColor: latest.avatarColor,
+          }) : null);
+          return;
+        }
+      }
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
     } else {
       localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -145,20 +178,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       else if (roleOrUsername === 'nurse') usernameToSend = 'nurse1';
       else if (roleOrUsername === 'nurse_assistant') usernameToSend = 'assistant1';
       else if (roleOrUsername === 'doctor') usernameToSend = 'doctor1';
+      else if (roleOrUsername === 'pharmacist') usernameToSend = 'pharmacist1';
+      else if (roleOrUsername === 'cashier') usernameToSend = 'cashier1';
 
       const res = await authApi.login(usernameToSend, password || 'password');
       if (res && res.user) {
         const userRole = res.user.role as UserRole;
         const fallback = DEMO_USERS[userRole] || DEMO_USERS['registrar'];
+
+        let fullName = res.user.fullname || fallback.fullName;
+        let department = fallback.department;
+        let avatarText = fallback.avatarText;
+        let roleTitleTh = fallback.roleTitleTh;
+
+        if (userRole === 'doctor') {
+          if (res.user.username === 'doctor2' || res.user.fullname?.includes('วิชัย')) {
+            fullName = 'นพ.วิชัย ชาญการแพทย์';
+            department = 'แผนกอายุรกรรมทั่วไป';
+            avatarText = 'WC';
+            roleTitleTh = 'แพทย์ผู้ตรวจ (อายุรกรรม)';
+          } else if (res.user.username === 'doctor3' || res.user.fullname?.includes('เกศรา')) {
+            fullName = 'พญ.เกศรา รักษาดี';
+            department = 'แผนกกุมารเวชกรรม';
+            avatarText = 'KR';
+            roleTitleTh = 'แพทย์ผู้ตรวจ (กุมารเวชกรรม)';
+          } else {
+            fullName = 'พญ.สุดา สุขสมบูรณ์';
+            department = 'แผนกสูตินรีเวช';
+            avatarText = 'SS';
+            roleTitleTh = 'แพทย์ผู้ตรวจ (สูตินรีเวช)';
+          }
+        }
+
         const loggedInUser: User = {
           id: String(res.user.id),
           username: res.user.username,
-          fullName: res.user.fullname || fallback.fullName,
+          fullName,
           role: userRole,
-          roleTitleTh: fallback.roleTitleTh,
+          roleTitleTh,
           roleTitleEn: fallback.roleTitleEn,
-          department: fallback.department,
-          avatarText: fallback.avatarText,
+          department,
+          avatarText,
           avatarColor: fallback.avatarColor,
         };
         setCurrentUser(loggedInUser);
@@ -169,7 +229,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     let matchedUser: User | undefined;
-    if (roleOrUsername in DEMO_USERS) {
+    if (roleOrUsername === 'doctor2') {
+      matchedUser = {
+        id: 'DOC-2',
+        username: 'doctor2',
+        fullName: 'นพ.วิชัย ชาญการแพทย์',
+        role: 'doctor',
+        roleTitleTh: 'แพทย์ผู้ตรวจ (อายุรกรรม)',
+        roleTitleEn: 'Doctor',
+        department: 'แผนกอายุรกรรมทั่วไป',
+        avatarText: 'WC',
+        avatarColor: '#DC2626',
+      };
+    } else if (roleOrUsername === 'doctor3') {
+      matchedUser = {
+        id: 'DOC-3',
+        username: 'doctor3',
+        fullName: 'พญ.เกศรา รักษาดี',
+        role: 'doctor',
+        roleTitleTh: 'แพทย์ผู้ตรวจ (กุมารเวชกรรม)',
+        roleTitleEn: 'Doctor',
+        department: 'แผนกกุมารเวชกรรม',
+        avatarText: 'KR',
+        avatarColor: '#DC2626',
+      };
+    } else if (roleOrUsername in DEMO_USERS) {
       matchedUser = DEMO_USERS[roleOrUsername as UserRole];
     } else {
       matchedUser = Object.values(DEMO_USERS).find((u) => u.username === roleOrUsername);
@@ -183,10 +267,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchRole = async (role: UserRole) => {
-    let username = 'registrar1';
-    if (role === 'nurse') username = 'nurse1';
+    let username = 'cashier1';
+    if (role === 'registrar') username = 'registrar1';
+    else if (role === 'nurse') username = 'nurse1';
     else if (role === 'nurse_assistant') username = 'assistant1';
     else if (role === 'doctor') username = 'doctor1';
+    else if (role === 'pharmacist') username = 'pharmacist1';
+    else if (role === 'cashier') username = 'cashier1';
 
     try {
       await authApi.login(username, 'password');

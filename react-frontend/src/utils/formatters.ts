@@ -4,17 +4,25 @@
  * and 13-digit Thai National ID / 10-digit Phone formats.
  */
 
-// 1. Hospital Number (HN) Formatter: HN + 4-digit Uppercase Hex (HN0001 - HNFFFF)
+// 1. Hospital Number (HN) Formatter: HN + 4-digit Decimal (HN0001 - HN9999)
 export const formatHN = (raw: string | number | undefined | null): string => {
   if (!raw) return 'HN0001';
-  if (typeof raw === 'string' && /^HN[0-9A-Fa-f]{4}$/i.test(raw)) {
-    return raw.toUpperCase();
+  if (typeof raw === 'number' && raw > 0) {
+    return 'HN' + String(raw).padStart(4, '0');
   }
-  const num = parseInt(String(raw).replace(/\D/g, ''), 10);
-  if (!isNaN(num) && num > 0) {
-    return 'HN' + num.toString(16).toUpperCase().padStart(4, '0');
+  const str = String(raw).trim();
+  if (/^HN\d{4,}$/i.test(str)) {
+    return str.toUpperCase();
   }
-  return String(raw || 'HN0001');
+  const digits = str.replace(/\D/g, '');
+  if (digits.length > 0) {
+    return 'HN' + digits.padStart(4, '0');
+  }
+  const clean = str.replace(/^HN-?/i, '');
+  if (clean.length > 0) {
+    return 'HN' + clean.toUpperCase();
+  }
+  return 'HN0001';
 };
 
 // 2. Queue Number Formatter: Q + 4-digit Uppercase Hex (Q0001 - QFFFF)

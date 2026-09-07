@@ -34,6 +34,7 @@ func LoadConfig() {
 	}
 
 	AppConfig = &Config{
+
 		Port:       getEnv("PORT", "8080"),
 		DBHost:     getEnv("DB_HOST", "localhost"),
 		DBUser:     getEnv("DB_USER", "postgres"),

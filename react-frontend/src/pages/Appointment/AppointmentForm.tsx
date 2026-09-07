@@ -1,19 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Autocomplete, TextField, Snackbar, Alert } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
-import { patientApi, appointmentApi, vitalsApi, type BackendPatient, type BackendDoctor } from '../../services/api';
 import './AppointmentForm.css';
 
 interface PatientOption {
   label: string;
-  id: number; // Patient ID
+  id: string;
   name: string;
 }
 
-interface DoctorOption {
-  label: string;
-  id: number;
-}
+const mockPatients: PatientOption[] = [
+  { label: 'HN-10001 : อนันต์ สุขสวัสดิ์', id: 'HN-10001', name: 'อนันต์ สุขสวัสดิ์' },
+  { label: 'HN-10002 : วิมล มั่นคง', id: 'HN-10002', name: 'วิมล มั่นคง' },
+  { label: 'HN-10003 : เกียรติศักดิ์ ศรีสุข', id: 'HN-10003', name: 'เกียรติศักดิ์ ศรีสุข' },
+  { label: 'HN-10004 : พงษ์ศักดิ์ แสนดี', id: 'HN-10004', name: 'พงษ์ศักดิ์ แสนดี' },
+  { label: 'HN-10005 : สมชาย ใจดี', id: 'HN-10005', name: 'สมชาย ใจดี' },
+  { label: 'HN-10006 : นภา งามตา', id: 'HN-10006', name: 'นภา งามตา' },
+  { label: 'HN-10007 : ประเสริฐ เลิศพงษ์', id: 'HN-10007', name: 'ประเสริฐ เลิศพงษ์' },
+  { label: 'HN-10008 : วรรณา รักไทย', id: 'HN-10008', name: 'วรรณา รักไทย' },
+  { label: 'HN-10009 : กนกวรรณ มีสุข', id: 'HN-10009', name: 'กนกวรรณ มีสุข' },
+  { label: 'HN-10010 : ชูใจ มั่นคอย', id: 'HN-10010', name: 'ชูใจ มั่นคอย' },
+];
 
 const timeSlots: string[] = [
   '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
@@ -21,82 +28,58 @@ const timeSlots: string[] = [
 ];
 
 export default function AppointmentForm() {
-  const { currentUser } = useAuth(); // Need register_id from currentUser.id
+  const { addAppointment } = useAuth();
 
-  const [patients, setPatients] = useState<PatientOption[]>([]);
-  const [doctors, setDoctors] = useState<DoctorOption[]>([]);
-  const [selectedPatientId, setSelectedPatientId] = useState<number | null>(null);
-  const [selectedDoctorId, setSelectedDoctorId] = useState<number | null>(null);
-  const [selectedPatientName, setSelectedPatientName] = useState<string>('');
-  
+  const [selectedPatient, setSelectedPatient] = useState<string>('');
   const [date, setDate] = useState<string>('');
   const [time, setTime] = useState<string>('');
   const [department, setDepartment] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
   
+  // ใช้สำหรับบังคับ Reset ค่าใน Autocomplete ของ MUI
   const [autocompleteKey, setAutocompleteKey] = useState<number>(0);
   const [openAlert, setOpenAlert] = useState<boolean>(false);
 
-  useEffect(() => {
-    // Load patients and doctors
-    const loadData = async () => {
-      try {
-        const [patientsData, doctorsData] = await Promise.all([
-          patientApi.getAll(),
-          vitalsApi.getDoctors()
-        ]);
-        if (patientsData && Array.isArray(patientsData)) {
-          const sorted = [...patientsData].sort((a, b) => (a.hn || '').localeCompare(b.hn || ''));
-          setPatients(sorted.map((p, index) => ({
-            label: `${index + 1}. ${p.hn || p.national_id} : ${p.fullname}`,
-            id: p.id,
-            name: p.fullname
-          })));
-        }
-        if (doctorsData && Array.isArray(doctorsData)) {
-          const sortedDoc = [...doctorsData].sort((a, b) => (a.fullname || '').localeCompare(b.fullname || ''));
-          setDoctors(sortedDoc.map((d, index) => ({
-            label: `${index + 1}. ${d.fullname}`,
-            id: d.id
-          })));
-        }
-      } catch (err) {
-        console.error("Failed to load initial data", err);
-      }
-    };
-    loadData();
-  }, []);
-
-  const handleSave = async () => {
-    if (!selectedPatientId || !date || !time || !department || !selectedDoctorId) {
+  const handleSave = () => {
+    if (!selectedPatient || !date || !time || !department) {
       alert('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');
       return;
     }
 
-    try {
-      await appointmentApi.create({
-        doctor_id: selectedDoctorId,
-        patient_id: selectedPatientId,
-        register_id: currentUser ? parseInt(currentUser.id, 10) : 1, // fallback to 1 if missing
-        appointment_date: date,
-        appointment_time: time + ":00", // e.g. "09:30:00"
-        clinical_note: notes || department // if notes empty, use dept as note for now
-      });
+    let deptName = 'โรคทั่วไป';
+    let deptColor = 'primary';
+    if (department === 'medicine') { deptName = 'อายุรกรรม'; deptColor = 'warning'; }
+    else if (department === 'psychology') { deptName = 'จิตวิทยา'; deptColor = 'secondary'; }
+    else if (department === 'physical') { deptName = 'กายภาพบำบัด'; deptColor = 'success'; }
 
-      setOpenAlert(true);
+    const initialText = selectedPatient.length >= 2 ? selectedPatient.substring(0, 2) : 'คน';
+    const randomPhone = `08${Math.floor(Math.random() * 9)} - ${Math.floor(100 + Math.random() * 900)} - ${Math.floor(1000 + Math.random() * 9000)}`;
 
-      // Clear values
-      setSelectedPatientId(null);
-      setSelectedPatientName('');
-      setSelectedDoctorId(null);
-      setDate('');
-      setTime('');
-      setDepartment('');
-      setNotes('');
-      setAutocompleteKey(prev => prev + 1);
-    } catch (err: any) {
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + err.message);
-    }
+    const newAppointment = {
+      id: Date.now(),
+      name: selectedPatient,
+      initial: initialText,
+      dept: deptName,
+      date: date,
+      time: time,
+      phone: randomPhone,
+      status: '-', 
+      statusColor: 'default',
+      deptColor: deptColor,
+      notes: notes,
+    };
+
+    // ส่งข้อมูลเข้าสู่ระบบกลาง
+    addAppointment(newAppointment);
+    setOpenAlert(true);
+
+    // ทำการ Clear ค่าในฟอร์มทั้งหมดทันทีหลังบันทึกสำเร็จ
+    setSelectedPatient('');
+    setDate('');
+    setTime('');
+    setDepartment('');
+    setNotes('');
+    setAutocompleteKey(prev => prev + 1); // สั่งรีเซ็ตช่อง Autocomplete ค้นหาผู้ป่วยให้ว่างเปล่า
   };
 
   const handleCloseAlert = (_event?: React.SyntheticEvent | Event, reason?: string) => {
@@ -123,13 +106,12 @@ export default function AppointmentForm() {
           <div className="input-group">
             <label>ค้นหาผู้ป่วย <span className="required">*</span></label>
             <Autocomplete<PatientOption>
-              key={`patient-${autocompleteKey}`}
+              key={autocompleteKey} // ใช้ key นี้บังคับล้างค่าช่องค้นหา
               disablePortal
-              options={patients}
-              getOptionLabel={(option) => option.label}
-              onChange={(_event, newValue: PatientOption | null) => {
-                setSelectedPatientId(newValue ? newValue.id : null);
-                setSelectedPatientName(newValue ? newValue.name : '');
+              options={mockPatients}
+              getOptionLabel={(option: PatientOption) => option.label}
+              onChange={(_event: unknown, newValue: PatientOption | null) => {
+                setSelectedPatient(newValue ? newValue.name : '');
               }}
               renderInput={(params) => (
                 <TextField 
@@ -158,41 +140,9 @@ export default function AppointmentForm() {
             <input 
               type="text" 
               readOnly 
-              value={selectedPatientName} 
+              value={selectedPatient} 
               placeholder="แสดงชื่อเมื่อเลือกผู้ป่วย" 
               className="read-only-input"
-            />
-          </div>
-
-          <div className="input-group">
-            <label>เลือกแพทย์ที่ต้องการนัด <span className="required">*</span></label>
-            <Autocomplete<DoctorOption>
-              key={`doctor-${autocompleteKey}`}
-              disablePortal
-              options={doctors}
-              getOptionLabel={(option) => option.label}
-              onChange={(_event, newValue: DoctorOption | null) => {
-                setSelectedDoctorId(newValue ? newValue.id : null);
-              }}
-              renderInput={(params) => (
-                <TextField 
-                  {...params} 
-                  size="small" 
-                  placeholder="พิมพ์ชื่อแพทย์..." 
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: 'var(--input-bg)',
-                      borderRadius: '8px',
-                      '& fieldset': { borderColor: 'var(--input-border)' },
-                      '&:hover fieldset': { borderColor: '#94A3B8' },
-                      '&.Mui-focused fieldset': { borderColor: '#2563EB', borderWidth: '1px' },
-                    },
-                    '& .MuiInputBase-input': {
-                      color: 'var(--input-text)'
-                    }
-                  }}
-                />
-              )}
             />
           </div>
 
@@ -215,10 +165,10 @@ export default function AppointmentForm() {
             <label>หมวดการรักษา <span className="required">*</span></label>
             <select value={department} onChange={(e) => setDepartment(e.target.value)}>
               <option value="" disabled>เลือกหมวดการรักษา...</option>
-              <option value="general">โรคทั่วไป (OPD)</option>
-              <option value="er">ฉุกเฉิน (ER)</option>
-              <option value="surgery">ศัลยกรรม (Surgery)</option>
-              <option value="pediatrics">กุมารเวช (Pediatrics)</option>
+              <option value="general">ตรวจโรคทั่วไป (General Practice)</option>
+              <option value="medicine">อายุรกรรม (Internal Medicine)</option>
+              <option value="psychology">จิตวิทยา (Psychology)</option>
+              <option value="physical">กายภาพบำบัด (Physical Therapy)</option>
             </select>
           </div>
 

@@ -1,8 +1,15 @@
 import './Topbar.css';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useDoctorData } from '../../pages/doctor/DoctorDataContext';
 import { matchPatientSearch } from '../../pages/doctor/utils/searchUtils';
+import { displayVN } from '../../pages/doctor/utils/vnGenerator';
+import {
+  type DocumentMessage,
+  getDocumentMessagesForUser,
+  markDocumentMessageAsRead,
+  markAllDocumentMessagesAsRead,
+} from '../../services/documentMessageStorage';
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -22,20 +29,140 @@ interface NotificationItem {
 
 function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onNavigate }: TopbarProps) {
   const { currentUser, logout } = useAuth();
-  const { patients: doctorPatients, setSelectedRecordPatient } = useDoctorData();
+  const {
+    patients: doctorPatients,
+    recordPatients,
+    refreshRecords,
+    setSelectedRecordPatient,
+  } = useDoctorData();
   const isDoctor = currentUser?.role === 'doctor';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
+  const [isDocMessagesOpen, setIsDocMessagesOpen] = useState(false);
+  const [docMessages, setDocMessages] = useState<DocumentMessage[]>(() => getDocumentMessagesForUser(currentUser));
+  const [selectedDocMessageModal, setSelectedDocMessageModal] = useState<DocumentMessage | null>(null);
+  const docMessageRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const [isAdminFontEnabled, setIsAdminFontEnabled] = useState(false);
+  const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // ค้นหาผู้ป่วยแบบ Live Search (เฉพาะ role หมอที่มีข้อมูลคิวผู้ป่วยให้ค้นหา)
+  // Sync Document Messages from storage & events
+  useEffect(() => {
+    const handleMessageUpdate = () => {
+      setDocMessages(getDocumentMessagesForUser(currentUser));
+    };
+    handleMessageUpdate();
+    window.addEventListener('clinic_document_message_sent', handleMessageUpdate);
+    window.addEventListener('storage', handleMessageUpdate);
+    return () => {
+      window.removeEventListener('clinic_document_message_sent', handleMessageUpdate);
+      window.removeEventListener('storage', handleMessageUpdate);
+    };
+  }, [currentUser]);
+
+  const unreadDocMessageCount = useMemo(() => {
+    return docMessages.filter((m) => m.isUnread).length;
+  }, [docMessages]);
+
+  const handleMarkAllMessagesRead = () => {
+    markAllDocumentMessagesAsRead(currentUser?.username, currentUser?.fullName);
+    setDocMessages(getDocumentMessagesForUser(currentUser));
+  };
+
+  const handleOpenMessageItem = (msg: DocumentMessage) => {
+    markDocumentMessageAsRead(msg.id);
+    setDocMessages(getDocumentMessagesForUser(currentUser));
+    setSelectedDocMessageModal(msg);
+    setIsDocMessagesOpen(false);
+  };
+
+  const [isAllDocsModalOpen, setIsAllDocsModalOpen] = useState(false);
+  const [allDocsFilter, setAllDocsFilter] = useState<string>('all');
+  const [allDocsSearch, setAllDocsSearch] = useState<string>('');
+
+  const handleOpenAllDocsModal = () => {
+    setIsDocMessagesOpen(false);
+    setIsAllDocsModalOpen(true);
+  };
+
+  const filteredAllDocs = useMemo(() => {
+    return docMessages.filter((msg) => {
+      // 1. Search term
+      if (allDocsSearch.trim()) {
+        const q = allDocsSearch.toLowerCase();
+        const matchTitle = msg.title.toLowerCase().includes(q);
+        const matchDesc = msg.description?.toLowerCase().includes(q);
+        const matchSender = msg.sender.toLowerCase().includes(q);
+        const matchType = msg.type.toLowerCase().includes(q);
+        if (!matchTitle && !matchDesc && !matchSender && !matchType) {
+          return false;
+        }
+      }
+      // 2. Filter category (Only 'all' and 'unread')
+      if (allDocsFilter === 'unread') return msg.isUnread;
+      return true;
+    });
+  }, [docMessages, allDocsSearch, allDocsFilter]);
+
+  useEffect(() => {
+    const isFontEnabled = localStorage.getItem('adminFontEnabled') === 'true';
+    setIsAdminFontEnabled(isFontEnabled);
+    if (isFontEnabled) {
+      document.body.classList.add('admin-font-theme');
+    }
+
+    const soundSetting = localStorage.getItem('notificationSoundEnabled');
+    setIsSoundEnabled(soundSetting !== 'false'); // Default true
+  }, []);
+
+  const toggleAdminFont = () => {
+    const isEnabled = !isAdminFontEnabled;
+    setIsAdminFontEnabled(isEnabled);
+    if (isEnabled) {
+      document.body.classList.add('admin-font-theme');
+      localStorage.setItem('adminFontEnabled', 'true');
+    } else {
+      document.body.classList.remove('admin-font-theme');
+      localStorage.removeItem('adminFontEnabled');
+    }
+  };
+
+  const toggleNotificationSound = () => {
+    const newVal = !isSoundEnabled;
+    setIsSoundEnabled(newVal);
+    localStorage.setItem('notificationSoundEnabled', newVal ? 'true' : 'false');
+  };
+  // โหลดผู้ป่วยย้อนหลังไว้ให้ช่องค้นหาด้านบนใช้ด้วย ไม่งั้นจะค้นเจอเฉพาะคิววันนี้
+  useEffect(() => {
+    if (isDoctor) {
+      void refreshRecords();
+    }
+  }, [isDoctor, refreshRecords]);
+
+  // ค้นหาผู้ป่วยแบบ Live Search (เฉพาะ role หมอ)
+  //
+  // รวม 2 ชุด: คิวที่ยังเดินอยู่ + ผู้ป่วยที่เคยมาตรวจ (ไม่จำกัดวัน)
+  // ถ้าคนเดียวกันอยู่ทั้งสองชุด ยึดของคิวเพราะสถานะเป็นปัจจุบันกว่า
+  const searchablePatients = useMemo(() => {
+    if (!isDoctor) return [];
+    const merged = [...doctorPatients];
+    const seen = new Set(doctorPatients.map((p) => p.hn));
+    for (const p of recordPatients) {
+      if (!seen.has(p.hn)) {
+        seen.add(p.hn);
+        merged.push(p);
+      }
+    }
+    return merged;
+  }, [isDoctor, doctorPatients, recordPatients]);
+
   const matchingPatients = isDoctor && searchQuery.trim()
-    ? doctorPatients.filter((p) => matchPatientSearch(p, searchQuery))
+    ? searchablePatients.filter((p) => matchPatientSearch(p, searchQuery))
     : [];
 
-  const handleSelectSearchResult = (patient: (typeof doctorPatients)[number]) => {
+  const handleSelectSearchResult = (patient: (typeof searchablePatients)[number]) => {
     setSelectedRecordPatient(patient);
     setSearchQuery('');
     setIsSearchDropdownOpen(false);
@@ -87,8 +214,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     },
     {
       id: '5',
-      category: 'นัดหมายผู้ป่วย',
-      message: 'แจ้งเตือนนัดติดตามอาการ คุณวิภา ติดดี เวลา 14:00 น.',
+      category: 'การคัดกรองสัญญาณชีพ',
+      message: 'แจ้งเตือนบันทึกสัญญาณชีพผู้ป่วยกลุ่ม Triage ฉุกเฉินเรียบร้อย',
       time: '1 ชั่วโมงที่แล้ว',
       isUnread: false,
     },
@@ -152,6 +279,9 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
       }
       if (noticeRef.current && !noticeRef.current.contains(event.target as Node)) {
         setIsNoticeOpen(false);
+      }
+      if (docMessageRef.current && !docMessageRef.current.contains(event.target as Node)) {
+        setIsDocMessagesOpen(false);
       }
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
         setIsSearchDropdownOpen(false);
@@ -392,6 +522,26 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     setNotifications(prev => prev.map(n => ({ ...n, isUnread: false })));
   };
 
+  const getSearchPlaceholder = () => {
+    switch (currentUser?.role) {
+      case 'doctor':
+        return 'ค้นหาผู้ป่วย ชื่อ, HN, VN...';
+      case 'officer':
+        return 'ค้นหาเอกสาร, ตารางงานแพทย์...';
+      case 'registrar':
+        return 'ค้นหาผู้ป่วย, HN, คิว...';
+      case 'nurse':
+      case 'nurse_assistant':
+        return 'ค้นหาผู้ป่วย, คิว, คัดกรอง...';
+      case 'pharmacist':
+        return 'ค้นหาชื่อยา, รหัสยา...';
+      case 'cashier':
+        return 'ค้นหาใบแจ้งหนี้, คิวชำระเงิน...';
+      default:
+        return 'ค้นหาในระบบคลินิก...';
+    }
+  };
+
   return (
     <header className={`top-nav-header ${isSidebarOpen ? 'topbar-with-sidebar' : 'topbar-full'}`}>
 
@@ -405,22 +555,19 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
       )}
 
       {/* Search Bar */}
-      {/* คลาส search-container-interactive ใส่เฉพาะ role แพทย์ ซึ่งเป็น role เดียว
-          ที่ช่องค้นหานี้ทำงานจริง จึงให้มีสถานะ focus (กรอบฟ้า) ตอบสนองการคลิก
-          role อื่นช่องค้นหายังไม่ได้ต่อข้อมูล จึงคงหน้าตาเดิมไว้ */}
       <div
-        className={`search-container${isDoctor ? ' search-container-interactive' : ''}`}
+        className="search-container search-container-interactive"
         ref={searchRef}
       >
         <div className="search-icon">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18" xmlns="http://www.w3.org/2000/svg">
             <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </div>
         <input
           className="search-input"
           type="text"
-          placeholder={isDoctor ? 'ค้นหาผู้ป่วย ชื่อ, HN, VN...' : 'Search'}
+          placeholder={getSearchPlaceholder()}
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value);
@@ -430,6 +577,21 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             if (searchQuery.trim()) setIsSearchDropdownOpen(true);
           }}
         />
+        {searchQuery && (
+          <button
+            type="button"
+            className="search-topbar-clear-btn"
+            onClick={() => {
+              setSearchQuery('');
+              setIsSearchDropdownOpen(false);
+            }}
+            aria-label="Clear Search"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+              <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+        )}
 
         {/* Live Search Results Dropdown (เฉพาะ role หมอ) */}
         {isDoctor && isSearchDropdownOpen && searchQuery.trim() !== '' && (
@@ -450,7 +612,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                     <div className="search-result-info">
                       <span className="search-result-name">{patient.name}</span>
                       <span className="search-result-meta">
-                        HN: {patient.hn} &bull; VN: {patient.vn}
+                        HN: {patient.hn} &bull; VN: {displayVN(patient.vn)}
                       </span>
                     </div>
                   </div>
@@ -465,42 +627,123 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
         )}
       </div>
 
-      {/* Actions Group (Reset DB + Notifications + Profile) */}
+      {/* Actions Group (Messages + Notifications + Profile) */}
       <div className="actions-group">
-        <button 
-          className="reset-db-btn"
-          onClick={async () => {
-            if (!window.confirm('คุณต้องการรีเซ็ตระบบและคืนค่าข้อมูลคิวทดสอบใหม่สำหรับ Re-testing ใช่หรือไม่?')) {
-              return;
-            }
-            try {
-              const token = localStorage.getItem('token');
-              await fetch('/api/system/reset-db', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                }
-              });
-              alert('✓ รีเซ็ตระบบและคืนค่าคิวทดสอบสำเร็จ! ทุกหน้าจอได้รับการอัปเดตแบบ Real-time เรียบร้อยแล้ว');
-            } catch {
-              alert('✓ ส่งคำสั่งรีเซ็ตระบบเรียบร้อยแล้ว');
-            }
-          }}
-          title="รีเซ็ตข้อมูลคิวและระบบทดสอบ (Reset Database for Re-testing)"
-          style={{ 
-            display: 'inline-flex', alignItems: 'center', gap: '6px', 
-            padding: '6px 12px', borderRadius: '8px', 
-            background: 'linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)', 
-            color: '#1D4ED8', border: '1px solid #93C5FD', 
-            fontWeight: '700', fontSize: '13px', cursor: 'pointer',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.05)', transition: 'all 0.2s ease',
-            marginRight: '8px'
-          }}
-        >
-          <span>🔄</span>
-          <span>รีเซ็ตระบบทดสอบ</span>
-        </button>
+
+        {/* Document Message Box Icon & Dropdown Panel (ข้างๆ รูปกระดิ่ง) */}
+        <div className="doc-message-container" ref={docMessageRef}>
+          <button 
+            className={`doc-message-btn ${isDocMessagesOpen ? 'active' : ''}`} 
+            onClick={() => {
+              setIsDocMessagesOpen(prev => !prev);
+              setIsNoticeOpen(false);
+              setIsDropdownOpen(false);
+            }}
+            aria-label="Document Messages"
+            title="กล่องข้อความเอกสารเข้าจากธุรการ"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            {unreadDocMessageCount > 0 && (
+              <span className="doc-message-badge">{unreadDocMessageCount > 9 ? '9+' : unreadDocMessageCount}</span>
+            )}
+          </button>
+
+          {/* Message Dropdown Menu */}
+          {isDocMessagesOpen && (
+            <div className="doc-message-dropdown-menu">
+              <div className="doc-message-header">
+                <div className="doc-message-header-title">
+                  <span className="doc-message-main-title">กล่องข้อความเอกสาร</span>
+                  {unreadDocMessageCount > 0 && (
+                    <span className="doc-message-count-tag">{unreadDocMessageCount} ใหม่</span>
+                  )}
+                </div>
+                <div className="doc-message-header-actions">
+                  <button 
+                    type="button" 
+                    className="doc-message-viewall-top-btn"
+                    onClick={handleOpenAllDocsModal}
+                    title="ดูเอกสารทั้งหมด"
+                  >
+                    <span>ดูเอกสารทั้งหมด</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-header info bar */}
+              <div className="doc-message-info-bar">
+                <span>📁 เอกสารที่ส่งต่อจากเจ้าหน้าที่ธุรการ</span>
+              </div>
+
+              {/* Message List */}
+              <div className="doc-message-list">
+                {docMessages.length === 0 ? (
+                  <div className="doc-message-empty">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="#94A3B8" strokeWidth="1.5">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      <line x1="9" y1="10" x2="15" y2="10" />
+                    </svg>
+                    <p>ยังไม่มีข้อความหรือเอกสารใหม่ส่งถึงคุณ</p>
+                  </div>
+                ) : (
+                  docMessages.map((msg) => (
+                    <div 
+                      key={msg.id} 
+                      className={`doc-message-item ${msg.isUnread ? 'unread' : ''}`}
+                      onClick={() => handleOpenMessageItem(msg)}
+                    >
+                      <div className="doc-message-item-icon">
+                        {msg.priority === 'emergency' ? '🚨' : msg.priority === 'urgent' ? '⚡' : '📄'}
+                      </div>
+                      <div className="doc-message-item-content">
+                        <div className="doc-message-item-top">
+                          <span className={`doc-message-tag ${msg.priority}`}>
+                            {msg.type}
+                          </span>
+                          <span className="doc-message-time">{msg.timeDisplay}</span>
+                        </div>
+                        <h5 className="doc-message-item-title">{msg.title}</h5>
+                        {msg.description && (
+                          <p className="doc-message-item-desc">{msg.description}</p>
+                        )}
+                        <div className="doc-message-item-sender">
+                          <span>จาก: {msg.sender}</span>
+                          {msg.isUnread && <span className="doc-unread-dot" />}
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Message List Footer */}
+              <div className="doc-message-dropdown-footer">
+                {unreadDocMessageCount > 0 && (
+                  <button 
+                    type="button" 
+                    className="doc-message-footer-readall"
+                    onClick={handleMarkAllMessagesRead}
+                    title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด"
+                  >
+                    ✓ อ่านทั้งหมด
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  className="doc-message-footer-viewall"
+                  onClick={handleOpenAllDocsModal}
+                >
+                  เปิดคลังเอกสารทั้งหมด ({docMessages.length}) &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Notification Icon & Dropdown Panel */}
         <div className="notice-container" ref={noticeRef}>
@@ -730,9 +973,89 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 </span>
               </button>
 
-              {/* 3. ออกจากระบบ (Text align center, no emoji) */}
+              {/* 3. สลับรูปแบบตัวอักษร (ทดสอบ) */}
               <button
-                className="dropdown-menu-item dropdown-item-3 dropdown-logout-btn"
+                className="dropdown-menu-item dropdown-item-3"
+                onClick={() => {
+                  toggleAdminFont();
+                  setIsDropdownOpen(false);
+                }}
+              >
+                <span className="theme-toggle-text">
+                  {isAdminFontEnabled ? 'ยกเลิกฟอนต์ทดสอบ' : 'ทดสอบฟอนต์ระบบจัดการสิทธิ์'}
+                </span>
+                <span className="theme-toggle-icon-wrapper" style={{ marginLeft: '8px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                    <line x1="9" y1="20" x2="15" y2="20"></line>
+                    <line x1="12" y1="4" x2="12" y2="20"></line>
+                  </svg>
+                </span>
+              </button>
+
+              {/* 4. เปิด/ปิด เสียงแจ้งเตือน */}
+              <button
+                className="dropdown-menu-item dropdown-item-4"
+                onClick={() => {
+                  toggleNotificationSound();
+                  setIsDropdownOpen(false);
+                }}
+              >
+                <span className="theme-toggle-text">
+                  {isSoundEnabled ? 'ปิดเสียงแจ้งเตือนคิว' : 'เปิดเสียงแจ้งเตือนคิว'}
+                </span>
+                <span className="theme-toggle-icon-wrapper" style={{ marginLeft: '8px' }}>
+                  {isSoundEnabled ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                      <line x1="23" y1="9" x2="17" y2="15"></line>
+                      <line x1="17" y1="9" x2="23" y2="15"></line>
+                    </svg>
+                  )}
+                </span>
+              </button>
+
+              <div className="dropdown-divider"></div>
+
+              {/* 5. ล้างข้อมูลทดสอบในระบบ */}
+              <button
+                className="dropdown-menu-item dropdown-item-reset"
+                onClick={async () => {
+                  setIsDropdownOpen(false);
+                  if (!window.confirm('คุณต้องการล้างข้อมูลทดสอบ (ผู้ป่วย คิว และการคัดกรอง) ทั้งหมดในระบบของคุณใช่หรือไม่?')) {
+                    return;
+                  }
+                  try {
+                    const token = localStorage.getItem('token');
+                    const res = await fetch('/api/system/reset-db', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                      }
+                    });
+                    if (res.ok) {
+                      window.location.reload();
+                    }
+                  } catch (err) {
+                    console.error('Reset system error:', err);
+                  }
+                }}
+              >
+                <span>ล้างข้อมูลทดสอบในระบบ</span>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: '#2563EB' }}>
+                  <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/>
+                </svg>
+              </button>
+
+              {/* 4. ออกจากระบบ (Text align center, no emoji) */}
+              <button
+                className="dropdown-menu-item dropdown-item-4 dropdown-logout-btn"
                 onClick={() => {
                   logout();
                   setIsDropdownOpen(false);
@@ -744,6 +1067,259 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
           )}
         </div>
       </div>
+
+      {/* Modal: Document Detail from Officer */}
+      {selectedDocMessageModal && (
+        <div className="doc-msg-modal-overlay" onClick={() => setSelectedDocMessageModal(null)}>
+          <div className="doc-msg-modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="doc-msg-modal-header">
+              <div className="doc-msg-modal-header-left">
+                <div className="doc-header-icon-badge">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="doc-msg-modal-title">รายละเอียดเอกสาร</h3>
+                  <p className="doc-msg-modal-subtitle">รหัสอ้างอิง: {selectedDocMessageModal.id}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="doc-modal-close-btn"
+                onClick={() => setSelectedDocMessageModal(null)}
+                title="ปิดหน้าต่าง"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="doc-msg-modal-body">
+              <div className="doc-msg-info-card">
+                <div className="doc-msg-field">
+                  <span className="doc-msg-field-label">หัวข้อเรื่อง:</span>
+                  <span className="doc-msg-field-value font-bold text-slate-900">{selectedDocMessageModal.title}</span>
+                </div>
+                <div className="doc-msg-field-grid">
+                  <div className="doc-msg-field">
+                    <span className="doc-msg-field-label">ผู้ส่ง:</span>
+                    <span className="doc-msg-field-value">{selectedDocMessageModal.sender}</span>
+                  </div>
+                  <div className="doc-msg-field">
+                    <span className="doc-msg-field-label">ผู้รับ:</span>
+                    <span className="doc-msg-field-value">{selectedDocMessageModal.recipient}</span>
+                  </div>
+                  <div className="doc-msg-field">
+                    <span className="doc-msg-field-label">ประเภทเอกสาร:</span>
+                    <span className="doc-msg-field-value">{selectedDocMessageModal.type}</span>
+                  </div>
+                  <div className="doc-msg-field">
+                    <span className="doc-msg-field-label">ระดับความสำคัญ:</span>
+                    <span className={`doc-msg-priority-tag ${selectedDocMessageModal.priority}`}>
+                      {selectedDocMessageModal.priority === 'emergency' ? 'ฉุกเฉินมาก' : selectedDocMessageModal.priority === 'urgent' ? 'ด่วน' : 'ปกติ'}
+                    </span>
+                  </div>
+                </div>
+                {selectedDocMessageModal.description && (
+                  <div className="doc-msg-field mt-2">
+                    <span className="doc-msg-field-label">ข้อความและรายละเอียดจากธุรการ:</span>
+                    <div className="doc-msg-note-box">
+                      {selectedDocMessageModal.description}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="doc-msg-modal-footer">
+              <button
+                type="button"
+                className="doc-msg-btn-primary"
+                onClick={() => setSelectedDocMessageModal(null)}
+              >
+                ✓ รับทราบและปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: All Documents Archive (คลังเอกสารและข้อความทั้งหมด) */}
+      {isAllDocsModalOpen && (
+        <div className="doc-msg-modal-overlay" onClick={() => setIsAllDocsModalOpen(false)}>
+          <div className="doc-all-modal-box" onClick={(e) => e.stopPropagation()}>
+            {/* Header: Cohesive Clinic Modal Design */}
+            <div className="doc-all-modal-header">
+              <div className="doc-all-modal-header-left">
+                <div className="doc-header-icon-badge">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="doc-all-modal-title">คลังเอกสารและข้อความ</h3>
+                  <p className="doc-all-modal-subtitle">
+                    เอกสารที่ส่งถึงคุณ ({currentUser?.fullName || currentUser?.username}) &bull; ทั้งหมด {docMessages.length} รายการ
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="doc-modal-close-btn"
+                onClick={() => setIsAllDocsModalOpen(false)}
+                title="ปิดหน้าต่าง"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Filter & Search Toolbar (Only 2 Tabs: เอกสารทั้งหมด & ยังไม่อ่าน) */}
+            <div className="doc-all-toolbar">
+              <div className="doc-all-toolbar-row">
+                <div className="doc-all-segment-tabs">
+                  <button
+                    type="button"
+                    className={`doc-all-tab-btn ${allDocsFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setAllDocsFilter('all')}
+                  >
+                    <span>เอกสารทั้งหมด</span>
+                    <span className="doc-all-tab-badge">{docMessages.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`doc-all-tab-btn ${allDocsFilter === 'unread' ? 'active' : ''}`}
+                    onClick={() => setAllDocsFilter('unread')}
+                  >
+                    <span>ยังไม่อ่าน</span>
+                    {unreadDocMessageCount > 0 && (
+                      <span className="doc-all-tab-badge unread">{unreadDocMessageCount}</span>
+                    )}
+                  </button>
+                </div>
+
+                {unreadDocMessageCount > 0 && (
+                  <button
+                    type="button"
+                    className="doc-all-quick-readall-btn"
+                    onClick={handleMarkAllMessagesRead}
+                    title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด"
+                  >
+                    ✓ ทำเครื่องหมายอ่านแล้วทั้งหมด
+                  </button>
+                )}
+              </div>
+
+              {/* Search Bar */}
+              <div className="doc-all-search-wrap">
+                <svg className="doc-all-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <input
+                  type="text"
+                  className="doc-all-search-input"
+                  placeholder="ค้นหาชื่อเอกสาร, ผู้ส่ง หรือข้อความ..."
+                  value={allDocsSearch}
+                  onChange={(e) => setAllDocsSearch(e.target.value)}
+                />
+                {allDocsSearch && (
+                  <button
+                    type="button"
+                    className="doc-all-search-clear"
+                    onClick={() => setAllDocsSearch('')}
+                    title="ล้างคำค้นหา"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Document List View */}
+            <div className="doc-all-modal-body">
+              {filteredAllDocs.length === 0 ? (
+                <div className="doc-all-empty">
+                  <div className="doc-all-empty-icon">📭</div>
+                  <h4>{allDocsFilter === 'unread' ? 'ไม่มีเอกสารที่ยังไม่ได้อ่าน' : 'ไม่พบเอกสารที่ค้นหา'}</h4>
+                  <p>{allDocsFilter === 'unread' ? 'คุณได้อ่านเอกสารทั้งหมดครบถ้วนแล้ว' : 'ลองเปลี่ยนคำค้นหาใหม่อีกครั้ง'}</p>
+                </div>
+              ) : (
+                <div className="doc-all-grid">
+                  {filteredAllDocs.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`doc-all-card ${msg.isUnread ? 'unread' : ''}`}
+                      onClick={() => handleOpenMessageItem(msg)}
+                    >
+                      <div className="doc-all-card-top">
+                        <div className="doc-all-card-badges">
+                          <span className={`doc-message-tag ${msg.priority}`}>
+                            {msg.priority === 'emergency' ? '🚨 ฉุกเฉินมาก' : msg.priority === 'urgent' ? '⚡ ด่วน' : 'ปกติ'}
+                          </span>
+                          <span className="doc-all-type-tag">{msg.type}</span>
+                          {msg.isUnread && <span className="doc-all-unread-badge">ยังไม่ได้อ่าน</span>}
+                        </div>
+                        <span className="doc-all-card-time">{msg.timeDisplay}</span>
+                      </div>
+
+                      <h4 className="doc-all-card-title">{msg.title}</h4>
+                      
+                      {msg.description && (
+                        <p className="doc-all-card-desc">{msg.description}</p>
+                      )}
+
+                      <div className="doc-all-card-footer">
+                        <div className="doc-all-card-sender">
+                          <span className="doc-all-sender-label">จาก:</span>
+                          <span className="doc-all-sender-name">{msg.sender}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="doc-all-view-detail-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenMessageItem(msg);
+                          }}
+                        >
+                          เปิดดูเอกสาร &rarr;
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="doc-all-modal-footer">
+              <div className="doc-all-footer-left">
+                {currentUser?.role === 'officer' && onNavigate && (
+                  <button
+                    type="button"
+                    className="doc-all-footer-nav-btn"
+                    onClick={() => {
+                      setIsAllDocsModalOpen(false);
+                      onNavigate('dms-documents');
+                    }}
+                  >
+                    📋 ไปที่หน้าจัดการเอกสารธุรการ &rarr;
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                className="doc-all-footer-close-btn"
+                onClick={() => setIsAllDocsModalOpen(false)}
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </header>
   );
