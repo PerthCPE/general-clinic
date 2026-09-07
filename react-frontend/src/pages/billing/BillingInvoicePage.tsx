@@ -396,7 +396,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
           medications: Array.isArray(data.medications) ? data.medications.map((m: any) => parseDispensedMed(m, masterMedicines)) : []
         };
         setQueueList(prev => [newPatient, ...prev.filter(q => q.id !== newPatient.id)]);
-        playBillingNotification('มีผู้ป่วยใหม่ ส่งมาที่ห้องการเงินค่ะ');
+
       }
       setTimeout(() => {
         fetchQueues();

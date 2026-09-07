@@ -562,7 +562,7 @@ export default function BillingDispensePage({
       if (data) {
         const pName = data.patient_name || 'ผู้ป่วย';
         triggerToast(`ได้รับคิวใหม่สำหรับการเงิน: ${pName} (${data.queue_number || ''})`, 'doctor');
-        playBillingNotification('มีผู้ป่วยใหม่ ส่งมาที่ห้องการเงินค่ะ');
+
       }
     });
 

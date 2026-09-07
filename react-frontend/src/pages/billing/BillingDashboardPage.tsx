@@ -233,7 +233,7 @@ export default function BillingDashboardPage() {
       fetchBillings();
       setLiveNotify(`มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
-      playBillingNotification('มีผู้ป่วยใหม่ ส่งมาที่ห้องการเงินค่ะ');
+
     });
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
