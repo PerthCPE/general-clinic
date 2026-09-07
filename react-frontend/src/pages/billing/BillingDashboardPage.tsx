@@ -13,6 +13,7 @@ interface PaymentRecord {
   hn: string;
   vn?: string;
   patientName: string;
+  nationalID?: string;
   date: string;
   time: string;
   amount: string;
@@ -354,7 +355,9 @@ export default function BillingDashboardPage() {
                           record.id.toLowerCase().includes(query) || 
                           record.hn.toLowerCase().includes(query) || 
                           (record.vn || '').toLowerCase().includes(query) ||
-                          record.patientName.toLowerCase().includes(query);
+                          record.patientName.toLowerCase().includes(query) ||
+                          (record.rawHistory?.national_id || '').toLowerCase().includes(query) ||
+                          (record.nationalID || '').toLowerCase().includes(query);
       const matchStatus = statusFilter === 'all' || record.status === statusFilter;
       const matchMethod = methodFilter === 'all' || 
                           (methodFilter === 'qr' && record.method === 'QR Code') ||
@@ -607,7 +610,7 @@ export default function BillingDashboardPage() {
             </div>
             <input
               type="text"
-              placeholder="ค้นหาด้วยรหัสใบเสร็จ, HN, หรือชื่อผู้ป่วย..."
+              placeholder="ค้นหาด้วยรหัสใบเสร็จ, HN, บัตรประชาชน หรือชื่อผู้ป่วย..."
               value={patientId}
               onChange={(e) => setPatientId(e.target.value)}
               className="search-input"
