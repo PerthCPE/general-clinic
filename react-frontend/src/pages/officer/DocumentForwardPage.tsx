@@ -64,18 +64,53 @@ const getRoleLabel = (role?: string): string => {
   }
 };
 
-const generateInitialIncomingDocs = (): ForwardDoc[] => {
+const STORAGE_KEY_INCOMING_DOCS = 'clinic_dms_incoming_docs_v2';
+const STORAGE_KEY_FORWARDED_DOCS = 'clinic_dms_forwarded_docs_v2';
+
+const getStoredIncomingDocs = (): ForwardDoc[] => {
+  if (typeof window === 'undefined') return [];
+  const raw = localStorage.getItem(STORAGE_KEY_INCOMING_DOCS);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+  }
   return [];
 };
 
-const generateInitialForwardedDocs = (): ForwardDoc[] => {
+const saveStoredIncomingDocs = (docs: ForwardDoc[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_INCOMING_DOCS, JSON.stringify(docs));
+  }
+};
+
+const getStoredForwardedDocs = (): ForwardDoc[] => {
+  if (typeof window === 'undefined') return [];
+  const raw = localStorage.getItem(STORAGE_KEY_FORWARDED_DOCS);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+  }
   return [];
+};
+
+const saveStoredForwardedDocs = (docs: ForwardDoc[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_FORWARDED_DOCS, JSON.stringify(docs));
+  }
 };
 
 export const DocumentForwardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'incoming' | 'forwarded'>('incoming');
-  const [incomingDocs, setIncomingDocs] = useState<ForwardDoc[]>([]);
-  const [forwardedDocs, setForwardedDocs] = useState<ForwardDoc[]>([]);
+  const [incomingDocs, setIncomingDocs] = useState<ForwardDoc[]>(() => getStoredIncomingDocs());
+  const [forwardedDocs, setForwardedDocs] = useState<ForwardDoc[]>(() => getStoredForwardedDocs());
   const [recipientsList, setRecipientsList] = useState<BackendUser[]>([]);
   const [systemDocuments, setSystemDocuments] = useState<BackendDocument[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -106,8 +141,8 @@ export const DocumentForwardPage: React.FC = () => {
     setIsLoading(true);
     try {
       // 1. Fetch Forwards
-      const forwardsData = await dmsApi.getForwards().catch(() => [] as BackendDocumentForward[]);
-      if (forwardsData && Array.isArray(forwardsData) && forwardsData.length > 0) {
+      const forwardsData = await dmsApi.getForwards().catch(() => null);
+      if (forwardsData !== null && Array.isArray(forwardsData)) {
         const mapped: ForwardDoc[] = forwardsData.map((fwd) => {
           const createdAt = new Date(fwd.created_at || Date.now());
           const isAck = fwd.status === 'Acknowledged';
@@ -132,6 +167,7 @@ export const DocumentForwardPage: React.FC = () => {
           };
         });
         setForwardedDocs(mapped);
+        saveStoredForwardedDocs(mapped);
       }
 
       // 2. Fetch Recipients List
@@ -224,7 +260,11 @@ export const DocumentForwardPage: React.FC = () => {
         status: 'processing',
       };
 
-      setForwardedDocs(prev => [newDoc, ...prev]);
+      setForwardedDocs(prev => {
+        const next = [newDoc, ...prev];
+        saveStoredForwardedDocs(next);
+        return next;
+      });
       sendDocumentMessage({
         docId: targetDocId,
         title: newDocTitle.trim(),
@@ -260,7 +300,11 @@ export const DocumentForwardPage: React.FC = () => {
         status: 'processing',
       };
 
-      setForwardedDocs(prev => [newDoc, ...prev]);
+      setForwardedDocs(prev => {
+        const next = [newDoc, ...prev];
+        saveStoredForwardedDocs(next);
+        return next;
+      });
       sendDocumentMessage({
         title: newDocTitle.trim(),
         description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
@@ -297,7 +341,11 @@ export const DocumentForwardPage: React.FC = () => {
 
     // Auto update unread incoming status to processing
     if (doc.status === 'unread' && activeTab === 'incoming') {
-      setIncomingDocs(prev => prev.map(d => d.id === doc.id ? { ...d, status: 'processing' } : d));
+      setIncomingDocs(prev => {
+        const next = prev.map(d => d.id === doc.id ? { ...d, status: 'processing' as const } : d);
+        saveStoredIncomingDocs(next);
+        return next;
+      });
     }
   };
 
@@ -313,8 +361,16 @@ export const DocumentForwardPage: React.FC = () => {
           : d
         );
 
-      setIncomingDocs(updatedList);
-      setForwardedDocs(updatedList);
+      setIncomingDocs(prev => {
+        const next = updatedList(prev);
+        saveStoredIncomingDocs(next);
+        return next;
+      });
+      setForwardedDocs(prev => {
+        const next = updatedList(prev);
+        saveStoredForwardedDocs(next);
+        return next;
+      });
       if (selectedDoc && (selectedDoc.id === doc.id || selectedDoc.forwardId === doc.forwardId)) {
         setSelectedDoc(prev => prev ? { ...prev, status: 'completed', acknowledgedAt: new Date().toISOString() } : null);
       }
@@ -325,8 +381,16 @@ export const DocumentForwardPage: React.FC = () => {
           ? { ...d, status: 'completed' as const }
           : d
         );
-      setIncomingDocs(updatedList);
-      setForwardedDocs(updatedList);
+      setIncomingDocs(prev => {
+        const next = updatedList(prev);
+        saveStoredIncomingDocs(next);
+        return next;
+      });
+      setForwardedDocs(prev => {
+        const next = updatedList(prev);
+        saveStoredForwardedDocs(next);
+        return next;
+      });
       if (selectedDoc) {
         setSelectedDoc(prev => prev ? { ...prev, status: 'completed' } : null);
       }
@@ -337,7 +401,11 @@ export const DocumentForwardPage: React.FC = () => {
   // Archive incoming document
   const handleArchive = (docId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setIncomingDocs(prev => prev.filter(d => d.id !== docId));
+    setIncomingDocs(prev => {
+      const next = prev.filter(d => d.id !== docId);
+      saveStoredIncomingDocs(next);
+      return next;
+    });
     toast.success('จัดเก็บเอกสารเข้าแฟ้มถาวรเรียบร้อยแล้ว');
   };
 
@@ -357,7 +425,11 @@ export const DocumentForwardPage: React.FC = () => {
       }
       deleteDocumentMessage(doc.id);
 
-      setForwardedDocs(prev => prev.filter(d => d.id !== doc.id && (!doc.forwardId || d.forwardId !== doc.forwardId)));
+      setForwardedDocs(prev => {
+        const next = prev.filter(d => d.id !== doc.id && (!doc.forwardId || d.forwardId !== doc.forwardId));
+        saveStoredForwardedDocs(next);
+        return next;
+      });
       if (selectedDoc && (selectedDoc.id === doc.id || (doc.forwardId && selectedDoc.forwardId === doc.forwardId))) {
         setIsDetailModalOpen(false);
         setSelectedDoc(null);
@@ -368,7 +440,11 @@ export const DocumentForwardPage: React.FC = () => {
         deleteDocumentMessageByDocId(doc.docId);
       }
       deleteDocumentMessage(doc.id);
-      setForwardedDocs(prev => prev.filter(d => d.id !== doc.id));
+      setForwardedDocs(prev => {
+        const next = prev.filter(d => d.id !== doc.id);
+        saveStoredForwardedDocs(next);
+        return next;
+      });
       if (selectedDoc && selectedDoc.id === doc.id) {
         setIsDetailModalOpen(false);
         setSelectedDoc(null);
@@ -383,7 +459,11 @@ export const DocumentForwardPage: React.FC = () => {
     if (!window.confirm('คุณต้องการลบเอกสารนี้ใช่หรือไม่?')) {
       return;
     }
-    setIncomingDocs(prev => prev.filter(d => d.id !== docId));
+    setIncomingDocs(prev => {
+      const next = prev.filter(d => d.id !== docId);
+      saveStoredIncomingDocs(next);
+      return next;
+    });
     if (selectedDoc && selectedDoc.id === docId) {
       setIsDetailModalOpen(false);
       setSelectedDoc(null);

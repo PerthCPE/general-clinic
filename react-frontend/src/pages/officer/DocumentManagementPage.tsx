@@ -58,48 +58,42 @@ const formatBytes = (bytes?: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 };
 
-// Generate realistic fallback documents with dynamic dates
-const generateMockDocs = (): DocumentItem[] => {
-  const docs: DocumentItem[] = [];
-  const baseNames = ['Q3_Patient_Report', 'Dr_Smith_Contract', 'Inventory_Log', 'Policy_Update', 'Lab_Results', 'Weekly_Meeting_Notes'];
-  const exts = ['.pdf', '.docx', '.xlsx'];
-  const sizes = [2450000, 1850000, 1200000, 3100000, 950000, 4200000];
-  
-  const now = new Date();
-  const buddhistYear = now.getFullYear() + 543;
-  const monthNames = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+const STORAGE_KEY_DOCUMENTS = 'clinic_dms_documents_list_v2';
 
-  for (let i = 1; i <= 12; i++) {
-    const type = CLINIC_DOCUMENT_TYPES[(i - 1) % (CLINIC_DOCUMENT_TYPES.length - 1)];
-    const status: 'approved' | 'reviewing' | 'draft' = i <= 4 ? 'reviewing' : 'approved';
-    const baseName = baseNames[Math.floor(Math.random() * baseNames.length)];
-    const ext = exts[Math.floor(Math.random() * exts.length)];
-    const size = sizes[i % sizes.length];
-    const day = (i % 28) + 1;
-    const month = monthNames[(i + 3) % 12];
-    
-    docs.push({
-      id: String(i),
-      name: `${baseName}_${i}${ext}`,
-      type: type,
-      fileSize: size,
-      modifiedDate: `${day} ${month} ${buddhistYear}`,
-      status: status,
-      subject: `หัวข้อเอกสารที่ ${i}: ${baseName}`,
-      description: `เอกสารบันทึกข้อมูลสำคัญของคลินิก หมวดหมู่ ${type}`,
-      externalRef: `สธ ${String(i).padStart(4, '0')}/2569`,
-      fileUrl: `https://example.com/docs/${baseName}_${i}${ext}`,
-      creatorName: 'เจ้าหน้าที่ธุรการ',
-      approverName: status === 'approved' ? 'นพ. ผู้อำนวยการคลินิก' : undefined,
-    });
+const getStoredDocuments = (): DocumentItem[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    localStorage.removeItem('clinic_dms_documents_list_v1');
+  } catch {
+    // ignore
   }
-  return docs;
+  const raw = localStorage.getItem(STORAGE_KEY_DOCUMENTS);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+  }
+  return [];
+};
+
+const saveStoredDocuments = (docs: DocumentItem[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_DOCUMENTS, JSON.stringify(docs));
+  }
+};
+
+// Generate realistic fallback documents with dynamic dates (empty by default)
+const generateMockDocs = (): DocumentItem[] => {
+  return [];
 };
 
 export const DocumentManagementPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'approved' | 'reviewing' | 'draft'>('all');
-  const [docs, setDocs] = useState<DocumentItem[]>(generateMockDocs());
+  const [docs, setDocs] = useState<DocumentItem[]>(() => getStoredDocuments());
   const [storageStats, setStorageStats] = useState<StorageStats | null>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -163,10 +157,11 @@ export const DocumentManagementPage: React.FC = () => {
             };
           });
           setDocs(mapped);
+          saveStoredDocuments(mapped);
         }
       })
       .catch(() => {
-        // Fallback to mock only if server is offline
+        // Fallback to cached documents if server is offline
       });
 
     fetchStorageStats();
@@ -261,7 +256,11 @@ export const DocumentManagementPage: React.FC = () => {
         rawDoc: res.document,
       };
 
-      setDocs([newDoc, ...docs]);
+      setDocs(prev => {
+        const next = [newDoc, ...prev];
+        saveStoredDocuments(next);
+        return next;
+      });
       setSelectedFile(null);
       setUploading(false);
       setUploadForm({ subject: '', externalRef: '', docType: CLINIC_DOCUMENT_TYPES[0], customDocType: '', description: '' });
@@ -287,7 +286,11 @@ export const DocumentManagementPage: React.FC = () => {
         creatorName: 'เจ้าหน้าที่ธุรการ',
       };
       
-      setDocs([newDoc, ...docs]);
+      setDocs(prev => {
+        const next = [newDoc, ...prev];
+        saveStoredDocuments(next);
+        return next;
+      });
       setSelectedFile(null);
       setUploading(false);
       setUploadForm({ subject: '', externalRef: '', docType: CLINIC_DOCUMENT_TYPES[0], customDocType: '', description: '' });
@@ -302,17 +305,21 @@ export const DocumentManagementPage: React.FC = () => {
       const res = await dmsApi.approveDocument(docId);
       toast.success('อนุมัติเอกสารเรียบร้อยแล้ว');
       
-      setDocs(prev => prev.map(d => {
-        if (d.id === docId) {
-          return {
-            ...d,
-            status: 'approved',
-            approverName: res.document?.approver?.full_name || 'เจ้าหน้าที่ธุรการ / ผู้อนุมัติ',
-            rawDoc: res.document || d.rawDoc,
-          };
-        }
-        return d;
-      }));
+      setDocs(prev => {
+        const next = prev.map(d => {
+          if (d.id === docId) {
+            return {
+              ...d,
+              status: 'approved' as const,
+              approverName: res.document?.approver?.full_name || 'เจ้าหน้าที่ธุรการ / ผู้อนุมัติ',
+              rawDoc: res.document || d.rawDoc,
+            };
+          }
+          return d;
+        });
+        saveStoredDocuments(next);
+        return next;
+      });
 
       if (selectedDoc && selectedDoc.id === docId) {
         setSelectedDoc({
@@ -323,7 +330,11 @@ export const DocumentManagementPage: React.FC = () => {
         });
       }
     } catch {
-      setDocs(prev => prev.map(d => d.id === docId ? { ...d, status: 'approved', approverName: 'เจ้าหน้าที่ธุรการ' } : d));
+      setDocs(prev => {
+        const next = prev.map(d => d.id === docId ? { ...d, status: 'approved' as const, approverName: 'เจ้าหน้าที่ธุรการ' } : d);
+        saveStoredDocuments(next);
+        return next;
+      });
       if (selectedDoc && selectedDoc.id === docId) {
         setSelectedDoc({ ...selectedDoc, status: 'approved', approverName: 'เจ้าหน้าที่ธุรการ' });
       }
@@ -347,7 +358,11 @@ export const DocumentManagementPage: React.FC = () => {
     try {
       await dmsApi.deleteDocument(docId);
       deleteDocumentMessageByDocId(docId);
-      setDocs(prev => prev.filter(d => d.id !== docId));
+      setDocs(prev => {
+        const next = prev.filter(d => d.id !== docId);
+        saveStoredDocuments(next);
+        return next;
+      });
       if (selectedDoc && selectedDoc.id === docId) {
         setActiveModal(null);
         setSelectedDoc(null);
@@ -356,7 +371,11 @@ export const DocumentManagementPage: React.FC = () => {
       toast.success('ลบเอกสารออกจากระบบเรียบร้อยแล้ว');
     } catch {
       deleteDocumentMessageByDocId(docId);
-      setDocs(prev => prev.filter(d => d.id !== docId));
+      setDocs(prev => {
+        const next = prev.filter(d => d.id !== docId);
+        saveStoredDocuments(next);
+        return next;
+      });
       if (selectedDoc && selectedDoc.id === docId) {
         setActiveModal(null);
         setSelectedDoc(null);
