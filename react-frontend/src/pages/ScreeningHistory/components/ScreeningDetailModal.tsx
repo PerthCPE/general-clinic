@@ -18,14 +18,17 @@ export const ScreeningDetailModal: React.FC<ScreeningDetailModalProps> = ({ reco
   const isTachycardia = record.heartRate > 100;
   const hasAllergy = record.allergies && record.allergies !== 'ปฏิเสธการแพ้ยา' && record.allergies !== 'ไม่มี';
 
-  const triageClass =
-    record.triageLevel.includes('วิกฤต')
-      ? 'modal-triage-red'
-      : record.triageLevel.includes('เร่งด่วน')
-      ? 'modal-triage-orange'
-      : record.triageLevel.includes('กึ่ง')
-      ? 'modal-triage-yellow'
-      : 'modal-triage-green';
+  const isCrisisTriage = record.triageLevel.includes('วิกฤต');
+  const isSemiTriage = record.triageLevel.includes('กึ่ง');
+  const isUrgentTriage = (record.triageLevel.includes('เร่งด่วน') || record.triageLevel.includes('ฉุกเฉิน')) && !isSemiTriage && !isCrisisTriage;
+
+  const triageClass = isCrisisTriage
+    ? 'modal-triage-red'
+    : isUrgentTriage
+    ? 'modal-triage-orange'
+    : isSemiTriage
+    ? 'modal-triage-yellow'
+    : 'modal-triage-green';
 
   const handleCopySummary = () => {
     const text = `[ใบคัดกรองสัญญาณชีพและประวัติ คลินิกเวชกรรม]

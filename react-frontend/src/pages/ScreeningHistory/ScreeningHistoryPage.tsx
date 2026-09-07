@@ -13,10 +13,24 @@ import { PatientVitalsTrendCard } from './components/PatientVitalsTrendCard';
 import { ScreeningDetailModal } from './components/ScreeningDetailModal';
 import { vitalsApi, type BackendScreening } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
-import { formatQueueNo, formatNationalId, formatPhone, formatHN } from '../../utils/formatters';
+import { formatQueueNo, formatNationalId, formatPhone, formatHN, maskNationalId } from '../../utils/formatters';
 import './ScreeningHistoryPage.css';
 
 export { formatQueueNo };
+
+const formatTriageText = (level: number | string | undefined): TriageLevelKey => {
+  if (level === 1 || level === '1') return 'ฉุกเฉินวิกฤต (Resuscitation)';
+  if (level === 2 || level === '2') return 'ฉุกเฉินเร่งด่วน (Urgent)';
+  if (level === 3 || level === '3') return 'กึ่งฉุกเฉิน (Semi-Urgent)';
+  if (level === 4 || level === '4') return 'ปกติ (Normal)';
+  if (typeof level === 'string') {
+    if (level.includes('วิกฤต') || level.includes('Resuscitation')) return 'ฉุกเฉินวิกฤต (Resuscitation)';
+    if (level.includes('กึ่ง') || level.includes('Semi-Urgent')) return 'กึ่งฉุกเฉิน (Semi-Urgent)';
+    if (level.includes('ฉุกเฉิน') || level.includes('เร่งด่วน') || level.includes('Urgent') || level.includes('Emergency')) return 'ฉุกเฉินเร่งด่วน (Urgent)';
+    if (level.includes('ปกติ') || level.includes('Normal')) return 'ปกติ (Normal)';
+  }
+  return 'ปกติ (Normal)';
+};
 
 const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
   let dateOnly = 'วันนี้';
@@ -63,8 +77,10 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
 
   const docName = s.assigned_doctor?.fullname || defaultDocName;
   const roomName = `ห้องตรวจ ${roomNum}`;
-  const queueFormatted = formatQueueNo(s.visit_id || s.id || 1);
+  const rawQueueNo = s.visit_record?.queue_number || '';
+  const queueFormatted = rawQueueNo ? formatQueueNo(rawQueueNo) : formatQueueNo(s.visit_id || s.id || 1);
   const hnFormatted = patient?.hn ? formatHN(patient.hn) : formatHN(s.visit_record?.patient_id || s.id || 1);
+  const canonicalTriage = formatTriageText(s.triage_level);
 
   return {
     id: String(s.id),
@@ -93,7 +109,7 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
     spo2: s.spo2 || 98,
     painScore: s.pain_score !== undefined ? s.pain_score : 0,
     bloodSugar: s.blood_sugar !== undefined ? s.blood_sugar : 0,
-    triageLevel: (s.triage_level as TriageLevelKey) || 'ปกติ (Normal)',
+    triageLevel: canonicalTriage,
     chiefComplaint: s.chief_complaint || 'ตรวจสุขภาพทั่วไป',
     allergies: s.allergies || 'ปฏิเสธการแพ้ยา',
     foodAllergies: s.food_allergies || 'ปฏิเสธการแพ้อาหาร',
@@ -242,7 +258,22 @@ export const ScreeningHistoryPage: React.FC = () => {
   // Total Statistics (Dynamically calculated to match actual records in database)
   const stats: ScreeningStats = useMemo(() => {
     const total = records.length;
-    const thisMonth = records.filter((r) => r.dateOnly.includes('/2026') || r.dateOnly.includes('วันนี้')).length;
+    const now = new Date();
+    const currentMonthStr = (now.getMonth() + 1).toString().padStart(2, '0');
+    const currentYearBE = (now.getFullYear() + 543).toString();
+    const currentYearCE = now.getFullYear().toString();
+    const monthPatternBE = `/${currentMonthStr}/${currentYearBE}`;
+    const monthPatternCE = `/${currentMonthStr}/${currentYearCE}`;
+
+    const THAI_MONTHS = [
+      'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+      'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+    ];
+    const monthLabel = `${THAI_MONTHS[now.getMonth()]} ${currentYearBE}`;
+
+    const thisMonth = records.filter(
+      (r) => r.dateOnly.includes(monthPatternBE) || r.dateOnly.includes(monthPatternCE) || r.dateOnly.includes('วันนี้')
+    ).length;
     const highBPCount = records.filter((r) => r.systolicBP >= 140 || r.diastolicBP >= 90).length;
     const urgentCount = records.filter(
       (r) => r.triageLevel.includes('ฉุกเฉิน') || r.triageLevel.includes('วิกฤต') || r.triageLevel.includes('เร่งด่วน')
@@ -254,6 +285,7 @@ export const ScreeningHistoryPage: React.FC = () => {
     return {
       totalRecords: total,
       thisMonthRecords: thisMonth,
+      monthLabel,
       highBPRatePercent: total > 0 ? Math.round((highBPCount / total) * 100) : 0,
       urgentTriageCount: urgentCount,
       allergyPatientsCount: allergyCount,
@@ -580,11 +612,14 @@ export const ScreeningHistoryPage: React.FC = () => {
                 paginatedRecords.map((item) => {
                   const isHighSys = item.systolicBP >= 140;
                   const isHighDia = item.diastolicBP >= 90;
-                  const isCrisis = item.systolicBP >= 180 || item.diastolicBP >= 110;
+                  const isCrisisBP = item.systolicBP >= 180 || item.diastolicBP >= 110;
 
-                  const isUrgent = item.triageLevel.includes('เร่งด่วน') || item.triageLevel.includes('วิกฤต');
+                  const isCrisis = item.triageLevel.includes('วิกฤต');
                   const isSemi = item.triageLevel.includes('กึ่ง');
-                  const triageClass = isUrgent
+                  const isUrgent = (item.triageLevel.includes('เร่งด่วน') || item.triageLevel.includes('ฉุกเฉิน')) && !isSemi && !isCrisis;
+                  const triageClass = isCrisis
+                    ? 'triage-badge-red'
+                    : isUrgent
                     ? 'triage-badge-orange'
                     : isSemi
                     ? 'triage-badge-yellow'
@@ -604,7 +639,7 @@ export const ScreeningHistoryPage: React.FC = () => {
                       <td>
                         <div className="scr-patient-cell">
                           <span className="patient-name">{item.patientName}</span>
-                          <span className="patient-id-code">{item.nationalId}</span>
+                          <span className="patient-id-code">{maskNationalId(item.nationalId)}</span>
                         </div>
                       </td>
 

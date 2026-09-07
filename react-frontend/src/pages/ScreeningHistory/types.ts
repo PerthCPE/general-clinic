@@ -79,6 +79,7 @@ export interface PatientProfileSummary {
 export interface ScreeningStats {
   totalRecords: number;
   thisMonthRecords: number;
+  monthLabel?: string;
   highBPRatePercent: number;
   urgentTriageCount: number;
   allergyPatientsCount: number;

@@ -5,6 +5,7 @@ import type { Patient, SchemeType } from './types';
 import { patientApi, queueApi, type BackendPatient, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
+import { clinicMockStore } from '../../mocks/clinicMockStore';
 import './RegistrationPage.css';
 
 export { formatHN, formatQueueNo, formatNationalId, formatPhone };
@@ -82,11 +83,11 @@ function RegistrationPage() {
         queueApi.getList().catch(() => [] as BackendQueue[]),
       ]);
 
-      if (Array.isArray(patientsData)) {
+      if (Array.isArray(patientsData) && patientsData.length > 0) {
         const allMapped = patientsData.map(mapBackendPatientToUI);
         setAllPatients(allMapped);
 
-        // หา ID ของผู้ป่วยทั้งหมดที่มีคิวแล้วในระบบ (เพื่อไม่ให้ผู้ป่วยที่ออกบัตรคิวไปแล้วโผล่มาในตาราง "รอเข้าคิว")
+        // หา ID ของผู้ป่วยทั้งหมดที่มีคิวแล้วในระบบ
         const queuedPatientIds = new Set(
           (Array.isArray(queuesData) ? queuesData : []).map((q) => q.patient_id)
         );
@@ -94,9 +95,78 @@ function RegistrationPage() {
         // กรองเอาเฉพาะผู้ป่วยที่ยังไม่ได้ออกบัตรคิวเข้าตรวจ
         const unqueued = patientsData.filter((p) => !queuedPatientIds.has(p.id));
         setPatients(unqueued.map(mapBackendPatientToUI));
+      } else {
+        const mockAll = clinicMockStore.getPatients().map((p) => ({
+          id: p.id,
+          hn: formatHN(p.hn),
+          fullName: p.fullName,
+          nationalId: formatNationalId(p.nationalId),
+          dob: p.dob,
+          age: p.age,
+          gender: p.gender,
+          phone: formatPhone(p.phone),
+          emergencyContact: p.emergencyContact,
+          address: p.address,
+          schemeType: p.schemeType as SchemeType,
+          chronicDiseases: p.chronicDiseases,
+          allergies: p.allergies,
+          registeredAt: p.registeredAt,
+        }));
+        setAllPatients(mockAll);
+        const mockUnqueued = clinicMockStore.getUnqueuedPatients().map((p) => ({
+          id: p.id,
+          hn: formatHN(p.hn),
+          fullName: p.fullName,
+          nationalId: formatNationalId(p.nationalId),
+          dob: p.dob,
+          age: p.age,
+          gender: p.gender,
+          phone: formatPhone(p.phone),
+          emergencyContact: p.emergencyContact,
+          address: p.address,
+          schemeType: p.schemeType as SchemeType,
+          chronicDiseases: p.chronicDiseases,
+          allergies: p.allergies,
+          registeredAt: p.registeredAt,
+        }));
+        setPatients(mockUnqueued);
       }
     } catch (err) {
-      console.warn('Could not fetch patients from backend:', err);
+      console.warn('Could not fetch patients from backend, using clinicMockStore:', err);
+      const mockAll = clinicMockStore.getPatients().map((p) => ({
+        id: p.id,
+        hn: formatHN(p.hn),
+        fullName: p.fullName,
+        nationalId: formatNationalId(p.nationalId),
+        dob: p.dob,
+        age: p.age,
+        gender: p.gender,
+        phone: formatPhone(p.phone),
+        emergencyContact: p.emergencyContact,
+        address: p.address,
+        schemeType: p.schemeType as SchemeType,
+        chronicDiseases: p.chronicDiseases,
+        allergies: p.allergies,
+        registeredAt: p.registeredAt,
+      }));
+      setAllPatients(mockAll);
+      const mockUnqueued = clinicMockStore.getUnqueuedPatients().map((p) => ({
+        id: p.id,
+        hn: formatHN(p.hn),
+        fullName: p.fullName,
+        nationalId: formatNationalId(p.nationalId),
+        dob: p.dob,
+        age: p.age,
+        gender: p.gender,
+        phone: formatPhone(p.phone),
+        emergencyContact: p.emergencyContact,
+        address: p.address,
+        schemeType: p.schemeType as SchemeType,
+        chronicDiseases: p.chronicDiseases,
+        allergies: p.allergies,
+        registeredAt: p.registeredAt,
+      }));
+      setPatients(mockUnqueued);
     } finally {
       setIsLoading(false);
     }
@@ -304,12 +374,13 @@ function RegistrationPage() {
     return 'badge-scheme-private';
   };
 
-  // สถิติสรุป
+  // สถิติสรุป (คำนวณจากผู้ป่วยทั้งหมดในคลินิก เพื่อให้ยอดสิทธิ์ตรงกับหน้าสิทธิ์การรักษา U2)
+  const pool = allPatients.length > 0 ? allPatients : patients;
   const stats = {
     total: patients.length,
-    gold: patients.filter((p) => p.schemeType === 'บัตรทอง (สปสช.)').length,
-    social: patients.filter((p) => p.schemeType === 'ประกันสังคม (ม.33)').length,
-    gov: patients.filter((p) => p.schemeType === 'สิทธิ์ข้าราชการ').length,
+    gold: pool.filter((p) => p.schemeType === 'บัตรทอง (สปสช.)').length,
+    social: pool.filter((p) => p.schemeType === 'ประกันสังคม (ม.33)').length,
+    gov: pool.filter((p) => p.schemeType === 'สิทธิ์ข้าราชการ').length,
   };
 
   return (

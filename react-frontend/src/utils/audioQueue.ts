@@ -61,6 +61,11 @@ export function playBillingNotification(message?: string): Promise<void> {
   });
 }
 
+// Helper alias for notification chime
+export function playNotificationDingDong(): Promise<void> {
+  return playHospitalChime();
+}
+
 // =========================================================================
 // Core Logic สำหรับเล่นเสียง (ใช้ร่วมกัน)
 // =========================================================================

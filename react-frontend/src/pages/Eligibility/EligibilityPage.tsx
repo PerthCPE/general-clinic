@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { eligibilityApi, patientApi, type BackendEligibility } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatNationalId } from '../../utils/formatters';
+import { clinicMockStore } from '../../mocks/clinicMockStore';
 import { validateThaiNationalID } from '../../utils/thaiIdValidator';
 import './EligibilityPage.css';
 
@@ -88,11 +89,52 @@ const EligibilityPage: React.FC = () => {
   const fetchHistory = useCallback(async () => {
     try {
       const data = await eligibilityApi.getHistory();
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         setHistoryList(data.map(mapBackendEligibilityToUI));
+      } else {
+        const mockPatients = clinicMockStore.getPatients();
+        setHistoryList(
+          mockPatients.map((p) => ({
+            id: String(p.id),
+            date: '04/09/2569',
+            nationalId: formatNationalId(p.nationalId),
+            patientName: p.fullName,
+            schemeType: p.schemeType,
+            coverage: p.schemeType.includes('บัตรทอง')
+              ? 'ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชีและบริการพิเศษ'
+              : p.schemeType.includes('ประกันสังคม')
+              ? 'ผู้ประกันตนมาตรา 33 ครอบคลุมการรักษาตามเกณฑ์ สปส.'
+              : p.schemeType.includes('ข้าราชการ')
+              ? 'จ่ายตรงกรมบัญชีกลาง เบิกค่ายาและค่ารักษาได้ตามสิทธิ์'
+              : 'คุ้มครองตามเงื่อนไขกรมธรรม์',
+            hospitalName: 'โรงพยาบาลคลินิกเวชกรรมชุมชน',
+            status: 'ใช้งานได้',
+            verifiedAt: `${p.registeredAt || '04/09/2569 08:30 น.'}`,
+          }))
+        );
       }
     } catch (err) {
-      console.warn('Could not fetch eligibility history from backend:', err);
+      console.warn('Could not fetch eligibility history from backend, using clinicMockStore:', err);
+      const mockPatients = clinicMockStore.getPatients();
+      setHistoryList(
+        mockPatients.map((p) => ({
+          id: String(p.id),
+          date: '04/09/2569',
+          nationalId: formatNationalId(p.nationalId),
+          patientName: p.fullName,
+          schemeType: p.schemeType,
+          coverage: p.schemeType.includes('บัตรทอง')
+            ? 'ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชีและบริการพิเศษ'
+            : p.schemeType.includes('ประกันสังคม')
+            ? 'ผู้ประกันตนมาตรา 33 ครอบคลุมการรักษาตามเกณฑ์ สปส.'
+            : p.schemeType.includes('ข้าราชการ')
+            ? 'จ่ายตรงกรมบัญชีกลาง เบิกค่ายาและค่ารักษาได้ตามสิทธิ์'
+            : 'คุ้มครองตามเงื่อนไขกรมธรรม์',
+          hospitalName: 'โรงพยาบาลคลินิกเวชกรรมชุมชน',
+          status: 'ใช้งานได้',
+          verifiedAt: `${p.registeredAt || '04/09/2569 08:30 น.'}`,
+        }))
+      );
     }
   }, []);
 

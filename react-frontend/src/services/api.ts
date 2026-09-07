@@ -273,7 +273,7 @@ export interface BackendScreening {
   visit_id: number;
   screened_by_user_id: number;
   assigned_doctor_id?: number;
-  triage_level: string;
+  triage_level: number | string;
   chief_complaint: string;
   allergies: string;
   medical_history: string;
@@ -300,6 +300,8 @@ export interface BackendScreening {
     patient_id: number;
     doctor_id: number;
     visit_date: string;
+    queue_id?: number;
+    queue_number?: string;
     patient?: BackendPatient;
   };
   screened_by?: {
@@ -349,13 +351,15 @@ export const vitalsApi = {
     medical_history?: string;
     nurse_notes?: string;
     assigned_doctor_id?: number;
-    triage_level?: string;
+    triage_level?: number | string;
   }) =>
     request<{
       message: string;
       screening_id: number;
+      visit_id?: number;
+      queue_number?: string;
       bmi: number;
-      triage_level: string;
+      triage_level: number | string;
     }>('/api/nurse/vitals', {
       method: 'POST',
       body: JSON.stringify(payload),
