@@ -2854,4 +2854,298 @@ body.dark-mode .doc-all-delete-btn:hover {
   border-color: #991B1B;
 }
 
+/* ================================================================
+   ===== RECIPIENT DOCUMENT ACKNOWLEDGMENT STYLES =====
+   ================================================================ */
+
+/* Status Banners in Document Message Modal */
+.doc-msg-ack-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+}
+
+.doc-msg-ack-banner.completed {
+  background: #ECFDF5;
+  border: 1px solid #A7F3D0;
+  color: #065F46;
+}
+
+body.dark-mode .doc-msg-ack-banner.completed {
+  background: rgba(6, 95, 70, 0.25);
+  border-color: #059669;
+  color: #A7F3D0;
+}
+
+.doc-msg-ack-banner.pending {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #92400E;
+}
+
+body.dark-mode .doc-msg-ack-banner.pending {
+  background: rgba(146, 64, 14, 0.25);
+  border-color: #D97706;
+  color: #FDE68A;
+}
+
+.doc-msg-ack-banner-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.doc-msg-ack-banner.completed .doc-msg-ack-banner-icon {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+.doc-msg-ack-banner.pending .doc-msg-ack-banner-icon {
+  background: #F59E0B;
+  color: #FFFFFF;
+}
+
+.doc-msg-ack-banner-text {
+  flex: 1;
+}
+
+.doc-msg-ack-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.doc-msg-ack-sub {
+  font-size: 12px;
+  margin-top: 2px;
+  opacity: 0.9;
+}
+
+.doc-msg-ack-pill-green {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  background: #10B981;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.doc-msg-ack-pill-amber {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 9999px;
+  background: #F59E0B;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Attachment Card */
+.doc-msg-attachment-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 8px;
+}
+
+body.dark-mode .doc-msg-attachment-card {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #059669;
+}
+
+.doc-msg-attachment-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0F172A;
+}
+
+body.dark-mode .doc-msg-attachment-info {
+  color: #F1F5F9;
+}
+
+.doc-msg-attachment-btn {
+  padding: 6px 14px;
+  background: #2563EB;
+  color: #FFFFFF;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.doc-msg-attachment-btn:hover {
+  background: #1D4ED8;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+/* Modal Footer Action Buttons */
+.doc-msg-footer-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.doc-msg-btn-acknowledge {
+  padding: 9px 18px;
+  background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+  transition: all 0.2s ease;
+}
+
+.doc-msg-btn-acknowledge:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.45);
+  transform: translateY(-1px);
+}
+
+.doc-msg-btn-acknowledge:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.doc-msg-acknowledged-tag {
+  padding: 6px 14px;
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+body.dark-mode .doc-msg-acknowledged-tag {
+  background: rgba(5, 150, 105, 0.2);
+  border-color: #059669;
+  color: #6EE7B7;
+}
+
+.doc-msg-btn-secondary {
+  padding: 8px 16px;
+  background: #F1F5F9;
+  color: #475569;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.doc-msg-btn-secondary:hover {
+  background: #E2E8F0;
+  color: #1E293B;
+}
+
+body.dark-mode .doc-msg-btn-secondary {
+  background: #1E293B;
+  border-color: #334155;
+  color: #CBD5E1;
+}
+
+body.dark-mode .doc-msg-btn-secondary:hover {
+  background: #334155;
+  color: #FFFFFF;
+}
+
+/* Status Pill in Message List Dropdown */
+.doc-msg-status-pill {
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.doc-msg-status-pill.completed {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+body.dark-mode .doc-msg-status-pill.completed {
+  background: rgba(5, 150, 105, 0.2);
+  border-color: #059669;
+  color: #6EE7B7;
+}
+
+.doc-msg-status-pill.pending {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+body.dark-mode .doc-msg-status-pill.pending {
+  background: rgba(217, 119, 6, 0.2);
+  border-color: #D97706;
+  color: #FCD34D;
+}
+
+/* Status Badge in All Docs Modal Cards */
+.doc-all-status-badge {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.doc-all-status-badge.ack {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+body.dark-mode .doc-all-status-badge.ack {
+  background: rgba(5, 150, 105, 0.25);
+  border-color: #059669;
+  color: #6EE7B7;
+}
+
+.doc-all-status-badge.pending {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+body.dark-mode .doc-all-status-badge.pending {
+  background: rgba(217, 119, 6, 0.25);
+  border-color: #D97706;
+  color: #FCD34D;
+}
+
+
 

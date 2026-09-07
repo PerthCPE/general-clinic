@@ -1,9 +1,11 @@
 import './Topbar.css';
 import { useState, useRef, useEffect, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { useDoctorData } from '../../pages/doctor/DoctorDataContext';
 import { matchPatientSearch } from '../../pages/doctor/utils/searchUtils';
 import { displayVN } from '../../pages/doctor/utils/vnGenerator';
+import { dmsApi } from '../../services/api';
 import {
   type DocumentMessage,
   getDocumentMessagesForUser,
@@ -11,6 +13,7 @@ import {
   markAllDocumentMessagesAsRead,
   deleteDocumentMessage,
   clearAllDocumentMessages,
+  acknowledgeDocumentMessage,
 } from '../../services/documentMessageStorage';
 
 interface TopbarProps {
@@ -50,23 +53,68 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const searchRef = useRef<HTMLDivElement>(null);
 
+  const [isAckLoading, setIsAckLoading] = useState(false);
+
   // Sync Document Messages from storage & events
   useEffect(() => {
     const handleMessageUpdate = () => {
-      setDocMessages(getDocumentMessagesForUser(currentUser));
+      const msgs = getDocumentMessagesForUser(currentUser);
+      setDocMessages(msgs);
+      if (selectedDocMessageModal) {
+        const currentSelected = msgs.find((m) => m.id === selectedDocMessageModal.id);
+        if (currentSelected) {
+          setSelectedDocMessageModal(currentSelected);
+        }
+      }
     };
     handleMessageUpdate();
     window.addEventListener('clinic_document_message_sent', handleMessageUpdate);
+    window.addEventListener('clinic_document_acknowledged', handleMessageUpdate);
     window.addEventListener('storage', handleMessageUpdate);
     return () => {
       window.removeEventListener('clinic_document_message_sent', handleMessageUpdate);
+      window.removeEventListener('clinic_document_acknowledged', handleMessageUpdate);
       window.removeEventListener('storage', handleMessageUpdate);
     };
-  }, [currentUser]);
+  }, [currentUser, selectedDocMessageModal?.id]);
 
   const unreadDocMessageCount = useMemo(() => {
     return docMessages.filter((m) => m.isUnread).length;
   }, [docMessages]);
+
+  const handleAcknowledgeMessage = async (msg: DocumentMessage) => {
+    setIsAckLoading(true);
+    try {
+      if (msg.forwardId) {
+        await dmsApi.acknowledgeForward(msg.forwardId).catch((err) => {
+          console.warn('API acknowledge forward failed (fallback to local):', err);
+        });
+      }
+
+      acknowledgeDocumentMessage({
+        msgId: msg.id,
+        forwardId: msg.forwardId,
+        docId: msg.docId,
+      });
+
+      const nowIso = new Date().toISOString();
+      const updated: DocumentMessage = {
+        ...msg,
+        isUnread: false,
+        isAcknowledged: true,
+        acknowledgedAt: nowIso,
+      };
+      setSelectedDocMessageModal(updated);
+      setDocMessages(getDocumentMessagesForUser(currentUser));
+
+      toast.success(`รับทราบเอกสาร "${msg.title}" เรียบร้อยแล้ว (สถานะ: ได้รับแล้ว)`);
+    } catch (err) {
+      console.error('Error acknowledging document:', err);
+      toast.error('เกิดข้อผิดพลาดในการบันทึกรับทราบเอกสาร');
+    } finally {
+      setIsAckLoading(false);
+    }
+  };
 
   const handleMarkAllMessagesRead = () => {
     markAllDocumentMessagesAsRead(currentUser?.username, currentUser?.fullName);
@@ -744,6 +792,11 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                         )}
                         <div className="doc-message-item-sender">
                           <span>จาก: {msg.sender}</span>
+                          {msg.isAcknowledged ? (
+                            <span className="doc-msg-status-pill completed">✓ ได้รับแล้ว</span>
+                          ) : (
+                            <span className="doc-msg-status-pill pending">รอรับทราบ</span>
+                          )}
                           {msg.isUnread && <span className="doc-unread-dot" />}
                         </div>
                       </div>
@@ -1130,6 +1183,41 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             </div>
 
             <div className="doc-msg-modal-body">
+              {/* Recipient Acknowledgment Status Banner */}
+              {selectedDocMessageModal.isAcknowledged ? (
+                <div className="doc-msg-ack-banner completed">
+                  <div className="doc-msg-ack-banner-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                  <div className="doc-msg-ack-banner-text">
+                    <div className="doc-msg-ack-title">คุณได้รับและรับทราบเอกสารนี้เรียบร้อยแล้ว</div>
+                    <div className="doc-msg-ack-sub">
+                      สถานะ: <span className="doc-msg-ack-pill-green">ได้รับแล้ว</span>
+                      {selectedDocMessageModal.acknowledgedAt && (
+                        <span> &bull; บันทึกเมื่อ {new Date(selectedDocMessageModal.acknowledgedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })} น.</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="doc-msg-ack-banner pending">
+                  <div className="doc-msg-ack-banner-icon">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  </div>
+                  <div className="doc-msg-ack-banner-text">
+                    <div className="doc-msg-ack-title">รอการรับทราบเอกสารจากคุณ</div>
+                    <div className="doc-msg-ack-sub">
+                      สถานะ: <span className="doc-msg-ack-pill-amber">รอรับทราบ</span> &bull; กรุณาตรวจสอบเอกสารและกดยืนยันรับทราบด้านล่าง
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="doc-msg-info-card">
                 <div className="doc-msg-field">
                   <span className="doc-msg-field-label">หัวข้อเรื่อง:</span>
@@ -1163,6 +1251,29 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                     </div>
                   </div>
                 )}
+
+                {/* File Attachment Box */}
+                {selectedDocMessageModal.fileUrl && (
+                  <div className="doc-msg-field mt-2">
+                    <span className="doc-msg-field-label">ไฟล์เอกสารแนบต้นฉบับ:</span>
+                    <div className="doc-msg-attachment-card">
+                      <div className="doc-msg-attachment-info">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#2563EB" strokeWidth="2">
+                          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                        </svg>
+                        <span>เอกสารแนบในระบบ</span>
+                      </div>
+                      <a
+                        href={selectedDocMessageModal.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="doc-msg-attachment-btn"
+                      >
+                        👁️ เปิดดูไฟล์แนบ
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1177,13 +1288,39 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
               >
                 🗑️ ลบข้อความนี้
               </button>
-              <button
-                type="button"
-                className="doc-msg-btn-primary"
-                onClick={() => setSelectedDocMessageModal(null)}
-              >
-                ✓ รับทราบและปิดหน้าต่าง
-              </button>
+
+              <div className="doc-msg-footer-right-actions">
+                {!selectedDocMessageModal.isAcknowledged ? (
+                  <button
+                    type="button"
+                    className="doc-msg-btn-acknowledge"
+                    disabled={isAckLoading}
+                    onClick={() => handleAcknowledgeMessage(selectedDocMessageModal)}
+                  >
+                    {isAckLoading ? (
+                      'กำลังบันทึก...'
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span>✓ รับทราบเอกสาร (บันทึกว่าได้รับแล้ว)</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <span className="doc-msg-acknowledged-tag">
+                    ✓ ได้รับแล้ว (รับทราบเรียบร้อย)
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="doc-msg-btn-secondary"
+                  onClick={() => setSelectedDocMessageModal(null)}
+                >
+                  ปิดหน้าต่าง
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1313,6 +1450,11 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                             {msg.priority === 'emergency' ? '🚨 ฉุกเฉินมาก' : msg.priority === 'urgent' ? '⚡ ด่วน' : 'ปกติ'}
                           </span>
                           <span className="doc-all-type-tag">{msg.type}</span>
+                          {msg.isAcknowledged ? (
+                            <span className="doc-all-status-badge ack">✓ ได้รับแล้ว</span>
+                          ) : (
+                            <span className="doc-all-status-badge pending">รอรับทราบ</span>
+                          )}
                           {msg.isUnread && <span className="doc-all-unread-badge">ยังไม่ได้อ่าน</span>}
                         </div>
                         <span className="doc-all-card-time">{msg.timeDisplay}</span>

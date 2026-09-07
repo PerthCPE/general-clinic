@@ -3,6 +3,7 @@
 
 export interface DocumentMessage {
   id: string;
+  forwardId?: number | string;
   docId?: number | string;
   title: string;
   description?: string;
@@ -17,6 +18,8 @@ export interface DocumentMessage {
   createdAt: string; // ISO string
   timeDisplay: string;
   isUnread: boolean;
+  isAcknowledged?: boolean;
+  acknowledgedAt?: string | null;
   fileUrl?: string;
 }
 
@@ -105,11 +108,89 @@ export function sendDocumentMessage(
     createdAt: now.toISOString(),
     timeDisplay: 'เมื่อสักครู่',
     isUnread: true,
+    isAcknowledged: false,
   };
 
   const updated = [newMsg, ...current];
   saveStoredDocumentMessages(updated);
   return newMsg;
+}
+
+/**
+ * Acknowledge a document message (Recipient confirms receipt)
+ * Synchronizes with forwarded documents list and triggers global events
+ */
+export function acknowledgeDocumentMessage(identifier: {
+  msgId?: string;
+  forwardId?: number | string;
+  docId?: number | string;
+}): boolean {
+  const current = getStoredDocumentMessages();
+  const nowIso = new Date().toISOString();
+  let found = false;
+
+  const updated = current.map(msg => {
+    const match =
+      (identifier.msgId && msg.id === identifier.msgId) ||
+      (identifier.forwardId && String(msg.forwardId) === String(identifier.forwardId)) ||
+      (identifier.docId && String(msg.docId) === String(identifier.docId));
+    if (match) {
+      found = true;
+      return {
+        ...msg,
+        isUnread: false,
+        isAcknowledged: true,
+        acknowledgedAt: nowIso,
+      };
+    }
+    return msg;
+  });
+
+  if (found || identifier.forwardId || identifier.docId) {
+    saveStoredDocumentMessages(updated);
+
+    // Sync with Forwarded Docs Storage
+    if (typeof window !== 'undefined') {
+      try {
+        const rawFwd = localStorage.getItem('clinic_dms_forwarded_docs_v2');
+        if (rawFwd) {
+          const fwdList = JSON.parse(rawFwd);
+          if (Array.isArray(fwdList)) {
+            const updatedFwd = fwdList.map((f: any) => {
+              const match =
+                (identifier.forwardId && String(f.forwardId) === String(identifier.forwardId)) ||
+                (identifier.docId && String(f.docId) === String(identifier.docId)) ||
+                (identifier.msgId && f.id === identifier.msgId);
+              if (match) {
+                return {
+                  ...f,
+                  status: 'completed',
+                  acknowledgedAt: nowIso,
+                };
+              }
+              return f;
+            });
+            localStorage.setItem('clinic_dms_forwarded_docs_v2', JSON.stringify(updatedFwd));
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('clinic_document_acknowledged', {
+          detail: {
+            msgId: identifier.msgId,
+            forwardId: identifier.forwardId,
+            docId: identifier.docId,
+            acknowledgedAt: nowIso,
+          },
+        })
+      );
+    }
+  }
+
+  return found;
 }
 
 /**

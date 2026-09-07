@@ -230,6 +230,25 @@ export const DocumentForwardPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+
+    const handleSyncUpdate = () => {
+      // Refresh forwards when recipient acknowledges
+      const fwd = getStoredForwardedDocs();
+      if (fwd.length > 0) {
+        setForwardedDocs(fwd);
+      }
+      loadData();
+    };
+
+    window.addEventListener('clinic_document_acknowledged', handleSyncUpdate);
+    window.addEventListener('clinic_document_message_sent', handleSyncUpdate);
+    window.addEventListener('storage', handleSyncUpdate);
+
+    return () => {
+      window.removeEventListener('clinic_document_acknowledged', handleSyncUpdate);
+      window.removeEventListener('clinic_document_message_sent', handleSyncUpdate);
+      window.removeEventListener('storage', handleSyncUpdate);
+    };
   }, []);
 
   // Submit Forwarding (System Document Only)
@@ -288,6 +307,7 @@ export const DocumentForwardPage: React.FC = () => {
       });
 
       sendDocumentMessage({
+        forwardId: fwdRes.forward.id,
         docId: selectedDocObj.id,
         title: docTitle,
         description: finalDescription,
@@ -299,6 +319,7 @@ export const DocumentForwardPage: React.FC = () => {
         recipientUsername: selectedRecipient?.username,
         type: docType,
         priority: newDocPriority,
+        fileUrl: selectedDocObj.file_url,
       });
 
       setIsSendModalOpen(false);
@@ -343,6 +364,7 @@ export const DocumentForwardPage: React.FC = () => {
         recipientUsername: selectedRecipient?.username,
         type: docType,
         priority: newDocPriority,
+        fileUrl: selectedDocObj.file_url,
       });
 
       setIsSendModalOpen(false);
@@ -814,8 +836,8 @@ export const DocumentForwardPage: React.FC = () => {
                         <span className={`status-pill ${doc.status}`}>
                           <span className="status-dot"></span>
                           {doc.status === 'unread' && 'ยังไม่อ่าน'}
-                          {doc.status === 'processing' && 'กำลังดำเนินการ'}
-                          {doc.status === 'completed' && 'เสร็จสิ้น'}
+                          {doc.status === 'processing' && 'รอปลายทางรับทราบ'}
+                          {doc.status === 'completed' && 'ได้รับแล้ว'}
                         </span>
                       </td>
                       <td style={{ textAlign: 'center' }}>
@@ -946,7 +968,7 @@ export const DocumentForwardPage: React.FC = () => {
         <div
           className="dms-card metric-card interactive"
           onClick={() => setActiveMetricModal('pending')}
-          title="คลิกเพื่อดูรายการที่อยู่ระหว่างดำเนินการ"
+          title="คลิกเพื่อดูรายการที่รอปลายทางรับทราบ"
         >
           <div className="metric-icon-wrapper amber-bg">
             <svg viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" width="24" height="24">
@@ -955,10 +977,10 @@ export const DocumentForwardPage: React.FC = () => {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">รอการรับทราบ / ดำเนินการ</span>
+            <span className="metric-label">รอปลายทางรับทราบ</span>
             <span className="metric-value">{totalPendingCount}</span>
             <span className="metric-subtext amber-text">
-              อยู่ระหว่างรอดำเนินการ →
+              อยู่ระหว่างรอปลายทางรับมอบ →
             </span>
           </div>
         </div>
@@ -966,7 +988,7 @@ export const DocumentForwardPage: React.FC = () => {
         <div
           className="dms-card metric-card interactive"
           onClick={() => setActiveMetricModal('completed')}
-          title="คลิกเพื่อดูเอกสารที่เสร็จสิ้นแล้ว"
+          title="คลิกเพื่อดูเอกสารที่ปลายทางได้รับแล้ว"
         >
           <div className="metric-icon-wrapper green-bg">
             <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" width="24" height="24">
@@ -975,10 +997,10 @@ export const DocumentForwardPage: React.FC = () => {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">ส่งต่อและรับทราบสำเร็จ</span>
+            <span className="metric-label">ได้รับแล้ว (รับทราบสำเร็จ)</span>
             <span className="metric-value">{totalCompletedCount}</span>
             <span className="metric-subtext green-text">
-              ดำเนินการเรียบร้อย →
+              ปลายทางรับทราบเรียบร้อย →
             </span>
           </div>
         </div>
@@ -1039,14 +1061,14 @@ export const DocumentForwardPage: React.FC = () => {
                 className={`filter-chip ${statusFilter === 'processing' ? 'active' : ''}`}
                 onClick={() => setStatusFilter('processing')}
               >
-                กำลังดำเนินการ
+                รอปลายทางรับทราบ
               </button>
               <button
                 type="button"
                 className={`filter-chip ${statusFilter === 'completed' ? 'active' : ''}`}
                 onClick={() => setStatusFilter('completed')}
               >
-                เสร็จสิ้น / รับทราบแล้ว
+                ได้รับแล้ว
               </button>
             </div>
 
@@ -1153,8 +1175,8 @@ export const DocumentForwardPage: React.FC = () => {
                     <span className={`status-pill ${doc.status}`}>
                       <span className="status-dot"></span>
                       {doc.status === 'unread' && 'ยังไม่อ่าน'}
-                      {doc.status === 'processing' && 'กำลังดำเนินการ'}
-                      {doc.status === 'completed' && 'เสร็จสิ้น'}
+                      {doc.status === 'processing' && 'รอปลายทางรับทราบ'}
+                      {doc.status === 'completed' && 'ได้รับแล้ว'}
                     </span>
                   </td>
 
@@ -1173,20 +1195,6 @@ export const DocumentForwardPage: React.FC = () => {
                           <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
-
-                      {activeTab === 'incoming' && doc.status !== 'completed' && (
-                        <button
-                          type="button"
-                          className="dms-action-icon-btn check-btn"
-                          onClick={() => handleAcknowledge(doc)}
-                          title="กดรับทราบเอกสาร"
-                          aria-label="กดรับทราบเอกสาร"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                            <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"></polyline>
-                          </svg>
-                        </button>
-                      )}
 
                       <button
                         type="button"
@@ -1421,7 +1429,7 @@ export const DocumentForwardPage: React.FC = () => {
         </div>
       )}
 
-      {/* 5. Detail & Acknowledgment Modal */}
+      {/* 5. Detail & Status Modal (Sender Audit View) */}
       {isDetailModalOpen && selectedDoc && (
         <div className="dms-modal-backdrop" onClick={() => setIsDetailModalOpen(false)}>
           <div className="dms-modal-card dms-modal-detail" onClick={e => e.stopPropagation()}>
@@ -1429,7 +1437,7 @@ export const DocumentForwardPage: React.FC = () => {
               <div className="dms-modal-title-group">
                 <div className="dms-modal-icon-badge">
                   <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="20" height="20">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 02 2h12a2 2 0 0 02-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
@@ -1440,6 +1448,10 @@ export const DocumentForwardPage: React.FC = () => {
                       {selectedDoc.priority === 'emergency' && 'ด่วนที่สุด'}
                       {selectedDoc.priority === 'urgent' && 'ด่วน'}
                       {selectedDoc.priority === 'normal' && 'ปกติ'}
+                    </span>
+                    <span className={`status-pill ${selectedDoc.status}`}>
+                      <span className="status-dot"></span>
+                      {selectedDoc.status === 'completed' ? 'ได้รับแล้ว' : 'รอปลายทางรับทราบ'}
                     </span>
                   </div>
                   <h3 className="dms-modal-title">{selectedDoc.title}</h3>
@@ -1520,11 +1532,13 @@ export const DocumentForwardPage: React.FC = () => {
                       )}
                     </div>
                     <div className="timeline-step-content">
-                      <div className="step-title">รับทราบ / ดำเนินการเสร็จสิ้น</div>
+                      <div className="step-title">
+                        {selectedDoc.status === 'completed' ? 'ปลายทางรับทราบแล้ว (ได้รับแล้ว)' : 'รอการตอบรับจากปลายทาง'}
+                      </div>
                       <div className="step-time">
                         {selectedDoc.status === 'completed'
-                          ? (selectedDoc.acknowledgedAt ? formatThaiDate(new Date(selectedDoc.acknowledgedAt)) : 'รับทราบเรียบร้อยแล้ว')
-                          : 'รอการตอบรับ'}
+                          ? (selectedDoc.acknowledgedAt ? formatThaiDate(new Date(selectedDoc.acknowledgedAt)) : 'ได้รับและรับทราบเรียบร้อยแล้ว')
+                          : 'อยู่ระหว่างรอปลายทางรับมอบและกดยืนยัน'}
                       </div>
                     </div>
                   </div>
@@ -1599,18 +1613,6 @@ export const DocumentForwardPage: React.FC = () => {
               </div>
 
               <div className="footer-right-buttons">
-                {selectedDoc.status !== 'completed' && (
-                  <button
-                    type="button"
-                    className="dms-btn-primary green-accent-btn"
-                    onClick={() => handleAcknowledge(selectedDoc)}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                      <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"></polyline>
-                    </svg>
-                    <span>บันทึกรับทราบเอกสาร</span>
-                  </button>
-                )}
                 <button
                   type="button"
                   className="dms-btn-primary"
