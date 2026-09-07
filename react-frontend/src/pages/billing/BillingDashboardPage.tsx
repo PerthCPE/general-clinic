@@ -5,6 +5,7 @@ import CopyableText from '../../components/Common/CopyableText';
 import { BillingDashboardSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
+import { playBillingNotification } from '../../utils/audioQueue';
 import html2pdf from 'html2pdf.js';
 
 interface PaymentRecord {
@@ -232,6 +233,7 @@ export default function BillingDashboardPage() {
       fetchBillings();
       setLiveNotify(`มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
+      playBillingNotification('มีผู้ป่วยใหม่ ส่งมาที่ห้องการเงินค่ะ');
     });
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {

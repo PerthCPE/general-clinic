@@ -8,7 +8,7 @@ import { PharmacyDetailSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 import { API_BASE_URL } from '../../services/api';
-import { playNotificationDingDong } from '../../utils/audioQueue';
+import { playPharmacyNotification } from '../../utils/audioQueue';
 
 interface ToastState {
   message: string;
@@ -432,7 +432,7 @@ export default function DetailPage({
     const unsubExam = subscribe('EXAMINATION_SAVED', (data: any) => {
       fetchQueues();
       triggerToast('แพทย์ส่งใบสั่งยาเรียบร้อยแล้ว', 'doctor');
-      playNotificationDingDong('มีผู้ป่วยใหม่ ส่งมาที่ห้องยาค่ะ');
+      playPharmacyNotification('มีผู้ป่วยใหม่ ส่งมาที่ห้องยาค่ะ');
     });
 
     const unsubVisit = subscribe('VISIT_UPDATED', () => {
@@ -445,7 +445,7 @@ export default function DetailPage({
         const pName = cleanPatientName(rawName, data.hn || data.patient?.hn) || `ผู้ป่วยคิว ${data.queue_number || ''}`;
         fetchQueues();
         triggerToast(`ได้รับใบสั่งยา: ${pName}`, 'doctor');
-        playNotificationDingDong('มีผู้ป่วยใหม่ ส่งมาที่ห้องยาค่ะ');
+        playPharmacyNotification('มีผู้ป่วยใหม่ ส่งมาที่ห้องยาค่ะ');
       }
     });
 
