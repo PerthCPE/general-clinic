@@ -1959,3 +1959,109 @@ body.dark-mode .reg-legacy-address-banner {
   border-color: rgba(245, 158, 11, 0.4) !important;
   color: #FBBF24 !important;
 }
+
+/* ===== Sprint 3.2 Auto-Queue Checkbox & Success Modal ===== */
+.reg-issue-queue-checkbox-wrap {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-top: 20px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.reg-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.reg-custom-checkbox {
+  width: 19px;
+  height: 19px;
+  cursor: pointer;
+  accent-color: #2563EB;
+  margin: 0;
+}
+
+.reg-checkbox-text {
+  font-family: var(--font-primary);
+  font-weight: 600;
+  font-size: 15px;
+  color: #1E293B;
+}
+
+.reg-checkbox-hint {
+  font-family: var(--font-primary);
+  font-size: 13px;
+  color: #64748B;
+  margin: 4px 0 0 29px;
+}
+
+.reg-success-queue-box {
+  margin-top: 14px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(37, 99, 235, 0.02));
+  border: 1.5px dashed #2563EB;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.reg-success-queue-lbl {
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563EB;
+}
+
+.reg-success-queue-val {
+  font-family: var(--font-heading);
+  font-size: 26px;
+  font-weight: 800;
+  color: #1D4ED8;
+  letter-spacing: 1px;
+}
+
+.reg-success-queue-dept {
+  font-family: var(--font-primary);
+  font-size: 12.5px;
+  color: #64748B;
+}
+
+/* Dark Mode Overrides for Sprint 3.2 */
+body.dark-mode .reg-issue-queue-checkbox-wrap {
+  background: #1C2230;
+  border-color: #333F53;
+}
+
+body.dark-mode .reg-checkbox-text {
+  color: #F1F5F9;
+}
+
+body.dark-mode .reg-checkbox-hint {
+  color: #94A3B8;
+}
+
+body.dark-mode .reg-success-queue-box {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: #60A5FA;
+}
+
+body.dark-mode .reg-success-queue-lbl {
+  color: #93C5FD;
+}
+
+body.dark-mode .reg-success-queue-val {
+  color: #60A5FA;
+}
+
+body.dark-mode .reg-success-queue-dept {
+  color: #94A3B8;
+}
+

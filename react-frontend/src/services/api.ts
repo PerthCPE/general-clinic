@@ -205,10 +205,20 @@ export const patientApi = {
     phone_number: string;
     emergency_contact: string;
     scheme_type?: string;
+    issue_queue?: boolean;
     allergies?: string;
     chronic_diseases?: string;
   }) =>
-    request<{ message: string; patient: BackendPatient }>('/api/registrar/patients', {
+    request<{
+      message: string;
+      patient: BackendPatient;
+      hn?: string;
+      patient_id?: number;
+      queue_number?: string;
+      queue_id?: number;
+      queue_issued: boolean;
+      queue?: BackendQueue;
+    }>('/api/registrar/patients', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),

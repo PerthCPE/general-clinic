@@ -453,3 +453,295 @@ func TestSprint31_UpdatePatient_AddressOverwrite(t *testing.T) {
 
 	t.Log("================================================================================\n")
 }
+
+// =========================================================================
+// SPRINT 3.2 - Auto-Queue Flag Verification Suite (B6706265)
+// =========================================================================
+
+// TestSprint32_TaskC_AutoQueueVerification tests the issue_queue flag, response format, duplicate handling, and regression
+func TestSprint32_TaskC_AutoQueueVerification(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	routes.SetUpRoutes(r)
+
+	token := generateTestToken(2, "registrar")
+
+	t.Log("================================================================================")
+	t.Log("  [SPRINT 3.2 - TASK C] AUTO-QUEUE FLAG & RESPONSE FORMAT VERIFICATION")
+	t.Log("================================================================================")
+
+	nidC1_1 := "1234567890001"
+	nidC1_2 := "1234567890002"
+	nidC1_3 := "1234567890003"
+
+	// Cleanup test patients
+	defer func() {
+		var pIDs []uint
+		config.DB.Model(&models.Patient{}).Where("national_id IN ?", []string{nidC1_1, nidC1_2, nidC1_3}).Pluck("id", &pIDs)
+		if len(pIDs) > 0 {
+			config.DB.Where("patient_id IN ?", pIDs).Delete(&models.Queue{})
+			config.DB.Where("patient_id IN ?", pIDs).Delete(&models.MedicalEligibility{})
+			config.DB.Where("id IN ?", pIDs).Delete(&models.Patient{})
+		}
+	}()
+
+	// -------------------------------------------------------------------------
+	// C1.1: POST patients โดยไม่ส่ง issue_queue เลย
+	// -------------------------------------------------------------------------
+	var p1ID uint
+	t.Run("C1.1_Without_issue_queue_param", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"national_id":  nidC1_1,
+			"fullname":     "นายทดสอบ ไม่ส่งคิวแฟลก",
+			"gender":       "ชาย",
+			"birthdate":    "1992-05-10",
+			"phone_number": "0812340001",
+			"district":     "บางรัก",
+			"province":     "กรุงเทพมหานคร",
+		}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, "/api/registrar/patients", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("Expected 201, got %d: %s", w.Code, w.Body.String())
+		}
+
+		rawJSON := w.Body.String()
+		t.Logf("  [RAW RESPONSE C1.1 (No issue_queue)]:\n  %s", rawJSON)
+
+		var res struct {
+			Message     string `json:"message"`
+			HN          string `json:"hn"`
+			PatientID   uint   `json:"patient_id"`
+			QueueIssued bool   `json:"queue_issued"`
+			QueueNumber string `json:"queue_number"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &res)
+		p1ID = res.PatientID
+
+		if res.QueueIssued != false {
+			t.Errorf("Expected queue_issued: false, got: %v", res.QueueIssued)
+		}
+		if res.QueueNumber != "" {
+			t.Errorf("Expected empty queue_number, got: %s", res.QueueNumber)
+		}
+
+		var qCount int64
+		config.DB.Model(&models.Queue{}).Where("patient_id = ?", res.PatientID).Count(&qCount)
+		if qCount != 0 {
+			t.Errorf("Expected 0 queues in DB for patient %d, found: %d", res.PatientID, qCount)
+		} else {
+			t.Logf("  [PASS C1.1] Patient %s created without queue. DB queue count: 0", res.HN)
+		}
+	})
+
+	// -------------------------------------------------------------------------
+	// C1.2: POST patients ด้วย issue_queue: false
+	// -------------------------------------------------------------------------
+	t.Run("C1.2_With_issue_queue_false", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"national_id":  nidC1_2,
+			"fullname":     "นางทดสอบ ปิดคิวแฟลก",
+			"gender":       "หญิง",
+			"birthdate":    "1988-11-20",
+			"phone_number": "0812340002",
+			"district":     "สาทร",
+			"province":     "กรุงเทพมหานคร",
+			"issue_queue":  false,
+		}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, "/api/registrar/patients", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("Expected 201, got %d: %s", w.Code, w.Body.String())
+		}
+
+		rawJSON := w.Body.String()
+		t.Logf("  [RAW RESPONSE C1.2 (issue_queue: false)]:\n  %s", rawJSON)
+
+		var res struct {
+			Message     string `json:"message"`
+			HN          string `json:"hn"`
+			PatientID   uint   `json:"patient_id"`
+			QueueIssued bool   `json:"queue_issued"`
+			QueueNumber string `json:"queue_number"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &res)
+
+		if res.QueueIssued != false {
+			t.Errorf("Expected queue_issued: false, got: %v", res.QueueIssued)
+		}
+		if res.QueueNumber != "" {
+			t.Errorf("Expected empty queue_number, got: %s", res.QueueNumber)
+		}
+
+		var qCount int64
+		config.DB.Model(&models.Queue{}).Where("patient_id = ?", res.PatientID).Count(&qCount)
+		if qCount != 0 {
+			t.Errorf("Expected 0 queues in DB for patient %d, found: %d", res.PatientID, qCount)
+		} else {
+			t.Logf("  [PASS C1.2] Patient %s created with issue_queue: false. DB queue count: 0", res.HN)
+		}
+	})
+
+	// -------------------------------------------------------------------------
+	// C1.3: POST patients ด้วย issue_queue: true
+	// -------------------------------------------------------------------------
+	var p3ID uint
+	var p3QueueNumber string
+	t.Run("C1.3_With_issue_queue_true", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"national_id":  nidC1_3,
+			"fullname":     "นายทดสอบ เปิดคิวแฟลก",
+			"gender":       "ชาย",
+			"birthdate":    "1995-03-15",
+			"phone_number": "0812340003",
+			"district":     "ปทุมวัน",
+			"province":     "กรุงเทพมหานคร",
+			"issue_queue":  true,
+		}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, "/api/registrar/patients", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("Expected 201, got %d: %s", w.Code, w.Body.String())
+		}
+
+		rawJSON := w.Body.String()
+		t.Logf("  [RAW RESPONSE C1.3 (issue_queue: true)]:\n  %s", rawJSON)
+
+		var res struct {
+			Message     string `json:"message"`
+			HN          string `json:"hn"`
+			PatientID   uint   `json:"patient_id"`
+			QueueIssued bool   `json:"queue_issued"`
+			QueueNumber string `json:"queue_number"`
+			QueueID     uint   `json:"queue_id"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &res)
+		p3ID = res.PatientID
+		p3QueueNumber = res.QueueNumber
+
+		if res.QueueIssued != true {
+			t.Errorf("Expected queue_issued: true, got: %v", res.QueueIssued)
+		}
+		if res.QueueNumber == "" {
+			t.Errorf("Expected non-empty queue_number, got empty")
+		}
+
+		// Verify queue in DB
+		var dbQueue models.Queue
+		if err := config.DB.First(&dbQueue, res.QueueID).Error; err != nil {
+			t.Fatalf("Queue record ID %d not found in DB: %v", res.QueueID, err)
+		}
+
+		if dbQueue.QueueNumber != res.QueueNumber {
+			t.Errorf("DB queue_number (%s) != Response queue_number (%s)", dbQueue.QueueNumber, res.QueueNumber)
+		}
+		if dbQueue.Status != "รอคัดกรอง" {
+			t.Errorf("Expected queue status 'รอคัดกรอง', got: %s", dbQueue.Status)
+		}
+
+		t.Logf("  [PASS C1.3] Patient %s created with queue %s (ID: %d, Status: %s)", res.HN, res.QueueNumber, res.QueueID, dbQueue.Status)
+	})
+
+	// -------------------------------------------------------------------------
+	// C2: Duplicate Queue Handling
+	// ลงทะเบียนด้วย issue_queue: true แล้วกดปุ่ม "ส่งเข้าคิว" ซ้ำทันที
+	// -------------------------------------------------------------------------
+	t.Run("C2_Duplicate_Queue_Behavior", func(t *testing.T) {
+		t.Logf("  Calling POST /api/queue/create for Patient ID %d (who already has queue %s)...", p3ID, p3QueueNumber)
+		qPayload := map[string]interface{}{
+			"patient_id": p3ID,
+			"department": "แผนกคัดกรอง",
+			"note":       "ส่งเข้าคิวซ้ำโดยเจตนา",
+		}
+		body, _ := json.Marshal(qPayload)
+		req := httptest.NewRequest(http.MethodPost, "/api/queue/create", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		rawJSON := w.Body.String()
+		t.Logf("  [RAW RESPONSE C2 (Create 2nd Queue)]:\n  Status: %d | Body: %s", w.Code, rawJSON)
+
+		var qList []models.Queue
+		config.DB.Where("patient_id = ?", p3ID).Order("id asc").Find(&qList)
+		t.Logf("  Total active queues for Patient ID %d in DB: %d", p3ID, len(qList))
+		for idx, q := range qList {
+			t.Logf("    Queue #%d: ID=%d, Number=%s, Status=%s, CreatedAt=%s", idx+1, q.ID, q.QueueNumber, q.Status, q.CreatedAt.Format(time.RFC3339))
+		}
+	})
+
+	// -------------------------------------------------------------------------
+	// C3: Regression: ปุ่ม "ส่งเข้าคิว" สำหรับคนไข้เดิม (ค้นหาแล้วส่งเข้าคิว)
+	// -------------------------------------------------------------------------
+	t.Run("C3_Regression_Assign_Queue_For_Existing_Patient", func(t *testing.T) {
+		t.Logf("  Assigning queue to existing unqueued patient ID %d (%s)...", p1ID, nidC1_1)
+		qPayload := map[string]interface{}{
+			"patient_id": p1ID,
+			"department": "แผนกคัดกรอง",
+			"note":       "ส่งเข้าคิวจากการค้นหาคนไข้เดิม",
+		}
+		body, _ := json.Marshal(qPayload)
+		req := httptest.NewRequest(http.MethodPost, "/api/queue/create", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("Expected 201 Created, got %d: %s", w.Code, w.Body.String())
+		}
+
+		rawJSON := w.Body.String()
+		t.Logf("  [RAW RESPONSE C3 (Assign Queue Existing Patient)]:\n  %s", rawJSON)
+
+		var res struct {
+			Queue models.Queue `json:"queue"`
+		}
+		_ = json.Unmarshal(w.Body.Bytes(), &res)
+
+		if res.Queue.QueueNumber == "" {
+			t.Errorf("Expected valid queue number, got empty")
+		} else {
+			t.Logf("  [PASS C3] Existing patient successfully assigned queue: %s (ID: %d)", res.Queue.QueueNumber, res.Queue.ID)
+		}
+	})
+
+	// -------------------------------------------------------------------------
+	// C4: Hexadecimal 4-digit Format Verification (Q0001-QFFFF)
+	// -------------------------------------------------------------------------
+	t.Run("C4_Queue_Number_Hex_Format", func(t *testing.T) {
+		var allTodayQueues []models.Queue
+		config.DB.Order("id desc").Limit(10).Find(&allTodayQueues)
+		for _, q := range allTodayQueues {
+			if len(q.QueueNumber) < 5 || q.QueueNumber[0] != 'Q' {
+				t.Errorf("Queue number %s does not start with 'Q' or is too short", q.QueueNumber)
+			}
+			hexPart := q.QueueNumber[1:]
+			var val int64
+			if _, err := fmt.Sscanf(hexPart, "%X", &val); err != nil {
+				t.Errorf("Queue number %s has invalid hex digits: %v", q.QueueNumber, err)
+			} else {
+				t.Logf("  [PASS C4] Queue %s is valid 4-digit Hex (decimal value: %d)", q.QueueNumber, val)
+			}
+		}
+	})
+
+	t.Log("================================================================================\n")
+}
+

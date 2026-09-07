@@ -37,6 +37,9 @@ type RegisterPatientReq struct {
 	Province         string `json:"province"`
 	PostalCode       string `json:"postal_code"`
 
+	// Auto Queue Issuance Flag (Sprint 3.2 - default: false)
+	IssueQueue       bool   `json:"issue_queue"`
+
 	// Legacy Address fallback
 	Address          string `json:"address"`
 }
@@ -301,47 +304,65 @@ func RegisterPatient(c *gin.Context) {
 	}
 	config.DB.Create(&initialEligibility)
 
-	// สร้างคิวรอคัดกรองให้อัตโนมัติ เพื่อส่งต่อเข้าสู่ระบบคัดกรองทันที (Atomic Daily Sequential Queue)
-	nowBkk := time.Now().In(services.BangkokLocation())
-	serviceDate := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
-	queueNo, qErr := services.NextQueueNumber(config.DB, nowBkk)
-	if qErr != nil {
-		var qCount int64
-		config.DB.Model(&models.Queue{}).Where("service_date = ?", serviceDate).Count(&qCount)
-		queueNo = fmt.Sprintf("Q%04X", qCount+1)
-	}
-
-	var creatorID uint = 2
-	if val, exists := c.Get("userID"); exists {
-		if idFloat, ok := val.(float64); ok {
-			creatorID = uint(idFloat)
-		} else if idUint, ok := val.(uint); ok {
-			creatorID = idUint
-		}
-	}
-
-	newQueue := models.Queue{
-		PatientID:       newPatient.ID,
-		CreatedByUserID: creatorID,
-		QueueNumber:     queueNo,
-		ServiceDate:     serviceDate,
-		Status:          "รอคัดกรอง",
-		Department:      "จุดคัดกรอง",
-		Note:            "ส่งเข้าคิวจากการลงทะเบียน",
-		CreatedAt:       nowBkk,
-		UpdatedAt:       nowBkk,
-	}
-	config.DB.Create(&newQueue)
-	ws.BroadcastEvent("QUEUE_CREATED", newQueue)
-
 	// ส่ง WebSocket Broadcast แจ้งเตือนทุกเครื่องว่ามีผู้ป่วยใหม่ลงทะเบียน
 	ws.BroadcastEvent("PATIENT_REGISTERED", newPatient)
 
-	// send json object to frontend
+	// Sprint 3.2: ตรวจสอบ issue_queue flag (Default = false: ไม่ออกคิว)
+	if req.IssueQueue {
+		// สร้างคิวรอคัดกรองให้อัตโนมัติ เพื่อส่งต่อเข้าสู่ระบบคัดกรองทันที (Atomic Daily Sequential Queue)
+		nowBkk := time.Now().In(services.BangkokLocation())
+		serviceDate := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
+		queueNo, qErr := services.NextQueueNumber(config.DB, nowBkk)
+		if qErr != nil {
+			var qCount int64
+			config.DB.Model(&models.Queue{}).Where("service_date = ?", serviceDate).Count(&qCount)
+			queueNo = fmt.Sprintf("Q%04X", qCount+1)
+		}
+
+		var creatorID uint = 2
+		if val, exists := c.Get("userID"); exists {
+			if idFloat, ok := val.(float64); ok {
+				creatorID = uint(idFloat)
+			} else if idUint, ok := val.(uint); ok {
+				creatorID = idUint
+			}
+		}
+
+		newQueue := models.Queue{
+			PatientID:       newPatient.ID,
+			CreatedByUserID: creatorID,
+			QueueNumber:     queueNo,
+			ServiceDate:     serviceDate,
+			Status:          "รอคัดกรอง",
+			Department:      "จุดคัดกรอง",
+			Note:            "ส่งเข้าคิวจากการลงทะเบียน",
+			CreatedAt:       nowBkk,
+			UpdatedAt:       nowBkk,
+		}
+		config.DB.Create(&newQueue)
+		ws.BroadcastEvent("QUEUE_CREATED", newQueue)
+
+		// คืน Response พร้อมข้อมูลคิวและ flag queue_issued: true
+		c.JSON(http.StatusCreated, gin.H{
+			"message":      "ลงทะเบียนคนไข้ใหม่และส่งเข้าคิวคัดกรองสำเร็จ",
+			"patient":      newPatient,
+			"hn":           newPatient.HN,
+			"patient_id":   newPatient.ID,
+			"queue_number": newQueue.QueueNumber,
+			"queue_id":     newQueue.ID,
+			"queue_issued": true,
+			"queue":        newQueue,
+		})
+		return
+	}
+
+	// กรณี issue_queue == false (หรือไม่ได้ส่งมา): ออกแค่ HN และไม่ออกคิว
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "ลงทะเบียนคนไข้ใหม่และส่งเข้าคิวคัดกรองสำเร็จ",
-		"patient": newPatient,
-		"queue":   newQueue,
+		"message":      "ลงทะเบียนคนไข้ใหม่สำเร็จ (ยังไม่ออกบัตรคิว)",
+		"patient":      newPatient,
+		"hn":           newPatient.HN,
+		"patient_id":   newPatient.ID,
+		"queue_issued": false,
 	})
 }
 

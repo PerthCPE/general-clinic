@@ -4,7 +4,7 @@ import { validateThaiNationalID } from '../../../utils/thaiIdValidator';
 import AddressFormSection, { composeAddressPreview } from './AddressFormSection';
 
 interface PatientFormCardProps {
-  onSubmit: (formData: Partial<Patient>) => void;
+  onSubmit: (formData: Partial<Patient> & { issueQueue?: boolean }) => void;
   formRef?: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -12,6 +12,7 @@ const STORAGE_KEY = 'clinic_patient_reg_draft';
 
 const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) => {
   const [isOpen, setIsOpen] = useState(true);
+  const [issueQueue, setIssueQueue] = useState(false);
   const [formData, setFormData] = useState({
     title: 'นาย',
     fullName: '',
@@ -268,6 +269,7 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
       postalCode: formData.postalCode.trim(),
       address: composedAddr || formData.address || 'กรุงเทพมหานคร',
       schemeType: formData.schemeType,
+      issueQueue,
     });
 
     // Clear saved draft on submit
@@ -283,6 +285,7 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
   };
 
   const handleReset = () => {
+    setIssueQueue(false);
     setFormData({
       title: 'นาย',
       fullName: '',
@@ -608,6 +611,23 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
               </select>
             </div>
           </div>
+        </div>
+
+        {/* Task B1: Checkbox ออกบัตรคิวทันทีหลังลงทะเบียน */}
+        <div className="reg-issue-queue-checkbox-wrap">
+          <label className="reg-checkbox-label" htmlFor="reg-issue-queue-chk">
+            <input
+              type="checkbox"
+              id="reg-issue-queue-chk"
+              className="reg-custom-checkbox"
+              checked={issueQueue}
+              onChange={(e) => setIssueQueue(e.target.checked)}
+            />
+            <span className="reg-checkbox-text">ออกบัตรคิวทันทีหลังลงทะเบียน</span>
+          </label>
+          <p className="reg-checkbox-hint">
+            ติ๊กเมื่อผู้ป่วยมาถึงคลินิกแล้วและต้องการเข้ารับบริการทันที
+          </p>
         </div>
 
         <div className="reg-form-actions-row">

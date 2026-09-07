@@ -70,6 +70,12 @@ const mapBackendPatientToUI = (p: BackendPatient): Patient => {
   };
 };
 
+interface RegSuccessResult {
+  patient: Patient;
+  queueIssued: boolean;
+  queueNumber?: string;
+}
+
 function RegistrationPage() {
   const [allPatients, setAllPatients] = useState<Patient[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -78,6 +84,7 @@ function RegistrationPage() {
   const [searchResult, setSearchResult] = useState<Patient | null>(null);
   const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
+  const [regSuccessModal, setRegSuccessModal] = useState<RegSuccessResult | null>(null);
   const [isRecentOpen, setIsRecentOpen] = useState(true);
   const { subscribe } = useWebSocket();
 
@@ -337,8 +344,14 @@ function RegistrationPage() {
     setSelectedPatientModal(null);
   };
 
-  // ลงทะเบียนผู้ป่วยใหม่ บันทึกลง Database จริง
-  const handleFormSubmit = async (formData: Partial<Patient>) => {
+  // ส่งต่อเข้าคิวจาก Success Modal (กรณีเลือกส่งเข้าคิวทันทีหลังลงทะเบียนแบบไม่ออกคิว)
+  const handleAssignQueueFromSuccessModal = async (patient: Patient) => {
+    await handleAssignQueue(patient);
+    setRegSuccessModal(null);
+  };
+
+  // ลงทะเบียนผู้ป่วยใหม่ บันทึกลง Database จริง (Sprint 3.2: รองรับ issueQueue flag)
+  const handleFormSubmit = async (formData: Partial<Patient> & { issueQueue?: boolean }) => {
     try {
       // แปลงวันเกิด DD/MM/YYYY (พ.ศ. หรือ ค.ศ.) เป็น YYYY-MM-DD
       let birthDateStr = formData.dob || '2000-01-01';
@@ -358,6 +371,8 @@ function RegistrationPage() {
         }
       }
 
+      const shouldIssueQueue = formData.issueQueue ?? false;
+
       const payload = {
         national_id: (formData.nationalId || '').replace(/[-\s]/g, ''),
         fullname: formData.fullName || 'ผู้ป่วยใหม่',
@@ -376,6 +391,7 @@ function RegistrationPage() {
         phone_number: (formData.phone || '').replace(/[-\s]/g, ''),
         emergency_contact: formData.emergencyContact || '-',
         scheme_type: formData.schemeType || 'บัตรทอง (สปสช.)',
+        issue_queue: shouldIssueQueue,
         chronic_diseases: formData.chronicDiseases || '',
         allergies: formData.allergies || '',
       };
@@ -383,8 +399,17 @@ function RegistrationPage() {
       const res = await patientApi.register(payload);
       if (res && res.patient) {
         const newUI = mapBackendPatientToUI(res.patient);
-        setPatients((prev) => [newUI, ...prev.filter((p) => p.hn !== newUI.hn && p.id !== newUI.id)]);
+        if (!res.queue_issued) {
+          // ถ้ายังไม่ได้ออกคิว ให้เพิ่มเข้าไปในรายการ "ผู้ป่วยรอเข้าคิว"
+          setPatients((prev) => [newUI, ...prev.filter((p) => p.hn !== newUI.hn && p.id !== newUI.id)]);
+        }
+        setAllPatients((prev) => [newUI, ...prev.filter((p) => p.hn !== newUI.hn && p.id !== newUI.id)]);
         setSearchResult(null);
+        setRegSuccessModal({
+          patient: newUI,
+          queueIssued: res.queue_issued,
+          queueNumber: res.queue_number,
+        });
         return;
       }
     } catch (err: any) {
@@ -679,6 +704,111 @@ function RegistrationPage() {
               >
                 ปิดหน้าต่าง
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Registration Success Result Modal (Sprint 3.2 Task B2) */}
+      {regSuccessModal && (
+        <div className="reg-modal-backdrop" onClick={() => setRegSuccessModal(null)}>
+          <div className="reg-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="reg-modal-header">
+              <div className="modal-title-wrap">
+                <div className={`reg-header-icon-box ${regSuccessModal.queueIssued ? 'green-box' : 'blue-box'}`}>
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="reg-modal-title">
+                    {regSuccessModal.queueIssued
+                      ? 'ลงทะเบียนและออกบัตรคิวเรียบร้อย'
+                      : 'ลงทะเบียนเรียบร้อย (ยังไม่ออกบัตรคิว)'}
+                  </h3>
+                  <p className="reg-card-subtitle" style={{ margin: 0, fontSize: '13px' }}>
+                    {regSuccessModal.queueIssued
+                      ? 'ผู้ป่วยถูกบันทึกข้อมูลและส่งเข้าคิวรอคัดกรองแล้ว'
+                      : 'บันทึกข้อมูลประวัติผู้ป่วยและออกรหัส HN สำเร็จ'}
+                  </p>
+                </div>
+              </div>
+              <button
+                className="reg-modal-close"
+                onClick={() => setRegSuccessModal(null)}
+                aria-label="ปิดหน้าต่าง"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div className="reg-modal-body">
+              <div className="reg-modal-card">
+                <div className="reg-modal-row">
+                  <span className="modal-lbl">รหัส HN:</span>
+                  <span className="reg-modal-hn font-bold">{regSuccessModal.patient.hn}</span>
+                </div>
+                <div className="reg-modal-row">
+                  <span className="modal-lbl">ชื่อ-นามสกุล:</span>
+                  <span className="modal-val font-bold">{regSuccessModal.patient.fullName}</span>
+                </div>
+                <div className="reg-modal-row">
+                  <span className="modal-lbl">เลขประจำตัวประชาชน:</span>
+                  <span className="modal-val font-mono">{regSuccessModal.patient.nationalId}</span>
+                </div>
+                <div className="reg-modal-row">
+                  <span className="modal-lbl">สิทธิการรักษา:</span>
+                  <span className={`scheme-pill ${getSchemeClass(regSuccessModal.patient.schemeType)}`}>
+                    {regSuccessModal.patient.schemeType}
+                  </span>
+                </div>
+              </div>
+
+              {regSuccessModal.queueIssued && regSuccessModal.queueNumber && (
+                <div className="reg-success-queue-box">
+                  <span className="reg-success-queue-lbl">หมายเลขคิวตรวจ (Queue Number)</span>
+                  <span className="reg-success-queue-val">{regSuccessModal.queueNumber}</span>
+                  <span className="reg-success-queue-dept">แผนก: จุดคัดกรอง • สถานะ: รอคัดกรอง</span>
+                </div>
+              )}
+            </div>
+
+            <div className="reg-modal-footer">
+              {!regSuccessModal.queueIssued ? (
+                <>
+                  <button
+                    type="button"
+                    className="reg-modal-btn-queue"
+                    onClick={() => handleAssignQueueFromSuccessModal(regSuccessModal.patient)}
+                  >
+                    ส่งเข้าคิวเลย
+                  </button>
+                  <button
+                    type="button"
+                    className="reg-modal-btn-close"
+                    onClick={() => setRegSuccessModal(null)}
+                  >
+                    ปิด
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="reg-modal-btn-queue"
+                  onClick={() => setRegSuccessModal(null)}
+                >
+                  ตกลง
+                </button>
+              )}
             </div>
           </div>
         </div>
