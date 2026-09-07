@@ -6,7 +6,8 @@ type Queue struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
 	PatientID       uint      `gorm:"not null" json:"patient_id"`
 	CreatedByUserID uint      `json:"created_by_user_id"` // เจ้าหน้าที่ลงทะเบียนที่ออกคิวให้
-	QueueNumber     string    `gorm:"not null" json:"queue_number"`
+	QueueNumber     string    `gorm:"not null;index:idx_queue_daily,unique" json:"queue_number"`
+	ServiceDate     time.Time `gorm:"type:date;default:CURRENT_DATE;index:idx_queue_daily,unique" json:"service_date"`
 	Status          string    `gorm:"not null" json:"status"` // รอคัดกรอง, รอพบแพทย์, กำลังตรวจ, เสร็จสิ้น, ยกเลิกคิว
 	Department      string    `json:"department"`             // แผนกคัดกรอง, ห้องตรวจ 1, ห้องตรวจ 2, ฯลฯ
 	Note            string    `json:"note"`                   // หมายเหตุเพิ่มเติม
