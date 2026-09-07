@@ -551,17 +551,27 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 	var billing models.Billing
 	if req.VisitID > 0 {
-		billing = models.Billing{
-			VisitID:                 req.VisitID,
-			TotalAmount:             totalAmount,
-			DiscountFromEligibility: 0,
-			NetAmount:               totalAmount,
-			PaymentStatus:           "pending",
-		}
-		if err := tx.Create(&billing).Error; err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing record: " + err.Error()})
-			return
+		tx.Where("visit_id = ?", req.VisitID).First(&billing)
+		if billing.ID == 0 {
+			billing = models.Billing{
+				VisitID:                 req.VisitID,
+				TotalAmount:             totalAmount,
+				DiscountFromEligibility: 0,
+				NetAmount:               totalAmount,
+				PaymentStatus:           "pending",
+				ReceiptNumber:           "",
+			}
+			if err := tx.Create(&billing).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing record: " + err.Error()})
+				return
+			}
+		} else {
+			// Update the amounts if billing already exists (e.g. re-sent from pharmacy)
+			tx.Model(&billing).Updates(map[string]interface{}{
+				"total_amount": totalAmount,
+				"net_amount":   totalAmount,
+			})
 		}
 	}
 

@@ -129,6 +129,8 @@ func ConnectDB() {
 	database.Exec("ALTER TABLE billings DROP CONSTRAINT IF EXISTS fk_billings_visit_record")
 	database.Exec("ALTER TABLE billings ALTER COLUMN visit_id DROP NOT NULL")
 	database.Exec("ALTER TABLE dispensings DROP CONSTRAINT IF EXISTS fk_dispensings_visit_record")
+	database.Exec("DROP INDEX IF EXISTS idx_billings_receipt_number")
+	database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_billings_receipt_number_partial ON billings (receipt_number) WHERE receipt_number IS NOT NULL AND receipt_number <> ''")
 
 	// เอกสารที่แพทย์ออกให้ผู้ป่วย (ใบรับรองแพทย์ / ใบรับรองยานอกบัญชี) เก็บเป็น JSON
 	database.Exec("ALTER TABLE examinations ADD COLUMN IF NOT EXISTS issued_documents text DEFAULT ''")

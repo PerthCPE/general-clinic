@@ -11,7 +11,7 @@ type Billing struct {
 	NetAmount               float64   `gorm:"not null;default:0" json:"net_amount"`       //คือจำนวนเงินสุทธิหลังจากหักส่วนลดแล้ว
 	PaymentMethod           string    `json:"payment_method"`                             //คือวิธีการชำระเงิน เช่น เงินสด บัตรเครดิต หรือโอนเงิน
 	PaymentStatus           string    `gorm:"default:'pending'" json:"payment_status"`    //คือสถานะการชำระเงิน เช่น pending, paid, หรือ failed
-	ReceiptNumber           string    `gorm:"uniqueIndex" json:"receipt_number"`          //คือหมายเลขใบเสร็จรับเงินที่ไม่ซ้ำกัน
+	ReceiptNumber           string    `json:"receipt_number"`                             //คือหมายเลขใบเสร็จรับเงินที่ไม่ซ้ำกัน
 	CreatedAt               time.Time `json:"created_at"`                                 //คือเวลาที่บิลถูกสร้างขึ้น
 	UpdatedAt               time.Time `json:"updated_at"`                                 //คือเวลาที่บิลถูกแก้ไขล่าสุด
 
