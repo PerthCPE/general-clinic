@@ -68,68 +68,7 @@ const getRoleLabel = (role?: string): string => {
   }
 };
 
-const getRoleTheme = (role?: string) => {
-  switch (role?.toLowerCase()) {
-    case 'doctor':
-      return {
-        bg: '#FFE4E6',
-        color: '#E11D48',
-        border: '#FECDD3',
-        label: 'แพทย์ (Doctor)',
-        gradient: 'linear-gradient(135deg, #F43F5E 0%, #BE123C 100%)',
-      };
-    case 'nurse':
-    case 'nurse_assistant':
-      return {
-        bg: '#D1FAE5',
-        color: '#059669',
-        border: '#A7F3D0',
-        label: role?.toLowerCase() === 'nurse_assistant' ? 'ผู้ช่วยพยาบาล' : 'พยาบาล (Nurse)',
-        gradient: 'linear-gradient(135deg, #10B981 0%, #047857 100%)',
-      };
-    case 'pharmacist':
-      return {
-        bg: '#EDE9FE',
-        color: '#7C3AED',
-        border: '#DDD6FE',
-        label: 'เภสัชกร (Pharmacy)',
-        gradient: 'linear-gradient(135deg, #8B5CF6 0%, #6D28D9 100%)',
-      };
-    case 'cashier':
-      return {
-        bg: '#FEF3C7',
-        color: '#D97706',
-        border: '#FDE68A',
-        label: 'การเงิน (Cashier)',
-        gradient: 'linear-gradient(135deg, #F59E0B 0%, #B45309 100%)',
-      };
-    case 'officer':
-    case 'registrar':
-      return {
-        bg: '#FCE7F3',
-        color: '#DB2777',
-        border: '#FBCFE8',
-        label: 'ธุรการ/เวชระเบียน',
-        gradient: 'linear-gradient(135deg, #EC4899 0%, #BE185D 100%)',
-      };
-    case 'admin':
-      return {
-        bg: '#DBEAFE',
-        color: '#2563EB',
-        border: '#BFDBFE',
-        label: 'ผู้ดูแลระบบ (Admin)',
-        gradient: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
-      };
-    default:
-      return {
-        bg: '#F1F5F9',
-        color: '#475569',
-        border: '#CBD5E1',
-        label: 'เจ้าหน้าที่',
-        gradient: 'linear-gradient(135deg, #64748B 0%, #334155 100%)',
-      };
-  }
-};
+
 
 const getStaffAvatarText = (fullname?: string, username?: string): string => {
   const str = (fullname || username || 'ST').trim();
@@ -872,8 +811,8 @@ export const DocumentForwardPage: React.FC = () => {
           <div className="dms-modal-card dms-modal-wide" onClick={e => e.stopPropagation()}>
             <div className="dms-modal-header">
               <div className="dms-modal-title-group">
-                <div className="dms-modal-icon-badge purple-badge">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="22" height="22">
+                <div className="dms-modal-icon-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="22" height="22">
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                     <circle cx="9" cy="7" r="4"></circle>
                     <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -912,7 +851,7 @@ export const DocumentForwardPage: React.FC = () => {
                 )}
               </div>
 
-              {/* Role Filter Chips */}
+              {/* Minimal Clean Role Filter Chips */}
               <div className="dms-modal-role-tabs">
                 <button
                   type="button"
@@ -926,35 +865,35 @@ export const DocumentForwardPage: React.FC = () => {
                   className={`dms-modal-role-chip ${modalRoleFilter === 'doctor' ? 'active' : ''}`}
                   onClick={() => setModalRoleFilter('doctor')}
                 >
-                  🩺 แพทย์
+                  แพทย์
                 </button>
                 <button
                   type="button"
                   className={`dms-modal-role-chip ${modalRoleFilter === 'nurse' ? 'active' : ''}`}
                   onClick={() => setModalRoleFilter('nurse')}
                 >
-                  💉 พยาบาล
+                  พยาบาล
                 </button>
                 <button
                   type="button"
                   className={`dms-modal-role-chip ${modalRoleFilter === 'pharmacist' ? 'active' : ''}`}
                   onClick={() => setModalRoleFilter('pharmacist')}
                 >
-                  💊 เภสัชกร
+                  เภสัชกร
                 </button>
                 <button
                   type="button"
                   className={`dms-modal-role-chip ${modalRoleFilter === 'cashier' ? 'active' : ''}`}
                   onClick={() => setModalRoleFilter('cashier')}
                 >
-                  💰 การเงิน
+                  การเงิน
                 </button>
                 <button
                   type="button"
                   className={`dms-modal-role-chip ${modalRoleFilter === 'officer' ? 'active' : ''}`}
                   onClick={() => setModalRoleFilter('officer')}
                 >
-                  📋 ธุรการ
+                  ธุรการ/เวชระเบียน
                 </button>
               </div>
             </div>
@@ -969,28 +908,17 @@ export const DocumentForwardPage: React.FC = () => {
               ) : (
                 <div className="staff-grid-list">
                   {filteredStaff.map(staff => {
-                    const theme = getRoleTheme(staff.role);
                     const avatarInitials = getStaffAvatarText(staff.fullname, staff.username);
                     return (
                       <div key={staff.id} className="staff-card-item">
                         <div className="staff-card-top">
-                          <div
-                            className="staff-avatar-box"
-                            style={{ background: theme.gradient }}
-                          >
+                          <div className="staff-avatar-box">
                             {avatarInitials}
                           </div>
                           <div className="staff-info-box">
                             <h4 className="staff-name">{staff.fullname || staff.username}</h4>
                             <div className="staff-meta-row">
-                              <span
-                                className="staff-role-pill"
-                                style={{
-                                  backgroundColor: theme.bg,
-                                  color: theme.color,
-                                  borderColor: theme.border,
-                                }}
-                              >
+                              <span className="staff-role-pill">
                                 {getRoleLabel(staff.role)}
                               </span>
                               <span className="staff-username-tag">@{staff.username}</span>
@@ -1008,8 +936,8 @@ export const DocumentForwardPage: React.FC = () => {
                               setIsSendModalOpen(true);
                             }}
                           >
-                            <span>+ ส่งต่อเอกสารถึงท่านนี้</span>
-                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <span>ส่งต่อเอกสารถึงท่านนี้</span>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
                               <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                           </button>
@@ -1310,8 +1238,8 @@ export const DocumentForwardPage: React.FC = () => {
           onClick={() => setActiveMetricModal('recipients')}
           title="คลิกเพื่อดูรายชื่อบุคลากรและแผนก"
         >
-          <div className="metric-icon-wrapper purple-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2" width="24" height="24">
+          <div className="metric-icon-wrapper blue-bg">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="24" height="24">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
               <circle cx="9" cy="7" r="4"></circle>
               <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
@@ -1321,7 +1249,7 @@ export const DocumentForwardPage: React.FC = () => {
           <div className="metric-info">
             <span className="metric-label">บุคลากรปลายทางในระบบ</span>
             <span className="metric-value">{recipientsList.length > 0 ? recipientsList.length : 8}</span>
-            <span className="metric-subtext purple-text">
+            <span className="metric-subtext blue-text">
               ดูรายชื่อแผนกและผู้รับ →
             </span>
           </div>
