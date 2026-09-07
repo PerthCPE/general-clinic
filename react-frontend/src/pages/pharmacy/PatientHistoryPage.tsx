@@ -742,15 +742,15 @@ export default function PatientHistoryPage() {
                   <table className="patient-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                     <thead>
                     <tr>
-                      <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>ID (HN)</th>
-                      <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>เลข VN</th>
-                      <th style={{ textAlign: 'left', width: '18%', padding: '12px 14px' }}>ชื่อผู้ป่วย</th>
-                      <th style={{ textAlign: 'center', width: '7%', padding: '12px 4px' }}>อายุ</th>
-                      <th style={{ textAlign: 'center', width: '7%', padding: '12px 4px' }}>กรุ๊ปเลือด</th>
+                      <th style={{ textAlign: 'center', width: '9%', padding: '12px 6px' }}>ID (HN)</th>
+                      <th style={{ textAlign: 'center', width: '9%', padding: '12px 6px' }}>เลข VN</th>
+                      <th style={{ textAlign: 'left', width: '17%', padding: '12px 12px' }}>ชื่อผู้ป่วย</th>
+                      <th style={{ textAlign: 'center', width: '6%', padding: '12px 4px' }}>อายุ</th>
+                      <th style={{ textAlign: 'center', width: '6%', padding: '12px 4px' }}>กรุ๊ปเลือด</th>
                       <th style={{ textAlign: 'center', width: '16%', padding: '12px 6px' }}>สิทธิการรักษา</th>
-                      <th style={{ textAlign: 'center', width: '12%', padding: '12px 6px' }}>จำนวนเข้ารักษา</th>
-                      <th style={{ textAlign: 'center', width: '14%', padding: '12px 6px' }}>โรคประจำตัว</th>
-                      <th style={{ textAlign: 'center', width: '16%', padding: '12px 16px 12px 6px' }}>การจัดการ</th>
+                      <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>จำนวนเข้ารักษา</th>
+                      <th style={{ textAlign: 'center', width: '13%', padding: '12px 4px' }}>โรคประจำตัว</th>
+                      <th style={{ textAlign: 'center', width: '13%', padding: '12px 8px 12px 4px' }}>การจัดการ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -769,7 +769,7 @@ export default function PatientHistoryPage() {
                           <td 
                             className="patient-name-cell clickable-patient-history"
                             onClick={() => handleSelectPatient(patient)}
-                            style={{ textAlign: 'left', padding: '12px 14px 12px 20px' }}
+                            style={{ textAlign: 'left', padding: '10px 12px' }}
                           >
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '3px' }}>
                               <span className="history-name-link" style={{ fontWeight: '700', color: '#0F172A', display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
@@ -786,20 +786,20 @@ export default function PatientHistoryPage() {
                           </td>
                           <td style={{ textAlign: 'center' }}>{patient.age} ปี</td>
                           <td style={{ textAlign: 'center' }}><span className="blood-badge">{patient.bloodType}</span></td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td style={{ textAlign: 'center', padding: '8px 4px' }}>
                             <span style={{ 
                               background: rights.includes('30') ? '#FEF9C3' : rights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
                               color: rights.includes('30') ? '#92400E' : rights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
                               border: `1px solid ${rights.includes('30') ? '#FDE68A' : rights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
-                              padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
-                              whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center',
-                              width: '175px', textAlign: 'center', boxSizing: 'border-box'
+                              padding: '4px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700',
+                              whiteSpace: 'normal', display: 'inline-block', lineHeight: 1.3,
+                              maxWidth: '100%', boxSizing: 'border-box'
                             }}>
                               {rights}
                             </span>
                           </td>
-                          <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <span className="visit-count-badge" style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: '700', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
+                          <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                            <span className="visit-count-badge" style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '4px 8px', borderRadius: '16px', fontSize: '12px', fontWeight: '700', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
                               เข้ารักษา {patient.visitCount || 1} ครั้ง
                             </span>
                           </td>
