@@ -569,7 +569,7 @@ export const DocumentForwardPage: React.FC = () => {
   };
 
   // Filtered List Computation
-  const currentList = activeTab === 'incoming' ? incomingDocs : forwardedDocs;
+  const currentList = forwardedDocs;
   const filteredList = useMemo(() => {
     return currentList.filter(doc => {
       const q = searchTerm.toLowerCase().trim();
@@ -589,9 +589,8 @@ export const DocumentForwardPage: React.FC = () => {
   }, [currentList, searchTerm, statusFilter, priorityFilter]);
 
   // Metric Computations
-  const incomingUnreadCount = incomingDocs.filter(d => d.status === 'unread').length;
-  const totalPendingCount = incomingDocs.filter(d => d.status === 'unread' || d.status === 'processing').length;
-  const totalCompletedCount = forwardedDocs.filter(d => d.status === 'completed').length + incomingDocs.filter(d => d.status === 'completed').length;
+  const totalPendingCount = forwardedDocs.filter(d => d.status === 'processing').length;
+  const totalCompletedCount = forwardedDocs.filter(d => d.status === 'completed').length;
 
   // Render Metric Details Modal
   const renderMetricModal = () => {
@@ -697,18 +696,14 @@ export const DocumentForwardPage: React.FC = () => {
       );
     }
 
-    if (activeMetricModal === 'today') {
-      title = `เอกสารขาเข้าทั้งหมด (${incomingDocs.length} รายการ)`;
-      subtitle = 'รายการเอกสารและบันทึกข้อความที่ได้รับเข้าสู่ระบบ';
-      dataList = incomingDocs;
-    } else if (activeMetricModal === 'pending') {
-      title = `รอดำเนินการและรอตรวจสอบ (${totalPendingCount} รายการ)`;
-      subtitle = 'เอกสารที่ยังไม่ได้รับการเปิดอ่านหรืออยู่ระหว่างการดำเนินการ';
-      dataList = incomingDocs.filter(d => d.status === 'unread' || d.status === 'processing');
+    if (activeMetricModal === 'pending') {
+      title = `รายการส่งต่อที่รอดำเนินการ (${totalPendingCount} รายการ)`;
+      subtitle = 'เอกสารที่ส่งต่อแล้วและอยู่ระหว่างรอปลายทางรับทราบ';
+      dataList = forwardedDocs.filter(d => d.status === 'processing');
     } else if (activeMetricModal === 'completed') {
       title = `ส่งต่อและรับทราบสำเร็จ (${totalCompletedCount} รายการ)`;
       subtitle = 'รายการเอกสารที่ปลายทางรับทราบและประมวลผลเสร็จสิ้น';
-      dataList = [...forwardedDocs, ...incomingDocs].filter(d => d.status === 'completed');
+      dataList = forwardedDocs.filter(d => d.status === 'completed');
     } else if (activeMetricModal === 'recipients') {
       return (
         <div className="dms-modal-backdrop" onClick={() => setActiveMetricModal(null)}>
@@ -964,7 +959,7 @@ export const DocumentForwardPage: React.FC = () => {
         <div
           className="dms-card metric-card interactive"
           onClick={() => setActiveMetricModal('pending')}
-          title="คลิกเพื่อดูเอกสารที่รอดำเนินการ"
+          title="คลิกเพื่อดูรายการที่อยู่ระหว่างดำเนินการ"
         >
           <div className="metric-icon-wrapper amber-bg">
             <svg viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" width="24" height="24">
@@ -973,10 +968,10 @@ export const DocumentForwardPage: React.FC = () => {
             </svg>
           </div>
           <div className="metric-info">
-            <span className="metric-label">รอการเปิดอ่าน / ดำเนินการ</span>
+            <span className="metric-label">รอการรับทราบ / ดำเนินการ</span>
             <span className="metric-value">{totalPendingCount}</span>
             <span className="metric-subtext amber-text">
-              ต้องดำเนินการตรวจสอบ →
+              อยู่ระหว่างรอดำเนินการ →
             </span>
           </div>
         </div>
@@ -1031,31 +1026,7 @@ export const DocumentForwardPage: React.FC = () => {
           <div className="forward-tab-buttons">
             <button
               type="button"
-              className={`forward-tab-btn ${activeTab === 'incoming' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('incoming');
-                setStatusFilter('all');
-                setPriorityFilter('all');
-              }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                <path d="M22 12h-6l-2 3h-4l-2-3H2v7a2 2 0 002 2h16a2 2 0 002-2v-7z" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M5.45 5.11L2 12v7a2 2 0 002 2h16a2 2 0 002-2v-7l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span>เอกสารขาเข้า (Incoming)</span>
-              <span className={`tab-counter-badge ${incomingUnreadCount > 0 ? 'badge-has-unread' : ''}`}>
-                {incomingDocs.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={`forward-tab-btn ${activeTab === 'forwarded' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('forwarded');
-                setStatusFilter('all');
-                setPriorityFilter('all');
-              }}
+              className="forward-tab-btn active"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
                 <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1076,16 +1047,6 @@ export const DocumentForwardPage: React.FC = () => {
               >
                 ทั้งหมด
               </button>
-              {activeTab === 'incoming' && (
-                <button
-                  type="button"
-                  className={`filter-chip ${statusFilter === 'unread' ? 'active' : ''}`}
-                  onClick={() => setStatusFilter('unread')}
-                >
-                  ยังไม่อ่าน
-                  {incomingUnreadCount > 0 && <span className="chip-count-dot"></span>}
-                </button>
-              )}
               <button
                 type="button"
                 className={`filter-chip ${statusFilter === 'processing' ? 'active' : ''}`}
@@ -1151,7 +1112,7 @@ export const DocumentForwardPage: React.FC = () => {
               <tr>
                 <th style={{ width: '140px' }}>รหัสเอกสาร</th>
                 <th>ชื่อเรื่องเอกสาร</th>
-                <th style={{ width: '220px' }}>{activeTab === 'incoming' ? 'ส่งมาจาก (ต้นทาง)' : 'ส่งถึง (ปลายทาง)'}</th>
+                <th style={{ width: '220px' }}>ส่งถึง (ปลายทาง)</th>
                 <th style={{ width: '170px' }}>วันที่และเวลา</th>
                 <th style={{ width: '120px' }}>ประเภท</th>
                 <th style={{ width: '100px' }}>ความเร่งด่วน</th>
@@ -1163,7 +1124,7 @@ export const DocumentForwardPage: React.FC = () => {
               {filteredList.map(doc => (
                 <tr
                   key={doc.id}
-                  className={`dms-clickable-row ${doc.status === 'unread' ? 'row-unread-highlight' : ''}`}
+                  className="dms-clickable-row"
                   onClick={() => handleViewDetail(doc)}
                 >
                   {/* Document Code */}
@@ -1175,13 +1136,12 @@ export const DocumentForwardPage: React.FC = () => {
                   <td>
                     <div className="doc-title-wrapper">
                       <span className="doc-name-text">{doc.title}</span>
-                      {doc.status === 'unread' && <span className="new-pulse-badge">ใหม่</span>}
                     </div>
                   </td>
 
                   {/* Sender / Recipient (Clean concise department/person name) */}
                   <td>
-                    <span className="doc-dept-text">{activeTab === 'incoming' ? doc.sender : doc.recipient}</span>
+                    <span className="doc-dept-text">{doc.recipient || '-'}</span>
                   </td>
 
                   {/* Date & Time */}
