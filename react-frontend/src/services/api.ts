@@ -56,6 +56,8 @@ async function ensureToken(): Promise<string | null> {
           else if (savedUser.role === 'doctor') username = 'doctor1';
           else if (savedUser.role === 'pharmacist') username = 'pharmacist1';
           else if (savedUser.role === 'cashier') username = 'cashier1';
+          else if (savedUser.role === 'officer') username = 'officer1';
+          else if (savedUser.role === 'registrar') username = 'registrar1';
           else if (savedUser.username) username = savedUser.username;
         } catch {
           // ignore
