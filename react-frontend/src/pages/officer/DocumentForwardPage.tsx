@@ -6,6 +6,7 @@ import {
   type BackendUser,
   type BackendDocument,
 } from '../../services/api';
+import { sendDocumentMessage } from '../../services/documentMessageStorage';
 import './DocumentForwardPage.css';
 
 export interface ForwardDoc {
@@ -387,6 +388,19 @@ export const DocumentForwardPage: React.FC = () => {
       };
 
       setForwardedDocs(prev => [newDoc, ...prev]);
+      sendDocumentMessage({
+        docId: targetDocId,
+        title: newDocTitle.trim(),
+        description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
+        sender: 'ธุรการ (คุณสมจิต ดีใจ)',
+        senderRole: 'เจ้าหน้าที่ธุรการ',
+        recipient: recipientName,
+        recipientRole: recipientRole,
+        recipientId: newDocRecipientId,
+        recipientUsername: selectedRecipient?.username,
+        type: newDocType,
+        priority: newDocPriority,
+      });
       setIsSendModalOpen(false);
       resetSendForm();
       toast.success(`ส่งต่อเอกสารไปยัง ${recipientName} เรียบร้อยแล้ว`);
@@ -410,6 +424,18 @@ export const DocumentForwardPage: React.FC = () => {
       };
 
       setForwardedDocs(prev => [newDoc, ...prev]);
+      sendDocumentMessage({
+        title: newDocTitle.trim(),
+        description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
+        sender: 'ธุรการ (คุณสมจิต ดีใจ)',
+        senderRole: 'เจ้าหน้าที่ธุรการ',
+        recipient: recipientName,
+        recipientRole: recipientRole,
+        recipientId: newDocRecipientId,
+        recipientUsername: selectedRecipient?.username,
+        type: newDocType,
+        priority: newDocPriority,
+      });
       setIsSendModalOpen(false);
       resetSendForm();
       toast.success(`ส่งต่อเอกสารไปยัง ${recipientName} สำเร็จ`);
