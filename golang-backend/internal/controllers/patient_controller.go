@@ -41,6 +41,11 @@ type RegisterPatientReq struct {
 	Address          string `json:"address"`
 }
 
+// ComposeAddress ประกอบฟิลด์ย่อยของที่อยู่เข้าเป็นสตริงเดียวกันตามมาตรฐาน
+func ComposeAddress(houseNo, villageNo, villageName, alley, road, subDistrict, district, province, postalCode, fallback string) string {
+	return composeAddress(houseNo, villageNo, villageName, alley, road, subDistrict, district, province, postalCode, fallback)
+}
+
 // composeAddress ประกอบฟิลด์ย่อยของที่อยู่เข้าเป็นสตริงเดียวกันตามมาตรฐาน
 func composeAddress(houseNo, villageNo, villageName, alley, road, subDistrict, district, province, postalCode, fallback string) string {
 	var parts []string
@@ -71,27 +76,54 @@ func composeAddress(houseNo, villageNo, villageName, alley, road, subDistrict, d
 			parts = append(parts, "ถ."+r)
 		}
 	}
+
+	pTrim := strings.TrimSpace(province)
+	isBkk := pTrim == "กรุงเทพมหานคร" || pTrim == "กทม." || strings.Contains(pTrim, "กรุงเทพ")
+
 	if sd := strings.TrimSpace(subDistrict); sd != "" {
-		if strings.HasPrefix(sd, "ต.") || strings.HasPrefix(sd, "ตำบล") || strings.HasPrefix(sd, "แขวง") {
-			parts = append(parts, sd)
+		if isBkk {
+			if strings.HasPrefix(sd, "แขวง") {
+				parts = append(parts, sd)
+			} else {
+				cleanSd := strings.TrimPrefix(strings.TrimPrefix(sd, "ตำบล"), "ต.")
+				parts = append(parts, "แขวง"+strings.TrimSpace(cleanSd))
+			}
 		} else {
-			parts = append(parts, "ต."+sd)
+			if strings.HasPrefix(sd, "ต.") || strings.HasPrefix(sd, "ตำบล") {
+				parts = append(parts, sd)
+			} else {
+				parts = append(parts, "ต."+sd)
+			}
 		}
 	}
+
 	if d := strings.TrimSpace(district); d != "" {
-		if strings.HasPrefix(d, "อ.") || strings.HasPrefix(d, "อำเภอ") || strings.HasPrefix(d, "เขต") {
-			parts = append(parts, d)
+		if isBkk {
+			if strings.HasPrefix(d, "เขต") {
+				parts = append(parts, d)
+			} else {
+				cleanD := strings.TrimPrefix(strings.TrimPrefix(d, "อำเภอ"), "อ.")
+				parts = append(parts, "เขต"+strings.TrimSpace(cleanD))
+			}
 		} else {
-			parts = append(parts, "อ."+d)
+			if strings.HasPrefix(d, "อ.") || strings.HasPrefix(d, "อำเภอ") {
+				parts = append(parts, d)
+			} else {
+				parts = append(parts, "อ."+d)
+			}
 		}
 	}
-	if p := strings.TrimSpace(province); p != "" {
-		if strings.HasPrefix(p, "จ.") || strings.HasPrefix(p, "จังหวัด") || p == "กรุงเทพมหานคร" || p == "กทม." {
-			parts = append(parts, p)
+
+	if pTrim != "" {
+		if isBkk {
+			parts = append(parts, "กรุงเทพมหานคร")
+		} else if strings.HasPrefix(pTrim, "จ.") || strings.HasPrefix(pTrim, "จังหวัด") {
+			parts = append(parts, pTrim)
 		} else {
-			parts = append(parts, "จ."+p)
+			parts = append(parts, "จ."+pTrim)
 		}
 	}
+
 	if pc := strings.TrimSpace(postalCode); pc != "" {
 		parts = append(parts, pc)
 	}
@@ -360,4 +392,124 @@ func SearchPatient(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, patients)
+}
+
+// UpdatePatientReq struct
+type UpdatePatientReq struct {
+	FullName         string `json:"fullname"`
+	Gender           string `json:"gender"`
+	BirthDate        string `json:"birthdate"`
+	PhoneNumber      string `json:"phone_number"`
+	EmergencyContact string `json:"emergency_contact"`
+	SchemeType       string `json:"scheme_type"`
+	Allergies        string `json:"allergies"`
+	ChronicDiseases  string `json:"chronic_diseases"`
+
+	// Structured Address Fields (Sprint 3)
+	HouseNo     string `json:"house_no"`
+	VillageNo   string `json:"village_no"`
+	VillageName string `json:"village_name"`
+	Alley       string `json:"alley"`
+	Road        string `json:"road"`
+	SubDistrict string `json:"sub_district"`
+	District    string `json:"district"`
+	Province    string `json:"province"`
+	PostalCode  string `json:"postal_code"`
+
+	// Legacy Address fallback
+	Address string `json:"address"`
+}
+
+// UpdatePatient - แก้ไขข้อมูลคนไข้ พร้อม Re-compose Address ใหม่ทุกครั้ง
+func UpdatePatient(c *gin.Context) {
+	id := c.Param("id")
+	var patient models.Patient
+	if err := config.DB.Where("id = ? OR hn = ?", id, id).First(&patient).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบข้อมูลผู้ป่วย"})
+		return
+	}
+
+	var req UpdatePatientReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลที่ส่งมาไม่ถูกต้อง"})
+		return
+	}
+
+	if req.FullName != "" {
+		patient.FullName = req.FullName
+	}
+	if req.Gender != "" {
+		patient.Gender = req.Gender
+	}
+	if req.PhoneNumber != "" {
+		patient.PhoneNumber = req.PhoneNumber
+	}
+	if req.EmergencyContact != "" {
+		patient.EmergencyContact = req.EmergencyContact
+	}
+	if req.SchemeType != "" {
+		patient.SchemeType = req.SchemeType
+	}
+	if req.Allergies != "" {
+		patient.Allergies = req.Allergies
+	}
+	if req.ChronicDiseases != "" {
+		patient.ChronicDiseases = req.ChronicDiseases
+	}
+
+	// Update structured address fields
+	if req.HouseNo != "" {
+		patient.HouseNo = strings.TrimSpace(req.HouseNo)
+	}
+	if req.VillageNo != "" {
+		patient.VillageNo = strings.TrimSpace(req.VillageNo)
+	}
+	if req.VillageName != "" {
+		patient.VillageName = strings.TrimSpace(req.VillageName)
+	}
+	if req.Alley != "" {
+		patient.Alley = strings.TrimSpace(req.Alley)
+	}
+	if req.Road != "" {
+		patient.Road = strings.TrimSpace(req.Road)
+	}
+	if req.SubDistrict != "" {
+		patient.SubDistrict = strings.TrimSpace(req.SubDistrict)
+	}
+	if req.District != "" {
+		patient.District = strings.TrimSpace(req.District)
+	}
+	if req.Province != "" {
+		patient.Province = strings.TrimSpace(req.Province)
+	}
+	if req.PostalCode != "" {
+		patient.PostalCode = strings.TrimSpace(req.PostalCode)
+	}
+
+	// Re-compose Address every time patient is updated
+	composedAddr := composeAddress(
+		patient.HouseNo,
+		patient.VillageNo,
+		patient.VillageName,
+		patient.Alley,
+		patient.Road,
+		patient.SubDistrict,
+		patient.District,
+		patient.Province,
+		patient.PostalCode,
+		req.Address,
+	)
+	patient.Address = composedAddr
+
+	if err := config.DB.Save(&patient).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถบันทึกการแก้ไขข้อมูลผู้ป่วยได้"})
+		return
+	}
+
+	ws.BroadcastEvent("PATIENT_UPDATED", patient)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "แก้ไขข้อมูลผู้ป่วยสำเร็จ",
+		"patient": patient,
+	})
 }

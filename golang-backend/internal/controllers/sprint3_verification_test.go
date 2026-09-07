@@ -3,12 +3,15 @@ package controllers_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"clinic-backend/internal/config"
+	"clinic-backend/internal/controllers"
 	"clinic-backend/internal/models"
 	"clinic-backend/internal/routes"
 
@@ -307,13 +310,146 @@ func TestSprint3_TaskB_PatientRegistrationAndAddressComposition(t *testing.T) {
 		}
 
 		t.Logf("  Minimal Registered Patient Address: '%s'", dbPatient.Address)
-		expectedMinimal := "อ.ปทุมวัน กรุงเทพมหานคร"
+		expectedMinimal := "เขตปทุมวัน กรุงเทพมหานคร"
 		if dbPatient.Address != expectedMinimal {
 			t.Errorf("Address compose mismatch:\n  Expected: %s\n  Actual:   %s", expectedMinimal, dbPatient.Address)
 		} else {
 			t.Log("  [PASS] Minimal address composed cleanly without dangling prefixes or extra spaces.")
 		}
 	})
+
+	t.Log("================================================================================\n")
+}
+
+// TestSprint31_ComposeAddress_4Cases tests the 4 distinct address composition cases
+func TestSprint31_ComposeAddress_4Cases(t *testing.T) {
+	t.Log("================================================================================")
+	t.Log("  [SPRINT 3.1 - TASK C] COMPOSE ADDRESS 4 CASES VERIFICATION")
+	t.Log("================================================================================")
+
+	// Case 1: Bangkok Full
+	case1 := controllers.ComposeAddress("99/1", "", "", "ร่วมฤดี", "วิทยุ", "ลุมพินี", "ปทุมวัน", "กรุงเทพมหานคร", "10330", "")
+	expected1 := "99/1 ซ.ร่วมฤดี ถ.วิทยุ แขวงลุมพินี เขตปทุมวัน กรุงเทพมหานคร 10330"
+	t.Logf("Case 1 (Bangkok Full):    '%s'", case1)
+	if case1 != expected1 {
+		t.Errorf("Case 1 mismatch:\n  Expected: %s\n  Actual:   %s", expected1, case1)
+	} else {
+		t.Log("  [PASS] Case 1 correctly used 'แขวง' and 'เขต' prefixes with postal code.")
+	}
+
+	// Case 2: Bangkok Minimal
+	case2 := controllers.ComposeAddress("", "", "", "", "", "", "ปทุมวัน", "กรุงเทพมหานคร", "", "")
+	expected2 := "เขตปทุมวัน กรุงเทพมหานคร"
+	t.Logf("Case 2 (Bangkok Minimal): '%s'", case2)
+	if case2 != expected2 {
+		t.Errorf("Case 2 mismatch:\n  Expected: %s\n  Actual:   %s", expected2, case2)
+	} else {
+		t.Log("  [PASS] Case 2 correctly used 'เขต' prefix for district in Bangkok without 'จ.'.")
+	}
+
+	// Case 3: Upcountry Full
+	case3 := controllers.ComposeAddress("123/45", "3", "หมู่บ้านร่มรื่น", "สุขใจ 5", "มิตรภาพ", "ในเมือง", "เมืองนครราชสีมา", "นครราชสีมา", "30000", "")
+	expected3 := "123/45 หมู่ 3 หมู่บ้านร่มรื่น ซ.สุขใจ 5 ถ.มิตรภาพ ต.ในเมือง อ.เมืองนครราชสีมา จ.นครราชสีมา 30000"
+	t.Logf("Case 3 (Upcountry Full):  '%s'", case3)
+	if case3 != expected3 {
+		t.Errorf("Case 3 mismatch:\n  Expected: %s\n  Actual:   %s", expected3, case3)
+	} else {
+		t.Log("  [PASS] Case 3 correctly used 'ต.', 'อ.', 'จ.' prefixes.")
+	}
+
+	// Case 4: Upcountry Minimal
+	case4 := controllers.ComposeAddress("", "", "", "", "", "", "เมืองนครราชสีมา", "นครราชสีมา", "", "")
+	expected4 := "อ.เมืองนครราชสีมา จ.นครราชสีมา"
+	t.Logf("Case 4 (Upcountry Minimal): '%s'", case4)
+	if case4 != expected4 {
+		t.Errorf("Case 4 mismatch:\n  Expected: %s\n  Actual:   %s", expected4, case4)
+	} else {
+		t.Log("  [PASS] Case 4 correctly used 'อ.' and 'จ.' prefixes without dangling tokens.")
+	}
+
+	t.Log("================================================================================\n")
+}
+
+// TestSprint31_UpdatePatient_AddressOverwrite tests updating an old patient with legacy address
+func TestSprint31_UpdatePatient_AddressOverwrite(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	routes.SetUpRoutes(r)
+
+	token := generateTestToken(2, "registrar")
+
+	t.Log("================================================================================")
+	t.Log("  [SPRINT 3.1 - TASK A2] PATIENT UPDATE & ADDRESS OVERWRITE TEST")
+	t.Log("================================================================================")
+
+	testNID := "9876543210999"
+	// Cleanup test patient
+	defer func() {
+		var p models.Patient
+		if err := config.DB.Where("national_id = ?", testNID).First(&p).Error; err == nil {
+			config.DB.Where("patient_id = ?", p.ID).Delete(&models.Queue{})
+			config.DB.Where("patient_id = ?", p.ID).Delete(&models.MedicalEligibility{})
+			config.DB.Delete(&p)
+		}
+	}()
+
+	// 1. Seed an old patient with ONLY legacy Address
+	oldPatient := models.Patient{
+		HN:               "HN9999",
+		NationalID:       testNID,
+		FullName:         "นายเก่า ทดสอบที่อยู่เดิม",
+		Gender:           "ชาย",
+		BirthDate:        time.Date(1980, 1, 1, 0, 0, 0, 0, time.UTC),
+		PhoneNumber:      "0811112222",
+		EmergencyContact: "0899990000",
+		SchemeType:       "บัตรทอง (สปสช.)",
+		Address:          "ข้อความที่อยู่เดิมแบบฟรีฟอร์ม 99/99 ถ.โบราณ",
+	}
+	if err := config.DB.Create(&oldPatient).Error; err != nil {
+		t.Fatalf("Failed to seed old patient: %v", err)
+	}
+
+	t.Logf("  [BEFORE UPDATE] Patient ID: %d, HN: %s", oldPatient.ID, oldPatient.HN)
+	t.Logf("  [BEFORE UPDATE] Address: '%s'", oldPatient.Address)
+	t.Logf("  [BEFORE UPDATE] HouseNo: '%s', District: '%s', Province: '%s'", oldPatient.HouseNo, oldPatient.District, oldPatient.Province)
+
+	// 2. Call PUT /api/registrar/patients/:id with structured address fields
+	updatePayload := map[string]interface{}{
+		"house_no":     "88/1",
+		"alley":        "สุขุมวิท 21",
+		"road":         "สุขุมวิท",
+		"sub_district": "คลองเตยเหนือ",
+		"district":     "วัฒนา",
+		"province":     "กรุงเทพมหานคร",
+		"postal_code":  "10110",
+	}
+	body, _ := json.Marshal(updatePayload)
+	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/registrar/patients/%d", oldPatient.ID), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("Expected status 200, got %d. Body: %s", w.Code, w.Body.String())
+	}
+
+	// 3. Query DB to verify address was overwritten with newly composed address
+	var updatedPatient models.Patient
+	if err := config.DB.First(&updatedPatient, oldPatient.ID).Error; err != nil {
+		t.Fatalf("Failed to fetch updated patient: %v", err)
+	}
+
+	t.Logf("  [AFTER UPDATE] Patient ID: %d, HN: %s", updatedPatient.ID, updatedPatient.HN)
+	t.Logf("  [AFTER UPDATE] Address: '%s'", updatedPatient.Address)
+	t.Logf("  [AFTER UPDATE] HouseNo: '%s', Subdistrict: '%s', District: '%s', Province: '%s'", updatedPatient.HouseNo, updatedPatient.SubDistrict, updatedPatient.District, updatedPatient.Province)
+
+	expectedNewAddress := "88/1 ซ.สุขุมวิท 21 ถ.สุขุมวิท แขวงคลองเตยเหนือ เขตวัฒนา กรุงเทพมหานคร 10110"
+	if updatedPatient.Address != expectedNewAddress {
+		t.Errorf("Address overwrite mismatch:\n  Expected: %s\n  Actual:   %s", expectedNewAddress, updatedPatient.Address)
+	} else {
+		t.Log("  [PASS] Address was successfully overwritten with newly composed string upon patient update!")
+	}
 
 	t.Log("================================================================================\n")
 }

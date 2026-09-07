@@ -81,19 +81,49 @@ export function composeAddressPreview(v: AddressValues): string {
     parts.push(r.startsWith('ถ.') || r.startsWith('ถนน') ? r : `ถ.${r}`);
   }
 
+  const p = (v.province || '').trim();
+  const isBkk = p === 'กรุงเทพมหานคร' || p === 'กทม.' || p.includes('กรุงเทพ');
+
   const sd = (v.subDistrict || '').trim();
   if (sd) {
-    parts.push(sd.startsWith('ต.') || sd.startsWith('ตำบล') || sd.startsWith('แขวง') ? sd : `ต.${sd}`);
+    if (isBkk) {
+      if (sd.startsWith('แขวง')) {
+        parts.push(sd);
+      } else {
+        const cleanSd = sd.replace(/^ตำบล/, '').replace(/^ต\./, '').trim();
+        parts.push(`แขวง${cleanSd}`);
+      }
+    } else {
+      if (sd.startsWith('ต.') || sd.startsWith('ตำบล')) {
+        parts.push(sd);
+      } else {
+        parts.push(`ต.${sd}`);
+      }
+    }
   }
 
   const d = (v.district || '').trim();
   if (d) {
-    parts.push(d.startsWith('อ.') || d.startsWith('อำเภอ') || d.startsWith('เขต') ? d : `อ.${d}`);
+    if (isBkk) {
+      if (d.startsWith('เขต')) {
+        parts.push(d);
+      } else {
+        const cleanD = d.replace(/^อำเภอ/, '').replace(/^อ\./, '').trim();
+        parts.push(`เขต${cleanD}`);
+      }
+    } else {
+      if (d.startsWith('อ.') || d.startsWith('อำเภอ')) {
+        parts.push(d);
+      } else {
+        parts.push(`อ.${d}`);
+      }
+    }
   }
 
-  const p = (v.province || '').trim();
   if (p) {
-    if (p.startsWith('จ.') || p.startsWith('จังหวัด') || p === 'กรุงเทพมหานคร' || p === 'กทม.') {
+    if (isBkk) {
+      parts.push('กรุงเทพมหานคร');
+    } else if (p.startsWith('จ.') || p.startsWith('จังหวัด')) {
       parts.push(p);
     } else {
       parts.push(`จ.${p}`);
@@ -438,6 +468,7 @@ export const AddressFormSection: React.FC<AddressFormSectionProps> = ({
   };
 
   const previewText = useMemo(() => composeAddressPreview(values), [values]);
+  const isBkk = values.province === 'กรุงเทพมหานคร' || values.province === 'กทม.' || (values.province || '').includes('กรุงเทพ');
 
   const provinceOptions = useMemo(
     () => provinces.map((p) => ({ label: p.name_th, value: p.name_th, extra: p.name_en })),
@@ -586,13 +617,15 @@ export const AddressFormSection: React.FC<AddressFormSectionProps> = ({
 
         <SearchableSelect
           id="addr-district-select"
-          label="อำเภอ / เขต"
+          label={isBkk ? 'เขต' : 'อำเภอ / เขต'}
           required
           placeholder={
             loadingDistricts
               ? 'กำลังโหลด...'
               : values.province
-              ? 'เลือกอำเภอ/เขต...'
+              ? isBkk
+                ? 'เลือกเขต...'
+                : 'เลือกอำเภอ/เขต...'
               : 'กรุณาเลือกจังหวัดก่อน'
           }
           value={values.district}
@@ -605,12 +638,16 @@ export const AddressFormSection: React.FC<AddressFormSectionProps> = ({
 
         <SearchableSelect
           id="addr-subdistrict-select"
-          label="ตำบล / แขวง"
+          label={isBkk ? 'แขวง' : 'ตำบล / แขวง'}
           placeholder={
             loadingSubDistricts
               ? 'กำลังโหลด...'
               : values.district
-              ? 'เลือกตำบล/แขวง...'
+              ? isBkk
+                ? 'เลือกแขวง...'
+                : 'เลือกตำบล/แขวง...'
+              : isBkk
+              ? 'กรุณาเลือกเขตก่อน'
               : 'กรุณาเลือกอำเภอก่อน'
           }
           value={values.subDistrict}

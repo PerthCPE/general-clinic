@@ -55,6 +55,7 @@ func SetUpRoutes(r *gin.Engine) {
 		regWrite.Use(middleware.RoleRequired("registrar"))
 		{
 			regWrite.POST("/patients", controllers.RegisterPatient)
+			regWrite.PUT("/patients/:id", controllers.UpdatePatient)
 			regWrite.POST("/eligibility/save", controllers.SavePatientEligibility)
 		}
 	}
