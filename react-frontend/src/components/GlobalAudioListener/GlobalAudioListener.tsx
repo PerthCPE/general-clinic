@@ -6,20 +6,19 @@ export function GlobalAudioListener() {
   const { subscribe } = useWebSocket();
 
   useEffect(() => {
-    const unsubExam = subscribe('EXAMINATION_SAVED', (data: any) => {
-      playPharmacyNotification('มีผู้ป่วยใหม่ ส่งมาที่ห้องยาค่ะ');
-    });
-
+    // 1. รับคิวห้องยา (แพทย์ส่งมา)
     const unsubVisit = subscribe('MEDICINE_QUEUE_CREATED', (data: any) => {
-      playPharmacyNotification('มีรายการสั่งยาใหม่ ส่งมาที่ห้องยาค่ะ');
+      const pName = data?.patient_name ? `ของคุณ ${data.patient_name} ` : '';
+      playPharmacyNotification(`มีรายการสั่งยาใหม่ ${pName}ส่งมาที่ห้องยาค่ะ`);
     });
 
+    // 2. รับคิวการเงิน (ห้องยาส่งมา หรือแพทย์ส่งตรง)
     const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
-      playBillingNotification('มีรายการชำระเงินใหม่ ส่งมาที่ห้องการเงินค่ะ');
+      const pName = data?.patient_name ? `ของคุณ ${data.patient_name} ` : '';
+      playBillingNotification(`มีรายการชำระเงินใหม่ ${pName}ส่งมาที่ห้องการเงินค่ะ`);
     });
 
     return () => {
-      unsubExam();
       unsubVisit();
       unsubBill();
     };
