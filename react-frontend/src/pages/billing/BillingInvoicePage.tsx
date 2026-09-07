@@ -8,6 +8,7 @@ import html2pdf from 'html2pdf.js';
 import { BillingInvoiceSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
+import { playBillingNotification } from '../../utils/audioQueue';
 
 interface BillingInvoicePageProps {
   selectedPatientId?: string;
@@ -395,6 +396,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
           medications: Array.isArray(data.medications) ? data.medications.map((m: any) => parseDispensedMed(m, masterMedicines)) : []
         };
         setQueueList(prev => [newPatient, ...prev.filter(q => q.id !== newPatient.id)]);
+        playBillingNotification('มีผู้ป่วยใหม่ ส่งมาที่ห้องการเงินค่ะ');
       }
       setTimeout(() => {
         fetchQueues();
