@@ -8,7 +8,8 @@ import { PharmacyDetailSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 import { API_BASE_URL } from '../../services/api';
-import { playPharmacyNotification } from '../../utils/audioQueue';
+// เสียงแจ้งเตือน "ใบสั่งยาใหม่" เล่นจาก GlobalAudioListener ที่เดียว (ฟัง event MEDICINE_QUEUE_CREATED)
+// ไม่เล่นซ้ำที่หน้านี้อีก เพื่อไม่ให้เสียงซ้อนกันสองรอบ
 
 interface ToastState {
   message: string;
@@ -449,9 +450,9 @@ export default function DetailPage({
       }
     });
 
-    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', () => {
+    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', (data: any) => {
       fetchQueues();
-      triggerToast('ได้รับใบสั่งยาเรียบร้อยแล้ว', 'doctor');
+      triggerToast(`ได้รับใบสั่งยาเรียบร้อย — ${data?.patient_name || 'ผู้ป่วย'}`, 'doctor');
     });
 
     return () => {

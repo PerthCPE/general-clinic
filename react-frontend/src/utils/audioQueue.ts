@@ -1,15 +1,24 @@
-﻿import { sharedAudioContext, initAudioContext } from './audioContext';
-/**
+﻿/**
  * Smart Audio Queue Calling with 100% Genuine Studio Google Thai Female Voice Pack
  * Plays gentle 3-tone hospital melodic chime + Studio Thai Female voice audio clips (.mp3)
  */
+
+import { getSharedAudioContext } from './audioContext';
+
+// =========================================================================
+// สวิตช์เลือกรูปแบบเสียงแจ้งเตือน (แก้ตรงนี้ที่เดียว มีผลทั้งห้องยา + ห้องการเงิน)
+//   true  = เล่นไฟล์ MP3 (/audio/pin_a1.mp3) เป็นหลัก  ← ค่าเริ่มต้น เหมือนระบบเดิม (เสียงดึงๆ)
+//   false = เล่นเสียงสังเคราะห์ 2 tone เป็นหลัก
+// อีกฝั่งจะถูกใช้เป็น fallback อัตโนมัติถ้าทางหลักเล่นไม่ได้
+// =========================================================================
+const USE_MP3 = false;
 
 // Global audio element reference to prevent overlapping voices
 let currentAudioElement: HTMLAudioElement | null = null;
 let isAudioSequencePlaying = false;
 
 // =========================================================================
-// 1. เธฃเธฐเธเธเน€เธชเธตเธขเธเนเธเนเธเน€เธ•เธทเธญเธเธชเธณเธซเธฃเธฑเธ "เธซเนเธญเธเธขเธฒ" (Pharmacy)
+// 1. ระบบเสียงแจ้งเตือนสำหรับ "ห้องยา" (Pharmacy)
 // =========================================================================
 export function playPharmacyNotification(message?: string): Promise<void> {
   return new Promise((resolve) => {
@@ -17,17 +26,16 @@ export function playPharmacyNotification(message?: string): Promise<void> {
       if (localStorage.getItem('notificationSoundEnabled') === 'false') {
         resolve(); return;
       }
-      
-      // เธ•เธฑเนเธเธเนเธฒเธฃเธนเธเนเธเธเน€เธชเธตเธขเธเนเธเนเธเน€เธ•เธทเธญเธ (เธซเนเธญเธเธขเธฒ)
-      const USE_MP3 = false; 
-      const MP3_FILE_PATH = '/audio/pin_a1.mp3'; 
-      const WAIT_BEFORE_TTS_MS = 1500; 
 
-      // เธ•เธฑเนเธเธเนเธฒเน€เธชเธตเธขเธเธชเธฑเธเน€เธเธฃเธฒเธฐเธซเน
-      const TONE_1_FREQ = 659.25; 
-      const TONE_2_FREQ = 523.25; 
+      // ตั้งค่ารูปแบบเสียงแจ้งเตือน (ห้องยา)
+      const MP3_FILE_PATH = '/audio/pin_a1.mp3';
+      const WAIT_BEFORE_TTS_MS = 3000;
 
-      executeAudioPlay(USE_MP3, MP3_FILE_PATH, WAIT_BEFORE_TTS_MS, TONE_1_FREQ, TONE_2_FREQ, message, resolve);
+      // ตั้งค่าเสียงสังเคราะห์
+      const TONE_1_FREQ = 659.25;
+      const TONE_2_FREQ = 523.25;
+
+      executeAudioPlay(MP3_FILE_PATH, WAIT_BEFORE_TTS_MS, TONE_1_FREQ, TONE_2_FREQ, message, resolve);
     } catch (e) {
       console.error('Pharmacy audio play failed', e);
       resolve();
@@ -36,7 +44,7 @@ export function playPharmacyNotification(message?: string): Promise<void> {
 }
 
 // =========================================================================
-// 2. เธฃเธฐเธเธเน€เธชเธตเธขเธเนเธเนเธเน€เธ•เธทเธญเธเธชเธณเธซเธฃเธฑเธ "เธซเนเธญเธเธเธฒเธฃเน€เธเธดเธ" (Billing)
+// 2. ระบบเสียงแจ้งเตือนสำหรับ "ห้องการเงิน" (Billing)
 // =========================================================================
 export function playBillingNotification(message?: string): Promise<void> {
   return new Promise((resolve) => {
@@ -44,17 +52,16 @@ export function playBillingNotification(message?: string): Promise<void> {
       if (localStorage.getItem('notificationSoundEnabled') === 'false') {
         resolve(); return;
       }
-      
-      // เธ•เธฑเนเธเธเนเธฒเธฃเธนเธเนเธเธเน€เธชเธตเธขเธเนเธเนเธเน€เธ•เธทเธญเธ (เธซเนเธญเธเธเธฒเธฃเน€เธเธดเธ)
-      const USE_MP3 = false; 
-      const MP3_FILE_PATH = '/audio/pin_a1.mp3'; // เธชเธฒเธกเธฒเธฃเธ–เน€เธเธฅเธตเนเธขเธเน€เธเนเธเนเธเธฅเนเธญเธทเนเธเนเธ”เน เน€เธเนเธ /audio/billing.mp3
-      const WAIT_BEFORE_TTS_MS = 1500; 
 
-      // เธ•เธฑเนเธเธเนเธฒเน€เธชเธตเธขเธเธชเธฑเธเน€เธเธฃเธฒเธฐเธซเน
-      const TONE_1_FREQ = 659.25; 
-      const TONE_2_FREQ = 523.25; 
+      // ตั้งค่ารูปแบบเสียงแจ้งเตือน (ห้องการเงิน)
+      const MP3_FILE_PATH = '/audio/pin_a1.mp3'; // สามารถเปลี่ยนเป็นไฟล์อื่นได้ เช่น /audio/billing.mp3
+      const WAIT_BEFORE_TTS_MS = 1500;
 
-      executeAudioPlay(USE_MP3, MP3_FILE_PATH, WAIT_BEFORE_TTS_MS, TONE_1_FREQ, TONE_2_FREQ, message, resolve);
+      // ตั้งค่าเสียงสังเคราะห์
+      const TONE_1_FREQ = 659.25;
+      const TONE_2_FREQ = 523.25;
+
+      executeAudioPlay(MP3_FILE_PATH, WAIT_BEFORE_TTS_MS, TONE_1_FREQ, TONE_2_FREQ, message, resolve);
     } catch (e) {
       console.error('Billing audio play failed', e);
       resolve();
@@ -62,54 +69,41 @@ export function playBillingNotification(message?: string): Promise<void> {
   });
 }
 
-// Helper alias for notification chime
-export function playNotificationDingDong(): Promise<void> {
-  return playHospitalChime();
+// Helper alias สำหรับเสียงแจ้งเตือนแบบ ding-dong (เล่นไฟล์ MP3 เหมือนระบบเดิม)
+export function playNotificationDingDong(message?: string): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      if (localStorage.getItem('notificationSoundEnabled') === 'false') {
+        resolve(); return;
+      }
+      executeAudioPlay('/audio/pin_a1.mp3', 3000, 659.25, 523.25, message, resolve);
+    } catch (e) {
+      console.error('Notification audio play failed', e);
+      resolve();
+    }
+  });
 }
 
 // =========================================================================
-// Core Logic เธชเธณเธซเธฃเธฑเธเน€เธฅเนเธเน€เธชเธตเธขเธ (เนเธเนเธฃเนเธงเธกเธเธฑเธ)
+// Core Logic สำหรับเล่นเสียงแจ้งเตือน (ใช้ร่วมกันทั้งห้องยา / ห้องการเงิน)
+//
+// เล่นเสียง "แจ้งเตือน 1 ครั้ง" เท่านั้น — ไม่วนลูป และไม่อ่านข้อความ (ไม่มี TTS)
+//   USE_MP3 = true  → เล่นไฟล์ MP3 ครั้งเดียว, ถ้าถูกบล็อก fallback เป็นเสียงสังเคราะห์
+//   USE_MP3 = false → เล่นเสียงสังเคราะห์ 2 tone, ถ้า AudioContext ยังไม่ถูกปลุก fallback เป็น MP3
+// พารามิเตอร์ WAIT_BEFORE_TTS_MS / message ยังรับไว้เพื่อความเข้ากันได้ แต่ไม่ถูกใช้แล้ว
 // =========================================================================
 function executeAudioPlay(
-  USE_MP3: boolean, 
-  MP3_FILE_PATH: string, 
-  WAIT_BEFORE_TTS_MS: number, 
-  TONE_1_FREQ: number, 
-  TONE_2_FREQ: number, 
-  message: string | undefined, 
+  MP3_FILE_PATH: string,
+  _WAIT_BEFORE_TTS_MS: number,
+  TONE_1_FREQ: number,
+  TONE_2_FREQ: number,
+  _message: string | undefined,
   resolve: (value: void | PromiseLike<void>) => void
 ) {
-  const playTTS = () => {
-    if (message) {
-      const win = window as any;
-      if (win.responsiveVoice) {
-        win.responsiveVoice.speak(message, "Thai Female", { rate: 1.0 });
-      }
-    }
-    resolve();
-  };
-
-  if (USE_MP3) {
-    const audio = new Audio(MP3_FILE_PATH);
-    audio.loop = true;
-    currentAudioElement = audio;
-    audio.play().catch(e => console.error('MP3 play failed', e));
-    
-    setTimeout(() => {
-      audio.pause();
-      audio.currentTime = 0;
-      playTTS();
-    }, WAIT_BEFORE_TTS_MS);
-  } else {
-    const AudioCtx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-
-    if (!AudioCtx) {
-      playTTS();
-      return;
-    }
-    const ctx = new AudioCtx();
+  // เสียงสังเคราะห์ 2 tone ผ่าน AudioContext กลาง (ไม่สร้างใหม่ ไม่ close) — เล่นครั้งเดียว
+  const playSynthTone = () => {
+    const ctx = getSharedAudioContext();
+    if (!ctx || ctx.state !== 'running') return;
 
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
@@ -133,9 +127,40 @@ function executeAudioPlay(
     gain2.connect(ctx.destination);
     osc2.start(ctx.currentTime + 0.15);
     osc2.stop(ctx.currentTime + 0.65);
+  };
 
-    setTimeout(playTTS, WAIT_BEFORE_TTS_MS);
+  // เล่นไฟล์ MP3 ผ่าน <audio> element — ครั้งเดียว ไม่วนลูป
+  const playMp3 = (): boolean => {
+    try {
+      if (currentAudioElement) {
+        try { currentAudioElement.pause(); } catch { /* ignore */ }
+      }
+      const audio = new Audio(MP3_FILE_PATH);
+      audio.loop = false;
+      currentAudioElement = audio;
+      audio.play().catch((e) => {
+        console.warn('[audio] mp3 blocked, falling back to synth:', e);
+        playSynthTone();
+      });
+      return true;
+    } catch (e) {
+      console.warn('[audio] mp3 element failed:', e);
+      return false;
+    }
+  };
+
+  if (USE_MP3) {
+    if (!playMp3()) playSynthTone();
+  } else {
+    const ctx = getSharedAudioContext();
+    if (ctx && ctx.state === 'running') {
+      playSynthTone();
+    } else {
+      playMp3();
+    }
   }
+
+  resolve();
 }
 
 /**
@@ -145,16 +170,20 @@ function executeAudioPlay(
 export function playHospitalChime(): Promise<void> {
   return new Promise((resolve) => {
     try {
-      const AudioCtx =
-        window.AudioContext ||
-        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-
-      if (!AudioCtx) {
-        resolve();
+      // ใช้ AudioContext กลาง ห้ามสร้างใหม่/ปิด เพื่อไม่ให้ชนลิมิต ~6 context ต่อแท็บ
+      const ctx = getSharedAudioContext();
+      if (!ctx || ctx.state !== 'running') {
+        // context ยังไม่พร้อม (ผู้ใช้ยังไม่คลิกหน้าจอ) → เล่นไฟล์เสียงสำรองแทน
+        try {
+          const audio = new Audio('/audio/pin_a1.mp3');
+          audio.play().catch(() => {});
+        } catch {
+          // ignore
+        }
+        setTimeout(resolve, 1000);
         return;
       }
 
-      const ctx = new AudioCtx();
       const now = ctx.currentTime;
 
       // Helper to create a bell note with fundamental frequency and warm overtone
@@ -197,14 +226,7 @@ export function playHospitalChime(): Promise<void> {
       // Note 3: C#6 (1108.73 Hz)
       playBellNote(1108.73, now + 0.56, 0.95, 0.22);
 
-      setTimeout(() => {
-        try {
-          ctx.close();
-        } catch {
-          // ignore
-        }
-        resolve();
-      }, 1400);
+      setTimeout(resolve, 1400);
     } catch {
       resolve();
     }
@@ -218,58 +240,58 @@ export function getSpokenDepartmentText(department: string = '', status: string 
   const dept = (department || '').trim();
   const st = (status || '').trim();
 
-  // 1. เธซเนเธญเธเธซเธฑเธ•เธ–เธเธฒเธฃ (Treatment / Procedure Room) -> "เธ—เธตเนเธซเนเธญเธเธซเธฑเธ•เธ–เธเธฒเธฃเธเนเธฐ"
+  // 1. ห้องหัตถการ (Treatment / Procedure Room) -> "ที่ห้องหัตถการค่ะ"
   if (
-    st === 'เธฃเธญเธ—เธณเธซเธฑเธ•เธ–เธเธฒเธฃ' ||
-    dept.includes('เธซเธฑเธ•เธ–เธเธฒเธฃ') ||
-    dept.includes('เธ—เธณเนเธเธฅ') ||
-    dept.includes('เธเธตเธ”เธขเธฒ') ||
-    dept.includes('เธเนเธเธขเธฒ') ||
-    dept.includes('เนเธซเนเธเนเธณเน€เธเธฅเธทเธญ')
+    st === 'รอทำหัตถการ' ||
+    dept.includes('หัตถการ') ||
+    dept.includes('ทำแผล') ||
+    dept.includes('ฉีดยา') ||
+    dept.includes('พ่นยา') ||
+    dept.includes('ให้น้ำเกลือ')
   ) {
-    return 'เธ—เธตเนเธซเนเธญเธเธซเธฑเธ•เธ–เธเธฒเธฃเธเนเธฐ';
+    return 'ที่ห้องหัตถการค่ะ';
   }
 
-  // 2. เธซเนเธญเธเธเธฒเธฃเน€เธเธดเธ (Cashier / Billing) -> "เธ—เธตเนเธซเนเธญเธเธเธฒเธฃเน€เธเธดเธเธเนเธฐ"
+  // 2. ห้องการเงิน (Cashier / Billing) -> "ที่ห้องการเงินค่ะ"
   if (
-    st === 'เธฃเธญเธเธณเธฃเธฐเน€เธเธดเธ' ||
-    dept.includes('เธเธณเธฃเธฐเน€เธเธดเธ') ||
-    dept.includes('เนเธเธเน€เธเธตเธขเธฃเน') ||
-    dept.includes('เธเธฒเธฃเน€เธเธดเธ') ||
-    dept.includes('เธเธดเธ”เน€เธเธดเธ')
+    st === 'รอชำระเงิน' ||
+    dept.includes('ชำระเงิน') ||
+    dept.includes('แคชเชียร์') ||
+    dept.includes('การเงิน') ||
+    dept.includes('คิดเงิน')
   ) {
-    return 'เธ—เธตเนเธซเนเธญเธเธเธฒเธฃเน€เธเธดเธเธเนเธฐ';
+    return 'ที่ห้องการเงินค่ะ';
   }
 
-  // 3. เธซเนเธญเธเธเนเธฒเธขเธขเธฒ (Pharmacy) -> "เธ—เธตเนเธซเนเธญเธเธเนเธฒเธขเธขเธฒเธเนเธฐ"
+  // 3. ห้องจ่ายยา (Pharmacy) -> "ที่ห้องจ่ายยาค่ะ"
   if (
-    st === 'เธฃเธญเธฃเธฑเธเธขเธฒ' ||
-    dept.includes('เธเนเธฒเธขเธขเธฒ') ||
-    dept.includes('เธซเนเธญเธเธขเธฒ') ||
-    dept.includes('เน€เธ เธชเธฑเธ') ||
-    dept.includes('เธฃเธฑเธเธขเธฒ')
+    st === 'รอรับยา' ||
+    dept.includes('จ่ายยา') ||
+    dept.includes('ห้องยา') ||
+    dept.includes('เภสัช') ||
+    dept.includes('รับยา')
   ) {
-    return 'เธ—เธตเนเธซเนเธญเธเธเนเธฒเธขเธขเธฒเธเนเธฐ';
+    return 'ที่ห้องจ่ายยาค่ะ';
   }
 
-  // 4. เธเธธเธ”เธเธฑเธ”เธเธฃเธญเธ (Screening Station) -> "เธ—เธตเนเธเธธเธ”เธเธฑเธ”เธเธฃเธญเธเธเนเธฐ"
-  if (st === 'เธฃเธญเธเธฑเธ”เธเธฃเธญเธ' || dept.includes('เธเธฑเธ”เธเธฃเธญเธ') || dept.includes('triage')) {
-    return 'เธ—เธตเนเธเธธเธ”เธเธฑเธ”เธเธฃเธญเธเธเนเธฐ';
+  // 4. จุดคัดกรอง (Screening Station) -> "ที่จุดคัดกรองค่ะ"
+  if (st === 'รอคัดกรอง' || dept.includes('คัดกรอง') || dept.includes('triage')) {
+    return 'ที่จุดคัดกรองค่ะ';
   }
 
-  // 5. เธซเนเธญเธเธ•เธฃเธงเธเนเธเธ—เธขเน (Doctor Examination Rooms with specific room number)
-  if (st === 'เธฃเธญเธเธเนเธเธ—เธขเน' || st === 'เธเธณเธฅเธฑเธเธ•เธฃเธงเธ' || dept.includes('เธซเนเธญเธเธ•เธฃเธงเธ') || dept.includes('เนเธเธ—เธขเน')) {
-    if (dept.includes('3') || dept.includes('เธชเธฒเธก')) return 'เธ—เธตเนเธซเนเธญเธเธ•เธฃเธงเธ 3 เธเนเธฐ';
-    if (dept.includes('2') || dept.includes('เธชเธญเธ')) return 'เธ—เธตเนเธซเนเธญเธเธ•เธฃเธงเธ 2 เธเนเธฐ';
-    if (dept.includes('1') || dept.includes('เธซเธเธถเนเธ')) return 'เธ—เธตเนเธซเนเธญเธเธ•เธฃเธงเธ 1 เธเนเธฐ';
+  // 5. ห้องตรวจแพทย์ (Doctor Examination Rooms with specific room number)
+  if (st === 'รอพบแพทย์' || st === 'กำลังตรวจ' || dept.includes('ห้องตรวจ') || dept.includes('แพทย์')) {
+    if (dept.includes('3') || dept.includes('สาม')) return 'ที่ห้องตรวจ 3 ค่ะ';
+    if (dept.includes('2') || dept.includes('สอง')) return 'ที่ห้องตรวจ 2 ค่ะ';
+    if (dept.includes('1') || dept.includes('หนึ่ง')) return 'ที่ห้องตรวจ 1 ค่ะ';
 
     const match = dept.match(/\d+/);
-    if (match) return `เธ—เธตเนเธซเนเธญเธเธ•เธฃเธงเธ ${match[0]} เธเนเธฐ`;
+    if (match) return `ที่ห้องตรวจ ${match[0]} ค่ะ`;
 
-    return 'เธ—เธตเนเธซเนเธญเธเธ•เธฃเธงเธ 1 เธเนเธฐ';
+    return 'ที่ห้องตรวจ 1 ค่ะ';
   }
 
-  return 'เธ—เธตเนเธเธธเธ”เธเธฑเธ”เธเธฃเธญเธเธเนเธฐ';
+  return 'ที่จุดคัดกรองค่ะ';
 }
 
 /**
@@ -279,50 +301,50 @@ function getDepartmentAudioPath(dept: string = '', status: string = ''): string 
   const d = (dept || '').trim();
   const st = (status || '').trim();
 
-  // 1. เธซเธฑเธ•เธ–เธเธฒเธฃ (Treatment / Procedure) -> "เธ—เธตเนเธซเนเธญเธเธซเธฑเธ•เธ–เธเธฒเธฃเธเนเธฐ"
-  // เธ•เธฃเธงเธเธซเธฑเธ•เธ–เธเธฒเธฃเน€เธเนเธเธญเธฑเธเธ”เธฑเธเนเธฃเธเน€เธเธทเนเธญเนเธกเนเนเธซเนเธเธณเธงเนเธฒ "เธเธตเธ”เธขเธฒ/เธเนเธเธขเธฒ" เนเธเธ•เธฃเธเธเธฑเธเธซเนเธญเธเธขเธฒ
+  // 1. หัตถการ (Treatment / Procedure) -> "ที่ห้องหัตถการค่ะ"
+  // ตรวจหัตถการเป็นอันดับแรกเพื่อไม่ให้คำว่า "ฉีดยา/พ่นยา" ไปตรงกับห้องยา
   if (
-    st === 'เธฃเธญเธ—เธณเธซเธฑเธ•เธ–เธเธฒเธฃ' ||
-    d.includes('เธซเธฑเธ•เธ–เธเธฒเธฃ') ||
-    d.includes('เธ—เธณเนเธเธฅ') ||
-    d.includes('เธเธตเธ”เธขเธฒ') ||
-    d.includes('เธเนเธเธขเธฒ') ||
-    d.includes('เนเธซเนเธเนเธณเน€เธเธฅเธทเธญ')
+    st === 'รอทำหัตถการ' ||
+    d.includes('หัตถการ') ||
+    d.includes('ทำแผล') ||
+    d.includes('ฉีดยา') ||
+    d.includes('พ่นยา') ||
+    d.includes('ให้น้ำเกลือ')
   ) {
     return '/audio/dept_treatment.mp3';
   }
 
-  // 2. เธเธฒเธฃเน€เธเธดเธ (Cashier / Billing) -> "เธ—เธตเนเธซเนเธญเธเธเธฒเธฃเน€เธเธดเธเธเนเธฐ"
+  // 2. การเงิน (Cashier / Billing) -> "ที่ห้องการเงินค่ะ"
   if (
-    st === 'เธฃเธญเธเธณเธฃเธฐเน€เธเธดเธ' ||
-    d.includes('เธเธณเธฃเธฐเน€เธเธดเธ') ||
-    d.includes('เนเธเธเน€เธเธตเธขเธฃเน') ||
-    d.includes('เธเธฒเธฃเน€เธเธดเธ') ||
-    d.includes('เธเธดเธ”เน€เธเธดเธ')
+    st === 'รอชำระเงิน' ||
+    d.includes('ชำระเงิน') ||
+    d.includes('แคชเชียร์') ||
+    d.includes('การเงิน') ||
+    d.includes('คิดเงิน')
   ) {
     return '/audio/dept_cashier.mp3';
   }
 
-  // 3. เธเนเธฒเธขเธขเธฒ (Pharmacy) -> "เธ—เธตเนเธซเนเธญเธเธเนเธฒเธขเธขเธฒเธเนเธฐ"
+  // 3. จ่ายยา (Pharmacy) -> "ที่ห้องจ่ายยาค่ะ"
   if (
-    st === 'เธฃเธญเธฃเธฑเธเธขเธฒ' ||
-    d.includes('เธเนเธฒเธขเธขเธฒ') ||
-    d.includes('เธซเนเธญเธเธขเธฒ') ||
-    d.includes('เน€เธ เธชเธฑเธ') ||
-    d.includes('เธฃเธฑเธเธขเธฒ')
+    st === 'รอรับยา' ||
+    d.includes('จ่ายยา') ||
+    d.includes('ห้องยา') ||
+    d.includes('เภสัช') ||
+    d.includes('รับยา')
   ) {
     return '/audio/dept_pharmacy.mp3';
   }
 
-  // 4. เธซเนเธญเธเธ•เธฃเธงเธเธฃเธฐเธเธธเน€เธฅเธ (Doctor Room 1, 2, 3)
-  if (d.includes('1') || d.includes('เธซเธเธถเนเธ')) return '/audio/dept_doctor1.mp3';
-  if (d.includes('2') || d.includes('เธชเธญเธ')) return '/audio/dept_doctor2.mp3';
-  if (d.includes('3') || d.includes('เธชเธฒเธก')) return '/audio/dept_doctor3.mp3';
-  if (st === 'เธฃเธญเธเธเนเธเธ—เธขเน' || st === 'เธเธณเธฅเธฑเธเธ•เธฃเธงเธ' || d.includes('เธ•เธฃเธงเธ') || d.includes('เนเธเธ—เธขเน')) {
+  // 4. ห้องตรวจระบุเลข (Doctor Room 1, 2, 3)
+  if (d.includes('1') || d.includes('หนึ่ง')) return '/audio/dept_doctor1.mp3';
+  if (d.includes('2') || d.includes('สอง')) return '/audio/dept_doctor2.mp3';
+  if (d.includes('3') || d.includes('สาม')) return '/audio/dept_doctor3.mp3';
+  if (st === 'รอพบแพทย์' || st === 'กำลังตรวจ' || d.includes('ตรวจ') || d.includes('แพทย์')) {
     return '/audio/dept_doctor1.mp3';
   }
 
-  // 5. เธเธธเธ”เธเธฑเธ”เธเธฃเธญเธ (Screening) -> "เธ—เธตเนเธเธธเธ”เธเธฑเธ”เธเธฃเธญเธเธเนเธฐ"
+  // 5. จุดคัดกรอง (Screening) -> "ที่จุดคัดกรองค่ะ"
   return '/audio/dept_screening.mp3';
 }
 
@@ -404,12 +426,13 @@ export function stopQueueAudio(): void {
 
 /**
  * Call queue announcement using 100% Genuine Studio Google Thai Female Voice Pack
- * Sequence: [Chime] -> "เธเธญเน€เธเธดเธเธซเธกเธฒเธขเน€เธฅเธ" -> "เธเธดเธง" -> "เธจเธนเธเธขเน" -> "เธจเธนเธเธขเน" -> "เธจเธนเธเธขเน" -> "เธซเธเธถเนเธ" -> "เธ—เธตเนเธเธธเธ”เธเธฑเธ”เธเธฃเธญเธเธเนเธฐ" / "เธ—เธตเนเธซเนเธญเธเธ•เธฃเธงเธเธซเธเธถเนเธเธเนเธฐ" / "เธ—เธตเนเธซเนเธญเธเธซเธฑเธ•เธ–เธเธฒเธฃเธเนเธฐ" / "เธ—เธตเนเธซเนเธญเธเธเธฒเธฃเน€เธเธดเธเธเนเธฐ" / "เธ—เธตเนเธซเนเธญเธเธเนเธฒเธขเธขเธฒเธเนเธฐ"
+ * Sequence: [Chime] -> "ขอเชิญหมายเลข" -> "คิว" -> "ศูนย์" -> "ศูนย์" -> "ศูนย์" -> "หนึ่ง"
+ *   -> "ที่จุดคัดกรองค่ะ" / "ที่ห้องตรวจหนึ่งค่ะ" / "ที่ห้องหัตถการค่ะ" / "ที่ห้องการเงินค่ะ" / "ที่ห้องจ่ายยาค่ะ"
  */
 export async function callQueueAudio(
   queueNo: string,
-  department: string = 'เธเธธเธ”เธเธฑเธ”เธเธฃเธญเธ',
-  status: string = 'เธฃเธญเธเธฑเธ”เธเธฃเธญเธ'
+  department: string = 'จุดคัดกรอง',
+  status: string = 'รอคัดกรอง'
 ): Promise<void> {
   stopQueueAudio();
 
@@ -418,7 +441,7 @@ export async function callQueueAudio(
   await new Promise((r) => setTimeout(r, 120));
 
   // 2. Build Audio Sequence with 100% Genuine Studio Thai Female Voice Clips
-  const sequence: string[] = ['/audio/intro.mp3']; // "เธเธญเน€เธเธดเธเธซเธกเธฒเธขเน€เธฅเธ"
+  const sequence: string[] = ['/audio/intro.mp3']; // "ขอเชิญหมายเลข"
 
   const clean = (queueNo || '').trim().toUpperCase();
   for (let i = 0; i < clean.length; i++) {
@@ -436,4 +459,3 @@ export async function callQueueAudio(
   // 4. Play audio sequence
   await playAudioSequence(sequence);
 }
-

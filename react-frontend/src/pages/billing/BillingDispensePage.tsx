@@ -561,7 +561,7 @@ export default function BillingDispensePage({
       fetchInitialQueue();
       if (data) {
         const pName = data.patient_name || 'ผู้ป่วย';
-        triggerToast(`ได้รับคิวใหม่สำหรับการเงิน: ${pName} (${data.queue_number || ''})`, 'doctor');
+        triggerToast(`รับคิวชำระเงินเข้ามาใหม่ — ${pName}`, 'doctor');
 
       }
     });
