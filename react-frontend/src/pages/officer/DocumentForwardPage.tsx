@@ -597,6 +597,10 @@ export const DocumentForwardPage: React.FC = () => {
   const renderMetricModal = () => {
     if (!activeMetricModal) return null;
 
+    let title = '';
+    let subtitle = '';
+    let dataList: ForwardDoc[] = [];
+
     if (activeMetricModal === 'system_docs') {
       return (
         <div className="dms-modal-backdrop" onClick={() => setActiveMetricModal(null)}>
