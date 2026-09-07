@@ -7,7 +7,7 @@ type Screening struct {
 	VisitID            uint    `gorm:"not null" json:"visit_id"`
 	ScreenedByUserID   uint    `json:"screened_by_user_id"` // พยาบาลผู้ทำการคัดกรอง
 	AssignedDoctorID   uint    `json:"assigned_doctor_id"`  // แพทย์ประจำห้องตรวจที่ส่งต่อ
-	TriageLevel        string  `json:"triage_level"`        // ปกติ (Normal), เร่งด่วน (Urgent), ฉุกเฉิน (Emergency), วิกฤต (Resuscitation)
+	TriageLevel        int     `gorm:"not null;default:4;check:triage_level BETWEEN 1 AND 4" json:"triage_level"` // 1=Resuscitation, 2=Urgent, 3=Semi-Urgent, 4=Normal
 	ChiefComplaint     string  `json:"chief_complaint"`
 	Allergies          string  `json:"allergies"`
 	MedicalHistory     string  `json:"medical_history"`

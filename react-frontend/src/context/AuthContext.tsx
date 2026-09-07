@@ -23,7 +23,7 @@ export interface PatientQueueItem {
 interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
-  login: (roleOrUsername: string, password?: string) => Promise<boolean>;
+  login: (roleOrUsername: string, password?: string) => Promise<{ success: boolean; requiresPasswordChange?: boolean }>;
   switchRole: (role: UserRole) => Promise<void>;
   logout: () => void;
   hasAccess: (pageId: string) => boolean;
@@ -134,8 +134,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPatientQueue(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
   };
 
+  // ของใหม่: ระบบข้อมูลแบบ Real-time (WebSocket)
+  useEffect(() => {
+    if (!currentUser) return; // เฉพาะตอนล็อกอินถึงจะเชื่อมต่อ WS
+
+    // เชื่อมต่อไปยัง Go Backend WebSocket
+    const wsUrl = `ws://localhost:8080/ws`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('✅ WebSocket Connected (Real-time Sync Active)');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        console.log('📩 รับข้อมูลแบบ Real-time ผ่าน WebSocket:', payload);
+
+        // คุณสามารถนำข้อมูลนี้ไปอัปเดต State หรือโชว์ Notification ได้ที่นี่
+        if (payload.type === 'QUEUE_CREATED') {
+          // ตัวอย่าง: ถ้าเป็นข้อมูลคิวที่เพิ่มเข้ามาใหม่ สามารถเรียก addAppointment ได้
+          // addAppointment({...});
+        }
+      } catch (err) {
+        console.error('WebSocket message parse error', err);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('❌ WebSocket Disconnected');
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [currentUser]);
+
   // ของเพื่อน: ระบบล็อกอิน
-  const login = async (roleOrUsername: string, password?: string): Promise<boolean> => {
+  const login = async (roleOrUsername: string, password?: string): Promise<{ success: boolean; requiresPasswordChange?: boolean }> => {
     try {
       let usernameToSend = roleOrUsername;
       if (roleOrUsername === 'registrar') usernameToSend = 'registrar1';
@@ -149,27 +185,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (res && res.user) {
         const userRole = res.user.role as UserRole;
         const fallback = DEMO_USERS[userRole] || DEMO_USERS['registrar'];
+
+        let fullName = res.user.fullname || fallback.fullName;
+        let department = fallback.department;
+        let avatarText = fallback.avatarText;
+        let roleTitleTh = fallback.roleTitleTh;
+
+        if (userRole === 'doctor') {
+          if (res.user.username === 'doctor2' || res.user.fullname?.includes('วิชัย')) {
+            fullName = 'นพ.วิชัย ชาญการแพทย์';
+            department = 'แผนกอายุรกรรมทั่วไป';
+            avatarText = 'WC';
+            roleTitleTh = 'แพทย์ผู้ตรวจ (อายุรกรรม)';
+          } else if (res.user.username === 'doctor3' || res.user.fullname?.includes('เกศรา')) {
+            fullName = 'พญ.เกศรา รักษาดี';
+            department = 'แผนกกุมารเวชกรรม';
+            avatarText = 'KR';
+            roleTitleTh = 'แพทย์ผู้ตรวจ (กุมารเวชกรรม)';
+          } else {
+            fullName = 'พญ.สุดา สุขสมบูรณ์';
+            department = 'แผนกสูตินรีเวช';
+            avatarText = 'SS';
+            roleTitleTh = 'แพทย์ผู้ตรวจ (สูตินรีเวช)';
+          }
+        }
+
         const loggedInUser: User = {
           id: String(res.user.id),
           username: res.user.username,
-          // ดึงชื่อและข้อมูลจาก DEMO_USERS (roles.ts) เป็นหลักเสมอ เพื่อให้แก้ที่ roles.ts ที่เดียวแล้วเปลี่ยนทันที
-          fullName: fallback.fullName || res.user.fullname,
+          fullName,
           role: userRole,
-          roleTitleTh: fallback.roleTitleTh,
+          roleTitleTh,
           roleTitleEn: fallback.roleTitleEn,
-          department: fallback.department,
-          avatarText: fallback.avatarText,
+          department,
+          avatarText,
           avatarColor: fallback.avatarColor,
         };
         setCurrentUser(loggedInUser);
-        return true;
+        return { success: true, requiresPasswordChange: res.requires_password_change };
       }
     } catch (err) {
       console.warn('Backend login error, checking fallback:', err);
     }
 
     let matchedUser: User | undefined;
-    if (roleOrUsername in DEMO_USERS) {
+    if (roleOrUsername === 'doctor2') {
+      matchedUser = {
+        id: 'DOC-2',
+        username: 'doctor2',
+        fullName: 'นพ.วิชัย ชาญการแพทย์',
+        role: 'doctor',
+        roleTitleTh: 'แพทย์ผู้ตรวจ (อายุรกรรม)',
+        roleTitleEn: 'Doctor',
+        department: 'แผนกอายุรกรรมทั่วไป',
+        avatarText: 'WC',
+        avatarColor: '#DC2626',
+      };
+    } else if (roleOrUsername === 'doctor3') {
+      matchedUser = {
+        id: 'DOC-3',
+        username: 'doctor3',
+        fullName: 'พญ.เกศรา รักษาดี',
+        role: 'doctor',
+        roleTitleTh: 'แพทย์ผู้ตรวจ (กุมารเวชกรรม)',
+        roleTitleEn: 'Doctor',
+        department: 'แผนกกุมารเวชกรรม',
+        avatarText: 'KR',
+        avatarColor: '#DC2626',
+      };
+    } else if (roleOrUsername in DEMO_USERS) {
       matchedUser = DEMO_USERS[roleOrUsername as UserRole];
     } else {
       matchedUser = Object.values(DEMO_USERS).find((u) => u.username === roleOrUsername);
@@ -177,9 +261,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (matchedUser) {
       setCurrentUser(matchedUser);
-      return true;
+      return { success: true, requiresPasswordChange: false };
     }
-    return false;
+    return { success: false };
   };
 
   const switchRole = async (role: UserRole) => {

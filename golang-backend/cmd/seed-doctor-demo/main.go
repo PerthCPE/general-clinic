@@ -32,7 +32,7 @@ const demoNote = "ข้อมูลทดสอบระบบแพทย์ (
 type demoCase struct {
 	QueueNumber    string
 	Room           string
-	TriageLevel    string // ข้อความไทยชุดเดียวกับที่พยาบาลบันทึก
+	TriageLevel    int // 1=Resuscitation, 2=Urgent, 3=Semi-Urgent, 4=Normal
 	ChiefComplaint string
 	Allergies      string
 	MedicalHistory string
@@ -54,7 +54,7 @@ var demoCases = []demoCase{
 	{
 		QueueNumber:     "Q901",
 		Room:            "ห้องตรวจ 1",
-		TriageLevel:     "ปกติ (Normal)",
+		TriageLevel:     4,
 		ChiefComplaint:  "ไข้ต่ำๆ ไอมีเสมหะ เจ็บคอ มา 3 วัน",
 		Allergies:       "ปฏิเสธการแพ้ยา",
 		MedicalHistory:  "ไม่มีโรคประจำตัว",
@@ -72,7 +72,7 @@ var demoCases = []demoCase{
 	{
 		QueueNumber:     "Q902",
 		Room:            "ห้องตรวจ 1",
-		TriageLevel:     "เร่งด่วน (Urgent)",
+		TriageLevel:     2,
 		ChiefComplaint:  "ปวดท้องบิดเป็นพักๆ บริเวณท้องน้อยขวา มา 1 วัน",
 		Allergies:       "แพ้ยา Penicillin (ผื่นลมพิษ)",
 		MedicalHistory:  "เคยผ่าตัดไส้ติ่งเมื่อ 10 ปีก่อน",
@@ -90,7 +90,7 @@ var demoCases = []demoCase{
 	{
 		QueueNumber:     "Q903",
 		Room:            "ห้องตรวจ 2",
-		TriageLevel:     "ฉุกเฉิน (Emergency)",
+		TriageLevel:     1,
 		ChiefComplaint:  "แน่นหน้าอก เหนื่อยหอบ ร้าวไปแขนซ้าย เริ่มมา 2 ชั่วโมง",
 		Allergies:       "ปฏิเสธการแพ้ยา",
 		MedicalHistory:  "ความดันโลหิตสูง ไขมันในเลือดสูง สูบบุหรี่",
@@ -108,7 +108,7 @@ var demoCases = []demoCase{
 	{
 		QueueNumber:     "Q904",
 		Room:            "ห้องตรวจ 1",
-		TriageLevel:     "ปกติ (Normal)",
+		TriageLevel:     4,
 		ChiefComplaint:  "มาตามนัดรับยาความดัน ไม่มีอาการผิดปกติ",
 		Allergies:       "ปฏิเสธการแพ้ยา",
 		MedicalHistory:  "ความดันโลหิตสูง คุมได้ดีด้วยยา Amlodipine",
@@ -127,7 +127,7 @@ var demoCases = []demoCase{
 	{
 		QueueNumber:     "Q905",
 		Room:            "ห้องตรวจ 2",
-		TriageLevel:     "เร่งด่วน (Urgent)",
+		TriageLevel:     2,
 		ChiefComplaint:  "เวียนศีรษะ บ้านหมุน คลื่นไส้ ลุกยืนแล้วเป็นมากขึ้น",
 		Allergies:       "แพ้อาหารทะเล",
 		MedicalHistory:  "เบาหวานชนิดที่ 2 กินยา Metformin",
@@ -272,7 +272,7 @@ func main() {
 		}
 
 		created++
-		log.Printf("  %s  %-28s  %-12s  %s", c.QueueNumber, p.FullName, queueStatus, c.TriageLevel)
+		log.Printf("  %s  %-28s  %-12s  Triage: %d", c.QueueNumber, p.FullName, queueStatus, c.TriageLevel)
 	}
 
 	log.Printf("สร้างคิวทดสอบเรียบร้อย %d คิว ให้แพทย์ %s (%s)", created, doctor.FullName, doctor.Username)

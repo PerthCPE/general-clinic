@@ -2,11 +2,14 @@ package controllers
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/services"
 	"clinic-backend/internal/ws"
 	"github.com/gin-gonic/gin"
 )
@@ -41,7 +44,7 @@ func GetQueueList(c *gin.Context) {
 	c.JSON(http.StatusOK, queues)
 }
 
-// CreateQueue - ออกบัตรคิวใหม่
+// CreateQueue - ออกบัตรคิวใหม่ (Atomic Daily Sequential Numbering)
 func CreateQueue(c *gin.Context) {
 	var req CreateQueueReq
 
@@ -54,24 +57,6 @@ func CreateQueue(c *gin.Context) {
 	if err := config.DB.First(&patient, req.PatientID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบข้อมูลผู้ป่วยในระบบ"})
 		return
-	}
-
-	// สร้างหมายเลขคิวอัตโนมัติ ฐาน 16 ความยาว 4 หลัก เช่น Q0001, Q0002, ... Q000A, ... QFFFF
-	var lastQueue models.Queue
-	var queueNo string
-	if err := config.DB.Order("id desc").First(&lastQueue).Error; err == nil {
-		var lastNum int
-		cleanHex := strings.TrimPrefix(strings.ToUpper(lastQueue.QueueNumber), "Q")
-		fmt.Sscanf(cleanHex, "%X", &lastNum)
-		if lastNum > 0 {
-			queueNo = fmt.Sprintf("Q%04X", lastNum+1)
-		} else {
-			queueNo = fmt.Sprintf("Q%04X", lastQueue.ID+1)
-		}
-	} else {
-		var count int64
-		config.DB.Model(&models.Queue{}).Count(&count)
-		queueNo = fmt.Sprintf("Q%04X", count+1)
 	}
 
 	// ดึง ID ของผู้ใช้ที่ออกคิวจาก JWT
@@ -89,28 +74,70 @@ func CreateQueue(c *gin.Context) {
 		department = "แผนกคัดกรอง"
 	}
 
-	newQueue := models.Queue{
-		PatientID:       req.PatientID,
-		CreatedByUserID: userID,
-		QueueNumber:     queueNo,
-		Status:          "รอคัดกรอง",
-		Department:      department,
-		Note:            req.Note,
+	nowBkk := time.Now().In(services.BangkokLocation())
+	serviceDate := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
+
+	var createdQueue models.Queue
+	maxRetries := 5
+	var lastErr error
+
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		tx := config.DB.Begin()
+		if tx.Error != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถเริ่ม Transaction ได้"})
+			return
+		}
+
+		queueNo, err := services.NextQueueNumber(config.DB, nowBkk)
+		if err != nil {
+			tx.Rollback()
+			lastErr = err
+			continue
+		}
+
+		newQueue := models.Queue{
+			PatientID:       req.PatientID,
+			CreatedByUserID: userID,
+			QueueNumber:     queueNo,
+			ServiceDate:     serviceDate,
+			Status:          "รอคัดกรอง",
+			Department:      department,
+			Note:            req.Note,
+			CreatedAt:       nowBkk,
+			UpdatedAt:       nowBkk,
+		}
+
+		if err := tx.Create(&newQueue).Error; err != nil {
+			tx.Rollback()
+			lastErr = err
+			log.Printf("[COLLISION RETRY] Attempt %d/%d encountered collision for queue %s: %v. Retrying with next sequence...", attempt+1, maxRetries, queueNo, err)
+			time.Sleep(10 * time.Millisecond) // Short backoff on collision
+			continue
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			lastErr = err
+			continue
+		}
+
+		createdQueue = newQueue
+		lastErr = nil
+		break
 	}
 
-	if err := config.DB.Create(&newQueue).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถออกบัตรคิวได้"})
+	if lastErr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("ไม่สามารถออกบัตรคิวได้: %v", lastErr)})
 		return
 	}
 
-	config.DB.Preload("Patient").First(&newQueue, newQueue.ID)
+	config.DB.Preload("Patient").First(&createdQueue, createdQueue.ID)
 
-	// ส่ง WebSocket Broadcast แจ้งเตือนทุกเครื่องว่ามีคิวใหม่ถูกสร้างขึ้น
-	ws.BroadcastEvent("QUEUE_CREATED", newQueue)
+	// ส่ง WebSocket Broadcast แจ้งเตือนทุกเครื่องว่ามีคิวใหม่ถูกสร้างขึ้นหลัง commit สำเร็จ
+	ws.BroadcastEvent("QUEUE_CREATED", createdQueue)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "ออกบัตรคิวสำเร็จ",
-		"queue":   newQueue,
+		"queue":   createdQueue,
 	})
 }
 

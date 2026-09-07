@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useAuth } from '../../context/AuthContext';
 import type {
   QueuePatientItem,
+  TriageLevelNum,
   TriageLevelKey,
   BMICategoryKey,
   BMICategoryInfo,
@@ -14,6 +15,7 @@ import { VitalsFormCard } from './components/VitalsFormCard';
 import { queueApi, vitalsApi, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
+import { clinicMockStore, type MockQueue } from '../../mocks/clinicMockStore';
 import './VitalsPage.css';
 
 export { formatHN, formatQueueNo };
@@ -41,7 +43,7 @@ interface VitalsDraftPayload {
   currentMedications: string;
   smokingHistory: string;
   alcoholHistory: string;
-  selectedTriage: TriageLevelKey;
+  selectedTriage: TriageLevelNum;
   assignedDoctorId: number;
   savedAt: string;
 }
@@ -102,6 +104,29 @@ const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
   };
 };
 
+const mapMockQueueToPatientItem = (q: MockQueue): QueuePatientItem => {
+  const queueFormatted = formatQueueNo(q.queueNo);
+  const hnFormatted = q.patient?.hn ? formatHN(q.patient.hn) : formatHN(q.patientId || q.id || 1);
+
+  return {
+    id: String(q.id),
+    queueId: q.id,
+    patientId: q.patientId,
+    queueNo: queueFormatted,
+    hn: hnFormatted,
+    fullName: q.patient?.fullName || `ผู้ป่วยคิว ${queueFormatted}`,
+    nationalId: formatNationalId(q.patient?.nationalId),
+    gender: (q.patient?.gender as 'ชาย' | 'หญิง' | 'อื่นๆ') || 'ชาย',
+    age: q.patient?.age || 35,
+    phone: formatPhone(q.patient?.phone),
+    schemeType: q.patient?.schemeType || 'บัตรทอง (สปสช.)',
+    allergies: q.patient?.allergies || 'ปฏิเสธการแพ้ยา',
+    chronicDiseases: q.patient?.chronicDiseases || 'ไม่มี',
+    registeredTime: q.createdAt || '08:30 น.',
+    queueStatus: (q.status as 'รอคัดกรอง' | 'รอพบแพทย์' | 'กำลังตรวจ' | 'เสร็จสิ้น') || 'รอคัดกรอง',
+  };
+};
+
 export const VitalsPage: React.FC = () => {
   const { currentUser } = useAuth();
   const initialDraft = useMemo(() => getInitialDraft(), []);
@@ -115,15 +140,23 @@ export const VitalsPage: React.FC = () => {
   const fetchQueues = useCallback(async () => {
     try {
       const data = await queueApi.getList();
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         const mapped = data.map(mapBackendQueueToPatientItem);
+        setQueueList(mapped);
+        return mapped;
+      } else {
+        const mockQueues = clinicMockStore.getQueues();
+        const mapped = mockQueues.map(mapMockQueueToPatientItem);
         setQueueList(mapped);
         return mapped;
       }
     } catch (err) {
-      console.warn('Could not load queues in vitals:', err);
+      console.warn('Could not load queues in vitals, using clinicMockStore:', err);
+      const mockQueues = clinicMockStore.getQueues();
+      const mapped = mockQueues.map(mapMockQueueToPatientItem);
+      setQueueList(mapped);
+      return mapped;
     }
-    return [];
   }, []);
 
   // ดึงรายชื่อแพทย์ประจำห้องตรวจจาก Backend DB
@@ -204,7 +237,7 @@ export const VitalsPage: React.FC = () => {
   const [currentMedications, setCurrentMedications] = useState<string>(() => initialDraft?.currentMedications || '');
   const [smokingHistory, setSmokingHistory] = useState<string>(() => initialDraft?.smokingHistory || '');
   const [alcoholHistory, setAlcoholHistory] = useState<string>(() => initialDraft?.alcoholHistory || '');
-  const [selectedTriage, setSelectedTriage] = useState<TriageLevelKey>(() => initialDraft?.selectedTriage || 'ปกติ (Normal)');
+  const [selectedTriage, setSelectedTriage] = useState<TriageLevelNum>(() => initialDraft?.selectedTriage || 4);
   const [assignedDoctorId, setAssignedDoctorId] = useState<number>(() => initialDraft?.assignedDoctorId || 4);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(() => initialDraft?.savedAt || null);
 
@@ -459,8 +492,8 @@ export const VitalsPage: React.FC = () => {
     return { bmiValue: bmi, bmiCategory: info };
   }, [weight, height]);
 
-  // Smart Triage Auto-Suggestion based on vitals
-  const suggestedTriageLevel = useMemo<TriageLevelKey>(() => {
+  // Smart Triage Auto-Suggestion based on vitals (1-4)
+  const suggestedTriageLevel = useMemo<TriageLevelNum>(() => {
     const tempNum = parseFloat(temperature);
     const sysNum = parseInt(systolicBP, 10);
     const diaNum = parseInt(diastolicBP, 10);
@@ -468,15 +501,15 @@ export const VitalsPage: React.FC = () => {
     const o2Num = parseInt(spo2, 10);
 
     if (sysNum >= 200 || diaNum >= 120 || (o2Num > 0 && o2Num < 90)) {
-      return 'ฉุกเฉินวิกฤต (Resuscitation)';
+      return 1; // ฉุกเฉินวิกฤต
     }
     if (sysNum >= 160 || diaNum >= 100 || tempNum >= 39.0 || hrNum > 120) {
-      return 'ฉุกเฉินเร่งด่วน (Urgent)';
+      return 2; // ฉุกเฉินเร่งด่วน
     }
     if (tempNum >= 38.0 || sysNum >= 140 || diaNum >= 90 || hrNum > 100) {
-      return 'กึ่งฉุกเฉิน (Semi-Urgent)';
+      return 3; // กึ่งฉุกเฉิน
     }
-    return 'ปกติ (Normal)';
+    return 4; // ปกติ
   }, [temperature, systolicBP, diastolicBP, heartRate, spo2]);
 
   // Handle Form Change
@@ -610,7 +643,7 @@ export const VitalsPage: React.FC = () => {
     setCurrentMedications('');
     setSmokingHistory('');
     setAlcoholHistory('');
-    setSelectedTriage('ปกติ (Normal)');
+    setSelectedTriage(4);
     setDraftSavedAt(null);
   };
 

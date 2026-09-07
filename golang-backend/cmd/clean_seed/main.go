@@ -210,15 +210,19 @@ func main() {
 	}
 	regID := &registrar.ID
 
+	d2026 := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	d2027 := time.Date(2027, 5, 15, 0, 0, 0, 0, time.UTC)
+	dLife := time.Date(2099, 12, 31, 0, 0, 0, 0, time.UTC)
+
 	eligibilities := []models.MedicalEligibility{
-		{PatientID: pID(0), UserID: regID, SchemeType: "บัตรทอง (สปสช.)", CoverageDetails: "ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชีและบริการพิเศษ", HospitalName: "โรงพยาบาลคลินิกเวชกรรมชุมชน", Status: "ใช้งานได้", ExpireDate: "31/12/2026", VerifiedAt: time.Now()},
-		{PatientID: pID(1), UserID: regID, SchemeType: "ประกันสังคม (ม.33)", CoverageDetails: "ผู้ประกันตนมาตรา 33 ครอบคลุมการรักษาตามเกณฑ์ สปส.", HospitalName: "โรงพยาบาลประกันสังคมสาขา 1", Status: "ใช้งานได้", ExpireDate: "31/12/2026", VerifiedAt: time.Now()},
-		{PatientID: pID(2), UserID: regID, SchemeType: "สิทธิ์ข้าราชการ", CoverageDetails: "จ่ายตรงกรมบัญชีกลาง เบิกค่ายาและค่ารักษาได้ตามสิทธิ์", HospitalName: "โรงพยาบาลรัฐบาลหลัก", Status: "ใช้งานได้", ExpireDate: "ตลอดอายุราชการ", VerifiedAt: time.Now()},
-		{PatientID: pID(3), UserID: regID, SchemeType: "บัตรทอง (สปสช.)", CoverageDetails: "ครอบคลุมการรักษาโรคทั่วไปและโรคเรื้อรัง", HospitalName: "โรงพยาบาลศูนย์สุขภาพปฐมภูมิ", Status: "ใช้งานได้", ExpireDate: "31/12/2026", VerifiedAt: time.Now()},
-		{PatientID: pID(4), UserID: regID, SchemeType: "ประกันสุขภาพเอกชน", CoverageDetails: "AIA Care Max คุ้มครองผู้ป่วยนอก 2,000 บ./ครั้ง", HospitalName: "โรงพยาบาลคู่สัญญาเอกชน", Status: "ใช้งานได้", ExpireDate: "15/05/2027", VerifiedAt: time.Now()},
-		{PatientID: pID(5), UserID: regID, SchemeType: "บัตรทอง (สปสช.)", CoverageDetails: "สิทธิ์คุ้มครองเด็กเล็กและทันตกรรมพื้นฐาน", HospitalName: "โรงพยาบาลส่งเสริมสุขภาพประจำตำบล", Status: "ใช้งานได้", ExpireDate: "31/12/2026", VerifiedAt: time.Now()},
-		{PatientID: pID(6), UserID: regID, SchemeType: "สิทธิ์ข้าราชการ", CoverageDetails: "สิทธิ์ข้าราชการบำนาญ จ่ายตรงเบิกได้เต็มจำนวน", HospitalName: "โรงพยาบาลรัฐบาลหลัก", Status: "ใช้งานได้", ExpireDate: "ตลอดชีพ", VerifiedAt: time.Now()},
-		{PatientID: pID(7), UserID: regID, SchemeType: "ชำระเงินเอง", CoverageDetails: "ชำระเงินเต็มจำนวนตามอัตราค่าบริการของคลินิก", HospitalName: "คลินิกเวชกรรมทั่วไป", Status: "ใช้งานได้", ExpireDate: "-", VerifiedAt: time.Now()},
+		{PatientID: pID(0), UserID: regID, SchemeType: "บัตรทอง (สปสช.)", CoverageDetails: "ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชีและบริการพิเศษ", HospitalName: "โรงพยาบาลคลินิกเวชกรรมชุมชน", Status: "ใช้งานได้", ExpireDate: &d2026, VerifiedAt: time.Now()},
+		{PatientID: pID(1), UserID: regID, SchemeType: "ประกันสังคม (ม.33)", CoverageDetails: "ผู้ประกันตนมาตรา 33 ครอบคลุมการรักษาตามเกณฑ์ สปส.", HospitalName: "โรงพยาบาลประกันสังคมสาขา 1", Status: "ใช้งานได้", ExpireDate: &d2026, VerifiedAt: time.Now()},
+		{PatientID: pID(2), UserID: regID, SchemeType: "สิทธิ์ข้าราชการ", CoverageDetails: "จ่ายตรงกรมบัญชีกลาง เบิกค่ายาและค่ารักษาได้ตามสิทธิ์", HospitalName: "โรงพยาบาลรัฐบาลหลัก", Status: "ใช้งานได้", ExpireDate: &dLife, VerifiedAt: time.Now()},
+		{PatientID: pID(3), UserID: regID, SchemeType: "บัตรทอง (สปสช.)", CoverageDetails: "ครอบคลุมการรักษาโรคทั่วไปและโรคเรื้อรัง", HospitalName: "โรงพยาบาลศูนย์สุขภาพปฐมภูมิ", Status: "ใช้งานได้", ExpireDate: &d2026, VerifiedAt: time.Now()},
+		{PatientID: pID(4), UserID: regID, SchemeType: "ประกันสุขภาพเอกชน", CoverageDetails: "AIA Care Max คุ้มครองผู้ป่วยนอก 2,000 บ./ครั้ง", HospitalName: "โรงพยาบาลคู่สัญญาเอกชน", Status: "ใช้งานได้", ExpireDate: &d2027, VerifiedAt: time.Now()},
+		{PatientID: pID(5), UserID: regID, SchemeType: "บัตรทอง (สปสช.)", CoverageDetails: "สิทธิ์คุ้มครองเด็กเล็กและทันตกรรมพื้นฐาน", HospitalName: "โรงพยาบาลส่งเสริมสุขภาพประจำตำบล", Status: "ใช้งานได้", ExpireDate: &d2026, VerifiedAt: time.Now()},
+		{PatientID: pID(6), UserID: regID, SchemeType: "สิทธิ์ข้าราชการ", CoverageDetails: "สิทธิ์ข้าราชการบำนาญ จ่ายตรงเบิกได้เต็มจำนวน", HospitalName: "โรงพยาบาลรัฐบาลหลัก", Status: "ใช้งานได้", ExpireDate: &dLife, VerifiedAt: time.Now()},
+		{PatientID: pID(7), UserID: regID, SchemeType: "ชำระเงินเอง", CoverageDetails: "ชำระเงินเต็มจำนวนตามอัตราค่าบริการของคลินิก", HospitalName: "คลินิกเวชกรรมทั่วไป", Status: "ใช้งานได้", ExpireDate: nil, VerifiedAt: time.Now()},
 	}
 	for i := range eligibilities {
 		db.Create(&eligibilities[i])
@@ -261,7 +265,7 @@ func main() {
 			VisitID:          visits[0].ID,
 			ScreenedByUserID: nurse.ID,
 			AssignedDoctorID: doc1.ID,
-			TriageLevel:      "ไม่ฉุกเฉิน (Non-Urgent)",
+			TriageLevel:      4,
 			ChiefComplaint:   "มาตรวจสุขภาพประจำปี รู้สึกอ่อนเพลียเล็กน้อย",
 			Allergies:        "ปฏิเสธการแพ้ยา",
 			MedicalHistory:   "ความดันโลหิตสูง (คุมได้ดี)",
@@ -280,7 +284,7 @@ func main() {
 			VisitID:          visits[1].ID,
 			ScreenedByUserID: nurse.ID,
 			AssignedDoctorID: doc2.ID,
-			TriageLevel:      "กึ่งฉุกเฉิน (Semi-Urgent)",
+			TriageLevel:      3,
 			ChiefComplaint:   "ปวดศีรษะท้ายทอยช่วงบ่าย ทานยาแก้ปวดแล้วไม่ดีขึ้น",
 			Allergies:        "ปฏิเสธการแพ้ยา",
 			MedicalHistory:   "ความดันโลหิตสูง",
@@ -299,7 +303,7 @@ func main() {
 			VisitID:          visits[2].ID,
 			ScreenedByUserID: nurse.ID,
 			AssignedDoctorID: doc1.ID,
-			TriageLevel:      "ฉุกเฉินเร่งด่วน (Urgent)",
+			TriageLevel:      2,
 			ChiefComplaint:   "ปวดศีรษะไมเกรนรุนแรง ตาพร่ามัว คลื่นไส้",
 			Allergies:        "แพ้ยา Penicillin",
 			MedicalHistory:   "ไมเกรน",
@@ -318,7 +322,7 @@ func main() {
 			VisitID:          visits[3].ID,
 			ScreenedByUserID: assistant.ID,
 			AssignedDoctorID: doc2.ID,
-			TriageLevel:      "ไม่ฉุกเฉิน (Non-Urgent)",
+			TriageLevel:      4,
 			ChiefComplaint:   "รับยาความดันต่อเนื่องตามนัด สบายดี ไม่มีอาการผิดปกติ",
 			Allergies:        "ปฏิเสธการแพ้ยา",
 			MedicalHistory:   "ความดันโลหิตสูง",
@@ -337,7 +341,7 @@ func main() {
 			VisitID:          visits[4].ID,
 			ScreenedByUserID: nurse.ID,
 			AssignedDoctorID: doc2.ID,
-			TriageLevel:      "กึ่งฉุกเฉิน (Semi-Urgent)",
+			TriageLevel:      3,
 			ChiefComplaint:   "ตรวจระดับน้ำตาลในเลือดสะสม ปัสสาวะบ่อยตอนกลางคืน",
 			Allergies:        "ปฏิเสธการแพ้ยา",
 			MedicalHistory:   "เบาหวานชนิดที่ 2",
@@ -356,7 +360,7 @@ func main() {
 			VisitID:          visits[5].ID,
 			ScreenedByUserID: assistant.ID,
 			AssignedDoctorID: doc3.ID,
-			TriageLevel:      "ไม่ฉุกเฉิน (Non-Urgent)",
+			TriageLevel:      4,
 			ChiefComplaint:   "ตรวจสุขภาพทั่วไป เพื่อขอใบรับรองแพทย์ทำใบขับขี่",
 			Allergies:        "ปฏิเสธการแพ้ยา",
 			MedicalHistory:   "ไม่มี",
@@ -375,7 +379,7 @@ func main() {
 			VisitID:          visits[6].ID,
 			ScreenedByUserID: nurse.ID,
 			AssignedDoctorID: doc3.ID,
-			TriageLevel:      "ฉุกเฉิน (Emergency)",
+			TriageLevel:      2,
 			ChiefComplaint:   "มีไข้สูง 39.2 องศา หนาวสั่น ไอมีเสมหะ ซึมลง",
 			Allergies:        "ปฏิเสธการแพ้ยา",
 			MedicalHistory:   "ไม่มี",
@@ -394,7 +398,7 @@ func main() {
 			VisitID:          visits[7].ID,
 			ScreenedByUserID: nurse.ID,
 			AssignedDoctorID: doc2.ID,
-			TriageLevel:      "ฉุกเฉินวิกฤต (Resuscitation)",
+			TriageLevel:      1,
 			ChiefComplaint:   "แน่นหน้าอกร้าวไปกรามซ้าย หายใจเหนื่อยหอบ เหงื่อแตก",
 			Allergies:        "แพ้ยา Sulfa",
 			MedicalHistory:   "โรคหัวใจขาดเลือด, ความดันโลหิตสูง",

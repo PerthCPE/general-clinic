@@ -6,6 +6,13 @@ interface ScreeningStatsBannerProps {
 }
 
 export const ScreeningStatsBanner: React.FC<ScreeningStatsBannerProps> = ({ stats }) => {
+  const now = new Date();
+  const THAI_MONTH_NAMES = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+  ];
+  const currentMonthLabel = `${THAI_MONTH_NAMES[now.getMonth()]} ${now.getFullYear() + 543}`;
+
   return (
     <div className="scr-stats-grid">
       {/* Card 1: Total Screenings */}
@@ -50,7 +57,7 @@ export const ScreeningStatsBanner: React.FC<ScreeningStatsBannerProps> = ({ stat
             <span className="scr-stat-value">{stats.thisMonthRecords.toLocaleString()}</span>
             <span className="scr-stat-unit">ครั้ง</span>
           </div>
-          <span className="scr-stat-badge green-badge">สิงหาคม 2026</span>
+          <span className="scr-stat-badge green-badge">{stats.monthLabel || currentMonthLabel}</span>
         </div>
       </div>
 

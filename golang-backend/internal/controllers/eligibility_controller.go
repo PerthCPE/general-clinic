@@ -102,6 +102,27 @@ func GetEligibilityHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, histories)
 }
 
+func parseEligibilityDate(raw string) *time.Time {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		dt := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+		return &dt
+	}
+	if t, err := time.Parse("2006-01-02", trimmed); err == nil {
+		return &t
+	}
+	if t, err := time.Parse("02/01/2006", trimmed); err == nil {
+		if t.Year() < 2400 {
+			return &t
+		}
+		ceYear := t.Year() - 543
+		dt := time.Date(ceYear, t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		return &dt
+	}
+	dt := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	return &dt
+}
+
 func SavePatientEligibility(c *gin.Context) {
 	var req SaveEligibilityReq
 
@@ -135,10 +156,7 @@ func SavePatientEligibility(c *gin.Context) {
 	if status == "" {
 		status = "ใช้งานได้"
 	}
-	expireDate := req.ExpireDate
-	if expireDate == "" {
-		expireDate = "31/12/2026"
-	}
+	parsedExpireDate := parseEligibilityDate(req.ExpireDate)
 
 	var existingEligibility models.MedicalEligibility
 	result := config.DB.Where("patient_id = ?", req.PatientID).First(&existingEligibility)
@@ -148,7 +166,7 @@ func SavePatientEligibility(c *gin.Context) {
 		existingEligibility.CoverageDetails = req.CoverageDetails
 		existingEligibility.HospitalName = hospitalName
 		existingEligibility.Status = status
-		existingEligibility.ExpireDate = expireDate
+		existingEligibility.ExpireDate = parsedExpireDate
 		existingEligibility.UserID = userID
 		existingEligibility.VerifiedAt = time.Now()
 		if err := config.DB.Save(&existingEligibility).Error; err != nil {
@@ -163,7 +181,7 @@ func SavePatientEligibility(c *gin.Context) {
 			CoverageDetails: req.CoverageDetails,
 			HospitalName:    hospitalName,
 			Status:          status,
-			ExpireDate:      expireDate,
+			ExpireDate:      parsedExpireDate,
 			VerifiedAt:      time.Now(),
 		}
 		if err := config.DB.Create(&newEligibility).Error; err != nil {

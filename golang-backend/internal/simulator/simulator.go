@@ -51,42 +51,42 @@ var complaints = []struct {
 	Complaint      string
 	History        string
 	NurseNote      string
-	Triage         string
+	Triage         int // 1=Resuscitation, 2=Urgent, 3=Semi-Urgent, 4=Normal
 	PainScore      int
 	NeedsProcedure bool
 	Specialty      string // general, medicine, pediatrics
 }{
 	{
 		Complaint: "ไข้ต่ำๆ ไอมีเสมหะ เจ็บคอ มา 3 วัน", History: "ไม่มีโรคประจำตัว ไม่เคยผ่าตัด",
-		NurseNote: "รู้สึกตัวดี เดินได้เอง ไม่มีภาวะขาดน้ำ", Triage: "ปกติ (Normal)", PainScore: 1, NeedsProcedure: false, Specialty: "general",
+		NurseNote: "รู้สึกตัวดี เดินได้เอง ไม่มีภาวะขาดน้ำ", Triage: 4, PainScore: 1, NeedsProcedure: false, Specialty: "general",
 	},
 	{
 		Complaint: "ปวดศีรษะข้างเดียว คลื่นไส้ ตาพร่ามัว มา 6 ชั่วโมง", History: "ไมเกรน มีประวัติแพ้ยา Penicillin",
-		NurseNote: "นอนพักห้องสังเกตอาการ อาการปวดศีรษะปานกลาง", Triage: "กึ่งฉุกเฉิน (Semi-Urgent)", PainScore: 6, NeedsProcedure: false, Specialty: "medicine",
+		NurseNote: "นอนพักห้องสังเกตอาการ อาการปวดศีรษะปานกลาง", Triage: 3, PainScore: 6, NeedsProcedure: false, Specialty: "medicine",
 	},
 	{
 		Complaint: "แน่นหน้าอก เหนื่อยหอบ ร้าวไปแขนซ้าย เริ่มมา 2 ชั่วโมง", History: "ความดันโลหิตสูง สูบบุหรี่วันละครึ่งซอง",
-		NurseNote: "ให้ออกซิเจน 3 LPM แล้ว EKG 12 Lead ส่งพบแพทย์ด่วน", Triage: "ฉุกเฉินเร่งด่วน (Level 2)", PainScore: 8, NeedsProcedure: false, Specialty: "medicine",
+		NurseNote: "ให้ออกซิเจน 3 LPM แล้ว EKG 12 Lead ส่งพบแพทย์ด่วน", Triage: 2, PainScore: 8, NeedsProcedure: false, Specialty: "medicine",
 	},
 	{
 		Complaint: "มีไข้สูง 38.9°C ไอ มีน้ำมูก ซึม ทานอาหารได้น้อย มา 1 วัน", History: "คลอดครบกำหนด วัคซีนครบตามเกณฑ์",
-		NurseNote: "เช็ดตัวลดไข้ทันที ส่งพบกุมารแพทย์ห้องตรวจ 3 ด่วน", Triage: "เร่งด่วน (Urgent)", PainScore: 3, NeedsProcedure: false, Specialty: "pediatrics",
+		NurseNote: "เช็ดตัวลดไข้ทันที ส่งพบกุมารแพทย์ห้องตรวจ 3 ด่วน", Triage: 2, PainScore: 3, NeedsProcedure: false, Specialty: "pediatrics",
 	},
 	{
 		Complaint: "มีดบาดแขนขวา แผลฉีกขาดยาว 3 ซม. เลือดไหลซึม", History: "ฉีดวัคซีนบาดทะยักครบเมื่อ 2 ปีก่อน",
-		NurseNote: "กดห้ามเลือดแล้ว ส่งเข้าห้องหัตถการเพื่อทำแผลและเย็บแผล", Triage: "ไม่เร่งด่วน (Non-Urgent)", PainScore: 5, NeedsProcedure: true, Specialty: "general",
+		NurseNote: "กดห้ามเลือดแล้ว ส่งเข้าห้องหัตถการเพื่อทำแผลและเย็บแผล", Triage: 4, PainScore: 5, NeedsProcedure: true, Specialty: "general",
 	},
 	{
 		Complaint: "ปวดท้องบิดเกร็งบริเวณลิ้นปี่ คลื่นไส้อาเจียน 2 ครั้ง", History: "โรคกระเพาะอาหาร ทานอาหารไม่ตรงเวลา",
-		NurseNote: "กดเจ็บบริเวณ Epigastrium ไม่มี Rebound tenderness", Triage: "กึ่งฉุกเฉิน (Semi-Urgent)", PainScore: 5, NeedsProcedure: false, Specialty: "medicine",
+		NurseNote: "กดเจ็บบริเวณ Epigastrium ไม่มี Rebound tenderness", Triage: 3, PainScore: 5, NeedsProcedure: false, Specialty: "medicine",
 	},
 	{
 		Complaint: "ผื่นแดงคันตามตัว ตาบวม หลังรับประทานอาหารทะเล 1 ชม.", History: "ประวัติแพ้กุ้ง ทานอาหารนอกบ้าน",
-		NurseNote: "ริมฝีปากบวมเล็กน้อย ไม่มี Stridor ให้นั่งสังเกตอาการ", Triage: "เร่งด่วน (Urgent)", PainScore: 3, NeedsProcedure: true, Specialty: "medicine",
+		NurseNote: "ริมฝีปากบวมเล็กน้อย ไม่มี Stridor ให้นั่งสังเกตอาการ", Triage: 2, PainScore: 3, NeedsProcedure: true, Specialty: "medicine",
 	},
 	{
 		Complaint: "ตรวจติดตามอาการเบาหวานและความดันตามนัด และรับยาต่อเนื่อง", History: "เบาหวานชนิดที่ 2 (10 ปี), ความดันโลหิตสูง (8 ปี)",
-		NurseNote: "ไม่มีอาการผิดปกติ ตรวจ DTX ก่อนพบแพทย์", Triage: "ปกติ (Normal)", PainScore: 0, NeedsProcedure: false, Specialty: "medicine",
+		NurseNote: "ไม่มีอาการผิดปกติ ตรวจ DTX ก่อนพบแพทย์", Triage: 4, PainScore: 0, NeedsProcedure: false, Specialty: "medicine",
 	},
 }
 
@@ -160,13 +160,14 @@ func generateUniquePatientData(rng *rand.Rand) (models.Patient, models.MedicalEl
 		regUserID = 1
 	}
 
+	defaultExp := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
 	elig := models.MedicalEligibility{
 		UserID:          &regUserID,
 		SchemeType:      scheme,
 		CoverageDetails: "สิทธิ์การรักษาตรวจสุขภาพและบริการทั่วไป",
 		HospitalName:    "โรงพยาบาลคลินิกเวชกรรม",
 		Status:          "ใช้งานได้",
-		ExpireDate:      "31/12/2026",
+		ExpireDate:      &defaultExp,
 		VerifiedAt:      time.Now(),
 	}
 

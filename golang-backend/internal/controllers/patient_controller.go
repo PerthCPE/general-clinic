@@ -132,13 +132,14 @@ func RegisterPatient(c *gin.Context) {
 		coverage = "ชำระค่ารักษาพยาบาลด้วยตนเอง"
 	}
 
+	defaultExp := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
 	initialEligibility := models.MedicalEligibility{
 		PatientID:       &newPatient.ID,
 		SchemeType:      schemeType,
 		CoverageDetails: coverage,
 		HospitalName:    "โรงพยาบาลคลินิกเวชกรรมชุมชน",
 		Status:          "ใช้งานได้",
-		ExpireDate:      "31/12/2026",
+		ExpireDate:      &defaultExp,
 		VerifiedAt:      time.Now(),
 	}
 	config.DB.Create(&initialEligibility)

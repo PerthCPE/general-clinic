@@ -89,6 +89,10 @@ func ConnectDB() {
 			&models.PatientHistory{},
 			&models.Examination{},
 			&models.Diagnosis{},
+			&models.QueueCounter{},
+			&models.Appointment{},
+			&models.SystemAccess{},
+			&models.TreatmentRight{},
 		)
 		if err != nil {
 			log.Fatal("Database Migration Failed. Error: ", err)
@@ -96,7 +100,7 @@ func ConnectDB() {
 		log.Println("Database Migration Complete.")
 	} else {
 		// Always ensure new models are migrated
-		database.AutoMigrate(&models.Medicine{}, &models.PatientMedicine{}, &models.BillingQueue{}, &models.MedicineQueue{})
+		database.AutoMigrate(&models.Medicine{}, &models.PatientMedicine{}, &models.BillingQueue{}, &models.MedicineQueue{}, &models.QueueCounter{}, &models.Appointment{}, &models.SystemAccess{}, &models.TreatmentRight{})
 		log.Println("Database schema already up to date. Skipped redundant AutoMigrate.")
 	}
 
@@ -175,15 +179,65 @@ func ConnectDB() {
 	// สามตัวแรกคือคู่ที่ query ของแพทย์ filter พร้อมกันเสมอ ถ้าไม่มี index
 	// PostgreSQL ต้องไล่อ่านทั้งตาราง (Seq Scan) ทุกครั้งที่เปิดหน้า
 	//
-	// idx_visit_records_patient_date สำคัญที่สุด
-	// หน้าประวัติหา "การมาตรวจครั้งล่าสุดของผู้ป่วยแต่ละคน" ด้วย
-	// DISTINCT ON (patient_id) ... ORDER BY patient_id, visit_date DESC
-	// ซึ่งจะเร็วก็ต่อเมื่อ index เรียงตามลำดับเดียวกันเป๊ะ (patient_id, visit_date DESC)
-	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_patient_date ON visit_records(patient_id, visit_date DESC)")
-	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_status_date ON visit_records(status, visit_date DESC)")
-	database.Exec("CREATE INDEX IF NOT EXISTS idx_diagnoses_visit_primary ON diagnoses(visit_id, is_primary)")
-	database.Exec("CREATE INDEX IF NOT EXISTS idx_screenings_visit_id ON screenings(visit_id)")
-	database.Exec("CREATE INDEX IF NOT EXISTS idx_examinations_visit_id ON examinations(visit_id)")
+	// ⚡ [Sprint 1] Triage canonical integer conversion & check constraint (1-4)
+	database.Exec(`DO $$
+	BEGIN
+		IF EXISTS (
+			SELECT 1 FROM information_schema.columns 
+			WHERE table_name = 'screenings' 
+			  AND column_name = 'triage_level' 
+			  AND data_type IN ('text', 'character varying')
+		) THEN
+			UPDATE screenings
+			SET triage_level = CASE
+				WHEN triage_level LIKE '%วิกฤต%' OR triage_level LIKE '%Resuscitation%' OR triage_level = '1' THEN '1'
+				WHEN triage_level LIKE '%กึ่ง%' OR triage_level LIKE '%Semi-Urgent%' OR triage_level = '3' THEN '3'
+				WHEN triage_level LIKE '%ฉุกเฉิน%' OR triage_level LIKE '%เร่งด่วน%' OR triage_level LIKE '%Urgent%' OR triage_level LIKE '%Emergency%' OR triage_level = '2' THEN '2'
+				WHEN triage_level LIKE '%ปกติ%' OR triage_level LIKE '%Normal%' OR triage_level = '4' THEN '4'
+				ELSE '4'
+			END;
+
+			ALTER TABLE screenings 
+			ALTER COLUMN triage_level TYPE integer USING (triage_level::integer);
+		END IF;
+
+		ALTER TABLE screenings ALTER COLUMN triage_level SET DEFAULT 4;
+		ALTER TABLE screenings ALTER COLUMN triage_level SET NOT NULL;
+
+		IF NOT EXISTS (
+			SELECT 1 FROM information_schema.constraint_column_usage 
+			WHERE table_name = 'screenings' 
+			  AND constraint_name = 'chk_screenings_triage_level'
+		) THEN
+			ALTER TABLE screenings 
+			ADD CONSTRAINT chk_screenings_triage_level CHECK (triage_level BETWEEN 1 AND 4);
+		END IF;
+	END $$;`)
+
+	// ⚡ [Sprint 1] Daily queue numbering sequence & unique constraint
+	database.Exec("ALTER TABLE queues ADD COLUMN IF NOT EXISTS service_date DATE DEFAULT CURRENT_DATE")
+	database.Exec("UPDATE queues SET service_date = DATE(created_at AT TIME ZONE 'Asia/Bangkok') WHERE service_date IS NULL")
+	database.Exec(`
+		INSERT INTO queue_counters (service_date, last_number, created_at, updated_at)
+		SELECT 
+			service_date,
+			COALESCE(MAX(('x' || lpad(SUBSTRING(queue_number FROM 2), 8, '0'))::bit(32)::bigint), 0) AS last_number,
+			NOW(),
+			NOW()
+		FROM queues
+		WHERE service_date IS NOT NULL 
+		  AND queue_number ~* '^Q[0-9A-Fa-f]{1,4}$'
+		GROUP BY service_date
+		ON CONFLICT (service_date) DO UPDATE
+		SET last_number = GREATEST(queue_counters.last_number, EXCLUDED.last_number),
+		    updated_at = NOW()
+	`)
+
+	// ⚡ [Sprint 1] VisitRecord idempotency & traceability
+	database.Exec("ALTER TABLE visit_records ADD COLUMN IF NOT EXISTS queue_id BIGINT")
+	database.Exec("ALTER TABLE visit_records ADD COLUMN IF NOT EXISTS queue_number VARCHAR(20) DEFAULT ''")
+	database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_visit_queue_unique ON visit_records (queue_id) WHERE queue_id IS NOT NULL")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_queue_number ON visit_records (queue_number)")
 
 	DB = database
 
@@ -295,15 +349,15 @@ func seedDatabase() {
 		}
 
 		docs := []models.Document{
-			{ExternalDocRef: "สธ 0201/2569", Subject: "แนวทางการควบคุมโรคติดต่อทางเดินหายใจ ประจำปี 2569", FileURL: "https://example.com/docs/guidelines_2569.pdf", CreatedBy: officerUser.ID},
-			{ExternalDocRef: "สปสช. 1102/2569", Subject: "ประกาศปรับปรุงอัตราค่าชดเชยค่าบริการทางการแพทย์ใหม่", FileURL: "https://example.com/docs/nhso_rates.pdf", CreatedBy: officerUser.ID},
-			{ExternalDocRef: "อย. 4405/2569", Subject: "แจ้งเตือนการเฝ้าระวังยาควบคุมพิเศษกลุ่มต้านการอักเสบ", FileURL: "https://example.com/docs/fda_alert.pdf", CreatedBy: officerUser.ID},
-			{ExternalDocRef: "รพ. 8812/2569", Subject: "หนังสือประสานงานแนวทางการส่งต่อผู้ป่วยฉุกเฉิน (Referral System)", FileURL: "https://example.com/docs/referral_network.pdf", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "สธ 0201/2569", Subject: "แนวทางการควบคุมโรคติดต่อทางเดินหายใจ ประจำปี 2569", FileURL: "https://example.com/docs/guidelines_2569.pdf", FileSize: 2450000, DocType: "PDF / แนวทางปฏิบัติ", Status: "approved", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "สปสช. 1102/2569", Subject: "ประกาศปรับปรุงอัตราค่าชดเชยค่าบริการทางการแพทย์ใหม่", FileURL: "https://example.com/docs/nhso_rates.pdf", FileSize: 1850000, DocType: "PDF / ประกาศ สปสช.", Status: "approved", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "อย. 4405/2569", Subject: "แจ้งเตือนการเฝ้าระวังยาควบคุมพิเศษกลุ่มต้านการอักเสบ", FileURL: "https://example.com/docs/fda_alert.pdf", FileSize: 1200000, DocType: "PDF / หนังสือแจ้งเตือน", Status: "reviewing", CreatedBy: officerUser.ID},
+			{ExternalDocRef: "รพ. 8812/2569", Subject: "หนังสือประสานงานแนวทางการส่งต่อผู้ป่วยฉุกเฉิน (Referral System)", FileURL: "https://example.com/docs/referral_network.pdf", FileSize: 3100000, DocType: "PDF / เอกสารส่งตัว", Status: "reviewing", CreatedBy: officerUser.ID},
 		}
 		for i := range docs {
 			DB.Create(&docs[i])
 		}
-		log.Println("Documents seeded successfully into Database.")
+		log.Println("Documents seeded successfully into Database with real file sizes.")
 
 		var doctorUser, nurseUser, cashierUser, pharmacistUser models.User
 		DB.Where("username = ?", "doctor1").First(&doctorUser)
@@ -357,3 +411,5 @@ func seedDatabase() {
 		}
 	}
 }
+
+

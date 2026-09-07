@@ -129,6 +129,7 @@ export const authApi = {
     const res = await request<{
       token: string;
       role: string;
+      requires_password_change?: boolean;
       user: {
         id: number;
         username: string;
@@ -146,6 +147,11 @@ export const authApi = {
     }
     return res;
   },
+  changePassword: (payload: { old_password: string; new_password: string }) =>
+    request('/api/auth/change-password', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
   logout: () => {
     tokenStorage.remove();
   },
@@ -273,7 +279,7 @@ export interface BackendScreening {
   visit_id: number;
   screened_by_user_id: number;
   assigned_doctor_id?: number;
-  triage_level: string;
+  triage_level: number | string;
   chief_complaint: string;
   allergies: string;
   medical_history: string;
@@ -300,6 +306,8 @@ export interface BackendScreening {
     patient_id: number;
     doctor_id: number;
     visit_date: string;
+    queue_id?: number;
+    queue_number?: string;
     patient?: BackendPatient;
   };
   screened_by?: {
@@ -349,13 +357,15 @@ export const vitalsApi = {
     medical_history?: string;
     nurse_notes?: string;
     assigned_doctor_id?: number;
-    triage_level?: string;
+    triage_level?: number | string;
   }) =>
     request<{
       message: string;
       screening_id: number;
+      visit_id?: number;
+      queue_number?: string;
       bmi: number;
-      triage_level: string;
+      triage_level: number | string;
     }>('/api/nurse/vitals', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -368,10 +378,30 @@ export const vitalsApi = {
 // ==============================================================================
 // 6. Officer DMS (Document Management & Forwarding) API
 // ==============================================================================
+export interface StorageBreakdown {
+  type: string;
+  size_bytes: number;
+  size_mb: number;
+  count: number;
+}
+
+export interface StorageStats {
+  quota_bytes: number;
+  quota_mb: number;
+  used_bytes: number;
+  used_mb: number;
+  remaining_bytes: number;
+  remaining_mb: number;
+  percentage: number;
+  total_files: number;
+  breakdown?: StorageBreakdown[];
+}
+
 export interface BackendUser {
   id: number;
   username: string;
   fullname?: string;
+  full_name?: string;
   role: string;
   phone?: string;
 }
@@ -380,11 +410,17 @@ export interface BackendDocument {
   id: number;
   external_doc_ref: string;
   subject: string;
+  description?: string;
   file_url: string;
+  file_size?: number;
+  status?: 'reviewing' | 'approved' | 'draft' | string;
+  doc_type?: string;
   created_by: number;
+  approved_by?: number | null;
   created_at: string;
   updated_at: string;
   creator?: BackendUser;
+  approver?: BackendUser;
 }
 
 export interface BackendDocumentForward {
@@ -401,15 +437,30 @@ export interface BackendDocumentForward {
 
 export const dmsApi = {
   getDocuments: () => request<BackendDocument[]>('/api/officer/documents'),
+  getDocumentById: (id: number | string) => request<BackendDocument>(`/api/officer/documents/${id}`),
   createDocument: (payload: {
     external_doc_ref?: string;
     subject: string;
+    description?: string;
     file_url?: string;
+    file_size?: number;
+    doc_type?: string;
+    status?: string;
   }) =>
     request<{ message: string; document: BackendDocument }>('/api/officer/documents', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
+  approveDocument: (id: number | string) =>
+    request<{ message: string; document: BackendDocument }>(`/api/officer/documents/${id}/approve`, {
+      method: 'PUT',
+    }),
+  updateDocumentStatus: (id: number | string, status: 'approved' | 'reviewing' | 'draft') =>
+    request<{ message: string; document: BackendDocument }>(`/api/officer/documents/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    }),
+  getStorageStats: () => request<StorageStats>('/api/officer/storage/stats'),
   getForwards: () => request<BackendDocumentForward[]>('/api/officer/documents/forwards'),
   forwardDocument: (payload: {
     doc_id: number;
@@ -898,3 +949,55 @@ export const examinationApi = {
       `/api/doctor/patients/${patientId}/visits`
     ),
 };
+export const adminApi = {
+    getAccounts: () => request<BackendUser[]>('/api/admin/accounts'),
+    createAccount: (payload: { username: string; password?: string; role: string; fullname: string; employee_id: string; phone: string; }) =>
+      request<BackendUser>('/api/admin/accounts', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    updateAccountStatus: (id: number | string, status: string) =>
+      request<{ message: string }>('/api/admin/accounts/' + id + '/status', {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      }),
+    createSystemAccess: (payload: { user_id: number; access_level: number; module_name: string; }) =>
+      request<any>('/api/admin/system-access', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+  };
+
+export interface BackendAppointment {
+  id: number;
+  doctor_id: number;
+  patient_id: number;
+  register_id: number;
+  appointment_date: string;
+  appointment_time: string;
+  status: string;
+  clinical_note: string;
+  doctor?: BackendUser;
+  patient?: BackendPatient;
+  register?: BackendUser;
+}
+
+export const appointmentApi = {
+  getList: () => request<BackendAppointment[]>('/api/appointments'),
+  create: (payload: { doctor_id: number; patient_id: number; register_id: number; appointment_date: string; appointment_time: string; clinical_note: string; }) =>
+    request<BackendAppointment>('/api/appointments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateStatus: (id: number | string, payload: { status: string; clinical_note?: string; }) =>
+    request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/status', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  updateSchedule: (id: number | string, payload: { appointment_date?: string; appointment_time?: string; }) =>
+    request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/schedule', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+};
+

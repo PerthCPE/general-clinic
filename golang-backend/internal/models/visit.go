@@ -20,6 +20,8 @@ type VisitRecord struct {
 	PatientID uint      `gorm:"not null" json:"patient_id"`
 	DoctorID  uint      `json:"doctor_id"`
 	VisitDate time.Time `json:"visit_date"`
+	QueueID   *uint     `gorm:"index" json:"queue_id"`
+	QueueNumber string  `gorm:"size:20;index" json:"queue_number"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 

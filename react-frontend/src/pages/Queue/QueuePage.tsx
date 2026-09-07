@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { queueApi, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
-import { formatQueueNo, formatNationalId } from '../../utils/formatters';
+import { formatQueueNo, formatNationalId, maskNationalId } from '../../utils/formatters';
+import { clinicMockStore } from '../../mocks/clinicMockStore';
 import { callQueueAudio, getSpokenDepartmentText } from '../../utils/audioQueue';
 import './QueuePage.css';
 
@@ -157,15 +158,38 @@ const QueuePage: React.FC = () => {
     setIsLoading(true);
     try {
       const data = await queueApi.getList();
-      if (Array.isArray(data)) {
-        if (data.length > 0) {
-          setQueueList(data.map(mapBackendQueueToUI));
-        } else {
-          setQueueList([]);
-        }
+      if (Array.isArray(data) && data.length > 0) {
+        setQueueList(data.map(mapBackendQueueToUI));
+      } else {
+        const mockQueues = clinicMockStore.getQueues();
+        setQueueList(
+          mockQueues.map((q) => ({
+            id: String(q.id),
+            queueNo: formatQueueNo(q.queueNo),
+            patientName: q.patient?.fullName || `ผู้ป่วยคิว ${q.queueNo}`,
+            idCard: formatNationalId(q.patient?.nationalId),
+            status: (q.status as QueueStatus) || 'รอคัดกรอง',
+            department: q.department || 'จุดคัดกรอง',
+            time: q.createdAt || '08:30 น.',
+            note: q.note || '',
+          }))
+        );
       }
     } catch (err) {
-      console.warn('Could not fetch queue list from backend:', err);
+      console.warn('Could not fetch queue list from backend, using clinicMockStore:', err);
+      const mockQueues = clinicMockStore.getQueues();
+      setQueueList(
+        mockQueues.map((q) => ({
+          id: String(q.id),
+          queueNo: formatQueueNo(q.queueNo),
+          patientName: q.patient?.fullName || `ผู้ป่วยคิว ${q.queueNo}`,
+          idCard: formatNationalId(q.patient?.nationalId),
+          status: (q.status as QueueStatus) || 'รอคัดกรอง',
+          department: q.department || 'จุดคัดกรอง',
+          time: q.createdAt || '08:30 น.',
+          note: q.note || '',
+        }))
+      );
     } finally {
       setIsLoading(false);
     }
@@ -399,7 +423,7 @@ const QueuePage: React.FC = () => {
             </div>
           </div>
           <div className="stat-value">{stats.active}</div>
-          <div className="stat-sub-text">กำลังรับบริการในระบบทั้งหมด</div>
+          <div className="stat-sub-text">คิวที่กำลังรับบริการในระบบ (ยกเว้นเสร็จสิ้น/ยกเลิก)</div>
         </div>
 
         <div
@@ -714,7 +738,7 @@ const QueuePage: React.FC = () => {
                           {item.patientName}
                         </span>
                         <span className="patient-sub-text" title={`${item.idCard} • เวลา ${item.time}`}>
-                          {item.idCard} • เวลา {item.time}
+                          {maskNationalId(item.idCard)} • เวลา {item.time}
                         </span>
                       </div>
                     </td>

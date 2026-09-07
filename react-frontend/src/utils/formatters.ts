@@ -63,3 +63,20 @@ export const formatPhone = (raw: string | number | undefined | null): string => 
   }
   return String(raw);
 };
+
+// 5. Masked National ID Formatter for PDPA Compliance: X-XXXX-xxxxx-XX-X
+export const maskNationalId = (raw: string | number | undefined | null): string => {
+  if (!raw) return '-';
+  const clean = String(raw).replace(/\D/g, '');
+  if (clean.length === 13) {
+    return `${clean[0]}-${clean.slice(1, 5)}-xxxxx-${clean.slice(10, 12)}-${clean[12]}`;
+  }
+  const formatted = formatNationalId(raw);
+  if (formatted.includes('-')) {
+    const parts = formatted.split('-');
+    if (parts.length === 5) {
+      return `${parts[0]}-${parts[1]}-xxxxx-${parts[3]}-${parts[4]}`;
+    }
+  }
+  return String(raw);
+};
