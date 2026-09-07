@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 /**
@@ -37,6 +37,34 @@ import { useLanguage } from '../context/LanguageContext';
  * เพื่อให้ทุกจอสถานะว่างของ role แพทย์อยู่ระดับความสูงเดียวกันหมด
  */
 
+/* --------------------------------------------------------------------------
+   CSS Keyframes สำหรับ loading animation
+   ใส่ไว้ใน style tag เพราะ Tailwind ไม่มี keyframes เหล่านี้ในตัว
+   -------------------------------------------------------------------------- */
+const loadingStyles = `
+@keyframes doctor-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes doctor-skeleton-shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+`;
+
+/** กล่องสี่เหลี่ยมกระพริบ shimmer ใช้เป็นโครงตัวแทนเนื้อหาที่ยังไม่โหลด */
+const Bone: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ className = '', style }) => (
+  <div
+    className={`rounded-md ${className}`}
+    style={{
+      background: 'linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%)',
+      backgroundSize: '400px 100%',
+      animation: 'doctor-skeleton-shimmer 1.6s ease-in-out infinite',
+      ...style,
+    }}
+  />
+);
+
 interface DoctorLoadingScreenProps {
   /** ข้อความบอกว่ากำลังโหลดอะไรอยู่ ไม่ส่งมาก็ได้ จะใช้ข้อความกลางๆ */
   message?: string;
@@ -46,24 +74,102 @@ export const DoctorLoadingScreen: React.FC<DoctorLoadingScreenProps> = ({ messag
   const { language } = useLanguage();
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="min-h-[calc(100vh-134px)] flex flex-col items-center justify-center -translate-y-12 gap-4 text-center px-6"
-    >
-      <div className="relative">
-        {/* วงแหวนจางด้านหลัง ทำให้เห็นว่าเป็นวงกลมเต็มวงขณะที่ตัวหมุนวิ่งอยู่ */}
-        <div className="w-14 h-14 rounded-full border-4 border-slate-200" />
-        <Loader2 className="w-14 h-14 text-blue-600 animate-spin absolute inset-0" />
-      </div>
+    <div role="status" aria-live="polite" className="relative">
+      {/* Inject keyframes */}
+      <style>{loadingStyles}</style>
 
-      <div className="space-y-1">
-        <p className="text-base font-bold text-slate-800">
-          {message || (language === 'th' ? 'กำลังโหลดข้อมูลจากฐานข้อมูล' : 'Loading data from the database')}
-        </p>
-        <p className="text-xs text-slate-500">
-          {language === 'th' ? 'กรุณารอสักครู่' : 'Please wait'}
-        </p>
+      {/* --- วงกลมหมุน + ข้อความ (ซ่อนไว้ก่อนเพื่อทดสอบ) ---
+      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center -translate-y-12 pointer-events-none">
+        <div className="flex flex-col items-center gap-4">
+          <div className="relative" style={{ width: 48, height: 48 }}>
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{ border: '3.5px solid #e2e8f0' }}
+            />
+            <svg
+              viewBox="0 0 48 48"
+              className="absolute inset-0"
+              style={{ width: 48, height: 48, animation: 'doctor-spin 1s linear infinite' }}
+            >
+              <circle
+                cx="24" cy="24" r="21"
+                fill="none"
+                strokeWidth="3.5"
+                strokeLinecap="round"
+                stroke="#2563eb"
+                strokeDasharray="92 132"
+              />
+            </svg>
+          </div>
+          <div className="space-y-1 text-center">
+            <p className="text-base font-bold text-slate-800">
+              {message || (language === 'th' ? 'กำลังโหลดข้อมูลจากฐานข้อมูล' : 'Loading data from the database')}
+            </p>
+            <p className="text-xs text-slate-500">
+              {language === 'th' ? 'กรุณารอสักครู่' : 'Please wait'}
+            </p>
+          </div>
+        </div>
+      </div>
+      */}
+
+      <div className="max-w-7xl mx-auto space-y-8">
+        {/* --- Section: Stat Cards skeleton --- */}
+        <section className="space-y-4">
+          <Bone className="!rounded-lg" style={{ width: 140, height: 22 }} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex items-center justify-between"
+              >
+                <div className="space-y-3">
+                  <Bone style={{ width: 100, height: 14 }} />
+                  <Bone className="!rounded-lg" style={{ width: 56, height: 36 }} />
+                </div>
+                <Bone className="!rounded-2xl" style={{ width: 48, height: 48 }} />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* --- Section: Queue Table skeleton --- */}
+        <section className="space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
+            {/* Filter tabs skeleton */}
+            <div className="px-6 pt-5 pb-3 flex items-center gap-3">
+              {[72, 64, 80, 88].map((w, i) => (
+                <Bone key={i} className="!rounded-full" style={{ width: w, height: 32 }} />
+              ))}
+              <div className="flex-1" />
+              <Bone className="!rounded-xl" style={{ width: 200, height: 36 }} />
+            </div>
+
+            {/* Table header skeleton */}
+            <div className="px-6 py-3 border-t border-slate-100 grid grid-cols-7 gap-4">
+              {[48, 56, 80, 40, 60, 64, 72].map((w, i) => (
+                <Bone key={i} style={{ width: w, height: 12 }} />
+              ))}
+            </div>
+
+            {/* Table rows skeleton */}
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="px-6 py-4 border-t border-slate-100 grid grid-cols-7 gap-4 items-center"
+                style={{ animationDelay: `${i * 0.08}s` }}
+              >
+                <Bone style={{ width: 40, height: 16 }} />
+                <Bone style={{ width: 48, height: 16 }} />
+                <Bone style={{ width: '80%', height: 16 }} />
+                <Bone style={{ width: 36, height: 16 }} />
+                <Bone className="!rounded-full" style={{ width: 64, height: 24 }} />
+                <Bone style={{ width: 72, height: 16 }} />
+                <Bone className="!rounded-xl" style={{ width: 80, height: 32 }} />
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );
