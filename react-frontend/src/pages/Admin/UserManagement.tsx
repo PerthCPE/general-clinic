@@ -1,38 +1,75 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus } from 'lucide-react';
+import { adminApi, type BackendUser } from '../../services/api';
 import './UserManagement.css';
 
 interface SystemUser {
-  id: string;
+  internalId: number; // For backend reference
+  id: string; // Employee ID
   name: string;
   email: string;
   phone: string;
   role: string;
   department: string;
   licenseId?: string;
-  status: 'กำลังใช้งาน' | 'รอการยืนยัน' | 'ระงับใช้งาน';
+  status: 'กำลังใช้งาน' | 'รอการยืนยัน' | 'ระงับใช้งาน' | string;
   avatar: string;
   createdAt: string;
+  password?: string;
+  username: string; // Add username for backend
 }
 
 // === สร้าง Mapping ตำแหน่งงาน ➡️ แผนกที่สอดคล้องกัน (สำหรับคลินิกขนาดกลาง) ===
 const ROLE_DEPARTMENTS: Record<string, string[]> = {
-  'แพทย์': ['แผนกตรวจโรคทั่วไป (OPD)', 'แผนกอายุรกรรม', 'แผนกสูตินรีเวช', 'แผนกกุมารเวช', 'แผนกศัลยกรรมทั่วไป'],
-  'พยาบาลวิชาชีพ': ['จุดคัดกรองและซักประวัติ (Triage)', 'ห้องฉุกเฉินเบื้องต้น (ER)', 'แผนกตรวจโรคทั่วไป (OPD)'],
-  'ผู้ช่วยพยาบาล': ['จุดคัดกรองและซักประวัติ (Triage)', 'แผนกตรวจโรคทั่วไป (OPD)'],
-  'เภสัชกร': ['ห้องยาและเวชภัณฑ์ (Pharmacy)'],
-  'เจ้าหน้าที่เวชระเบียน': ['แผนกเวชระเบียนและต้อนรับ (Reception)'],
-  'เจ้าหน้าที่การเงิน': ['แผนกการเงินและบัญชี (Cashier)'],
-  'ช่างเทคนิคการแพทย์': ['ห้องปฏิบัติการเบื้องต้น (Lab)'],
-  'ผู้ดูแลระบบ': ['ฝ่ายบริหารและเทคโนโลยีสารสนเทศ (Admin/IT)']
+  'แพทย์': ['ห้องตรวจโรคทั่วไป (OPD)', 'แผนกอุบัติเหตุและฉุกเฉิน (ER)', 'ห้องตรวจอายุรกรรม', 'ห้องตรวจศัลยกรรม', 'ห้องตรวจกุมารเวชกรรม'],
+  'พยาบาลและผู้ช่วยพยาบาล': ['จุดคัดกรองผู้ป่วย (Triage)', 'แผนกอุบัติเหตุและฉุกเฉิน (ER)', 'ห้องตรวจโรคทั่วไป (OPD)'],
+  'พนักงานเวชระเบียน': ['จุดคัดกรองผู้ป่วย (Triage)', 'ห้องตรวจโรคทั่วไป (OPD)'],
+  'เภสัชกร': ['แผนกเภสัชกรรมห้องยา (Pharmacy)'],
+  'พนักงานธุรการต้อนรับ': ['ห้องทะเบียนประวัติและคิว (Reception)'],
+  'พนักงานธุรการการเงิน': ['ห้องชำระเงินและออกใบเสร็จ (Cashier)'],
+  'นักเทคนิคการแพทย์': ['แผนกเจาะเลือดและห้องปฏิบัติการ (Lab)'],
+  'ผู้ดูแลระบบ': ['ศูนย์คอมพิวเตอร์และระบบสารสนเทศ (Admin/IT)']
+};
+
+const roleToEnglish: Record<string, string> = {
+  'แพทย์': 'doctor', 'พยาบาล': 'nurse', 'ผู้ช่วยพยาบาล': 'nurse_assistant',
+  'พยาบาลและผู้ช่วยพยาบาล': 'nurse', 'เภสัชกร': 'pharmacist',
+  'พนักงานเวชระเบียน': 'registrar', 'พนักงานธุรการต้อนรับ': 'registrar',
+  'พนักงานธุรการการเงิน': 'cashier', 'นักเทคนิคการแพทย์': 'lab_technician',
+  'ผู้ดูแลระบบ': 'admin'
+};
+
+const englishToRole: Record<string, string> = {
+  'doctor': 'แพทย์', 'nurse': 'พยาบาลและผู้ช่วยพยาบาล', 'nurse_assistant': 'พยาบาลและผู้ช่วยพยาบาล',
+  'pharmacist': 'เภสัชกร', 'registrar': 'พนักงานเวชระเบียน', 'cashier': 'พนักงานธุรการการเงิน',
+  'lab_technician': 'นักเทคนิคการแพทย์', 'admin': 'ผู้ดูแลระบบ', 'officer': 'พนักงานเวชระเบียน'
+};
+
+const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
+  const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'];
+  const randomColor = colors[u.id % colors.length];
+  
+  const thaiRole = englishToRole[u.role] || 'พนักงานเวชระเบียน';
+  const defaultDept = ROLE_DEPARTMENTS[thaiRole] ? ROLE_DEPARTMENTS[thaiRole][0] : 'ทั่วไป';
+  
+  return {
+    internalId: u.id,
+    id: u.employee_id || `EMP-${u.id}`,
+    name: u.fullname,
+    email: u.email || `${u.username}@clinic.com`,
+    phone: u.phone,
+    role: thaiRole,
+    department: defaultDept,
+    status: u.status === 'active' ? 'กำลังใช้งาน' : (u.status === 'suspended' ? 'ระงับใช้งาน' : 'รอการยืนยัน'),
+    avatar: randomColor,
+    createdAt: new Date(u.created_at).toLocaleDateString('en-GB'),
+    username: u.username,
+  };
 };
 
 const UserManagement: React.FC = () => {
-  const [users, setUsers] = useState<SystemUser[]>([
-    { id: 'DOC-2026-001', name: 'นพ. วีรยุทธ อารีใจ', email: 'weerayut.a@clinic.com', phone: '081-234-5678', role: 'แพทย์', department: 'แผนกอายุรกรรม', licenseId: 'ว.12345', status: 'กำลังใช้งาน', avatar: '#4F46E5', createdAt: '10/07/2026' },
-    { id: 'NUR-2026-001', name: 'พว. รังสิมา สุขใจ', email: 'rangsima.s@clinic.com', phone: '082-345-6789', role: 'พยาบาลวิชาชีพ', department: 'จุดคัดกรองและซักประวัติ (Triage)', licenseId: 'พ.98765', status: 'กำลังใช้งาน', avatar: '#F59E0B', createdAt: '12/07/2026' },
-    { id: 'REG-2026-001', name: 'คุณ กรุณา ดีดี', email: 'karuna.d@clinic.com', phone: '083-456-7890', role: 'เจ้าหน้าที่เวชระเบียน', department: 'แผนกเวชระเบียนและต้อนรับ (Reception)', status: 'รอการยืนยัน', avatar: '#10B981', createdAt: '08/08/2026' },
-    { id: 'TEC-2026-001', name: 'คุณ สมชาย มั่นคง', email: 'somchai.m@clinic.com', phone: '084-567-8901', role: 'ช่างเทคนิคการแพทย์', department: 'ห้องปฏิบัติการเบื้องต้น (Lab)', status: 'ระงับใช้งาน', avatar: '#6B7280', createdAt: '01/05/2026' },
-  ]);
+  const [users, setUsers] = useState<SystemUser[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
@@ -42,8 +79,40 @@ const UserManagement: React.FC = () => {
   const [deptFilter, setDeptFilter] = useState<string>('ทั้งหมด');
 
   const [formData, setFormData] = useState<SystemUser>({
-    id: '', name: '', email: '', phone: '', role: 'แพทย์', department: ROLE_DEPARTMENTS['แพทย์'][0], licenseId: '', status: 'รอการยืนยัน', avatar: '', createdAt: ''
+    internalId: 0, id: '', name: '', email: '', phone: '', role: 'แพทย์', department: ROLE_DEPARTMENTS['แพทย์'][0], licenseId: '', status: 'รอการยืนยัน', avatar: '', createdAt: '', password: '', username: ''
   });
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await adminApi.getAccounts();
+      if (data) {
+        setUsers(data.map(mapBackendToSystemUser));
+      }
+    } catch (err) {
+      console.error("Failed to fetch accounts", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  // Auto-generate Username and Password when name changes (only in add mode)
+  React.useEffect(() => {
+    if (modalMode === 'add' && formData.name) {
+      const parts = formData.name.split(' ').filter(Boolean);
+      let usernameGen = formData.id.toLowerCase();
+      setFormData(prev => ({
+        ...prev,
+        username: usernameGen,
+        email: `${usernameGen}@clinic.com`,
+        password: prev.id
+      }));
+    }
+  }, [formData.name, modalMode, formData.id]);
 
   const stats = useMemo(() => {
     return {
@@ -67,52 +136,65 @@ const UserManagement: React.FC = () => {
     return ['ทั้งหมด', ...Array.from(depts)];
   }, [users]);
 
-  const generateNewId = (role: string) => {
+  const generateNewId = (roleTh: string, currentUsers: SystemUser[]) => {
+    const roleEn = englishToRole[roleTh] ? roleTh : (roleToEnglish[roleTh] || 'officer');
     let prefix = 'EMP';
-    if (role === 'แพทย์') prefix = 'DOC';
-    else if (role.includes('พยาบาล')) prefix = 'NUR';
-    else if (role.includes('เวชระเบียน')) prefix = 'REG';
-    else if (role.includes('เภสัช')) prefix = 'PHA';
-    else if (role.includes('เทคนิค')) prefix = 'TEC';
-    else if (role.includes('การเงิน')) prefix = 'FIN';
-    else if (role.includes('ระบบ')) prefix = 'ADM';
+    if (roleEn === 'doctor' || roleTh === 'แพทย์') prefix = 'DOC';
+    else if (roleEn === 'nurse' || roleTh === 'พยาบาล' || roleTh === 'ผู้ช่วยพยาบาล') prefix = 'NUR';
+    else if (roleEn === 'pharmacist' || roleTh === 'เภสัชกร') prefix = 'PHA';
+    else if (roleEn === 'cashier' || roleTh === 'เจ้าหน้าที่การเงิน') prefix = 'CAS';
+    else if (roleEn === 'registrar' || roleTh === 'เจ้าหน้าที่เวชระเบียน' || roleTh === 'เจ้าหน้าที่ประชาสัมพันธ์') prefix = 'REC';
+    else if (roleEn === 'admin' || roleTh === 'ผู้ดูแลระบบ') prefix = 'ADM';
+    else prefix = 'OFF';
 
-    const year = new Date().getFullYear();
-    const existingRoleUsers = users.filter(u => u.id.startsWith(`${prefix}-${year}`));
-    const nextNumber = String(existingRoleUsers.length + 1).padStart(3, '0');
-    return `${prefix}-${year}-${nextNumber}`;
+    let maxNum = 0;
+    currentUsers.forEach(u => {
+      if (u.id.startsWith(prefix)) {
+        const numPart = parseInt(u.id.substring(prefix.length), 10);
+        if (!isNaN(numPart) && numPart > maxNum) {
+          maxNum = numPart;
+        }
+      }
+    });
+
+    const nextNum = maxNum + 1;
+    return `${prefix}${nextNum.toString().padStart(3, '0')}`;
   };
 
-  // === ฟังก์ชันจัดการเมื่อเปลี่ยน "ตำแหน่งงาน" ===
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newRole = e.target.value;
-    const availableDepts = ROLE_DEPARTMENTS[newRole] || ['ทั่วไป'];
+    const availableDepts = ROLE_DEPARTMENTS[newRole] || ['แผนกทั่วไป'];
     
-    setFormData(prev => ({
-      ...prev,
-      role: newRole,
-      id: modalMode === 'add' ? generateNewId(newRole) : prev.id, // สร้าง ID ใหม่เฉพาะตอน Add
-      department: availableDepts[0] // รีเซ็ตแผนกให้ตรงกับตำแหน่งใหม่แบบอัตโนมัติ
-    }));
+    setFormData(prev => {
+      const newId = modalMode === 'add' ? generateNewId(newRole, users) : prev.id;
+      return {
+        ...prev,
+        role: newRole,
+        id: newId,
+        password: modalMode === 'add' ? newId : prev.password,
+        department: availableDepts[0]
+      };
+    });
   };
 
   const openAddModal = () => {
     setModalMode('add');
     const today = new Date().toLocaleDateString('en-GB'); 
     const defaultRole = 'แพทย์';
+    const newId = generateNewId(defaultRole, users);
     setFormData({ 
-      id: generateNewId(defaultRole), 
-      name: '', email: '', phone: '', 
+      internalId: 0,
+      id: newId, 
+      name: '', email: '', phone: '', username: '',
       role: defaultRole, 
       department: ROLE_DEPARTMENTS[defaultRole][0], 
-      licenseId: '', status: 'รอการยืนยัน', avatar: '', createdAt: today 
+      licenseId: '', status: 'กำลังใช้งาน', avatar: '', createdAt: today, password: newId 
     });
     setIsModalOpen(true);
   };
 
   const openEditModal = (user: SystemUser) => {
     setModalMode('edit');
-    // เช็กเผื่อข้อมูลเก่าแผนกไม่ตรงกับ Role
     let validDepartment = user.department;
     if (ROLE_DEPARTMENTS[user.role] && !ROLE_DEPARTMENTS[user.role].includes(user.department)) {
       validDepartment = ROLE_DEPARTMENTS[user.role][0];
@@ -121,21 +203,45 @@ const UserManagement: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (modalMode === 'add') {
-      const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'];
-      const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      setUsers([{ ...formData, avatar: randomColor }, ...users]);
+      try {
+        await adminApi.createAccount({
+          username: formData.username,
+          password: formData.password,
+          role: roleToEnglish[formData.role] || 'officer',
+          fullname: formData.name,
+          employee_id: formData.id,
+          phone: formData.phone,
+        });
+        alert('สร้างบัญชีสำเร็จ');
+        fetchUsers();
+      } catch (err: any) {
+        alert('เกิดข้อผิดพลาด: ' + err.message);
+      }
     } else {
-      setUsers(users.map(u => u.id === formData.id ? formData : u));
+      // In edit mode, maybe just update status for now
+      try {
+        let backendStatus = formData.status === 'กำลังใช้งาน' ? 'active' : (formData.status === 'ระงับใช้งาน' ? 'suspended' : 'pending');
+        await adminApi.updateAccountStatus(formData.internalId, backendStatus);
+        alert('อัปเดตข้อมูลสำเร็จ');
+        fetchUsers();
+      } catch (err: any) {
+        alert('เกิดข้อผิดพลาด: ' + err.message);
+      }
     }
     setIsModalOpen(false);
   };
 
-  const handleDeleteUser = (userId: string, userName: string) => {
-    if (window.confirm(`⚠️ คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีของ "${userName}"?`)) {
-      setUsers(users.filter(user => user.id !== userId));
+  const handleDeleteUser = async (userId: string, userName: string, internalId: number) => {
+    if (window.confirm(`⚠️ คุณแน่ใจหรือไม่ว่าต้องการระงับบัญชีของ "${userName}"?`)) {
+      try {
+        await adminApi.updateAccountStatus(internalId, 'suspended');
+        fetchUsers();
+      } catch (err: any) {
+        alert('เกิดข้อผิดพลาด: ' + err.message);
+      }
     }
   };
 
@@ -160,22 +266,22 @@ const UserManagement: React.FC = () => {
         <div className={`stat-card clickable ${activeFilter === 'ทั้งหมด' ? 'card-active-blue' : ''}`} onClick={() => setActiveFilter('ทั้งหมด')}>
           <div className="stat-value text-blue">{stats.total}</div>
           <div className="stat-label">บัญชีทั้งหมด</div>
-          <div className="stat-icon bg-blue-light">👥</div>
+          <div className="stat-icon bg-blue-light"><Users size={24} strokeWidth={2} /></div>
         </div>
         <div className={`stat-card clickable ${activeFilter === 'กำลังใช้งาน' ? 'card-active-green' : ''}`} onClick={() => setActiveFilter('กำลังใช้งาน')}>
           <div className="stat-value text-green">{stats.active}</div>
           <div className="stat-label">กำลังใช้งาน</div>
-          <div className="stat-icon bg-green-light">✓</div>
+          <div className="stat-icon bg-green-light"><CheckCircle size={24} strokeWidth={2} /></div>
         </div>
         <div className={`stat-card clickable ${activeFilter === 'รอการยืนยัน' ? 'card-active-orange' : ''}`} onClick={() => setActiveFilter('รอการยืนยัน')}>
           <div className="stat-value text-orange">{stats.pending}</div>
           <div className="stat-label">รอการยืนยัน</div>
-          <div className="stat-icon bg-orange-light">⋯</div>
+          <div className="stat-icon bg-orange-light"><Clock size={24} strokeWidth={2} /></div>
         </div>
         <div className={`stat-card clickable ${activeFilter === 'ระงับใช้งาน' ? 'card-active-red' : ''}`} onClick={() => setActiveFilter('ระงับใช้งาน')}>
           <div className="stat-value text-red">{stats.suspended}</div>
           <div className="stat-label">ระงับการใช้งาน</div>
-          <div className="stat-icon bg-red-light">⊘</div>
+          <div className="stat-icon bg-red-light"><Ban size={24} strokeWidth={2} /></div>
         </div>
       </div>
 
@@ -213,7 +319,7 @@ const UserManagement: React.FC = () => {
             </thead>
             <tbody>
               {filteredUsers.length === 0 ? (
-                <tr><td colSpan={6} style={{textAlign: 'center', padding: '24px', color: '#6b7280'}}>ไม่มีข้อมูลผู้ใช้งานที่ตรงตามเงื่อนไข</td></tr>
+                <tr><td colSpan={6} style={{textAlign: 'center', padding: '24px', color: '#62748E'}}>ไม่มีข้อมูลผู้ใช้งานที่ตรงตามเงื่อนไข</td></tr>
               ) : (
                 filteredUsers.slice(0, itemsPerPage).map((user) => (
                   <tr key={user.id}>
@@ -225,6 +331,9 @@ const UserManagement: React.FC = () => {
                         <div className="user-details">
                           <span className="user-name">{user.name}</span>
                           <span className="user-email">{user.email}</span>
+                          <span className="user-email" style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
+                            <span style={{ fontWeight: 600 }}>ID:</span> {user.username}
+                          </span>
                         </div>
                       </div>
                     </td>
@@ -246,8 +355,12 @@ const UserManagement: React.FC = () => {
                     </td>
                     <td>
                       <div className="action-buttons">
-                        <button className="btn-edit" onClick={() => openEditModal(user)} title="แก้ไขข้อมูล">✎</button>
-                        <button className="btn-delete" onClick={() => handleDeleteUser(user.id, user.name)} title="ลบบัญชี">🗑</button>
+                        <button className="btn-edit" onClick={() => openEditModal(user)} title="แก้ไขข้อมูล">
+                          <Edit2 size={16} strokeWidth={2} />
+                        </button>
+                        <button className="btn-delete" onClick={() => handleDeleteUser(user.id, user.name, user.internalId)} title="ระงับบัญชี">
+                          <Trash2 size={16} strokeWidth={2} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -303,9 +416,14 @@ const UserManagement: React.FC = () => {
 
                 <div className="form-divider">ข้อมูลส่วนบุคคล</div>
 
-                <div className="form-group">
-                  <label>ชื่อ-นามสกุล (พร้อมคำนำหน้า)</label>
-                  <input required type="text" placeholder="เช่น นพ. สมชาย รักดี" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} autoFocus={modalMode === 'add'} />
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label>รหัสพนักงาน (Auto)</label>
+                  <input required type="text" disabled value={formData.id} className="input-disabled text-blue font-bold" />
+                </div>
+                
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label>ชื่อ-นามสกุล (ผู้ใช้งานระบบ)</label>
+                  <input required type="text" placeholder="เช่น นพ. สมชาย ใจดี" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} autoFocus={modalMode === 'add'} />
                 </div>
                 <div className="form-group">
                   <label>อีเมลติดต่อ</label>
@@ -319,6 +437,17 @@ const UserManagement: React.FC = () => {
                   <label>เลขที่ใบประกอบวิชาชีพ (ถ้ามี)</label>
                   <input type="text" placeholder="เช่น ว.12345" value={formData.licenseId || ''} onChange={e => setFormData({...formData, licenseId: e.target.value})} />
                 </div>
+                
+                {modalMode === 'add' && (
+                  <div className="form-group" style={{ gridColumn: 'span 2', backgroundColor: 'var(--bg-canvas)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                    <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--brand-primary)' }}>
+                      <strong>ข้อมูลเข้าสู่ระบบอัตโนมัติ:</strong><br />
+                      Username: <code>{formData.username || 'ระบบจะสร้างให้เมื่อกรอกชื่อ'}</code><br />
+                      Password เริ่มต้น: <code>{formData.password || 'Clinic@YYYY'}</code>
+                    </p>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>* ผู้ใช้งานสามารถเปลี่ยนรหัสผ่านได้ในภายหลัง</span>
+                  </div>
+                )}
 
                 <div className="form-divider">สถานะระบบ</div>
                 
@@ -329,7 +458,7 @@ const UserManagement: React.FC = () => {
                     <input 
                       type="text" 
                       disabled 
-                      value="🟡 รอการยืนยัน (รอการตั้งสิทธิ์/เข้าสู่ระบบ)" 
+                      value="รอการยืนยัน (รอการตั้งสิทธิ์/เข้าสู่ระบบ)" 
                       className="input-disabled text-orange font-bold" 
                     />
                   ) : (
@@ -340,9 +469,9 @@ const UserManagement: React.FC = () => {
                         formData.status === 'กำลังใช้งาน' ? 'text-green' : formData.status === 'ระงับใช้งาน' ? 'text-red' : 'text-orange'
                       }`}
                     >
-                      <option value="รอการยืนยัน">🟡 รอการยืนยัน (รอการตั้งสิทธิ์/เข้าสู่ระบบ)</option>
-                      <option value="กำลังใช้งาน">🟢 กำลังใช้งาน</option>
-                      <option value="ระงับใช้งาน">🔴 ระงับใช้งาน (บล็อก)</option>
+                      <option value="รอการยืนยัน">รอการยืนยัน (รอการตั้งสิทธิ์/เข้าสู่ระบบ)</option>
+                      <option value="กำลังใช้งาน">กำลังใช้งาน</option>
+                      <option value="ระงับใช้งาน">ระงับใช้งาน (บล็อก)</option>
                     </select>
                   )}
                 </div>

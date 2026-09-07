@@ -28,6 +28,11 @@ func SetUpRoutes(r *gin.Engine) {
 	// check jwt bearer token และแจก role
 	api.Use(middleware.AuthRequired())
 
+	authRoutes := api.Group("/auth")
+	{
+		authRoutes.PUT("/change-password", controllers.ChangePassword)
+	}
+
 	// Common Endpoints
 	api.GET("/doctors", controllers.GetDoctors)
 
@@ -148,7 +153,11 @@ func SetUpRoutes(r *gin.Engine) {
 	officerRoutes.Use(middleware.RoleRequired("officer", "registrar", "doctor", "nurse", "nurse_assistant", "pharmacist", "cashier"))
 	{
 		officerRoutes.GET("/documents", controllers.GetDocuments)
+		officerRoutes.GET("/documents/:id", controllers.GetDocumentByID)
 		officerRoutes.POST("/documents", controllers.CreateDocument)
+		officerRoutes.PUT("/documents/:id/approve", controllers.ApproveDocument)
+		officerRoutes.PUT("/documents/:id/status", controllers.UpdateDocumentStatus)
+		officerRoutes.GET("/storage/stats", controllers.GetStorageStats)
 		officerRoutes.GET("/documents/forwards", controllers.GetDocumentForwards)
 		officerRoutes.POST("/documents/forward", controllers.ForwardDocument)
 		officerRoutes.PUT("/documents/forwards/:id/ack", controllers.AcknowledgeDocumentForward)
@@ -175,6 +184,7 @@ func SetUpRoutes(r *gin.Engine) {
 	{
 		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
 		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
+		systemRoutes.GET("/storage/stats", controllers.GetStorageStats)
 		systemRoutes.GET("/pharmacy/queues", controllers.GetPharmacyQueues)
 		systemRoutes.GET("/medicines", controllers.GetMedicines)
 		systemRoutes.POST("/medicines/create", controllers.CreateMedicine)
@@ -196,3 +206,4 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.POST("/billing/confirm", controllers.ConfirmPayment)
 	}
 }
+

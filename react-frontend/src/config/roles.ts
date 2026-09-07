@@ -58,14 +58,14 @@ export const DEMO_USERS: Record<UserRole, User> = {
     avatarColor: '#F59E0B',
   },
   doctor: {
-    id: 'user-doc-01',
+    id: 'DOC-1',
     username: 'doctor1',
-    fullName: 'นพ.สุดา สุขสมบูรณ์',
+    fullName: 'พญ.สุดา สุขสมบูรณ์',
     role: 'doctor',
-    roleTitleTh: 'แพทย์ผู้ตรวจ',
+    roleTitleTh: 'แพทย์ผู้ตรวจ (สูตินรีเวช)',
     roleTitleEn: 'Doctor',
-    department: 'แผนกตรวจโรคทั่วไป',
-    avatarText: 'AS',
+    department: 'แผนกสูตินรีเวช',
+    avatarText: 'SS',
     avatarColor: '#DC2626',
   },
   admin: {
@@ -118,6 +118,8 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'doctor-examination', title: 'บันทึกการตรวจ', iconType: 'examination', path: '/doctor-examination' },
     { id: 'doctor-schedule', title: 'ตารางเวร', iconType: 'schedule', path: '/doctor-schedule' },
     { id: 'doctor-records', title: 'ประวัติเวชระเบียน', iconType: 'records', path: '/doctor-records' },
+    { id: 'appointment-form', title: 'สร้างนัดหมาย', iconType: 'calendar', path: '/appointment-form' },
+    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' },
   ],
   admin: [
     { id: 'admin-users', title: 'จัดการบัญชีผู้ใช้งาน', iconType: 'admin-users', path: '/admin-users' },

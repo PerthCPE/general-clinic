@@ -1,4 +1,12 @@
 {
+  "name": "general-clinic",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix react-frontend run dev",
+    "build": "npm --prefix react-frontend run build",
+    "lint": "npm --prefix react-frontend run lint"
+  },
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",

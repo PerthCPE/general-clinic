@@ -21,5 +21,6 @@ type Doctor struct {
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 
-	User User `gorm:"foreignKey:UserID;references:ID" json:"user"`
+	User          User          `gorm:"foreignKey:UserID;references:ID" json:"user"`
+	Appointments  []Appointment `gorm:"-" json:"appointments"`
 }
