@@ -28,7 +28,11 @@ func LoadConfig() {
 	if err := godotenv.Load(); err != nil {
 		if err2 := godotenv.Load("golang-backend/.env"); err2 != nil {
 			if err3 := godotenv.Load("../.env"); err3 != nil {
-				log.Println("Notice: No .env file found in default paths, checking environment variables or fallback defaults.")
+				if err4 := godotenv.Load("../../.env"); err4 != nil {
+					if err5 := godotenv.Load("../../golang-backend/.env"); err5 != nil {
+						log.Println("Notice: No .env file found in default paths, checking environment variables or fallback defaults.")
+					}
+				}
 			}
 		}
 	}

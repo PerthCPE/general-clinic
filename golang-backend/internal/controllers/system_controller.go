@@ -175,6 +175,7 @@ func ResetTestDatabase(c *gin.Context) {
 	}
 
 	// 5. Seed สิทธิ์การรักษาเริ่มต้นให้ตรงกับผู้ป่วย
+	defaultExp := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
 	for _, p := range basePatients {
 		elig := models.MedicalEligibility{
 			PatientID:       &p.ID,
@@ -183,7 +184,7 @@ func ResetTestDatabase(c *gin.Context) {
 			CoverageDetails: "ครอบคลุมการรักษาโรคทั่วไปตามสิทธิ์",
 			HospitalName:    "โรงพยาบาลคลินิกเวชกรรมชุมชน",
 			Status:          "ใช้งานได้",
-			ExpireDate:      "31/12/2026",
+			ExpireDate:      &defaultExp,
 			VerifiedAt:      time.Now(),
 		}
 		db.Create(&elig)

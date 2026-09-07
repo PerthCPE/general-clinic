@@ -1,8 +1,12 @@
 package routes
 
 import (
+	"net/http"
+
+	"clinic-backend/internal/config"
 	"clinic-backend/internal/controllers"
 	"clinic-backend/internal/middleware"
+	"clinic-backend/internal/models"
 	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
@@ -29,26 +33,45 @@ func SetUpRoutes(r *gin.Engine) {
 
 	// 1. Registrar Module (ลงทะเบียน, ค้นหาผู้ป่วย, ตรวจสอบสิทธิ์)
 	registrarRoutes := api.Group("/registrar")
-	registrarRoutes.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant", "doctor"))
 	{
-		registrarRoutes.GET("/patients", controllers.GetPatients)
-		registrarRoutes.POST("/patients", controllers.RegisterPatient)
-		registrarRoutes.GET("/patients/search", controllers.SearchPatient)
-		registrarRoutes.GET("/patients/search/:query", controllers.SearchPatient)
+		// Read endpoints (ค้นหา/ดูผู้ป่วย และประวัติสิทธิ์) -> registrar, nurse, nurse_assistant, doctor
+		regRead := registrarRoutes.Group("")
+		regRead.Use(middleware.RoleRequired("registrar", "nurse", "nurse_assistant", "doctor"))
+		{
+			regRead.GET("/patients", controllers.GetPatients)
+			regRead.GET("/patients/search", controllers.SearchPatient)
+			regRead.GET("/patients/search/:query", controllers.SearchPatient)
+			regRead.GET("/eligibility/check/:national_id", controllers.CheckExternalEligibility)
+			regRead.GET("/eligibility/history", controllers.GetEligibilityHistory)
+		}
 
-		registrarRoutes.GET("/eligibility/check/:national_id", controllers.CheckExternalEligibility)
-		registrarRoutes.POST("/eligibility/save", controllers.SavePatientEligibility)
-		registrarRoutes.GET("/eligibility/history", controllers.GetEligibilityHistory)
+		// Write endpoints (สร้างผู้ป่วย และบันทึกสิทธิ์) -> registrar เท่านั้น
+		regWrite := registrarRoutes.Group("")
+		regWrite.Use(middleware.RoleRequired("registrar"))
+		{
+			regWrite.POST("/patients", controllers.RegisterPatient)
+			regWrite.POST("/eligibility/save", controllers.SavePatientEligibility)
+		}
 	}
 
 	// 2. Nurse & Nurse Assistant Module (คัดกรอง, วัดสัญญาณชีพ, ประวัติคัดกรอง)
 	nurseRoutes := api.Group("/nurse")
-	nurseRoutes.Use(middleware.RoleRequired("nurse", "nurse_assistant", "registrar", "doctor"))
 	{
-		nurseRoutes.GET("/doctors", controllers.GetDoctors)
-		nurseRoutes.POST("/vitals", controllers.RecordVitalsAndTriage)
-		nurseRoutes.GET("/vitals/history", controllers.GetAllScreeningHistory)
-		nurseRoutes.GET("/vitals/history/:patient_id", controllers.GetScreeningHistory)
+		// Read endpoints -> nurse, nurse_assistant, registrar, doctor
+		nurseRead := nurseRoutes.Group("")
+		nurseRead.Use(middleware.RoleRequired("nurse", "nurse_assistant", "doctor", "registrar"))
+		{
+			nurseRead.GET("/doctors", controllers.GetDoctors)
+			nurseRead.GET("/vitals/history", controllers.GetAllScreeningHistory)
+			nurseRead.GET("/vitals/history/:patient_id", controllers.GetScreeningHistory)
+		}
+
+		// Write endpoints (บันทึกสัญญาณชีพ / Triage) -> nurse, nurse_assistant เท่านั้น
+		nurseWrite := nurseRoutes.Group("")
+		nurseWrite.Use(middleware.RoleRequired("nurse", "nurse_assistant"))
+		{
+			nurseWrite.POST("/vitals", controllers.RecordVitalsAndTriage)
+		}
 	}
 
 	// 3. Doctor Module (คิวตรวจ, เปิดเคสตรวจ, เปลี่ยนสถานะการตรวจ)
@@ -109,7 +132,7 @@ func SetUpRoutes(r *gin.Engine) {
 
 	// ===== ระบบย่อยที่ 2: การเงิน (Billing / QRPayment) -Bun =====
 	billingRoutes := api.Group("/billing")
-	billingRoutes.Use(middleware.RoleRequired("cashier", "pharmacist", "registrar", "doctor", "nurse", "nurse_assistant", "admin"))
+	billingRoutes.Use(middleware.RoleRequired("cashier", "admin"))
 	{
 		billingRoutes.GET("/queues", controllers.GetBillingQueues)
 		billingRoutes.GET("/history", controllers.GetBillingHistories)
@@ -130,6 +153,20 @@ func SetUpRoutes(r *gin.Engine) {
 		officerRoutes.POST("/documents/forward", controllers.ForwardDocument)
 		officerRoutes.PUT("/documents/forwards/:id/ack", controllers.AcknowledgeDocumentForward)
 		officerRoutes.GET("/recipients", controllers.GetRecipients)
+	}
+
+	// ===== 5. Admin Module =====
+	adminRoutes := api.Group("/admin")
+	adminRoutes.Use(middleware.RoleRequired("admin"))
+	{
+		adminRoutes.GET("/users", func(c *gin.Context) {
+			var users []models.User
+			if err := config.DB.Find(&users).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"users": users})
+		})
 	}
 
 	// ===== 5. System Utilities (Reset Database for Testing) =====

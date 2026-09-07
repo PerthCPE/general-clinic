@@ -261,7 +261,8 @@ func toPatientBrief(p models.Patient) dto.PatientBrief {
 
 // toScreeningBrief - แปลงผลคัดกรองเป็นรูปแบบที่หน้าจอแพทย์ใช้
 func toScreeningBrief(s models.Screening) dto.ScreeningBrief {
-	code, priority := triageInfo(s.TriageLevel)
+	label := triageLabelFromInt(s.TriageLevel)
+	code, priority := triageInfo(label)
 
 	return dto.ScreeningBrief{
 		ID:              s.ID,
@@ -269,7 +270,7 @@ func toScreeningBrief(s models.Screening) dto.ScreeningBrief {
 		Allergies:       s.Allergies,
 		MedicalHistory:  s.MedicalHistory,
 		NurseNotes:      s.NurseNotes,
-		TriageLevel:     s.TriageLevel,
+		TriageLevel:     label,
 		TriageCode:      code,
 		TriagePriority:  priority,
 		BP:              formatBP(s.SystolicBP, s.DiastolicBP),
@@ -748,12 +749,16 @@ func GetDoctorVisitDetail(c *gin.Context) {
 	var eligibility models.MedicalEligibility
 	if err := config.DB.Where("patient_id = ?", visit.PatientID).
 		Order("id desc").First(&eligibility).Error; err == nil {
+		expireStr := ""
+		if eligibility.ExpireDate != nil {
+			expireStr = eligibility.ExpireDate.Format("2006-01-02")
+		}
 		detail.Eligibility = &dto.EligibilityBrief{
 			SchemeType:      eligibility.SchemeType,
 			CoverageDetails: eligibility.CoverageDetails,
 			HospitalName:    eligibility.HospitalName,
 			Status:          eligibility.Status,
-			ExpireDate:      eligibility.ExpireDate,
+			ExpireDate:      expireStr,
 		}
 	}
 
