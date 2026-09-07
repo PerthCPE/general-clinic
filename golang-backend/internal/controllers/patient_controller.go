@@ -186,22 +186,11 @@ func RegisterPatient(c *gin.Context) {
 	}
 
 	// birth date format check with Buddhist Era (พ.ศ.) auto-conversion
-	var parsedBirthDate time.Time
 	cleanBD := strings.TrimSpace(req.BirthDate)
-	if parsed, err := time.Parse("2006-01-02", cleanBD); err == nil {
-		parsedBirthDate = parsed
-	} else if parsed, err := time.Parse("02/01/2006", cleanBD); err == nil {
-		parsedBirthDate = parsed
-	} else if parsed, err := time.Parse("2006/01/02", cleanBD); err == nil {
-		parsedBirthDate = parsed
-	} else {
+	parsedBirthDate, err := services.ParseFlexibleDate(cleanBD)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "รูปแบบวันเกิดไม่ถูกต้อง กรุณาใช้ DD/MM/YYYY หรือ YYYY-MM-DD"})
 		return
-	}
-
-	// หากปีเกิดเป็น พ.ศ. (>= 2400) ให้แปลงเป็น ค.ศ. (ลบ 543 ปี)
-	if parsedBirthDate.Year() >= 2400 {
-		parsedBirthDate = parsedBirthDate.AddDate(-543, 0, 0)
 	}
 
 	// query checking in DB
@@ -461,6 +450,14 @@ func UpdatePatient(c *gin.Context) {
 	}
 	if req.Gender != "" {
 		patient.Gender = req.Gender
+	}
+	if strings.TrimSpace(req.BirthDate) != "" {
+		parsedBirthDate, err := services.ParseFlexibleDate(req.BirthDate)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "รูปแบบวันเกิดไม่ถูกต้อง กรุณาใช้ DD/MM/YYYY หรือ YYYY-MM-DD"})
+			return
+		}
+		patient.BirthDate = parsedBirthDate
 	}
 	if req.PhoneNumber != "" {
 		patient.PhoneNumber = req.PhoneNumber

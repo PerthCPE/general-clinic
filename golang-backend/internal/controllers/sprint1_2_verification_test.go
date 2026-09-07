@@ -321,7 +321,7 @@ func TestSprint1_2_TaskC_SeedViaAPI(t *testing.T) {
 			"national_id":       fmt.Sprintf("11000000000%02d", i),
 			"fullname":          fmt.Sprintf("ผู้ป่วยทดสอบระบบ ที่%d", i),
 			"gender":            map[bool]string{true: "ชาย", false: "หญิง"}[i%2 == 1],
-			"birthdate":         "1990-01-01",
+			"birthdate":         "01/01/2533",
 			"address":           fmt.Sprintf("เลขที่ %d/1 หมู่ 2 ต.ในเมือง อ.เมือง จ.นครราชสีมา 30000", i),
 			"phone_number":      fmt.Sprintf("081000%04d", i),
 			"emergency_contact": "ญาติผู้ป่วย 0890000000",

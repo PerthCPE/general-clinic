@@ -115,7 +115,7 @@ func TestSprint3_TaskB_AddressValidation(t *testing.T) {
 			"national_id":  "1234567890123",
 			"fullname":     "ทดสอบ ขาดจังหวัด",
 			"gender":       "ชาย",
-			"birthdate":    "1990-01-01",
+			"birthdate":    "01/01/2533",
 			"phone_number": "0812345678",
 			"district":     "เมือง",
 			// province is missing or empty
@@ -140,7 +140,7 @@ func TestSprint3_TaskB_AddressValidation(t *testing.T) {
 			"national_id":  "1234567890124",
 			"fullname":     "ทดสอบ ขาดอำเภอ",
 			"gender":       "หญิง",
-			"birthdate":    "1992-05-15",
+			"birthdate":    "15/05/2535",
 			"phone_number": "0812345679",
 			"province":     "นครราชสีมา",
 			// district is missing or empty
@@ -167,7 +167,7 @@ func TestSprint3_TaskB_AddressValidation(t *testing.T) {
 				"national_id":  "1234567890125",
 				"fullname":     "ทดสอบ รหัสไปรษณีย์ผิด",
 				"gender":       "ชาย",
-				"birthdate":    "1988-12-10",
+				"birthdate":    "10/12/1988",
 				"phone_number": "0812345680",
 				"province":     "กรุงเทพมหานคร",
 				"district":     "ปทุมวัน",
@@ -225,7 +225,7 @@ func TestSprint3_TaskB_PatientRegistrationAndAddressComposition(t *testing.T) {
 			"national_id":       testNID1,
 			"fullname":          "นาย สมคิด พัฒนาสุข",
 			"gender":            "ชาย",
-			"birthdate":         "1985-06-20",
+			"birthdate":         "20/06/2528",
 			"phone_number":      "0851112233",
 			"emergency_contact": "0859998877",
 			"scheme_type":       "บัตรทอง (สปสช.)",
@@ -288,7 +288,7 @@ func TestSprint3_TaskB_PatientRegistrationAndAddressComposition(t *testing.T) {
 			"national_id":  testNID2,
 			"fullname":     "นางสาว รัตนา วงศ์สว่าง",
 			"gender":       "หญิง",
-			"birthdate":    "1995-10-12",
+			"birthdate":    "12/10/1995",
 			"phone_number": "0898887766",
 			"district":     "ปทุมวัน",
 			"province":     "กรุงเทพมหานคร",
@@ -494,7 +494,7 @@ func TestSprint32_TaskC_AutoQueueVerification(t *testing.T) {
 			"national_id":  nidC1_1,
 			"fullname":     "นายทดสอบ ไม่ส่งคิวแฟลก",
 			"gender":       "ชาย",
-			"birthdate":    "1992-05-10",
+			"birthdate":    "10/05/2535",
 			"phone_number": "0812340001",
 			"district":     "บางรัก",
 			"province":     "กรุงเทพมหานคร",
@@ -547,7 +547,7 @@ func TestSprint32_TaskC_AutoQueueVerification(t *testing.T) {
 			"national_id":  nidC1_2,
 			"fullname":     "นางทดสอบ ปิดคิวแฟลก",
 			"gender":       "หญิง",
-			"birthdate":    "1988-11-20",
+			"birthdate":    "20/11/1988",
 			"phone_number": "0812340002",
 			"district":     "สาทร",
 			"province":     "กรุงเทพมหานคร",
@@ -602,7 +602,7 @@ func TestSprint32_TaskC_AutoQueueVerification(t *testing.T) {
 			"national_id":  nidC1_3,
 			"fullname":     "นายทดสอบ เปิดคิวแฟลก",
 			"gender":       "ชาย",
-			"birthdate":    "1995-03-15",
+			"birthdate":    "15/03/2538",
 			"phone_number": "0812340003",
 			"district":     "ปทุมวัน",
 			"province":     "กรุงเทพมหานคร",
@@ -744,4 +744,304 @@ func TestSprint32_TaskC_AutoQueueVerification(t *testing.T) {
 
 	t.Log("================================================================================\n")
 }
+
+// =========================================================================
+// TASK D: Centralized Birth Date & Flexible Date Parser Verification
+// =========================================================================
+func TestSprint32_TaskD_BirthDateParserAndValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	routes.SetUpRoutes(r)
+
+	token := generateTestToken(1, "registrar")
+
+	t.Log("================================================================================")
+	t.Log("  [SPRINT 3.2 - TASK D] BIRTH DATE PARSER & VALIDATION TEST SUITE")
+	t.Log("================================================================================")
+
+	nidD1 := "9000000000001"
+	nidD2 := "9000000000002"
+	nidD3 := "9000000000003"
+	nidD4 := "9000000000004"
+	nidD5 := "9000000000005"
+
+	// Cleanup before & after
+	cleanup := func() {
+		var pIDs []uint
+		config.DB.Model(&models.Patient{}).Where("national_id IN ?", []string{nidD1, nidD2, nidD3, nidD4, nidD5}).Pluck("id", &pIDs)
+		if len(pIDs) > 0 {
+			config.DB.Where("patient_id IN ?", pIDs).Delete(&models.Queue{})
+			config.DB.Where("patient_id IN ?", pIDs).Delete(&models.MedicalEligibility{})
+			config.DB.Where("id IN ?", pIDs).Delete(&models.Patient{})
+		}
+	}
+	cleanup()
+	defer cleanup()
+
+	// D1: Register with Buddhist Era (พ.ศ.) "12/05/2549" -> 201 -> DB has 2006-05-12
+	t.Run("D1_BE_Slash_12_05_2549", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"national_id":  nidD1,
+			"fullname":     "นายทดสอบ พ.ศ. สแลช",
+			"gender":       "ชาย",
+			"birthdate":    "12/05/2549",
+			"phone_number": "0810001111",
+			"district":     "เมือง",
+			"province":     "นครราชสีมา",
+		}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, "/api/registrar/patients", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("Expected 201 Created, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var p models.Patient
+		if err := config.DB.Where("national_id = ?", nidD1).First(&p).Error; err != nil {
+			t.Fatalf("Patient not found in DB: %v", err)
+		}
+
+		if p.BirthDate.Year() != 2006 || p.BirthDate.Month() != time.May || p.BirthDate.Day() != 12 {
+			t.Errorf("DB BirthDate mismatch for 12/05/2549: expected 2006-05-12, got %s", p.BirthDate.Format("2006-01-02"))
+		} else {
+			t.Logf("  [PASS D1] 12/05/2549 (พ.ศ.) -> DB BirthDate: %s (Year: %d, Month: %d, Day: %d)",
+				p.BirthDate.Format("2006-01-02"), p.BirthDate.Year(), p.BirthDate.Month(), p.BirthDate.Day())
+		}
+	})
+
+	// D2: Register with Common Era (ค.ศ.) "12/05/2006" -> 201 -> DB has 2006-05-12
+	t.Run("D2_CE_Slash_12_05_2006", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"national_id":  nidD2,
+			"fullname":     "นายทดสอบ ค.ศ. สแลช",
+			"gender":       "ชาย",
+			"birthdate":    "12/05/2006",
+			"phone_number": "0810002222",
+			"district":     "เมือง",
+			"province":     "นครราชสีมา",
+		}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, "/api/registrar/patients", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("Expected 201 Created, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var p models.Patient
+		if err := config.DB.Where("national_id = ?", nidD2).First(&p).Error; err != nil {
+			t.Fatalf("Patient not found in DB: %v", err)
+		}
+
+		if p.BirthDate.Year() != 2006 || p.BirthDate.Month() != time.May || p.BirthDate.Day() != 12 {
+			t.Errorf("DB BirthDate mismatch for 12/05/2006: expected 2006-05-12, got %s", p.BirthDate.Format("2006-01-02"))
+		} else {
+			t.Logf("  [PASS D2] 12/05/2006 (ค.ศ.) -> DB BirthDate: %s", p.BirthDate.Format("2006-01-02"))
+		}
+	})
+
+	// D3: Register with Dash Buddhist Era "12-05-2549" -> 201 -> DB has 2006-05-12
+	t.Run("D3_BE_Dash_12_05_2549", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"national_id":  nidD3,
+			"fullname":     "นายทดสอบ พ.ศ. แดช",
+			"gender":       "ชาย",
+			"birthdate":    "12-05-2549",
+			"phone_number": "0810003333",
+			"district":     "เมือง",
+			"province":     "นครราชสีมา",
+		}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, "/api/registrar/patients", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusCreated {
+			t.Fatalf("Expected 201 Created, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var p models.Patient
+		if err := config.DB.Where("national_id = ?", nidD3).First(&p).Error; err != nil {
+			t.Fatalf("Patient not found in DB: %v", err)
+		}
+
+		if p.BirthDate.Year() != 2006 || p.BirthDate.Month() != time.May || p.BirthDate.Day() != 12 {
+			t.Errorf("DB BirthDate mismatch for 12-05-2549: expected 2006-05-12, got %s", p.BirthDate.Format("2006-01-02"))
+		} else {
+			t.Logf("  [PASS D3] 12-05-2549 (พ.ศ. Dash) -> DB BirthDate: %s", p.BirthDate.Format("2006-01-02"))
+		}
+	})
+
+	// D4: Negative Test - Invalid date string -> 400 Bad Request
+	t.Run("D4_Negative_Invalid_String -> 400", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"national_id":  nidD4,
+			"fullname":     "นายทดสอบ วันที่ผิด",
+			"gender":       "ชาย",
+			"birthdate":    "invalid-date-format",
+			"phone_number": "0810004444",
+			"district":     "เมือง",
+			"province":     "นครราชสีมา",
+		}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, "/api/registrar/patients", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400 for invalid date, got %d: %s", w.Code, w.Body.String())
+		} else {
+			t.Logf("  [PASS D4] Invalid date string returned 400 Bad Request: %s", w.Body.String())
+		}
+	})
+
+	// D5: Negative Test - Impossible date 31/02/2549 -> 400 Bad Request
+	t.Run("D5_Negative_Impossible_Date_31_02_2549 -> 400", func(t *testing.T) {
+		payload := map[string]interface{}{
+			"national_id":  nidD5,
+			"fullname":     "นายทดสอบ กุมภา 31",
+			"gender":       "ชาย",
+			"birthdate":    "31/02/2549",
+			"phone_number": "0810005555",
+			"district":     "เมือง",
+			"province":     "นครราชสีมา",
+		}
+		body, _ := json.Marshal(payload)
+		req := httptest.NewRequest(http.MethodPost, "/api/registrar/patients", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected status 400 for 31/02/2549, got %d: %s", w.Code, w.Body.String())
+		} else {
+			t.Logf("  [PASS D5] 31/02/2549 returned 400 Bad Request: %s", w.Body.String())
+		}
+	})
+
+	// D6: UpdatePatient with birthdate in BE (15/08/2540 -> 1997-08-15)
+	t.Run("D6_UpdatePatient_BirthDate_BE", func(t *testing.T) {
+		var p models.Patient
+		config.DB.Where("national_id = ?", nidD1).First(&p)
+
+		updatePayload := map[string]interface{}{
+			"birthdate": "15/08/2540",
+		}
+		body, _ := json.Marshal(updatePayload)
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/registrar/patients/%d", p.ID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200 OK for UpdatePatient, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var updated models.Patient
+		config.DB.First(&updated, p.ID)
+		if updated.BirthDate.Year() != 1997 || updated.BirthDate.Month() != time.August || updated.BirthDate.Day() != 15 {
+			t.Errorf("DB BirthDate not updated properly: expected 1997-08-15, got %s", updated.BirthDate.Format("2006-01-02"))
+		} else {
+			t.Logf("  [PASS D6] UpdatePatient birthdate 15/08/2540 updated DB to: %s", updated.BirthDate.Format("2006-01-02"))
+		}
+	})
+
+	// D7: UpdatePatient with invalid date -> 400 Bad Request
+	t.Run("D7_UpdatePatient_Invalid_BirthDate -> 400", func(t *testing.T) {
+		var p models.Patient
+		config.DB.Where("national_id = ?", nidD1).First(&p)
+
+		updatePayload := map[string]interface{}{
+			"birthdate": "invalid-update-date",
+		}
+		body, _ := json.Marshal(updatePayload)
+		req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/registrar/patients/%d", p.ID), bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400 Bad Request for invalid birthdate on update, got %d: %s", w.Code, w.Body.String())
+		} else {
+			t.Logf("  [PASS D7] UpdatePatient with invalid birthdate returned 400: %s", w.Body.String())
+		}
+	})
+
+	// D8: SavePatientEligibility with ExpireDate in BE (31/12/2570 -> 2027-12-31)
+	t.Run("D8_SavePatientEligibility_BE_ExpireDate", func(t *testing.T) {
+		var p models.Patient
+		config.DB.Where("national_id = ?", nidD1).First(&p)
+
+		eligPayload := map[string]interface{}{
+			"patient_id":       p.ID,
+			"scheme_type":      "สิทธิ์ข้าราชการ",
+			"coverage_details": "เบิกจ่ายตรงกรมบัญชีกลาง",
+			"hospital_name":    "โรงพยาบาลมหาราชนครราชสีมา",
+			"status":           "ใช้งานได้",
+			"expire_date":      "31/12/2570",
+		}
+		body, _ := json.Marshal(eligPayload)
+		req := httptest.NewRequest(http.MethodPost, "/api/registrar/eligibility/save", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusOK {
+			t.Fatalf("Expected 200 OK for SavePatientEligibility, got %d: %s", w.Code, w.Body.String())
+		}
+
+		var elig models.MedicalEligibility
+		if err := config.DB.Where("patient_id = ?", p.ID).First(&elig).Error; err != nil {
+			t.Fatalf("Eligibility record not found: %v", err)
+		}
+
+		if elig.ExpireDate == nil || elig.ExpireDate.Year() != 2027 || elig.ExpireDate.Month() != time.December || elig.ExpireDate.Day() != 31 {
+			t.Errorf("Eligibility ExpireDate mismatch: expected 2027-12-31, got %v", elig.ExpireDate)
+		} else {
+			t.Logf("  [PASS D8] SavePatientEligibility expire_date '31/12/2570' saved as: %s", elig.ExpireDate.Format("2006-01-02"))
+		}
+	})
+
+	// D9: Negative Test - SavePatientEligibility with invalid date -> 400 Bad Request
+	t.Run("D9_SavePatientEligibility_Invalid_ExpireDate -> 400", func(t *testing.T) {
+		var p models.Patient
+		config.DB.Where("national_id = ?", nidD1).First(&p)
+
+		eligPayload := map[string]interface{}{
+			"patient_id":  p.ID,
+			"scheme_type": "บัตรทอง",
+			"expire_date": "not-a-valid-date",
+		}
+		body, _ := json.Marshal(eligPayload)
+		req := httptest.NewRequest(http.MethodPost, "/api/registrar/eligibility/save", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("Expected 400 Bad Request for invalid eligibility expire date, got %d: %s", w.Code, w.Body.String())
+		} else {
+			t.Logf("  [PASS D9] Invalid expire_date returned 400 Bad Request: %s", w.Body.String())
+		}
+	})
+
+	t.Log("================================================================================\n")
+}
+
 
