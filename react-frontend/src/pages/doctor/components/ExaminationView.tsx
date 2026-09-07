@@ -6,6 +6,7 @@ import { translateClinicalText } from '../utils/clinicalTranslation';
 import { displayVN } from '../utils/vnGenerator';
 import { formatNationalId, rawNationalId } from '../utils/nationalId';
 import { findAllergyConflicts, describeConflict } from '../utils/allergyCheck';
+import { fmtVital } from '../utils/vitals';
 import {
   Stethoscope,
   HeartPulse,
@@ -29,6 +30,7 @@ import {
   User,
   FileSpreadsheet,
   ArrowLeft,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   Info,
@@ -114,31 +116,22 @@ function formatScreenedAt(value: string | undefined): string {
 const NOT_MEASURED = { th: 'ยังไม่ได้วัด', en: 'Not measured' };
 
 /**
- * ==============================================================================
- * ปัดค่าสัญญาณชีพให้ตรงกับความละเอียดของเครื่องมือวัดจริง
- * ==============================================================================
- * เคยเจอในฐานข้อมูลจริง: อุณหภูมิ 36.89750419129597 °C
- *                        น้ำหนัก 76.06828326560182 กก.
- *                        ส่วนสูง 171.91949858478532 ซม.
- * มาจากตัวจำลองคิว (AutoSimulator) ที่สุ่มเป็นเลขทศนิยมดิบแล้วเขียนลงตาราง
- * screenings ตรงๆ แต่ปัญหาไม่ได้อยู่ที่ตัวจำลองอย่างเดียว
+ * ป้าย "ไม่มีข้อมูล" สำหรับช่องข้อมูลผู้ป่วยที่ฐานข้อมูลไม่มีค่า
  *
- * ไม่มีเครื่องมือแพทย์เครื่องไหนวัดได้ละเอียดขนาดนั้น
- *   เทอร์โมมิเตอร์  ทศนิยม 1 ตำแหน่ง
- *   เครื่องชั่ง      ทศนิยม 1 ตำแหน่ง
- *   ที่วัดส่วนสูง    จำนวนเต็ม
- *   ชีพจร/หายใจ/SpO2 จำนวนเต็ม
+ * เดิมช่องพวกนี้ fallback เป็นค่าตัวอย่างที่ดูสมจริง เช่นหมู่โลหิต "O Positive"
+ * วันเกิด "1984-03-15" สิทธิการรักษา "บัตรทอง" ซึ่งไม่มีอะไรบอกว่าเป็นของปลอม
+ * แพทย์จึงแยกไม่ออกว่ากำลังอ่านข้อมูลจริงของผู้ป่วยคนนี้ หรืออ่านค่าที่ใส่ไว้ตอนทำดีไซน์
  *
- * หน้าจอจึงควรคุมรูปแบบการแสดงผลของตัวเอง ไม่ว่าข้อมูลต้นทางจะมาแบบไหน
- * ปัดเฉพาะ "ตอนแสดงผล" เท่านั้น ค่าที่เก็บในฐานข้อมูลยังเป็นค่าเดิมไม่ถูกแตะ
+ * หมู่โลหิตอันตรายที่สุด — ขึ้น O Positive ให้ทุกคนที่ไม่มีข้อมูล
+ * ถ้ามีใครหยิบไปใช้อ้างอิงตอนฉุกเฉิน คือให้เลือดผิดหมู่
  *
- * ใช้ Number() ครอบอีกชั้นเพื่อตัดศูนย์ท้ายทิ้ง
- * toFixed(1) ของ 36 จะได้ "36.0" ซึ่งอ่านแปลกกว่า "36"
+ * (คู่กับ NoData ใน PatientRecordsView.tsx ซึ่งอธิบายเหตุผลไว้ครบกว่า)
  */
-function fmtVital(value: number | undefined, decimals = 0): string {
-  if (value === undefined || Number.isNaN(value)) return '';
-  return String(Number(value.toFixed(decimals)));
-}
+const NoData: React.FC<{ lang: string }> = ({ lang }) => (
+  <span className="font-normal text-slate-400">
+    {lang === 'th' ? 'ไม่มีข้อมูล' : 'No data'}
+  </span>
+);
 
 /**
  * ==============================================================================
@@ -535,6 +528,28 @@ const DocumentCheckRow: React.FC<{
   </label>
 );
 
+/**
+ * ==============================================================================
+ * รายการแท็บของหน้าบันทึกการตรวจ
+ * ==============================================================================
+ * ย้ายออกมาไว้นอกคอมโพเนนต์ เพราะตอนนี้ใช้ 2 ที่
+ *   1. แถบแท็บด้านบน
+ *   2. ปุ่ม "ก่อนหน้า / ถัดไป" ท้ายหน้า
+ *
+ * ถ้าปล่อยให้ต่างคนต่างเขียนรายการของตัวเอง วันหลังเพิ่มแท็บใหม่แล้วลืมแก้อีกที่
+ * ปุ่มถัดไปจะข้ามแท็บนั้นไปเลยโดยไม่มีอะไรฟ้อง — ลำดับในอาร์เรย์นี้
+ * คือลำดับการเดินของปุ่มถัดไป/ก่อนหน้า และต้องตรงกับลำดับบนแถบแท็บเสมอ
+ */
+type ExamTabId = 'notes' | 'diagnosis' | 'prescription' | 'referral' | 'followup';
+
+const EXAM_TABS: { id: ExamTabId; th: string; en: string; icon: React.ElementType }[] = [
+  { id: 'notes',        th: 'ข้อมูลคัดกรอง & ประวัติ', en: 'Triage & History',       icon: FileText },
+  { id: 'diagnosis',    th: 'การวินิจฉัยโรค',          en: 'Diagnosis & Assessment', icon: Stethoscope },
+  { id: 'prescription', th: 'การสั่งยา',               en: 'Prescription',           icon: Pill },
+  { id: 'referral',     th: 'เอกสาร & การส่งต่อ',      en: 'Documents & Referral',   icon: Send },
+  { id: 'followup',     th: 'นัดหมายติดตามอาการ',      en: 'Follow-up & Actions',    icon: Calendar },
+];
+
 const EXAM_ANCHOR = {
   chiefComplaint: 'exam-anchor-chief-complaint',
   vitals: 'exam-anchor-vitals',
@@ -779,7 +794,40 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 }) => {
   const { language, t } = useLanguage();
   // Active Examination Tab (Clinical Notes, Diagnosis, Prescription, Referral & Counseling, Follow-up)
-  const [activeTab, setActiveTab] = useState<'notes' | 'diagnosis' | 'prescription' | 'referral' | 'followup'>('notes');
+  const [activeTab, setActiveTab] = useState<ExamTabId>('notes');
+
+  /**
+   * เดินไปมาระหว่างแท็บด้วยปุ่มท้ายหน้า
+   *
+   * ปัญหาเดิม: แท็บแต่ละใบยาวเกินหนึ่งจอ พอกรอกถึงล่างสุดแล้วจะไปแท็บถัดไป
+   * ต้องเลื่อนกลับขึ้นไปบนสุดเพื่อกดแถบแท็บทุกครั้ง ซึ่งเป็นการเดินย้อนทาง
+   * ที่ต้องทำซ้ำ 4 รอบต่อการตรวจหนึ่งเคส
+   *
+   * ทำไมต้องเลื่อนจอด้วยไม่ใช่แค่เปลี่ยนแท็บ: ตอนกดปุ่มสายตาอยู่ท้ายหน้า
+   * ถ้าเปลี่ยนเนื้อหาเฉยๆ จอจะค้างอยู่ตรงกลางแท็บใหม่ ไม่เห็นหัวข้อว่าอยู่แท็บอะไร
+   * เลื่อนกลับไปที่แถบแท็บให้ ทำให้เริ่มอ่านแท็บใหม่จากบนสุดเสมอ
+   */
+  const tabCardRef = React.useRef<HTMLDivElement>(null);
+
+  const goToTab = (id: ExamTabId) => {
+    setActiveTab(id);
+
+    // หัก 90px เผื่อ Topbar ที่ตรึงอยู่ด้านบน (สูง 74px) ไม่งั้นแถบแท็บจะไปอยู่ใต้ Topbar
+    // ใช้ requestAnimationFrame เพื่อให้ React วาดแท็บใหม่เสร็จก่อนค่อยวัดตำแหน่ง
+    requestAnimationFrame(() => {
+      const el = tabCardRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY - 90;
+      window.scrollTo({ top, behavior: 'smooth' });
+    });
+  };
+
+  const activeTabIndex = EXAM_TABS.findIndex((tab) => tab.id === activeTab);
+  const prevTab = activeTabIndex > 0 ? EXAM_TABS[activeTabIndex - 1] : null;
+  const nextTab =
+    activeTabIndex >= 0 && activeTabIndex < EXAM_TABS.length - 1
+      ? EXAM_TABS[activeTabIndex + 1]
+      : null;
 
   // Status State
   const [status, setStatus] = useState<QueueStatus>(patient.status === 'Waiting' ? 'Examining' : patient.status);
@@ -1518,7 +1566,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
    */
   type ValidationIssue = {
     message: string;
-    tab: 'notes' | 'diagnosis' | 'prescription' | 'referral' | 'followup';
+    tab: ExamTabId;
     anchor: string;
   };
   const [showHistoryModal, setShowHistoryModal] = useState<string | null>(null);
@@ -1827,8 +1875,8 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         vn: displayVN(patient.vn),
       },
       hint: language === 'th'
-        ? 'ยังไม่ส่งรายการสั่งยาไปห้องยา จนกว่าจะกด "บันทึกและเสร็จสิ้นการตรวจ"'
-        : 'Prescriptions are not sent to the pharmacy until you use "Save & Complete Visit".',
+        ? 'ยังไม่ส่งรายการสั่งยาไปห้องยา จนกว่าจะกด "บันทึกผลการตรวจ"'
+        : 'Prescriptions are not sent to the pharmacy until you use "Save Examination".',
       confirmLabel: language === 'th' ? 'บันทึกฉบับร่าง' : 'Save Draft',
       onConfirm: runSaveDraft
     });
@@ -2358,7 +2406,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       </div>
 
       {/* แบนเนอร์เตือนแพ้ยาแบบค้างอยู่บนหน้าจอถูกถอดออกแล้ว
-          เปลี่ยนไปเตือนเป็นกล่องกลางจอตอนกด "บันทึกและเสร็จสิ้นการตรวจ" แทน
+          เปลี่ยนไปเตือนเป็นกล่องกลางจอตอนกด "บันทึกผลการตรวจ" แทน
           (ดู handleCompleteVisit) เพราะแบนเนอร์ที่ค้างอยู่ตลอดจะถูกมองข้ามในที่สุด
           ส่วนกล่องกลางจอบังคับให้ตัดสินใจก่อนถึงจะไปต่อได้ */}
 
@@ -2399,10 +2447,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               <div className="space-y-1">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h2 className="text-xl font-bold text-slate-900 tracking-tight">{patient.name}</h2>
-                  <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    {language === 'th' ? `คิว #${patient.queueNo}` : `Queue #${patient.queueNo}`}
-                  </span>
+                  {/* เลขคิวใช้รูปแบบเดียวกับ HN / VN / เลขบัตร คือ "ป้าย: ค่า"
+                      เดิมเขียนเป็น "คิว #Q0001" ซึ่งเป็นรูปแบบเดียวในแถวนี้ที่ไม่เหมือนใคร
+                      ทำให้ตากวาดหาเลขไม่เจอในจังหวะเดียวกับป้ายอื่น
+                      และคัดลอกไม่ได้ทั้งที่เป็นเลขอ้างอิงที่ต้องพิมพ์ต่อบ่อยพอกัน */}
+                  <CopyableText label={language === 'th' ? 'คิว' : 'Queue'} value={patient.queueNo} className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
                   <CopyableText label="HN" value={patient.hn} className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
                   <CopyableText label="VN" value={displayVN(patient.vn)} className="bg-purple-50 text-purple-700 border border-purple-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
                   {/* แสดงแบบมีขีดคั่นให้อ่านง่าย แต่คัดลอกได้เป็นตัวเลขล้วน
@@ -2469,14 +2518,12 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                   <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'หมู่โลหิต :' : 'Blood Group :'}</span>
                   <span className="font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 inline-block text-[11px]">
-                    {patient.bloodGroup
-                      ? patient.bloodGroup
-                      : (language === 'th' ? 'หมู่ O (O Positive)' : 'O Positive (O+)')}
+                    {patient.bloodGroup || <NoData lang={language} />}
                   </span>
                 </div>
                 <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                   <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'วันเกิด :' : 'Date of Birth :'}</span>
-                  <span className="font-semibold text-slate-800 text-xs">{patient.dob || '1984-03-15'}</span>
+                  <span className="font-semibold text-slate-800 text-xs">{patient.dob || <NoData lang={language} />}</span>
                 </div>
               </div>
 
@@ -2490,9 +2537,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                 <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'สิทธิการรักษา :' : 'Insurance Scheme :'}</span>
                 <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 inline-block text-xs">
-                  {patient.insuranceType
-                    ? patient.insuranceType
-                    : (language === 'th' ? 'บัตรทอง (หลักประกันสุขภาพถั่วหน้า UC)' : 'Universal Health Coverage (UC)')}
+                  {patient.insuranceType || <NoData lang={language} />}
                 </span>
               </div>
 
@@ -2500,11 +2545,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                   <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'วันที่รับบริการ :' : 'Visit Date :'}</span>
-                  <span className="font-bold text-slate-900 text-xs">{patient.visitDate || '2026-07-23'}</span>
+                  <span className="font-bold text-slate-900 text-xs">{patient.visitDate || <NoData lang={language} />}</span>
                 </div>
                 <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                   <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เวลา :' : 'Visit Time :'}</span>
-                  <span className="font-bold text-slate-900 text-xs">{patient.visitTime || '-'}</span>
+                  <span className="font-bold text-slate-900 text-xs">{patient.visitTime || <NoData lang={language} />}</span>
                 </div>
               </div>
             </div>
@@ -2513,21 +2558,26 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
       </div>
 
       {/* MAIN TABS NAVBAR */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="flex border-b border-slate-200 overflow-x-auto scrollbar-none px-2 pt-1.5 w-full">
-          {[
-            { id: 'notes', label: language === 'th' ? 'ข้อมูลคัดกรอง & ประวัติ' : 'Triage & History', icon: FileText },
-            { id: 'diagnosis', label: language === 'th' ? 'การวินิจฉัยโรค' : 'Diagnosis & Assessment', icon: Stethoscope },
-            { id: 'prescription', label: language === 'th' ? 'การสั่งยา' : 'Prescription', badge: prescriptions.length, icon: Pill },
-            { id: 'referral', label: language === 'th' ? 'เอกสาร & การส่งต่อ' : 'Documents & Referral', icon: Send },
-            { id: 'followup', label: language === 'th' ? 'นัดหมายติดตามอาการ' : 'Follow-up & Actions', icon: Calendar },
-          ].map((tab) => {
+      {/* ⚠️ ห้ามใส่ overflow-hidden ที่การ์ดใบนี้
+          position: sticky ของแถบแท็บด้านในจะตายทันที เพราะ overflow-hidden
+          ทำให้การ์ดกลายเป็น scroll container ของแถบแท็บ ซึ่งเลื่อนไม่ได้
+          แถบจึงไม่มีวันติดขอบจอ (ไม่มี error อะไรฟ้อง มันแค่เงียบๆ ไม่ทำงาน)
+          มุมโค้งย้ายไปทำที่แถบแท็บ (rounded-t-2xl) กับแถบปุ่มท้าย (rounded-b-2xl) แทน */}
+      <div ref={tabCardRef} className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+        {/* แถบแท็บติดหนึบใต้ Topbar
+            top-[74px] = ความสูง Topbar ที่ตรึงอยู่ ถ้าใส่ top-0 แถบจะไปซ่อนอยู่ใต้ Topbar
+            z-30 อยู่เหนือเนื้อหาแท็บ แต่ต่ำกว่ากล่องยืนยัน (z-1200) จึงไม่โผล่ทับโมดัล
+            bg-white ทึบ ห้ามโปร่งใส ไม่งั้นเนื้อหาที่เลื่อนผ่านด้านหลังจะทะลุขึ้นมา */}
+        <div className="sticky top-[74px] z-30 flex border-b border-slate-200 overflow-x-auto scrollbar-none px-2 pt-1.5 w-full bg-white rounded-t-2xl">
+          {EXAM_TABS.map((tab) => {
             const isActive = activeTab === tab.id;
             const Icon = tab.icon;
+            const label = language === 'th' ? tab.th : tab.en;
+            const badge = tab.id === 'prescription' ? prescriptions.length : undefined;
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => goToTab(tab.id)}
                 className={`flex-1 min-w-[140px] py-3.5 px-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap flex items-center justify-center gap-2 cursor-pointer ${
                   isActive
                     ? 'border-[#2563eb] text-[#2563eb] font-bold bg-blue-50/40'
@@ -2535,10 +2585,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 }`}
               >
                 <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#2563eb]' : 'text-slate-400'}`} />
-                <span>{tab.label}</span>
-                {tab.badge !== undefined && tab.badge > 0 && (
+                <span>{label}</span>
+                {badge !== undefined && badge > 0 && (
                   <span className={`text-xs px-2 py-0.5 rounded-full font-mono ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                    {tab.badge}
+                    {badge}
                   </span>
                 )}
               </button>
@@ -4325,7 +4375,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  <span>{language === 'th' ? 'บันทึกและเสร็จสิ้นการตรวจ' : 'Save & Complete Visit'}</span>
+                  <span>{t('saveExam')}</span>
                 </button>
 
                 {/* ปุ่ม "ใบรับรองแพทย์" กับ "พิมพ์สรุปการตรวจ" ถูกถอดออก
@@ -4340,6 +4390,95 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             </div>
           </div>
         )}
+
+        {/* ------------------------------------------------------------------
+            แถบเดินแท็บท้ายหน้า
+            ------------------------------------------------------------------
+            อยู่ในการ์ดเดียวกับแถบแท็บด้านบน จึงเป็นขอบล่างของเนื้อหาแท็บพอดี
+            ไม่ใช่กล่องลอยแยกที่ดูเหมือนคนละส่วนกัน
+
+            ⚠️ ปุ่มต้องกว้างเท่ากันทุกแท็บ (w-[236px]) ห้ามปล่อยให้ยืดตามข้อความ
+            ชื่อแท็บยาวไม่เท่ากัน ("การสั่งยา" 9 ตัว vs "ข้อมูลคัดกรอง & ประวัติ" 21 ตัว)
+            ถ้าปล่อยให้ปุ่มยืดตามชื่อ ปุ่มจะเปลี่ยนขนาดทุกครั้งที่เปลี่ยนแท็บ
+            ตำแหน่งที่ต้องเอาเมาส์ไปกดจึงขยับไปมาตลอด ทั้งที่เป็นปุ่มเดิม
+            ชื่อที่ยาวเกินให้ตัดด้วย truncate แทนการดันปุ่มให้กว้างขึ้น
+
+            ตัวนับขั้นตอนตรงกลางมี 2 หน้าที่
+              1. บอกว่าอยู่ขั้นไหนของ 5 ขั้น โดยไม่ต้องเงยไปดูแถบแท็บ
+              2. เป็นสมอกลางที่ทำให้แถวนี้สมดุลเสมอ แม้แท็บแรก/สุดท้าย
+                 จะมีปุ่มแค่ข้างเดียว (อีกข้างใส่กล่องเปล่ากว้างเท่ากันแทน)
+            ------------------------------------------------------------------ */}
+        <div className="flex items-center justify-between gap-4 border-t border-slate-200 bg-slate-50/70 px-5 py-4 rounded-b-2xl">
+          {prevTab ? (
+            <button
+              type="button"
+              onClick={() => goToTab(prevTab.id)}
+              className="group w-[236px] max-w-[45%] shrink-0 flex items-center gap-3 p-2 rounded-2xl bg-white border border-slate-200 hover:border-blue-400 hover:shadow-2xs transition-all cursor-pointer text-left"
+            >
+              <span className="w-9 h-9 shrink-0 rounded-xl bg-slate-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                <ChevronLeft className="w-[18px] h-[18px] text-slate-500 group-hover:text-blue-600 stroke-[2.5]" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 leading-tight">
+                  {language === 'th' ? 'ก่อนหน้า' : 'Previous'}
+                </span>
+                <span className="block text-xs font-bold text-slate-800 group-hover:text-blue-700 leading-tight truncate">
+                  {language === 'th' ? prevTab.th : prevTab.en}
+                </span>
+              </span>
+            </button>
+          ) : (
+            <div className="w-[236px] max-w-[45%] shrink-0" aria-hidden />
+          )}
+
+          {/* ตัวนับขั้นตอน ซ่อนบนจอแคบเพราะปุ่มสองข้างสำคัญกว่า */}
+          <div className="hidden sm:flex flex-col items-center gap-1.5">
+            <div className="flex items-center gap-1.5">
+              {EXAM_TABS.map((tab, index) => (
+                <span
+                  key={tab.id}
+                  className={`h-1.5 rounded-full transition-all ${
+                    index === activeTabIndex
+                      ? 'w-6 bg-[#2563eb]'
+                      : index < activeTabIndex
+                        ? 'w-1.5 bg-blue-300'
+                        : 'w-1.5 bg-slate-300'
+                  }`}
+                />
+              ))}
+            </div>
+            <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">
+              {language === 'th'
+                ? `ขั้นที่ ${activeTabIndex + 1} จาก ${EXAM_TABS.length}`
+                : `Step ${activeTabIndex + 1} of ${EXAM_TABS.length}`}
+            </span>
+          </div>
+
+          {nextTab ? (
+            <button
+              type="button"
+              onClick={() => goToTab(nextTab.id)}
+              className="group w-[236px] max-w-[45%] shrink-0 flex items-center gap-3 p-2 rounded-2xl bg-white border border-slate-200 hover:border-blue-400 hover:shadow-2xs transition-all cursor-pointer text-right"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 leading-tight">
+                  {language === 'th' ? 'ถัดไป' : 'Next'}
+                </span>
+                <span className="block text-xs font-bold text-slate-800 group-hover:text-blue-700 leading-tight truncate">
+                  {language === 'th' ? nextTab.th : nextTab.en}
+                </span>
+              </span>
+              {/* ปุ่มถัดไปเป็นทิศทางหลักของการกรอก ไอคอนจึงทึบสีน้ำเงิน
+                  ส่วนปุ่มก่อนหน้าเป็นสีเทา — ต่างกันแค่ตรงนี้จุดเดียว
+                  ขนาดและโครงสร้างปุ่มเหมือนกันเป๊ะ จะได้ไม่รู้สึกว่าเป็นคนละชุด */}
+              <span className="w-9 h-9 shrink-0 rounded-xl bg-[#2563eb] group-hover:bg-blue-700 flex items-center justify-center transition-colors shadow-2xs">
+                <ChevronRight className="w-[18px] h-[18px] text-white stroke-[2.5]" />
+              </span>
+            </button>
+          ) : (
+            <div className="w-[236px] max-w-[45%] shrink-0" aria-hidden />
+          )}
+        </div>
       </div>
 
       {/* History Preview Modal */}
@@ -4639,6 +4778,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };
