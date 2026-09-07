@@ -107,12 +107,46 @@ const saveStoredForwardedDocs = (docs: ForwardDoc[]) => {
   }
 };
 
+const getStoredSystemDocs = (): BackendDocument[] => {
+  if (typeof window === 'undefined') return [];
+  const raw = localStorage.getItem('clinic_dms_documents_list_v2');
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map((p: any) => ({
+          id: Number(p.id) || 0,
+          external_doc_ref: p.externalRef || '',
+          subject: p.subject || p.name || '',
+          description: p.description || '',
+          file_url: p.fileUrl || '',
+          file_size: p.fileSize || 0,
+          status: p.status || 'reviewing',
+          doc_type: p.type || 'เอกสารทั่วไป',
+          created_by: 1,
+          created_at: p.rawDoc?.created_at || new Date().toISOString(),
+          updated_at: p.rawDoc?.updated_at || new Date().toISOString(),
+          creator: p.rawDoc?.creator || { full_name: p.creatorName || 'ธุรการ' },
+        }));
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return [];
+};
+
 export const DocumentForwardPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'incoming' | 'forwarded'>('incoming');
+  const [activeTab, setActiveTab] = useState<'incoming' | 'forwarded'>(() => {
+    const inc = getStoredIncomingDocs();
+    const fwd = getStoredForwardedDocs();
+    if (inc.length === 0 && fwd.length > 0) return 'forwarded';
+    return 'forwarded';
+  });
   const [incomingDocs, setIncomingDocs] = useState<ForwardDoc[]>(() => getStoredIncomingDocs());
   const [forwardedDocs, setForwardedDocs] = useState<ForwardDoc[]>(() => getStoredForwardedDocs());
   const [recipientsList, setRecipientsList] = useState<BackendUser[]>([]);
-  const [systemDocuments, setSystemDocuments] = useState<BackendDocument[]>([]);
+  const [systemDocuments, setSystemDocuments] = useState<BackendDocument[]>(() => getStoredSystemDocs());
   const [isLoading, setIsLoading] = useState(false);
 
   // Filters & Search
@@ -124,7 +158,7 @@ export const DocumentForwardPage: React.FC = () => {
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<ForwardDoc | null>(null);
-  const [activeMetricModal, setActiveMetricModal] = useState<'today' | 'pending' | 'completed' | 'recipients' | null>(null);
+  const [activeMetricModal, setActiveMetricModal] = useState<'system_docs' | 'today' | 'pending' | 'completed' | 'recipients' | null>(null);
 
   // Send Form State
   const [sendMode, setSendMode] = useState<'custom' | 'from_system'>('custom');
@@ -563,9 +597,101 @@ export const DocumentForwardPage: React.FC = () => {
   const renderMetricModal = () => {
     if (!activeMetricModal) return null;
 
-    let title = '';
-    let subtitle = '';
-    let dataList: ForwardDoc[] = [];
+    if (activeMetricModal === 'system_docs') {
+      return (
+        <div className="dms-modal-backdrop" onClick={() => setActiveMetricModal(null)}>
+          <div className="dms-modal-card dms-modal-wide" onClick={e => e.stopPropagation()}>
+            <div className="dms-modal-header">
+              <div className="dms-modal-title-group">
+                <div className="dms-modal-icon-badge blue-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="20" height="20">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 02 2h12a2 2 0 0 02-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="dms-modal-title">เอกสารทั้งหมดในระบบที่สามารถส่งต่อได้ ({systemDocuments.length} รายการ)</h3>
+                  <p className="dms-modal-subtitle">รายการเอกสารจากคลังเอกสารหลัก (Document Management) ที่พร้อมส่งต่อให้บุคลากร</p>
+                </div>
+              </div>
+              <button className="dms-close-btn" onClick={() => setActiveMetricModal(null)} aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className="dms-modal-body dms-modal-scrollable">
+              <div className="table-responsive">
+                <table className="dms-master-table">
+                  <thead>
+                    <tr>
+                      <th>เลขอ้างอิง / ID</th>
+                      <th>ชื่อเรื่องเอกสาร</th>
+                      <th>ประเภท</th>
+                      <th>สถานะในคลัง</th>
+                      <th>ผู้จัดทำ</th>
+                      <th style={{ textAlign: 'center' }}>การดำเนินการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {systemDocuments.map(doc => (
+                      <tr key={doc.id}>
+                        <td className="doc-code-text">{doc.external_doc_ref || `#${doc.id}`}</td>
+                        <td>
+                          <span className="doc-name-text">{doc.subject}</span>
+                          {doc.description && <div className="doc-subtext">{doc.description}</div>}
+                        </td>
+                        <td>
+                          <span className="doc-dept-text">{doc.doc_type || 'เอกสารทั่วไป'}</span>
+                        </td>
+                        <td>
+                          <span className={`status-pill ${doc.status === 'approved' ? 'completed' : 'processing'}`}>
+                            <span className="status-dot"></span>
+                            {doc.status === 'approved' ? 'อนุมัติแล้ว' : 'รอตรวจสอบ'}
+                          </span>
+                        </td>
+                        <td className="doc-dept-text">{doc.creator?.fullname || doc.creator?.username || 'ธุรการ'}</td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            className="dms-btn-small"
+                            onClick={() => {
+                              setSelectedSystemDocId(doc.id);
+                              setSendMode('from_system');
+                              setNewDocTitle(doc.subject);
+                              setNewDocDescription(doc.description || '');
+                              setNewDocType(doc.doc_type || 'เอกสารทั่วไป');
+                              setActiveMetricModal(null);
+                              setIsSendModalOpen(true);
+                            }}
+                          >
+                            ส่งต่อเอกสารนี้ ➔
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {systemDocuments.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="no-data-cell">
+                          <div className="no-data-content">
+                            <p>ไม่มีเอกสารในคลังระบบในขณะนี้</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div className="dms-modal-footer">
+              <button className="dms-btn-secondary" onClick={() => setActiveMetricModal(null)}>
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     if (activeMetricModal === 'today') {
       title = `เอกสารขาเข้าทั้งหมด (${incomingDocs.length} รายการ)`;
@@ -809,25 +935,24 @@ export const DocumentForwardPage: React.FC = () => {
       <div className="dms-metrics-grid">
         <div
           className="dms-card metric-card interactive"
-          onClick={() => setActiveMetricModal('today')}
-          title="คลิกเพื่อดูเอกสารขาเข้าทั้งหมด"
+          onClick={() => setActiveMetricModal('system_docs')}
+          title="คลิกเพื่อดูเอกสารทั้งหมดในระบบที่พร้อมส่งต่อ"
         >
           <div className="metric-icon-wrapper blue-bg">
             <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="24" height="24">
-              <path d="M22 12h-6l-2 3h-4l-2-3H2v7a2 2 0 002 2h16a2 2 0 002-2v-7z" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M5.45 5.11L2 12v7a2 2 0 002 2h16a2 2 0 002-2v-7l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 02 2h12a2 2 0 0 02-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
             </svg>
           </div>
           <div className="metric-info">
             <div className="metric-label-row">
-              <span className="metric-label">เอกสารขาเข้าในระบบ</span>
-              {incomingUnreadCount > 0 && (
-                <span className="metric-tag-unread">{incomingUnreadCount} ใหม่</span>
-              )}
+              <span className="metric-label">เอกสารทั้งหมดในระบบ (พร้อมส่งต่อ)</span>
             </div>
-            <span className="metric-value">{incomingDocs.length}</span>
+            <span className="metric-value">{systemDocuments.length}</span>
             <span className="metric-subtext blue-text">
-              คลิกเพื่อดูรายการทั้งหมด →
+              คลิกเพื่อเลือกส่งต่อเอกสาร →
             </span>
           </div>
         </div>
