@@ -643,6 +643,7 @@ const QueuePage: React.FC = () => {
                         setCurrentPage(1);
                       }}
                     >
+                      <span className="pill-dot dot-all"></span>
                       <span>ทั้งหมดในกลุ่มนี้</span>
                       <span className="pill-count">
                         {stats.waitingScreening + stats.waitingDoctor + stats.inExamination + stats.waitingTreatment}
@@ -723,6 +724,7 @@ const QueuePage: React.FC = () => {
                         setCurrentPage(1);
                       }}
                     >
+                      <span className="pill-dot dot-all"></span>
                       <span>ทั้งหมดในกลุ่มนี้</span>
                       <span className="pill-count">{stats.waitingBilling + stats.waitingPharmacy}</span>
                     </button>
@@ -771,6 +773,7 @@ const QueuePage: React.FC = () => {
                         setCurrentPage(1);
                       }}
                     >
+                      <span className="pill-dot dot-all"></span>
                       <span>ทั้งหมดในกลุ่มนี้</span>
                       <span className="pill-count">{stats.completed + stats.cancelled}</span>
                     </button>

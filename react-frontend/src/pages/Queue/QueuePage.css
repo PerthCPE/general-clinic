@@ -369,6 +369,7 @@
   flex-shrink: 0;
 }
 
+.dot-all { background: #64748B; }
 .dot-screening { background: #2563EB; }
 .dot-doctor { background: #8B5CF6; }
 .dot-examination { background: #D97706; }
@@ -379,7 +380,7 @@
 .dot-cancelled { background: #DC2626; }
 
 .filter-pill-btn.active .pill-dot {
-  background: #FFFFFF;
+  background: #FFFFFF !important;
 }
 
 /* ===== Rows Per Page Selector ===== */
@@ -1336,6 +1337,16 @@ body.dark-mode .filter-pill-btn.active .pill-count {
   background: rgba(255, 255, 255, 0.22);
   color: #FFFFFF;
 }
+
+body.dark-mode .dot-all { background: #94A3B8; }
+body.dark-mode .dot-screening { background: #60A5FA; }
+body.dark-mode .dot-doctor { background: #A855F7; }
+body.dark-mode .dot-examination { background: #FBBF24; }
+body.dark-mode .dot-treatment { background: #FB923C; }
+body.dark-mode .dot-billing { background: #38BDF8; }
+body.dark-mode .dot-pharmacy { background: #2DD4BF; }
+body.dark-mode .dot-completed { background: #4ADE80; }
+body.dark-mode .dot-cancelled { background: #F87171; }
 
 body.dark-mode .table-search-input {
   background: #22272E;
