@@ -5,6 +5,7 @@ import CopyableText from '../../components/Common/CopyableText';
 import { BillingDashboardSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
+import { playBillingNotification } from '../../utils/audioQueue';
 import html2pdf from 'html2pdf.js';
 
 interface PaymentRecord {
@@ -232,6 +233,7 @@ export default function BillingDashboardPage() {
       fetchBillings();
       setLiveNotify(`มีบิลชำระเงินใหม่เข้ามาในระบบ (Visit #${data?.visit_id || ''})`);
       setTimeout(() => setLiveNotify(null), 4000);
+
     });
 
     const unsubQueue = subscribe('QUEUE_UPDATED', (data: any) => {
@@ -363,9 +365,15 @@ export default function BillingDashboardPage() {
 
     // เรียงลำดับให้คนล่าสุดที่บันทึกอยู่บนสุดเสมอ (Newest record ALWAYS on top)
     return [...list].sort((a, b) => {
-      const timeA = new Date(a.rawHistory?.created_at || a.date || 0).getTime();
-      const timeB = new Date(b.rawHistory?.created_at || b.date || 0).getTime();
-      if (timeB !== timeA) return timeB - timeA;
+      const timeA = a.rawHistory?.created_at ? new Date(a.rawHistory.created_at).getTime() : 0;
+      const timeB = b.rawHistory?.created_at ? new Date(b.rawHistory.created_at).getTime() : 0;
+      
+      // กันเหนียวกรณี parse ไม่ผ่าน
+      const safeTimeA = isNaN(timeA) ? 0 : timeA;
+      const safeTimeB = isNaN(timeB) ? 0 : timeB;
+      
+      if (safeTimeB !== safeTimeA) return safeTimeB - safeTimeA;
+      
       const idA = Number(a.rawHistory?.id) || parseInt(String(a.id).replace(/\D/g, '')) || 0;
       const idB = Number(b.rawHistory?.id) || parseInt(String(b.id).replace(/\D/g, '')) || 0;
       return idB - idA;
@@ -579,8 +587,24 @@ export default function BillingDashboardPage() {
       {/* Search Bar */}
       <div className="search-card card" style={{ marginBottom: '20px' }}>
         <div className="search-inputs" style={{ display: 'flex', gap: '16px', flex: 1, alignItems: 'flex-end' }}>
-          <div className="input-group" style={{ flex: 2 }}>
-            <label>ค้นหารหัสผู้ป่วย หรือ ชื่อผู้ป่วย (Patient ID / Name)</label>
+          <div className="input-group" style={{ flex: 2, position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label>ค้นหารหัสผู้ป่วย หรือ ชื่อผู้ป่วย (Patient ID / Name)</label>
+              {(patientId || statusFilter !== 'all' || methodFilter !== 'all') && (
+                <span 
+                  onClick={handleResetFilters} 
+                  style={{ 
+                    cursor: 'pointer', 
+                    fontSize: '12.5px', 
+                    fontWeight: '600',
+                    color: '#3B82F6', 
+                    textDecoration: 'underline' 
+                  }}
+                >
+                  ล้างการค้นหา
+                </span>
+              )}
+            </div>
             <input
               type="text"
               placeholder="ค้นหาด้วยรหัสใบเสร็จ, HN, หรือชื่อผู้ป่วย..."
@@ -620,18 +644,6 @@ export default function BillingDashboardPage() {
                </svg>
                ค้นหาข้อมูล
             </button>
-            {(patientId || statusFilter !== 'all' || methodFilter !== 'all') && (
-              <button 
-                className="search-btn" 
-                onClick={handleResetFilters} 
-                style={{ 
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  background: 'var(--bg-card, #F1F5F9)', color: 'var(--text-primary, #475569)', border: '1px solid #CBD5E1' 
-                }}
-              >
-                ล้างการค้นหา
-              </button>
-            )}
           </div>
         </div>
       </div>

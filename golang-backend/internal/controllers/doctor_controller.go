@@ -283,8 +283,22 @@ func toScreeningBrief(s models.Screening) dto.ScreeningBrief {
 		RespiratoryRate: s.RespiratoryRate,
 		SpO2:            s.SpO2,
 
-		PainScore:          s.PainScore,
-		BloodSugar:         s.BloodSugar,
+		PainScore:       s.PainScore,
+		BloodSugar:      s.BloodSugar,
+		HasURI:          s.HasURI,
+		HasTB:           s.HasTB,
+		OnAnticoagulant: s.OnAnticoagulant,
+
+		IsPregnant:          s.IsPregnant,
+		IsBreastfeeding:     s.IsBreastfeeding,
+		LastMenstrualPeriod: s.LastMenstrualPeriod,
+		PrecautionType:      s.PrecautionType,
+
+		HerbalMedicines:    s.HerbalMedicines,
+		DietarySupplements: s.DietarySupplements,
+		Q2Depressed:        s.Q2Depressed,
+		Q2Anhedonia:        s.Q2Anhedonia,
+
 		FoodAllergies:      s.FoodAllergies,
 		CurrentMedications: s.CurrentMedications,
 		SmokingHistory:     s.SmokingHistory,

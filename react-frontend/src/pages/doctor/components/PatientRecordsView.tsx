@@ -30,6 +30,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { translateClinicalText } from '../utils/clinicalTranslation';
 import { StatusFilterTabs } from './StatusFilterTabs';
 import { displayVN } from '../utils/vnGenerator';
+import { formatNationalId, rawNationalId } from '../utils/nationalId';
+import { fmtVital } from '../utils/vitals';
 
 /**
  * ==============================================================================
@@ -65,6 +67,59 @@ interface PatientRecordsViewProps {
  *   และจำนวนช่องจะไม่เท่ากันในแต่ละครั้ง ทำให้กวาดตาเทียบข้ามครั้งไม่ได้
  *   การเห็น "-" บอกชัดว่าหัวข้อนี้มีอยู่ แต่วันนั้นแพทย์ไม่ได้กรอก
  */
+/**
+ * ==============================================================================
+ * ป้าย "ไม่มีข้อมูล" — ใช้แทนค่าตัวอย่างที่เคยเขียนตายไว้ในโค้ด
+ * ==============================================================================
+ * เดิมช่องที่ backend ไม่ได้ส่งค่ามา จะ fallback เป็นข้อมูลสมมติที่ดูสมจริงมาก
+ *
+ *   หมู่โลหิต       -> "หมู่ O (O Positive)"
+ *   ที่อยู่          -> "123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110"
+ *   เบอร์โทรศัพท์    -> "081-234-5678"
+ *   อาชีพ           -> "วิศวกรซอฟต์แวร์"
+ *   วันเกิด         -> "1984-03-15"
+ *   สิทธิการรักษา    -> "บัตรทอง (UC)"
+ *   วันที่/เวลารับบริการ -> "2026-07-23 08:45"
+ *
+ * ทุกตัวหน้าตาเหมือนข้อมูลจริงทุกประการ ไม่มีอะไรบอกว่าเป็นของปลอม
+ * แพทย์ที่เปิดดูจึงไม่มีทางรู้ว่ากำลังอ่านข้อมูลของผู้ป่วยคนนี้จริง
+ * หรืออ่านค่าตัวอย่างที่โปรแกรมเมอร์ใส่ไว้ตอนทำดีไซน์
+ *
+ * อันตรายที่สุดคือหมู่โลหิต — ขึ้น "O Positive" ให้ทุกคนที่ไม่มีข้อมูลในระบบ
+ * ถ้ามีใครหยิบไปใช้อ้างอิงตอนฉุกเฉิน คือให้เลือดผิดหมู่
+ * รองลงมาคือเบอร์โทรกับที่อยู่ ซึ่งใช้ตามตัวผู้ป่วยกลับมาฟังผลไม่ได้เลย
+ *
+ * ช่องว่างที่บอกตรงๆ ว่าไม่มีข้อมูล ทำให้คนอ่านไปหาข้อมูลจากที่อื่นต่อ
+ * ส่วนข้อมูลปลอมที่ดูน่าเชื่อ ทำให้คนอ่านหยุดหา — ซึ่งแย่กว่ากันมาก
+ */
+const NoData: React.FC = () => {
+  const { language } = useLanguage();
+  return (
+    <span className="font-normal text-slate-400">
+      {language === 'th' ? 'ไม่มีข้อมูล' : 'No data'}
+    </span>
+  );
+};
+
+/**
+ * ป้าย "ยังไม่ได้ซักประวัติ" สำหรับช่องที่คำตอบเป็นมี/ไม่มี
+ *
+ * แยกจาก NoData เพราะช่องพวกนี้เคย fallback เป็น "ไม่สูบบุหรี่" / "ไม่ดื่มแอลกอฮอล์"
+ * / "ไม่มี" ซึ่งไม่ใช่แค่ข้อมูลปลอม แต่เป็นการ "ตอบแทนผู้ป่วย" ว่าไม่มีความเสี่ยง
+ *
+ * "ยังไม่ได้ถาม" กับ "ถามแล้วตอบว่าไม่มี" นำไปสู่การตัดสินใจคนละทาง
+ * เช่นผู้ป่วยที่ยังไม่เคยถูกซักว่าสูบบุหรี่ไหม ควรถูกถามก่อนสั่งยาบางกลุ่ม
+ * แต่ถ้าหน้าจอขึ้นว่า "ไม่สูบบุหรี่" ไปแล้ว จะไม่มีใครถามอีกเลย
+ */
+const NotAsked: React.FC = () => {
+  const { language } = useLanguage();
+  return (
+    <span className="text-slate-400">
+      {language === 'th' ? 'ยังไม่ได้ซักประวัติ' : 'Not recorded'}
+    </span>
+  );
+};
+
 const HistoryField: React.FC<{ label: string; value?: string }> = ({ label, value }) => {
   const text = (value || '').trim();
   return (
@@ -117,6 +172,62 @@ function buildPrescriptionDetail(item: PrescriptionItem, language: string): stri
 
   return lines.join('\n');
 }
+
+/**
+ * ==============================================================================
+ * ป้ายสถานะรวมของการมาตรวจ 1 ครั้ง (ในมุมของผู้ป่วย ไม่ใช่มุมของแพทย์)
+ * ==============================================================================
+ * ต่างจากป้ายสถานะคิว (รอตรวจ / กำลังตรวจ / ตรวจเสร็จ) ซึ่งจบแค่ตอนแพทย์ปิดเคส
+ * ป้ายนี้ตอบว่า "ผู้ป่วยคนนี้ได้รับบริการจนจบจริงหรือเปล่า"
+ * คือต้องผ่านครบทั้งตรวจ รับยา และชำระเงิน
+ *
+ * แพทย์ต้องแยกออกว่าเคสไหนตกหล่นระหว่างทาง เช่นตรวจแล้วแต่ไม่ได้ไปรับยา
+ * เพราะครั้งหน้าที่ผู้ป่วยกลับมา จะได้รู้ว่ายาที่สั่งไปครั้งก่อนไม่เคยถึงมือคนไข้
+ *
+ * ค่าคำนวณมาจาก backend (ดู computeVisitProgress) ไม่ได้คิดที่หน้าจอ
+ * เพราะต้องดูตารางของห้องยาและการเงินประกอบ ซึ่งหน้าจอแพทย์ไม่ได้ดึงมา
+ *
+ * เวชระเบียนเก่าที่ backend ยังไม่ได้ส่ง progress มา จะไม่แสดงป้ายเลย
+ * ดีกว่าเดาแล้วแสดงผิด เพราะป้ายนี้ใช้ตัดสินใจทางการรักษา
+ */
+const VisitProgressBadge: React.FC<{ visit: PastVisitRecord; language: string }> = ({
+  visit,
+  language,
+}) => {
+  if (!visit.progress) return null;
+
+  const isTh = language === 'th';
+
+  if (visit.progress === 'completed') {
+    return (
+      <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md">
+        {isTh ? 'เสร็จสิ้น' : 'Completed'}
+      </span>
+    );
+  }
+
+  if (visit.progress === 'in_progress') {
+    return (
+      <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md">
+        {isTh ? 'กำลังดำเนินการ' : 'In Progress'}
+      </span>
+    );
+  }
+
+  // ยกเลิก — ต่อท้ายด้วยสาเหตุ เพื่อให้แพทย์รู้ว่าตกหล่นที่ขั้นตอนไหน
+  const reasonText: Record<string, { th: string; en: string }> = {
+    no_medicine: { th: ' (ไม่ได้รับยา)', en: ' (No Medicine)' },
+    unpaid: { th: ' (ยังไม่ชำระค่าบริการ)', en: ' (Unpaid)' },
+  };
+  const suffix = reasonText[visit.progressReason || ''];
+
+  return (
+    <span className="text-[10px] font-extrabold text-rose-800 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md">
+      {isTh ? 'ยกเลิกการรับบริการ' : 'Cancelled'}
+      {suffix ? (isTh ? suffix.th : suffix.en) : ''}
+    </span>
+  );
+};
 
 /**
  * ยา 1 รายการในประวัติ แสดงเป็นแถวพับเก็บได้
@@ -290,8 +401,8 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
       list.push({
         id: `current-${patient.id}`,
         vn: currentVN,
-        visitDate: patient.visitDate || '2026-07-23',
-        visitTime: patient.visitTime || '08:45 AM',
+        visitDate: patient.visitDate || '',
+        visitTime: patient.visitTime || '',
         doctorName: language === 'th' ? 'แพทย์ประจำคลินิก (Current Session)' : 'Attending Physician (Current)',
         department: language === 'th' ? 'แผนกผู้ป่วยนอก (OPD)' : 'Outpatient Department (OPD)',
         diagnosis: patient.primaryDiagnosis?.name || patient.diagnosis || (language === 'th' ? 'ยังไม่ได้ระบุการวินิจฉัย' : 'No diagnosis recorded'),
@@ -481,7 +592,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                           <div className="flex flex-wrap items-center gap-2">
                             <CopyableText label="VN" value={vnCode} />
                             <span>•</span>
-                            <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={patient.nationalId || '1-1002-34567-89-0'} />
+                            <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={formatNationalId(patient.nationalId)} copyValue={rawNationalId(patient.nationalId)} />
                           </div>
                           <div className="px-1.5 py-0.5"><strong className="text-slate-800">{language === 'th' ? 'เพศ/อายุ:' : 'Gender/Age:'}</strong> {patient.gender}, {patient.age} {language === 'th' ? 'ปี' : 'yrs'}</div>
                         </div>
@@ -524,7 +635,12 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
            ------------------------------------------------------------- */
         <div className="space-y-6 animate-in fade-in duration-200">
           {/* Top Bar: Back to Search Button */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 px-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+          {/* ช่อง "ค้นหาผู้ป่วยคนอื่น" ถูกถอดออกแล้ว
+              ซ้ำหน้าที่กับช่องค้นหาในหน้ารายชื่อผู้ป่วย ซึ่งอยู่ห่างไปแค่ปุ่มเดียว
+              และการมีช่องค้นหาสองที่ที่ผูกกับ state ตัวเดียวกัน (search)
+              ทำให้พิมพ์ค้างไว้ในหน้านี้แล้วกดย้อนกลับ จะเจอรายชื่อถูกกรองอยู่
+              โดยไม่มีอะไรบอกว่าทำไม */}
+          <div className="bg-white p-3.5 px-5 rounded-2xl border border-slate-200/90 shadow-2xs">
             <button
               onClick={() => handleSelectPatient(null)}
               className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 px-3.5 py-2 rounded-xl transition-all border border-slate-200 hover:border-blue-200 cursor-pointer w-fit"
@@ -532,18 +648,6 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
               <ArrowLeft className="w-4 h-4 text-blue-600" />
               <span>{language === 'th' ? 'กลับไปหน้าค้นหาผู้ป่วย' : 'Back to Patient Search'}</span>
             </button>
-
-            {/* Quick Switch Patient Search */}
-            <div className="relative w-full sm:w-72">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={language === 'th' ? 'ค้นหาผู้ป่วยคนอื่น...' : 'Search another patient...'}
-                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden"
-              />
-            </div>
           </div>
 
           {/* Header Profile Card (Exact Image 2 representation) */}
@@ -563,7 +667,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                     <span>•</span>
                     <CopyableText label="VN" value={displayVN(selectedPatient.vn)} />
                     <span>•</span>
-                    <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={selectedPatient.nationalId || '1-1002-34567-89-0'} />
+                    <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={formatNationalId(selectedPatient.nationalId)} copyValue={rawNationalId(selectedPatient.nationalId)} />
                     <span>•</span>
                     <span>{selectedPatient.gender}, {selectedPatient.age} {language === 'th' ? 'ปี' : 'yrs'}</span>
                   </div>
@@ -592,19 +696,19 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
               <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80">
                 <span className="text-[11px] text-slate-400 font-medium block mb-0.5">{language === 'th' ? 'วันเกิด / อายุ' : 'DOB / Age'}</span>
-                <span className="font-semibold text-slate-800">{selectedPatient.dob || '1984-03-15'} ({selectedPatient.age} {language === 'th' ? 'ปี' : 'yrs'})</span>
+                <span className="font-semibold text-slate-800">{selectedPatient.dob || <NoData />} ({selectedPatient.age} {language === 'th' ? 'ปี' : 'yrs'})</span>
               </div>
               <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80">
                 <span className="text-[11px] text-slate-400 font-medium block mb-0.5">{language === 'th' ? 'หมู่เลือด' : 'Blood Group'}</span>
-                <span className="font-bold text-rose-600">{selectedPatient.bloodGroup || 'หมู่ O (O Positive)'}</span>
+                <span className="font-bold text-rose-600">{selectedPatient.bloodGroup || <NoData />}</span>
               </div>
               <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80">
                 <span className="text-[11px] text-slate-400 font-medium block mb-0.5">{language === 'th' ? 'เบอร์โทรศัพท์' : 'Phone'}</span>
-                <span className="font-mono font-semibold text-slate-800">{selectedPatient.phone || '081-234-5678'}</span>
+                <span className="font-mono font-semibold text-slate-800">{selectedPatient.phone || <NoData />}</span>
               </div>
               <div className="p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200/80">
                 <span className="text-[11px] text-slate-400 font-medium block mb-0.5">{language === 'th' ? 'สิทธิการรักษา' : 'Insurance'}</span>
-                <span className="font-semibold text-slate-800 truncate block">{selectedPatient.insuranceType || (language === 'th' ? 'Universal Health Coverage (UC)' : 'UC')}</span>
+                <span className="font-semibold text-slate-800 truncate block">{selectedPatient.insuranceType || <NoData />}</span>
               </div>
             </div>
           </div>
@@ -722,6 +826,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                                       </span>
                                     )}
                                     <CopyableText label="VN" value={visit.vn} />
+                                    <VisitProgressBadge visit={visit} language={language} />
                                   </div>
 
                                   <h4 className="text-sm font-bold text-blue-900 mt-1">
@@ -734,7 +839,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                                   </h4>
 
                                   <div className="text-xs text-slate-600 font-medium">
-                                    <span>{visit.doctorName || (language === 'th' ? 'แพทย์ประจำคลินิก' : 'Attending Doctor')}</span>
+                                    <span>{visit.doctorName || <NoData />}</span>
                                     {visit.department && <span className="text-slate-400"> ({visit.department})</span>}
                                   </div>
                                 </div>
@@ -779,15 +884,15 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                                       </div>
                                       <div className="p-2.5 bg-white rounded-xl border border-slate-200">
                                         <span className="text-[10px] text-slate-400 block">{t('pulseRate')}</span>
-                                        <span className="font-mono font-bold text-slate-800 text-xs">{visit.vitals.pulse ? `${visit.vitals.pulse} bpm` : '-'}</span>
+                                        <span className="font-mono font-bold text-slate-800 text-xs">{visit.vitals.pulse ? `${fmtVital(visit.vitals.pulse)} bpm` : '-'}</span>
                                       </div>
                                       <div className="p-2.5 bg-white rounded-xl border border-slate-200">
                                         <span className="text-[10px] text-slate-400 block">{t('temperature')}</span>
-                                        <span className="font-mono font-bold text-slate-800 text-xs">{visit.vitals.temp ? `${visit.vitals.temp} °C` : '-'}</span>
+                                        <span className="font-mono font-bold text-slate-800 text-xs">{visit.vitals.temp ? `${fmtVital(visit.vitals.temp, 1)} °C` : '-'}</span>
                                       </div>
                                       <div className="p-2.5 bg-white rounded-xl border border-slate-200">
                                         <span className="text-[10px] text-slate-400 block">{t('weight')}</span>
-                                        <span className="font-mono font-bold text-slate-800 text-xs">{visit.vitals.weight ? `${visit.vitals.weight} kg` : '-'}</span>
+                                        <span className="font-mono font-bold text-slate-800 text-xs">{visit.vitals.weight ? `${fmtVital(visit.vitals.weight, 1)} kg` : '-'}</span>
                                       </div>
                                     </div>
                                   </div>
@@ -804,18 +909,10 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                                      หน้าอื่นในระบบและอ่านยากเวลามีหลายกล่องต่อกัน
                                      ทุกหัวข้อโชว์เสมอ ถ้าไม่มีข้อมูลจะขึ้น "-" (ดู HistoryField) */}
 
-                                <HistorySection title={language === 'th' ? 'ประวัติการเจ็บป่วยปัจจุบัน' : 'Present Illness'}>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <HistoryField
-                                      label={language === 'th' ? 'ประวัติการเจ็บป่วยปัจจุบัน' : 'Present Illness'}
-                                      value={visit.presentIllness}
-                                    />
-                                    <HistoryField
-                                      label={language === 'th' ? 'ระยะเวลาที่เป็นมา' : 'Duration'}
-                                      value={visit.complaintDuration}
-                                    />
-                                  </div>
-                                </HistorySection>
+                                {/* "ประวัติการเจ็บป่วยปัจจุบัน" กับ "ระยะเวลาที่เป็นมา" ถูกถอดออก
+                                    หน้าบันทึกการตรวจเอาสองช่องนี้ออกไปแล้ว เพราะซ้ำกับ
+                                    "อาการสำคัญ" (ที่พยาบาลเขียนระยะเวลารวมมาด้วย)
+                                    และ "การประเมินและวินิจฉัยเบื้องต้น" ตามลำดับ */}
 
                                 <HistorySection title={language === 'th' ? 'ผลการตรวจร่างกายตามระบบ' : 'Physical Examination'}>
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -847,10 +944,12 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
 
                                 <HistorySection title={language === 'th' ? 'การประเมินและแผนการรักษา' : 'Assessment & Plan'}>
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <HistoryField label={language === 'th' ? 'เหตุผลทางการแพทย์และการประเมิน' : 'Assessment'} value={visit.assessmentNotes} />
+                                    <HistoryField label={language === 'th' ? 'การประเมินและวินิจฉัยเบื้องต้น' : 'Assessment'} value={visit.assessmentNotes} />
                                     <HistoryField label={language === 'th' ? 'แผนการรักษาและหัตถการ' : 'Treatment Plan'} value={visit.treatmentPlan} />
-                                    <HistoryField label={language === 'th' ? 'บันทึกทางคลินิกเพิ่มเติม' : 'Clinical Notes'} value={visit.clinicalNotes} />
-                                    <HistoryField label={language === 'th' ? 'หัตถการที่ทำ' : 'Procedures Performed'} value={visit.proceduresPerformed} />
+                                    {/* "บันทึกทางคลินิกเพิ่มเติม" กับ "หัตถการที่ทำ" ถูกถอดออก
+                                        ไม่มีช่องกรอกในหน้าบันทึกการตรวจ ค่าจึงว่างตลอด
+                                        หัตถการที่แพทย์ทำจริงถูกเขียนรวมอยู่ในช่อง "แผนการรักษาและหัตถการ"
+                                        ด้านบนอยู่แล้ว (ดูข้อความ placeholder ของช่องนั้น) */}
                                   </div>
                                 </HistorySection>
 
@@ -965,19 +1064,17 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                           <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                             <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'หมู่โลหิต :' : 'Blood Group :'}</span>
                             <span className="font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 inline-block text-[11px]">
-                              {selectedPatient.bloodGroup
-                                ? selectedPatient.bloodGroup
-                                : (language === 'th' ? 'หมู่ O (O Positive)' : 'O Positive (O+)')}
+                              {selectedPatient.bloodGroup || <NoData />}
                             </span>
                           </div>
                           <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                             <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'วันเกิด :' : 'Date of Birth :'}</span>
-                            <span className="font-semibold text-slate-800 text-xs">{selectedPatient.dob || '1984-03-15'}</span>
+                            <span className="font-semibold text-slate-800 text-xs">{selectedPatient.dob || <NoData />}</span>
                           </div>
                         </div>
                         <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                           <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เลขบัตรประชาชน :' : 'National ID :'}</span>
-                          <CopyableText value={selectedPatient.nationalId || '1-1002-34567-89-0'} />
+                          <CopyableText value={formatNationalId(selectedPatient.nationalId)} copyValue={rawNationalId(selectedPatient.nationalId)} />
                         </div>
                       </div>
                     </div>
@@ -994,17 +1091,17 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                         <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                           <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เบอร์โทรศัพท์ :' : 'Patient Phone :'}</span>
                           <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60 inline-block text-xs">
-                            {selectedPatient.phone || '081-234-5678'}
+                            {selectedPatient.phone || <NoData />}
                           </span>
                         </div>
                         <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                           <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'อาชีพ :' : 'Occupation :'}</span>
-                          <span className="font-bold text-slate-900 text-xs">{selectedPatient.occupation || (language === 'th' ? 'วิศวกรซอฟต์แวร์' : 'Software Engineer')}</span>
+                          <span className="font-bold text-slate-900 text-xs">{selectedPatient.occupation || <NoData />}</span>
                         </div>
                         <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                           <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'ที่อยู่ผู้ป่วย :' : 'Patient Address :'}</span>
                           <p className="font-semibold text-slate-800 text-xs leading-relaxed">
-                            {selectedPatient.address || '123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110'}
+                            {selectedPatient.address || <NoData />}
                           </p>
                         </div>
                       </div>
@@ -1022,19 +1119,17 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                         <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                           <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'สิทธิการรักษา :' : 'Insurance Scheme :'}</span>
                           <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 inline-block text-xs">
-                            {selectedPatient.insuranceType
-                              ? selectedPatient.insuranceType
-                              : (language === 'th' ? 'บัตรทอง (หลักประกันสุขภาพถั่วหน้า UC)' : 'Universal Health Coverage (UC)')}
+                            {selectedPatient.insuranceType || <NoData />}
                           </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
                           <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                             <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'วันที่รับบริการ :' : 'Visit Date :'}</span>
-                            <span className="font-bold text-slate-900 text-xs">{selectedPatient.visitDate || '2026-07-23'}</span>
+                            <span className="font-bold text-slate-900 text-xs">{selectedPatient.visitDate || <NoData />}</span>
                           </div>
                           <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
                             <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เวลา :' : 'Visit Time :'}</span>
-                            <span className="font-bold text-slate-900 text-xs">{selectedPatient.visitTime || (language === 'th' ? '08:45 น.' : '08:45 AM')}</span>
+                            <span className="font-bold text-slate-900 text-xs">{selectedPatient.visitTime || <NoData />}</span>
                           </div>
                         </div>
                       </div>
@@ -1118,11 +1213,11 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                       <div className="space-y-1.5 text-slate-700">
                         <div>
                           <strong className="text-slate-900">{language === 'th' ? 'การสูบบุหรี่:' : 'Smoking:'}</strong>{' '}
-                          {selectedPatient.smokingHistory?.status || (language === 'th' ? 'ไม่สูบบุหรี่' : 'Non-smoker')}
+                          {selectedPatient.smokingHistory?.status || <NotAsked />}
                         </div>
                         <div>
                           <strong className="text-slate-900">{language === 'th' ? 'การดื่มแอลกอฮอล์:' : 'Alcohol:'}</strong>{' '}
-                          {selectedPatient.alcoholHistory?.status || (language === 'th' ? 'ไม่ดื่มแอลกอฮอล์' : 'Non-drinker')}
+                          {selectedPatient.alcoholHistory?.status || <NotAsked />}
                         </div>
                       </div>
                     </div>
@@ -1134,11 +1229,11 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                       <div className="space-y-1.5 text-slate-700">
                         <div>
                           <strong className="text-slate-900">{language === 'th' ? 'การผ่าตัดเดิม:' : 'Past Surgery:'}</strong>{' '}
-                          {selectedPatient.pastSurgery || (language === 'th' ? 'ไม่มี' : 'None')}
+                          {selectedPatient.pastSurgery || <NotAsked />}
                         </div>
                         <div>
                           <strong className="text-slate-900">{language === 'th' ? 'ประวัติครอบครัว:' : 'Family History:'}</strong>{' '}
-                          {selectedPatient.familyHistory || (language === 'th' ? 'ไม่มี' : 'None')}
+                          {selectedPatient.familyHistory || <NotAsked />}
                         </div>
                       </div>
                     </div>

@@ -123,6 +123,35 @@ func ConnectDB() {
 	database.Exec("ALTER TABLE dispensings DROP CONSTRAINT IF EXISTS fk_dispensings_doctor")
 	database.Exec("ALTER TABLE dispensings ALTER COLUMN doctor_id DROP NOT NULL")
 
+	// เอกสารที่แพทย์ออกให้ผู้ป่วย (ใบรับรองแพทย์ / ใบรับรองยานอกบัญชี) เก็บเป็น JSON
+	database.Exec("ALTER TABLE examinations ADD COLUMN IF NOT EXISTS issued_documents text DEFAULT ''")
+
+	// สถานะผู้ป่วยหลังตรวจเสร็จ: '' | home | refer
+	database.Exec("ALTER TABLE examinations ADD COLUMN IF NOT EXISTS disposition text DEFAULT ''")
+
+	// คัดกรองอาการทางเดินหายใจส่วนบน (URI) ปล่อยให้เป็น NULL ได้ ห้ามใส่ DEFAULT
+	// NULL = ยังไม่ได้ประเมิน ซึ่งต้องแยกจาก false ที่แปลว่าประเมินแล้วไม่มีอาการ
+	// ถ้าใส่ DEFAULT false แถวเก่าทั้งหมดจะกลายเป็น "คัดกรองแล้วไม่มีอาการ" ทันที
+	// ทั้งที่ไม่เคยมีใครประเมิน
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS has_uri boolean")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS has_tb boolean")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS on_anticoagulant boolean")
+
+	// คัดกรองเฉพาะผู้ป่วยหญิง + ข้อควรระวังในการดูแล [role แพทย์]
+	// สองคอลัมน์แรกไม่ใส่ DEFAULT เจตนา NULL = พยาบาลยังไม่ได้ถาม
+	// ถ้าใส่ DEFAULT false จะกลายเป็น "ถามแล้วไม่ตั้งครรภ์" ทั้งตาราง ซึ่งอันตรายมาก
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS is_pregnant boolean")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS is_breastfeeding boolean")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS last_menstrual_period text DEFAULT ''")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS precaution_type text DEFAULT ''")
+
+	// สมุนไพร/อาหารเสริม และแบบคัดกรองซึมเศร้า 2Q [role แพทย์]
+	// สอง boolean ไม่ใส่ DEFAULT เจตนา NULL = ยังไม่ได้ถาม
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS herbal_medicines text DEFAULT ''")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS dietary_supplements text DEFAULT ''")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS q2_depressed boolean")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS q2_anhedonia boolean")
+
 	// ⚡ Database Indexes สำหรับเร่งความเร็วการ Query คิว, คนไข้, ประวัติการเงิน บน Supabase
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_created_at ON queues(created_at)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_status ON queues(status)")
@@ -140,6 +169,21 @@ func ConnectDB() {
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_patients_hn ON patients(hn)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_medicines_code_name ON medicines(medicine_code, name)")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_patient_id ON visit_records(patient_id)")
+
+	// ⚡ [role แพทย์] index สำหรับ endpoint ของหน้าคิว ประวัติเวชระเบียน และบันทึกการตรวจ
+	//
+	// สามตัวแรกคือคู่ที่ query ของแพทย์ filter พร้อมกันเสมอ ถ้าไม่มี index
+	// PostgreSQL ต้องไล่อ่านทั้งตาราง (Seq Scan) ทุกครั้งที่เปิดหน้า
+	//
+	// idx_visit_records_patient_date สำคัญที่สุด
+	// หน้าประวัติหา "การมาตรวจครั้งล่าสุดของผู้ป่วยแต่ละคน" ด้วย
+	// DISTINCT ON (patient_id) ... ORDER BY patient_id, visit_date DESC
+	// ซึ่งจะเร็วก็ต่อเมื่อ index เรียงตามลำดับเดียวกันเป๊ะ (patient_id, visit_date DESC)
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_patient_date ON visit_records(patient_id, visit_date DESC)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_status_date ON visit_records(status, visit_date DESC)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_diagnoses_visit_primary ON diagnoses(visit_id, is_primary)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_screenings_visit_id ON screenings(visit_id)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_examinations_visit_id ON examinations(visit_id)")
 
 	DB = database
 
@@ -197,7 +241,7 @@ func seedDatabase() {
 		{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
 		{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
 		{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
-		{Username: "pharmacist1", Password: passStr, Role: "pharmacist", FullName: "ภก.บุญชู เภสัชกร", Phone: "081-333-0001"},
+		{Username: "pharmacist1", Password: passStr, Role: "pharmacist", FullName: "ดร.บุญ สั่งยา", Phone: "081-333-0001"},
 		{Username: "cashier1", Password: passStr, Role: "cashier", FullName: "นส.รวย การเงิน", Phone: "081-444-0001"},
 		{Username: "doctor1", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
 		{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
@@ -207,9 +251,16 @@ func seedDatabase() {
 		var existing models.User
 		if err := DB.Where("username = ?", users[i].Username).First(&existing).Error; err != nil {
 			DB.Create(&users[i])
+		} else {
+			// อัปเดตข้อมูล FullName, Role, Phone ให้ตรงกับค่า seed ล่าสุดเสมอ
+			DB.Model(&existing).Updates(map[string]interface{}{
+				"full_name": users[i].FullName,
+				"role":      users[i].Role,
+				"phone":     users[i].Phone,
+			})
 		}
 	}
-	log.Println("Users & Doctors verified and seeded successfully.")
+	log.Println("Users & Doctors verified, updated and seeded successfully.")
 
 	// 2. Seed Medicines (if empty)
 	var medCount int64

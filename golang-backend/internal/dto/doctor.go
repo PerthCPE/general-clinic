@@ -63,6 +63,37 @@ type ScreeningBrief struct {
 	BloodSugar int `json:"blood_sugar"` // DTX หน่วย mg/dL
 
 	// ประวัติที่พยาบาลซักตอนคัดกรอง เก็บเป็นข้อความอิสระทั้งหมด
+	// อาการติดเชื้อทางเดินหายใจส่วนบน (URI) ที่จุดคัดกรองประเมินไว้
+	// nil = ยังไม่ได้ประเมิน / false = ไม่มี / true = มี (ดูคำอธิบายใน models.Screening)
+	HasURI *bool `json:"has_uri"`
+
+	// คัดกรองวัณโรค และการใช้ยาละลายลิ่มเลือด
+	// nil = ยังไม่ได้ประเมิน / false = ไม่มี / true = มี
+	HasTB           *bool `json:"has_tb"`
+	OnAnticoagulant *bool `json:"on_anticoagulant"`
+
+	// คัดกรองเฉพาะผู้ป่วยหญิง (หน้าจอแพทย์แสดงเฉพาะเมื่อ patient.gender = หญิง)
+	// nil = ยังไม่ได้ถาม / false = ถามแล้วไม่ใช่ / true = ใช่
+	IsPregnant      *bool `json:"is_pregnant"`
+	IsBreastfeeding *bool `json:"is_breastfeeding"`
+
+	// ประจำเดือนครั้งสุดท้าย เก็บเป็นข้อความตามที่ผู้ป่วยบอก
+	LastMenstrualPeriod string `json:"last_menstrual_period"`
+
+	// ข้อควรระวังในการดูแล: "" | Standard | Contact | Droplet | Airborne
+	PrecautionType string `json:"precaution_type"`
+
+	// สมุนไพรและอาหารเสริมที่ใช้อยู่ แยกจาก current_medications
+	// เพราะผู้ป่วยไม่คิดว่าสองอย่างนี้คือยา แต่ตีกับยาจริงได้
+	HerbalMedicines    string `json:"herbal_medicines"`
+	DietarySupplements string `json:"dietary_supplements"`
+
+	// แบบคัดกรองภาวะซึมเศร้า 2Q (ช่วง 2 สัปดาห์ที่ผ่านมา)
+	// nil = ยังไม่ได้ถาม / false = ไม่มี / true = มี
+	// ตอบใช่ข้อใดข้อหนึ่ง = ผลบวก ต้องประเมินต่อด้วย 9Q
+	Q2Depressed *bool `json:"q2_depressed"`
+	Q2Anhedonia *bool `json:"q2_anhedonia"`
+
 	FoodAllergies      string `json:"food_allergies"`
 	CurrentMedications string `json:"current_medications"` // ยาที่ผู้ป่วยใช้อยู่ ใช้เช็คยาตีกัน
 	SmokingHistory     string `json:"smoking_history"`

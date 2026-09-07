@@ -712,6 +712,11 @@ func ConfirmPayment(c *gin.Context) {
 	// ปรับสถานะในตาราง queues ของคลินิกเป็น เสร็จสิ้น (completed)
 	if req.VisitID > 0 {
 		config.DB.Model(&models.Queue{}).Where("visit_id = ?", req.VisitID).Update("status", "เสร็จสิ้น")
+	} else if req.HN != "" {
+		var pat models.Patient
+		if config.DB.Where("hn = ? OR hn = ?", req.HN, "HN"+req.HN).First(&pat).Error == nil {
+			config.DB.Model(&models.Queue{}).Where("patient_id = ?", pat.ID).Update("status", "เสร็จสิ้น")
+		}
 	}
 
 	// ปรับสถานะในตาราง medicine_queues เป็น completed

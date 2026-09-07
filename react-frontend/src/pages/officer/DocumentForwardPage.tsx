@@ -7,6 +7,7 @@ import {
   type BackendDocument,
 } from '../../services/api';
 import { sendDocumentMessage } from '../../services/documentMessageStorage';
+import { DEMO_USERS } from '../../config/roles';
 import './DocumentForwardPage.css';
 
 export interface ForwardDoc {
@@ -1283,14 +1284,14 @@ export const DocumentForwardPage: React.FC = () => {
                       ))
                     ) : (
                       <>
-                        {/* รายชื่อบุคลากรสำรอง (Fallback) */}
-                        <option value="7">พญ.สุดา สุขสมบูรณ์ — แพทย์ (doctor1)</option>
-                        <option value="8">นพ.วิชัย ชาญการแพทย์ — แพทย์ (doctor2)</option>
-                        <option value="9">พญ.เกศรา รักษาดี — แพทย์ (doctor3)</option>
-                        <option value="3">พว. กานดา คัดกรอง — พยาบาล (nurse1)</option>
-                        <option value="5">ภก.บุญชู เภสัชกร — ห้องยา/เภสัชกร (pharmacist1)</option>
-                        <option value="6">นส.รวย การเงิน — การเงิน (cashier1)</option>
-                        <option value="1">คุณสมจิต ดีใจ — ธุรการ (officer1)</option>
+                        {/* ปรับชื่อตาม DEMO_USERS อัตโนมัติ (Fallback) */}
+                        <option value="6">{DEMO_USERS.doctor?.fullName || 'พญ.สุดา สุขสมบูรณ์'} — แพทย์ (doctor1)</option>
+                        <option value="7">นพ.วิชัย ชาญการแพทย์ — แพทย์ (doctor2)</option>
+                        <option value="8">พญ.เกศรา รักษาดี — แพทย์ (doctor3)</option>
+                        <option value="3">{DEMO_USERS.nurse?.fullName || 'พว. กานดา คัดกรอง'} — พยาบาล (nurse1)</option>
+                        <option value="5">{DEMO_USERS.pharmacist?.fullName || 'ดร.บุญ สั่งยา'} — ห้องยา/เภสัชกร (pharmacist1)</option>
+                        <option value="9">{DEMO_USERS.cashier?.fullName || 'นส.รวย การเงิน'} — การเงิน (cashier1)</option>
+                        <option value="2">{DEMO_USERS.officer?.fullName || 'คุณสมจิต ดีใจ'} — ธุรการ (officer1)</option>
                       </>
                     )}
                   </select>

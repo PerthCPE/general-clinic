@@ -1,5 +1,6 @@
 // ===== Central Clinic System Configuration =====
 // ปรับเปลี่ยนชื่อระบบ, ชื่อเจ้าหน้าที่ตามบทบาท และข้อมูลผู้ป่วยค้นหาได้ 2 คน (B6741990, B6741991)
+import { DEMO_USERS } from './roles';
 
 export interface PatientConfig {
   id: string;
@@ -57,14 +58,14 @@ export const CLINIC_CONFIG = {
 // ====================================
   staff: {
     pharmacist: {
-      name: 'ดร.บุญ หล่อ',
-      roleTitle: 'เจ้าหน้าที่คลังยา',
+      name: DEMO_USERS.pharmacist?.fullName || 'ดร.บุญ สั่งยา',
+      roleTitle: DEMO_USERS.pharmacist?.roleTitleTh || 'เจ้าหน้าที่คลังยา',
       roleBadge: 'PH',
       roleCode: 'pharmacist' as const,
     },
     cashier: {
-      name: 'นส.อนงค์ จิต',
-      roleTitle: 'เจ้าหน้าที่การเงิน',
+      name: DEMO_USERS.cashier?.fullName || 'นส.รวย การเงิน',
+      roleTitle: DEMO_USERS.cashier?.roleTitleTh || 'เจ้าหน้าที่การเงิน',
       roleBadge: 'FN',
       roleCode: 'cashier' as const,
     },

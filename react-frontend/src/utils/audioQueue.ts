@@ -7,6 +7,131 @@
 let currentAudioElement: HTMLAudioElement | null = null;
 let isAudioSequencePlaying = false;
 
+// =========================================================================
+// 1. ระบบเสียงแจ้งเตือนสำหรับ "ห้องยา" (Pharmacy)
+// =========================================================================
+export function playPharmacyNotification(message?: string): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      if (localStorage.getItem('notificationSoundEnabled') === 'false') {
+        resolve(); return;
+      }
+      
+      // ตั้งค่ารูปแบบเสียงแจ้งเตือน (ห้องยา)
+      const USE_MP3 = true; 
+      const MP3_FILE_PATH = '/audio/pin_a1.mp3'; 
+      const WAIT_BEFORE_TTS_MS = 3000; 
+
+      // ตั้งค่าเสียงสังเคราะห์
+      const TONE_1_FREQ = 659.25; 
+      const TONE_2_FREQ = 523.25; 
+
+      executeAudioPlay(USE_MP3, MP3_FILE_PATH, WAIT_BEFORE_TTS_MS, TONE_1_FREQ, TONE_2_FREQ, message, resolve);
+    } catch (e) {
+      console.error('Pharmacy audio play failed', e);
+      resolve();
+    }
+  });
+}
+
+// =========================================================================
+// 2. ระบบเสียงแจ้งเตือนสำหรับ "ห้องการเงิน" (Billing)
+// =========================================================================
+export function playBillingNotification(message?: string): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      if (localStorage.getItem('notificationSoundEnabled') === 'false') {
+        resolve(); return;
+      }
+      
+      // ตั้งค่ารูปแบบเสียงแจ้งเตือน (ห้องการเงิน)
+      const USE_MP3 = true; 
+      const MP3_FILE_PATH = '/audio/pin_a1.mp3'; // สามารถเปลี่ยนเป็นไฟล์อื่นได้ เช่น /audio/billing.mp3
+      const WAIT_BEFORE_TTS_MS = 3000; 
+
+      // ตั้งค่าเสียงสังเคราะห์
+      const TONE_1_FREQ = 659.25; 
+      const TONE_2_FREQ = 523.25; 
+
+      executeAudioPlay(USE_MP3, MP3_FILE_PATH, WAIT_BEFORE_TTS_MS, TONE_1_FREQ, TONE_2_FREQ, message, resolve);
+    } catch (e) {
+      console.error('Billing audio play failed', e);
+      resolve();
+    }
+  });
+}
+
+// =========================================================================
+// Core Logic สำหรับเล่นเสียง (ใช้ร่วมกัน)
+// =========================================================================
+function executeAudioPlay(
+  USE_MP3: boolean, 
+  MP3_FILE_PATH: string, 
+  WAIT_BEFORE_TTS_MS: number, 
+  TONE_1_FREQ: number, 
+  TONE_2_FREQ: number, 
+  message: string | undefined, 
+  resolve: (value: void | PromiseLike<void>) => void
+) {
+  const playTTS = () => {
+    if (message) {
+      const win = window as any;
+      if (win.responsiveVoice) {
+        win.responsiveVoice.speak(message, "Thai Female", { rate: 1.0 });
+      }
+    }
+    resolve();
+  };
+
+  if (USE_MP3) {
+    const audio = new Audio(MP3_FILE_PATH);
+    audio.loop = true;
+    currentAudioElement = audio;
+    audio.play().catch(e => console.error('MP3 play failed', e));
+    
+    setTimeout(() => {
+      audio.pause();
+      audio.currentTime = 0;
+      playTTS();
+    }, WAIT_BEFORE_TTS_MS);
+  } else {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+
+    if (!AudioCtx) {
+      playTTS();
+      return;
+    }
+    const ctx = new AudioCtx();
+
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(TONE_1_FREQ, ctx.currentTime);
+    gain1.gain.setValueAtTime(0.5, ctx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start();
+    osc1.stop(ctx.currentTime + 0.5);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(TONE_2_FREQ, ctx.currentTime + 0.15);
+    gain2.gain.setValueAtTime(0, ctx.currentTime);
+    gain2.gain.setValueAtTime(0.5, ctx.currentTime + 0.15);
+    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.65);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(ctx.currentTime + 0.15);
+    osc2.stop(ctx.currentTime + 0.65);
+
+    setTimeout(playTTS, WAIT_BEFORE_TTS_MS);
+  }
+}
+
 /**
  * Play a prestigious, soothing hospital announcement chime
  * 3-Tone Gentle Melodic Progression: F#5 -> A#5 -> C#6 with warm acoustic harmonics
