@@ -113,7 +113,6 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'billing-dashboard', title: 'แดชบอร์ด', iconType: 'dashboard', path: '/billing-dashboard' },
   ],
   doctor: [
-    { id: 'doctor-dashboard', title: 'แดชบอร์ด', iconType: 'dashboard', path: '/doctor-dashboard' },
     { id: 'doctor-queue', title: 'คิวผู้ป่วย', iconType: 'queue', path: '/doctor-queue' },
     { id: 'doctor-examination', title: 'บันทึกการตรวจ', iconType: 'examination', path: '/doctor-examination' },
     { id: 'doctor-schedule', title: 'ตารางเวร', iconType: 'schedule', path: '/doctor-schedule' },
@@ -139,7 +138,7 @@ export const ROLE_DEFAULT_PAGES: Record<UserRole, string> = {
   nurse_assistant: 'queue',
   pharmacist: 'pharmacy-dispense',
   cashier: 'billing-dispense',
-  doctor: 'doctor-dashboard',
+  doctor: 'doctor-queue',
   admin: 'admin-users',
   officer: 'dms-documents',
 };
