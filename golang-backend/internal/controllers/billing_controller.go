@@ -701,9 +701,22 @@ func ConfirmPayment(c *gin.Context) {
 		return
 	}
 
+	todayStr := time.Now().Format("20060102")
 	var count int64
 	tx.Model(&models.Billing{}).Count(&count)
-	receiptNo := fmt.Sprintf("REC-%s-%04d", time.Now().Format("20060102"), count+1)
+	receiptNo := ""
+	for i := count + 1; i < count+1000; i++ {
+		candidate := fmt.Sprintf("REC-%s-%04d", todayStr, i)
+		var exists int64
+		tx.Model(&models.Billing{}).Where("receipt_number = ?", candidate).Count(&exists)
+		if exists == 0 {
+			receiptNo = candidate
+			break
+		}
+	}
+	if receiptNo == "" {
+		receiptNo = fmt.Sprintf("REC-%s-%04d", todayStr, billing.ID+9000)
+	}
 
 	billing.PaymentMethod = req.PaymentMethod
 	billing.PaymentStatus = "paid"
@@ -756,28 +769,47 @@ func ConfirmPayment(c *gin.Context) {
 		meds = "[]"
 	}
 
-	history := models.BillingHistory{
-		ReceiptNumber: receiptNo,
-		VisitID:       visitID,
-		HN:            hn,
-		PatientName:   patName,
-		NationalID:    patient.NationalID,
-		DoctorName:    docName,
-		TotalAmount:   billing.TotalAmount,
-		Discount:      billing.DiscountFromEligibility,
-		NetAmount:     billing.NetAmount,
-		PaymentMethod: req.PaymentMethod,
-		PaymentStatus: "completed",
-		Medications:   meds,
-		CashReceived:  req.CashReceived,
-		ChangeAmount:  changeAmount,
-		CreatedAt:     time.Now(),
+	var history models.BillingHistory
+	if visitID > 0 {
+		tx.Where("visit_id = ?", visitID).First(&history)
 	}
-	
-	if err := tx.Create(&history).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing history: " + err.Error()})
-		return
+
+	if history.ID == 0 {
+		history = models.BillingHistory{
+			ReceiptNumber: receiptNo,
+			VisitID:       visitID,
+			HN:            hn,
+			PatientName:   patName,
+			NationalID:    patient.NationalID,
+			DoctorName:    docName,
+			TotalAmount:   billing.TotalAmount,
+			Discount:      billing.DiscountFromEligibility,
+			NetAmount:     billing.NetAmount,
+			PaymentMethod: req.PaymentMethod,
+			PaymentStatus: "completed",
+			Medications:   meds,
+			CashReceived:  req.CashReceived,
+			ChangeAmount:  changeAmount,
+			CreatedAt:     time.Now(),
+		}
+		
+		if err := tx.Create(&history).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing history: " + err.Error()})
+			return
+		}
+	} else {
+		// Update existing history
+		tx.Model(&history).Updates(map[string]interface{}{
+			"receipt_number": receiptNo,
+			"total_amount":   billing.TotalAmount,
+			"net_amount":     billing.NetAmount,
+			"payment_method": req.PaymentMethod,
+			"cash_received":  req.CashReceived,
+			"change_amount":  changeAmount,
+			"medications":    meds,
+			"updated_at":     time.Now(),
+		})
 	}
 
 	if err := tx.Commit().Error; err != nil {

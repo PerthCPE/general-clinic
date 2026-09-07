@@ -567,7 +567,6 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 				return
 			}
 		} else {
-			// Update the amounts if billing already exists (e.g. re-sent from pharmacy)
 			tx.Model(&billing).Updates(map[string]interface{}{
 				"total_amount": totalAmount,
 				"net_amount":   totalAmount,
@@ -639,25 +638,39 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 	// บันทึกลงตาราง BillingQueue โมเดลคิวการเงินโดยเฉพาะ
 	medsJSON, _ := json.Marshal(medList)
-	billingQueue := models.BillingQueue{
-		QueueNumber:  bQueueNo,
-		HN:           targetHN,
-		PatientName:  targetName,
-		NationalID:   nationalID,
-		Gender:       req.Gender,
-		Age:          age,
-		SchemeType:   schemeType,
-		VisitID:      req.VisitID,
-		TotalAmount:  totalAmount,
-		Status:       "pending",
-		DoctorAdvice: req.DoctorAdvice,
-		Medications:  string(medsJSON),
+	var billingQueue models.BillingQueue
+	if req.VisitID > 0 {
+		tx.Where("visit_id = ?", req.VisitID).First(&billingQueue)
 	}
-	// บันทึกลงตาราง BillingQueue ตรงผ่าน tx เพื่อให้อยู่ใน Transaction
-	if err := tx.Create(&billingQueue).Error; err != nil {
-		tx.Rollback()
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing queue: " + err.Error()})
-		return
+
+	if billingQueue.ID == 0 {
+		billingQueue = models.BillingQueue{
+			QueueNumber:  bQueueNo,
+			HN:           targetHN,
+			PatientName:  targetName,
+			NationalID:   nationalID,
+			Gender:       req.Gender,
+			Age:          age,
+			SchemeType:   schemeType,
+			VisitID:      req.VisitID,
+			TotalAmount:  totalAmount,
+			Status:       "pending",
+			DoctorAdvice: req.DoctorAdvice,
+			Medications:  string(medsJSON),
+		}
+		if err := tx.Create(&billingQueue).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing queue: " + err.Error()})
+			return
+		}
+	} else {
+		// Update existing queue
+		tx.Model(&billingQueue).Updates(map[string]interface{}{
+			"total_amount":  totalAmount,
+			"doctor_advice": req.DoctorAdvice,
+			"medications":   string(medsJSON),
+			"status":        "pending",
+		})
 	}
 
 	// อัปเดต/สร้างลงตาราง patient_medicines ใน Supabase DB ทันที!
@@ -714,7 +727,6 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		config.DB.Save(&patMed)
 	}
 
-	tx.Commit()
 	ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", patMed)
 
 	billingPayload := gin.H{
