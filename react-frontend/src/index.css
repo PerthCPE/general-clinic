@@ -309,7 +309,7 @@ body.dark-mode thead th {
 }
 
 
-/* ทดสอบฟอนต์ระบบจัดการสิทธิ์ (Prompt) */
+/* Admin access-management font theme (Prompt). */
 body.admin-font-theme {
   --font-primary: 'Prompt', 'Kanit', sans-serif !important;
   --font-heading: 'Prompt', 'Kanit', sans-serif !important;

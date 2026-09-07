@@ -21,7 +21,7 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
      (ดูคำอธิบายเต็มใน utils/scrollLockGuard.ts) */
   useUnlockPageScroll();
 
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const {
     patients,
     setActiveExamPatient,
