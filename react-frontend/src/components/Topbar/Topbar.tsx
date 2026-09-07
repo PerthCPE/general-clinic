@@ -76,6 +76,38 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     setIsDocMessagesOpen(false);
   };
 
+  const [isAllDocsModalOpen, setIsAllDocsModalOpen] = useState(false);
+  const [allDocsFilter, setAllDocsFilter] = useState<string>('all');
+  const [allDocsSearch, setAllDocsSearch] = useState<string>('');
+
+  const handleOpenAllDocsModal = () => {
+    setIsDocMessagesOpen(false);
+    setIsAllDocsModalOpen(true);
+  };
+
+  const filteredAllDocs = useMemo(() => {
+    return docMessages.filter((msg) => {
+      // 1. Search term
+      if (allDocsSearch.trim()) {
+        const q = allDocsSearch.toLowerCase();
+        const matchTitle = msg.title.toLowerCase().includes(q);
+        const matchDesc = msg.description?.toLowerCase().includes(q);
+        const matchSender = msg.sender.toLowerCase().includes(q);
+        const matchType = msg.type.toLowerCase().includes(q);
+        if (!matchTitle && !matchDesc && !matchSender && !matchType) {
+          return false;
+        }
+      }
+      // 2. Filter category
+      if (allDocsFilter === 'unread') return msg.isUnread;
+      if (allDocsFilter === 'urgent') return msg.priority === 'urgent' || msg.priority === 'emergency';
+      if (allDocsFilter === 'lab') return msg.type.includes('ผลตรวจ') || msg.type.includes('แล็บ');
+      if (allDocsFilter === 'refer') return msg.type.includes('ส่งตัว');
+      if (allDocsFilter === 'report') return msg.type.includes('รายงาน');
+      return true;
+    });
+  }, [docMessages, allDocsSearch, allDocsFilter]);
+
   // โหลดผู้ป่วยย้อนหลังไว้ให้ช่องค้นหาด้านบนใช้ด้วย ไม่งั้นจะค้นเจอเฉพาะคิววันนี้
   useEffect(() => {
     if (isDoctor) {
@@ -602,16 +634,19 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                     <span className="doc-message-count-tag">{unreadDocMessageCount} ใหม่</span>
                   )}
                 </div>
-                {unreadDocMessageCount > 0 && (
+                <div className="doc-message-header-actions">
                   <button 
                     type="button" 
-                    className="doc-message-readall-btn"
-                    onClick={handleMarkAllMessagesRead}
-                    title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด"
+                    className="doc-message-viewall-top-btn"
+                    onClick={handleOpenAllDocsModal}
+                    title="ดูเอกสารทั้งหมด"
                   >
-                    อ่านทั้งหมด
+                    <span>ดูเอกสารทั้งหมด</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" width="13" height="13">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
                   </button>
-                )}
+                </div>
               </div>
 
               {/* Sub-header info bar */}
@@ -658,6 +693,27 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                     </div>
                   ))
                 )}
+              </div>
+
+              {/* Message List Footer */}
+              <div className="doc-message-dropdown-footer">
+                {unreadDocMessageCount > 0 && (
+                  <button 
+                    type="button" 
+                    className="doc-message-footer-readall"
+                    onClick={handleMarkAllMessagesRead}
+                    title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด"
+                  >
+                    ✓ อ่านทั้งหมด
+                  </button>
+                )}
+                <button 
+                  type="button" 
+                  className="doc-message-footer-viewall"
+                  onClick={handleOpenAllDocsModal}
+                >
+                  เปิดคลังเอกสารทั้งหมด ({docMessages.length}) &rarr;
+                </button>
               </div>
             </div>
           )}
@@ -1004,6 +1060,194 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 onClick={() => setSelectedDocMessageModal(null)}
               >
                 ✓ รับทราบและปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: All Documents Archive (คลังเอกสารและข้อความทั้งหมด) */}
+      {isAllDocsModalOpen && (
+        <div className="doc-msg-modal-overlay" onClick={() => setIsAllDocsModalOpen(false)}>
+          <div className="doc-all-modal-box" onClick={(e) => e.stopPropagation()}>
+            <div className="doc-all-modal-header">
+              <div className="doc-all-modal-header-left">
+                <div className="doc-all-header-icon">📁</div>
+                <div>
+                  <h3 className="doc-all-modal-title">คลังเอกสารและข้อความทั้งหมด</h3>
+                  <p className="doc-all-modal-subtitle">
+                    เอกสารที่ส่งถึงคุณ ({currentUser?.fullName || currentUser?.username}) &bull; ทั้งหมด {docMessages.length} รายการ {unreadDocMessageCount > 0 && `(${unreadDocMessageCount} ยังไม่ได้อ่าน)`}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="doc-msg-modal-close"
+                onClick={() => setIsAllDocsModalOpen(false)}
+                title="ปิดหน้าต่าง"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Filter & Search Toolbar */}
+            <div className="doc-all-toolbar">
+              <div className="doc-all-search-wrap">
+                <svg className="doc-all-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <input
+                  type="text"
+                  className="doc-all-search-input"
+                  placeholder="ค้นหาชื่อเอกสาร, ผู้ส่ง, ประเภท หรือข้อความ..."
+                  value={allDocsSearch}
+                  onChange={(e) => setAllDocsSearch(e.target.value)}
+                />
+                {allDocsSearch && (
+                  <button
+                    type="button"
+                    className="doc-all-search-clear"
+                    onClick={() => setAllDocsSearch('')}
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <div className="doc-all-filter-chips">
+                <button
+                  type="button"
+                  className={`doc-all-chip ${allDocsFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setAllDocsFilter('all')}
+                >
+                  ทั้งหมด ({docMessages.length})
+                </button>
+                <button
+                  type="button"
+                  className={`doc-all-chip ${allDocsFilter === 'unread' ? 'active' : ''}`}
+                  onClick={() => setAllDocsFilter('unread')}
+                >
+                  ยังไม่อ่าน ({unreadDocMessageCount})
+                </button>
+                <button
+                  type="button"
+                  className={`doc-all-chip ${allDocsFilter === 'urgent' ? 'active' : ''}`}
+                  onClick={() => setAllDocsFilter('urgent')}
+                >
+                  ⚡ ด่วน / ฉุกเฉิน
+                </button>
+                <button
+                  type="button"
+                  className={`doc-all-chip ${allDocsFilter === 'lab' ? 'active' : ''}`}
+                  onClick={() => setAllDocsFilter('lab')}
+                >
+                  🔬 ผลตรวจ/แล็บ
+                </button>
+                <button
+                  type="button"
+                  className={`doc-all-chip ${allDocsFilter === 'refer' ? 'active' : ''}`}
+                  onClick={() => setAllDocsFilter('refer')}
+                >
+                  🏥 ใบส่งตัว
+                </button>
+                <button
+                  type="button"
+                  className={`doc-all-chip ${allDocsFilter === 'report' ? 'active' : ''}`}
+                  onClick={() => setAllDocsFilter('report')}
+                >
+                  📊 รายงาน
+                </button>
+              </div>
+            </div>
+
+            {/* Document List View */}
+            <div className="doc-all-modal-body">
+              {filteredAllDocs.length === 0 ? (
+                <div className="doc-all-empty">
+                  <div className="doc-all-empty-icon">📭</div>
+                  <h4>ไม่พบเอกสารที่ตรงกับเงื่อนไข</h4>
+                  <p>ลองเปลี่ยนคำค้นหาหรือเลือกแท็บตัวกรองอื่น</p>
+                </div>
+              ) : (
+                <div className="doc-all-grid">
+                  {filteredAllDocs.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`doc-all-card ${msg.isUnread ? 'unread' : ''}`}
+                      onClick={() => {
+                        handleOpenMessageItem(msg);
+                      }}
+                    >
+                      <div className="doc-all-card-top">
+                        <div className="doc-all-card-badges">
+                          <span className={`doc-message-tag ${msg.priority}`}>
+                            {msg.priority === 'emergency' ? '🚨 ฉุกเฉินมาก' : msg.priority === 'urgent' ? '⚡ ด่วน' : 'ปกติ'}
+                          </span>
+                          <span className="doc-all-type-tag">{msg.type}</span>
+                          {msg.isUnread && <span className="doc-all-unread-badge">ยังไม่ได้อ่าน</span>}
+                        </div>
+                        <span className="doc-all-card-time">{msg.timeDisplay}</span>
+                      </div>
+
+                      <h4 className="doc-all-card-title">{msg.title}</h4>
+                      
+                      {msg.description && (
+                        <p className="doc-all-card-desc">{msg.description}</p>
+                      )}
+
+                      <div className="doc-all-card-footer">
+                        <div className="doc-all-card-sender">
+                          <span className="doc-all-sender-label">จาก:</span>
+                          <span className="doc-all-sender-name">{msg.sender}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="doc-all-view-detail-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenMessageItem(msg);
+                          }}
+                        >
+                          เปิดดูเอกสาร &rarr;
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="doc-all-modal-footer">
+              <div className="doc-all-footer-left">
+                {unreadDocMessageCount > 0 && (
+                  <button
+                    type="button"
+                    className="doc-all-footer-readall-btn"
+                    onClick={handleMarkAllMessagesRead}
+                  >
+                    ✓ ทำเครื่องหมายอ่านแล้วทั้งหมด
+                  </button>
+                )}
+                {currentUser?.role === 'officer' && onNavigate && (
+                  <button
+                    type="button"
+                    className="doc-all-footer-nav-btn"
+                    onClick={() => {
+                      setIsAllDocsModalOpen(false);
+                      onNavigate('dms-documents');
+                    }}
+                  >
+                    📋 ไปที่หน้าจัดการเอกสารธุรการ &rarr;
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                className="doc-all-footer-close-btn"
+                onClick={() => setIsAllDocsModalOpen(false)}
+              >
+                ปิดหน้าต่าง
               </button>
             </div>
           </div>
