@@ -1928,6 +1928,34 @@ body.dark-mode .reg-btn-draft-dismiss:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
+/* ===== Structured Address Section Styles (Sprint 3) ===== */
+body.dark-mode .address-dropdown-menu {
+  background-color: #212836 !important;
+  border-color: #333F53 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+}
 
+body.dark-mode .address-dropdown-menu input {
+  background-color: #1C2230 !important;
+  border-color: #333F53 !important;
+  color: #F1F5F9 !important;
+}
 
+body.dark-mode .address-dropdown-item {
+  color: #E2E8F0 !important;
+}
 
+body.dark-mode .address-dropdown-item:hover {
+  background-color: #2A3447 !important;
+}
+
+body.dark-mode .address-preview-box {
+  background-color: #1C2230 !important;
+  border-color: #333F53 !important;
+}
+
+body.dark-mode .reg-legacy-address-banner {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  color: #FBBF24 !important;
+}

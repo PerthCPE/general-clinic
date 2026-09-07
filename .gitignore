@@ -1,6 +1,11 @@
-﻿node_modules/
+node_modules/
 **/node_modules/
+.env
+.env.local
+.env.test
 golang-backend/.env
+golang-backend/.env.local
+golang-backend/.env.test
 golang-backend/golang-backend
 golang-backend/*.exe
 
@@ -8,6 +13,7 @@ react-frontend/node_modules/
 react-frontend/dist/
 react-frontend/.env
 react-frontend/.env.local
+react-frontend/.env.test
 
 .DS_Store
 Thumbs.db

@@ -152,7 +152,11 @@ func visitStatusToQueueStatus(status string) string {
 // ห้ามไล่ด้วย strings.Contains อย่างเดียว เพราะ "กึ่งฉุกเฉิน" มีคำว่า "ฉุกเฉิน"
 // อยู่ข้างใน เคส Level 3 จะโดนดักเป็น Level 2 ทั้งหมด
 var triageByLabel = map[string][2]string{
-	// พยาบาลกดเลือกเอง
+	// พยาบาลกดเลือกเอง (แบบย่อและแบบมีวงเล็บ)
+	"ฉุกเฉินวิกฤต":                 {"Level 1: Resuscitation", "High"},
+	"ฉุกเฉินเร่งด่วน":             {"Level 2: Emergency", "High"},
+	"กึ่งฉุกเฉิน":                 {"Level 3: Urgent", "Medium"},
+	"ปกติ":                        {"Level 4: Less Urgent", "Low"},
 	"ฉุกเฉินวิกฤต (Resuscitation)": {"Level 1: Resuscitation", "High"},
 	"ฉุกเฉินเร่งด่วน (Urgent)":     {"Level 2: Emergency", "High"},
 	"กึ่งฉุกเฉิน (Semi-Urgent)":    {"Level 3: Urgent", "Medium"},
@@ -170,7 +174,7 @@ var triageByLabel = map[string][2]string{
 // priority ลงช่อง "ระดับความสำคัญ"   High / Medium / Low
 func triageInfo(thai string) (code string, priority string) {
 	t := strings.TrimSpace(thai)
-	if t == "" {
+	if t == "" || t == "ไม่ระบุ" {
 		return "", ""
 	}
 
@@ -189,9 +193,11 @@ func triageInfo(thai string) (code string, priority string) {
 		return "Level 2: Emergency", "High"
 	case strings.Contains(t, "เร่งด่วน"), strings.Contains(t, "Urgent"):
 		return "Level 3: Urgent", "Medium"
+	case strings.Contains(t, "ปกติ"), strings.Contains(t, "Normal"), strings.Contains(t, "Non-Urgent"):
+		return "Level 4: Less Urgent", "Low"
 	}
 
-	return "Level 4: Less Urgent", "Low"
+	return "", ""
 }
 
 // waitingMinutesSince - เวลารอของผู้ป่วย นับเป็นนาที
@@ -261,8 +267,7 @@ func toPatientBrief(p models.Patient) dto.PatientBrief {
 
 // toScreeningBrief - แปลงผลคัดกรองเป็นรูปแบบที่หน้าจอแพทย์ใช้
 func toScreeningBrief(s models.Screening) dto.ScreeningBrief {
-	label := triageLabelFromInt(s.TriageLevel)
-	code, priority := triageInfo(label)
+	code, priority, labelTH, _ := models.TriageInfoFromLevel(s.TriageLevel)
 
 	return dto.ScreeningBrief{
 		ID:              s.ID,
@@ -270,7 +275,8 @@ func toScreeningBrief(s models.Screening) dto.ScreeningBrief {
 		Allergies:       s.Allergies,
 		MedicalHistory:  s.MedicalHistory,
 		NurseNotes:      s.NurseNotes,
-		TriageLevel:     label,
+		TriageLevel:     labelTH,
+		TriageLevelNum:  s.TriageLevel,
 		TriageCode:      code,
 		TriagePriority:  priority,
 		BP:              formatBP(s.SystolicBP, s.DiastolicBP),

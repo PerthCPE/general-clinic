@@ -26,12 +26,12 @@ func ConnectDB() {
 		AppConfig.DBSSLMode,
 	)
 
-	// gorm connect to db (เปิด PreferSimpleProtocol: true เพื่อรองรับ Supabase / PgBouncer Pooler)
+	// gorm connect to db (PreferSimpleProtocol and PrepareStmt configured dynamically from environment)
 	database, err := gorm.Open(postgres.New(postgres.Config{
 		DSN:                  dsn,
-		PreferSimpleProtocol: true,
+		PreferSimpleProtocol: AppConfig.DBPreferSimpleProtocol,
 	}), &gorm.Config{
-		PrepareStmt: false,
+		PrepareStmt: AppConfig.DBPrepareStmt,
 	})
 
 	if err != nil {
@@ -291,26 +291,28 @@ func seedDatabase() {
 
 	// 1. Seed Users & Doctors
 	users := []models.User{
-		{Username: "officer1", Password: passStr, Role: "officer", FullName: "คุณสมจิต ดีใจ", Phone: "081-555-0001"},
-		{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
-		{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
-		{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
-		{Username: "pharmacist1", Password: passStr, Role: "pharmacist", FullName: "ดร.บุญ สั่งยา", Phone: "081-333-0001"},
-		{Username: "cashier1", Password: passStr, Role: "cashier", FullName: "นส.รวย การเงิน", Phone: "081-444-0001"},
-		{Username: "doctor1", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
-		{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
-		{Username: "doctor3", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
+		{Username: "officer1", Email: "officer1@clinic.local", Password: passStr, Role: "officer", FullName: "คุณสมจิต ดีใจ", Phone: "081-555-0001"},
+		{Username: "registrar1", Email: "registrar1@clinic.local", Password: passStr, Role: "registrar", FullName: "คุณสุภาพร เวชระเบียน", Phone: "081-111-0001"},
+		{Username: "nurse1", Email: "nurse1@clinic.local", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
+		{Username: "assistant1", Email: "assistant1@clinic.local", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
+		{Username: "pharmacist1", Email: "pharmacist1@clinic.local", Password: passStr, Role: "pharmacist", FullName: "ดร.บุญ สั่งยา", Phone: "081-333-0001"},
+		{Username: "cashier1", Email: "cashier1@clinic.local", Password: passStr, Role: "cashier", FullName: "นส.รวย การเงิน", Phone: "081-444-0001"},
+		{Username: "doctor1", Email: "doctor1@clinic.local", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
+		{Username: "doctor2", Email: "doctor2@clinic.local", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
+		{Username: "doctor3", Email: "doctor3@clinic.local", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
+		{Username: "admin1", Email: "admin1@clinic.local", Password: passStr, Role: "admin", FullName: "ผู้ดูแลระบบ คลินิก", Phone: "081-999-0001"},
 	}
 	for i := range users {
 		var existing models.User
 		if err := DB.Where("username = ?", users[i].Username).First(&existing).Error; err != nil {
 			DB.Create(&users[i])
 		} else {
-			// อัปเดตข้อมูล FullName, Role, Phone ให้ตรงกับค่า seed ล่าสุดเสมอ
+			// อัปเดตข้อมูล FullName, Role, Phone, Email ให้ตรงกับค่า seed ล่าสุดเสมอ
 			DB.Model(&existing).Updates(map[string]interface{}{
 				"full_name": users[i].FullName,
 				"role":      users[i].Role,
 				"phone":     users[i].Phone,
+				"email":     users[i].Email,
 			})
 		}
 	}

@@ -11,6 +11,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/services"
 	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
@@ -45,18 +46,7 @@ type RecordVitalsReq struct {
 
 // triageLabelFromInt returns the human-readable Thai label for triage level 1-4
 func triageLabelFromInt(level int) string {
-	switch level {
-	case 1:
-		return "ฉุกเฉินวิกฤต (Resuscitation)"
-	case 2:
-		return "ฉุกเฉินเร่งด่วน (Urgent)"
-	case 3:
-		return "กึ่งฉุกเฉิน (Semi-Urgent)"
-	case 4:
-		return "ปกติ (Normal)"
-	default:
-		return "ปกติ (Normal)"
-	}
+	return models.TriageLabelTH(level)
 }
 
 // parseTriageLevel converts numeric or textual triage level into canonical integer 1..4
@@ -488,22 +478,126 @@ func GetDoctors(c *gin.Context) {
 	c.JSON(http.StatusOK, doctors)
 }
 
-// GetAllScreeningHistory - ดึงประวัติการคัดกรองทั้งหมดสำหรับ Dashboard
+// GetAllScreeningHistory - ดึงประวัติการคัดกรองทั้งหมดสำหรับ Dashboard (Server-Side Pagination & Filtered COUNT)
 func GetAllScreeningHistory(c *gin.Context) {
-	var screenings []models.Screening
+	pageStr := c.Query("page")
+	limitStr := c.Query("limit")
+	search := strings.TrimSpace(c.Query("search"))
+	triage := strings.TrimSpace(c.Query("triage"))
+	datePreset := strings.TrimSpace(c.Query("date_preset"))
 
-	err := config.DB.Preload("VisitRecord.Patient").
+	baseQuery := config.DB.Model(&models.Screening{}).
+		Joins("LEFT JOIN visit_records ON visit_records.id = screenings.visit_id").
+		Joins("LEFT JOIN patients ON patients.id = visit_records.patient_id")
+
+	// 1. Search Filter (Patient Name, National ID, Phone, HN)
+	if search != "" {
+		searchTerm := "%" + search + "%"
+		cleanSearch := strings.ReplaceAll(strings.ReplaceAll(search, "-", ""), " ", "")
+		baseQuery = baseQuery.Where(
+			"patients.full_name ILIKE ? OR REPLACE(REPLACE(patients.national_id, '-', ''), ' ', '') ILIKE ? OR patients.phone_number ILIKE ? OR patients.hn ILIKE ?",
+			searchTerm, "%"+cleanSearch+"%", searchTerm, searchTerm,
+		)
+	}
+
+	// 2. Triage Level Filter
+	if triage != "" && triage != "all" {
+		triageNum := 0
+		switch {
+		case triage == "1" || strings.Contains(triage, "วิกฤต"):
+			triageNum = 1
+		case triage == "2" || strings.Contains(triage, "เร่งด่วน"):
+			triageNum = 2
+		case triage == "3" || strings.Contains(triage, "กึ่ง"):
+			triageNum = 3
+		case triage == "4" || strings.Contains(triage, "ปกติ"):
+			triageNum = 4
+		default:
+			triageNum, _ = strconv.Atoi(triage)
+		}
+		if triageNum > 0 {
+			baseQuery = baseQuery.Where("screenings.triage_level = ?", triageNum)
+		}
+	}
+
+	// 3. Date Preset Filter
+	nowBkk := time.Now().In(services.BangkokLocation())
+	if datePreset == "today" {
+		startOfDay := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, nowBkk.Location())
+		baseQuery = baseQuery.Where("screenings.created_at >= ?", startOfDay)
+	} else if datePreset == "this-month" {
+		startOfMonth := time.Date(nowBkk.Year(), nowBkk.Month(), 1, 0, 0, 0, 0, nowBkk.Location())
+		baseQuery = baseQuery.Where("screenings.created_at >= ?", startOfMonth)
+	}
+
+	// Backward Compatibility: If no page or limit, return unpaginated slice
+	if pageStr == "" && limitStr == "" {
+		var screenings []models.Screening
+		if err := baseQuery.Preload("VisitRecord.Patient").
+			Preload("ScreenedBy").
+			Preload("AssignedDoctor").
+			Order("screenings.created_at DESC, screenings.id DESC").
+			Find(&screenings).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถดึงประวัติการคัดกรองได้"})
+			return
+		}
+		if screenings == nil {
+			screenings = []models.Screening{}
+		}
+		c.JSON(http.StatusOK, screenings)
+		return
+	}
+
+	// Server-side pagination
+	page, _ := strconv.Atoi(pageStr)
+	if page < 1 {
+		page = 1
+	}
+
+	rawLimit, _ := strconv.Atoi(limitStr)
+	var limit int
+	if rawLimit <= 10 {
+		limit = 10
+	} else if rawLimit <= 25 {
+		limit = 25
+	} else {
+		limit = 50
+	}
+
+	var total int64
+	if err := baseQuery.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถนับจำนวนประวัติการคัดกรองได้"})
+		return
+	}
+
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	offset := (page - 1) * limit
+	var screenings []models.Screening
+	if err := baseQuery.Preload("VisitRecord.Patient").
 		Preload("ScreenedBy").
 		Preload("AssignedDoctor").
-		Order("triage_level asc, created_at desc").
-		Find(&screenings).Error
-
-	if err != nil {
+		Order("screenings.created_at DESC, screenings.id DESC").
+		Limit(limit).Offset(offset).
+		Find(&screenings).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถดึงประวัติการคัดกรองได้"})
 		return
 	}
 
-	c.JSON(http.StatusOK, screenings)
+	if screenings == nil {
+		screenings = []models.Screening{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":        screenings,
+		"total":       total,
+		"page":        page,
+		"limit":       limit,
+		"total_pages": totalPages,
+	})
 }
 
 // GetScreeningHistory - ดึงประวัติการคัดกรองย้อนหลังของผู้ป่วยรายบุคคล

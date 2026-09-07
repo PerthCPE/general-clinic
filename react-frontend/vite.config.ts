@@ -23,10 +23,35 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     server: {
+      host: '127.0.0.1',
       proxy: {
         '/api': {
           target: apiTarget,
           changeOrigin: true,
+        },
+      },
+    },
+    build: {
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('@mui') || id.includes('@emotion')) {
+                return 'vendor-mui'
+              }
+              if (id.includes('react') || id.includes('react-dom')) {
+                return 'vendor-react'
+              }
+              if (id.includes('lucide-react') || id.includes('react-hot-toast')) {
+                return 'vendor-ui'
+              }
+              if (id.includes('@supabase')) {
+                return 'vendor-supabase'
+              }
+              return 'vendor'
+            }
+          },
         },
       },
     },

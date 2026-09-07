@@ -28,8 +28,18 @@ func init() {
 }
 
 func generateTestToken(userID uint, role string) string {
+	actualUserID := userID
+	if config.DB != nil {
+		var u models.User
+		if err := config.DB.Where("id = ?", userID).First(&u).Error; err != nil {
+			if err2 := config.DB.Where("role = ?", role).First(&u).Error; err2 == nil {
+				actualUserID = u.ID
+			}
+		}
+	}
+
 	claims := jwt.MapClaims{
-		"user_id": userID,
+		"user_id": actualUserID,
 		"role":    role,
 		"exp":     time.Now().Add(time.Hour).Unix(),
 	}

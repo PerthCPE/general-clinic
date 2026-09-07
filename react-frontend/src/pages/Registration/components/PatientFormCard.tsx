@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Patient, SchemeType } from '../types';
 import { validateThaiNationalID } from '../../../utils/thaiIdValidator';
+import AddressFormSection, { composeAddressPreview } from './AddressFormSection';
 
 interface PatientFormCardProps {
   onSubmit: (formData: Partial<Patient>) => void;
@@ -20,6 +21,16 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
     age: '',
     phone: '',
     emergencyContact: '',
+    // Structured Address Fields (Sprint 3)
+    houseNo: '',
+    villageNo: '',
+    villageName: '',
+    alley: '',
+    road: '',
+    subDistrict: '',
+    district: '',
+    province: '',
+    postalCode: '',
     address: '',
     schemeType: 'บัตรทอง (สปสช.)' as SchemeType,
   });
@@ -34,7 +45,7 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.data && (parsed.data.fullName || parsed.data.nationalId || parsed.data.phone)) {
+        if (parsed && parsed.data && (parsed.data.fullName || parsed.data.nationalId || parsed.data.phone || parsed.data.province)) {
           setHasDraft(true);
           setDraftTime(parsed.savedAt || '');
         }
@@ -46,7 +57,7 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
 
   // Save draft whenever formData changes
   useEffect(() => {
-    if (formData.fullName || formData.nationalId || formData.phone || formData.address) {
+    if (formData.fullName || formData.nationalId || formData.phone || formData.province || formData.address) {
       const timer = setTimeout(() => {
         try {
           const payload = {
@@ -203,6 +214,18 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
     }
     if (!formData.phone.trim()) errors.phone = 'กรุณาระบุเบอร์โทรศัพท์';
 
+    // Address validation (Sprint 3)
+    if (!formData.province.trim()) {
+      errors.province = 'กรุณาระบุจังหวัด';
+    }
+    if (!formData.district.trim()) {
+      errors.district = 'กรุณาระบุอำเภอ/เขต';
+    }
+    const cleanPostal = formData.postalCode.trim();
+    if (cleanPostal && (cleanPostal.length !== 5 || !/^\d{5}$/.test(cleanPostal))) {
+      errors.postalCode = 'รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก';
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -224,6 +247,8 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
     const birthDateISO = parsed.valid ? parsed.birthdateISO : formData.dob;
     const finalAge = parsed.valid ? parseInt(parsed.ageStr, 10) : parseInt(formData.age, 10) || 25;
 
+    const composedAddr = composeAddressPreview(formData);
+
     onSubmit({
       fullName: fullPatientName,
       nationalId: formData.nationalId,
@@ -232,7 +257,16 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
       age: finalAge,
       phone: formData.phone,
       emergencyContact: formData.emergencyContact,
-      address: formData.address || 'กรุงเทพมหานคร',
+      houseNo: formData.houseNo.trim(),
+      villageNo: formData.villageNo.trim(),
+      villageName: formData.villageName.trim(),
+      alley: formData.alley.trim(),
+      road: formData.road.trim(),
+      subDistrict: formData.subDistrict.trim(),
+      district: formData.district.trim(),
+      province: formData.province.trim(),
+      postalCode: formData.postalCode.trim(),
+      address: composedAddr || formData.address || 'กรุงเทพมหานคร',
       schemeType: formData.schemeType,
     });
 
@@ -258,6 +292,15 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
       age: '',
       phone: '',
       emergencyContact: '',
+      houseNo: '',
+      villageNo: '',
+      villageName: '',
+      alley: '',
+      road: '',
+      subDistrict: '',
+      district: '',
+      province: '',
+      postalCode: '',
       address: '',
       schemeType: 'บัตรทอง (สปสช.)',
     });
@@ -492,7 +535,7 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
             <span className="reg-section-title">ข้อมูลการติดต่อและที่อยู่</span>
           </div>
 
-          <div className="reg-form-grid">
+          <div className="reg-form-grid" style={{ marginBottom: '16px' }}>
             <div className="reg-form-group">
               <label className="reg-form-label">
                 เบอร์โทรศัพท์ติดต่อ <span className="text-required">*</span>
@@ -517,18 +560,28 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
                 onChange={(e) => handleChange('emergencyContact', e.target.value)}
               />
             </div>
-
-            <div className="reg-form-group span-3">
-              <label className="reg-form-label">ที่อยู่ปัจจุบัน</label>
-              <input
-                type="text"
-                className="reg-form-input"
-                placeholder="บ้านเลขที่, ถนน, ตำบล/แขวง, อำเภอ/เขต, จังหวัด..."
-                value={formData.address}
-                onChange={(e) => handleChange('address', e.target.value)}
-              />
-            </div>
           </div>
+
+          <AddressFormSection
+            values={{
+              houseNo: formData.houseNo,
+              villageNo: formData.villageNo,
+              villageName: formData.villageName,
+              alley: formData.alley,
+              road: formData.road,
+              subDistrict: formData.subDistrict,
+              district: formData.district,
+              province: formData.province,
+              postalCode: formData.postalCode,
+              address: formData.address,
+            }}
+            errors={{
+              province: formErrors.province,
+              district: formErrors.district,
+              postalCode: formErrors.postalCode,
+            }}
+            onChange={(field, val) => handleChange(field, val)}
+          />
         </div>
 
         <div className="reg-form-section">

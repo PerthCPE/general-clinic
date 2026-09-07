@@ -4,14 +4,31 @@ services:
     container_name: clinic_postgres
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: general_clinic
+      POSTGRES_USER: clinic
+      POSTGRES_PASSWORD: clinic_dev_2569
+      POSTGRES_DB: clinic
       TZ: Asia/Bangkok
+      PGTZ: Asia/Bangkok
     ports:
       - "5433:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - clinic_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinic -d clinic"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  adminer:
+    image: adminer:latest
+    container_name: clinic_adminer
+    restart: always
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
-  postgres_data:
+  clinic_pgdata:
+    name: clinic_pgdata

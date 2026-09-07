@@ -8,6 +8,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/services"
 	"clinic-backend/internal/ws"
 	"github.com/gin-gonic/gin"
 )
@@ -19,12 +20,96 @@ type RegisterPatientReq struct {
 	FullName         string `json:"fullname" binding:"required"`
 	Gender           string `json:"gender"`
 	BirthDate        string `json:"birthdate" binding:"required"`
-	Address          string `json:"address"`
 	PhoneNumber      string `json:"phone_number" binding:"required"`
 	EmergencyContact string `json:"emergency_contact"`
 	SchemeType       string `json:"scheme_type"`
 	Allergies        string `json:"allergies"`
 	ChronicDiseases  string `json:"chronic_diseases"`
+
+	// Structured Address Fields (Sprint 3)
+	HouseNo          string `json:"house_no"`
+	VillageNo        string `json:"village_no"`
+	VillageName      string `json:"village_name"`
+	Alley            string `json:"alley"`
+	Road             string `json:"road"`
+	SubDistrict      string `json:"sub_district"`
+	District         string `json:"district"`
+	Province         string `json:"province"`
+	PostalCode       string `json:"postal_code"`
+
+	// Legacy Address fallback
+	Address          string `json:"address"`
+}
+
+// composeAddress ประกอบฟิลด์ย่อยของที่อยู่เข้าเป็นสตริงเดียวกันตามมาตรฐาน
+func composeAddress(houseNo, villageNo, villageName, alley, road, subDistrict, district, province, postalCode, fallback string) string {
+	var parts []string
+	if h := strings.TrimSpace(houseNo); h != "" {
+		parts = append(parts, h)
+	}
+	if vNo := strings.TrimSpace(villageNo); vNo != "" {
+		if strings.HasPrefix(vNo, "หมู่") {
+			parts = append(parts, vNo)
+		} else {
+			parts = append(parts, "หมู่ "+vNo)
+		}
+	}
+	if vName := strings.TrimSpace(villageName); vName != "" {
+		parts = append(parts, vName)
+	}
+	if a := strings.TrimSpace(alley); a != "" {
+		if strings.HasPrefix(a, "ซ.") || strings.HasPrefix(a, "ซอย") || strings.HasPrefix(a, "ตรอก") {
+			parts = append(parts, a)
+		} else {
+			parts = append(parts, "ซ."+a)
+		}
+	}
+	if r := strings.TrimSpace(road); r != "" {
+		if strings.HasPrefix(r, "ถ.") || strings.HasPrefix(r, "ถนน") {
+			parts = append(parts, r)
+		} else {
+			parts = append(parts, "ถ."+r)
+		}
+	}
+	if sd := strings.TrimSpace(subDistrict); sd != "" {
+		if strings.HasPrefix(sd, "ต.") || strings.HasPrefix(sd, "ตำบล") || strings.HasPrefix(sd, "แขวง") {
+			parts = append(parts, sd)
+		} else {
+			parts = append(parts, "ต."+sd)
+		}
+	}
+	if d := strings.TrimSpace(district); d != "" {
+		if strings.HasPrefix(d, "อ.") || strings.HasPrefix(d, "อำเภอ") || strings.HasPrefix(d, "เขต") {
+			parts = append(parts, d)
+		} else {
+			parts = append(parts, "อ."+d)
+		}
+	}
+	if p := strings.TrimSpace(province); p != "" {
+		if strings.HasPrefix(p, "จ.") || strings.HasPrefix(p, "จังหวัด") || p == "กรุงเทพมหานคร" || p == "กทม." {
+			parts = append(parts, p)
+		} else {
+			parts = append(parts, "จ."+p)
+		}
+	}
+	if pc := strings.TrimSpace(postalCode); pc != "" {
+		parts = append(parts, pc)
+	}
+
+	composed := strings.Join(parts, " ")
+	if strings.TrimSpace(composed) != "" {
+		return composed
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func isOnlyDigits(s string) bool {
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
 }
 
 // GetPatients - ดึงรายชื่อคนไข้ทั้งหมด
@@ -44,6 +129,24 @@ func RegisterPatient(c *gin.Context) {
 	// required check
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณากรอกเลขบัตรประชาชนให้ครบ 13 หลัก และกรอกชื่อ-เบอร์โทรให้ถูกต้อง"})
+		return
+	}
+
+	// Address Validation (Sprint 3: บังคับจังหวัดและอำเภอ)
+	cleanProvince := strings.TrimSpace(req.Province)
+	cleanDistrict := strings.TrimSpace(req.District)
+	cleanPostal := strings.TrimSpace(req.PostalCode)
+
+	if cleanProvince == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุจังหวัด"})
+		return
+	}
+	if cleanDistrict == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุอำเภอ/เขต"})
+		return
+	}
+	if cleanPostal != "" && (len(cleanPostal) != 5 || !isOnlyDigits(cleanPostal)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก"})
 		return
 	}
 
@@ -93,6 +196,19 @@ func RegisterPatient(c *gin.Context) {
 		hn = fmt.Sprintf("HN%04d", maxNum+1)
 	}
 
+	composedAddr := composeAddress(
+		req.HouseNo,
+		req.VillageNo,
+		req.VillageName,
+		req.Alley,
+		req.Road,
+		req.SubDistrict,
+		cleanDistrict,
+		cleanProvince,
+		cleanPostal,
+		req.Address,
+	)
+
 	// define new patient
 	newPatient := models.Patient{
 		HN:               hn,
@@ -100,7 +216,16 @@ func RegisterPatient(c *gin.Context) {
 		FullName:         req.FullName,
 		Gender:           req.Gender,
 		BirthDate:        parsedBirthDate,
-		Address:          req.Address,
+		HouseNo:          strings.TrimSpace(req.HouseNo),
+		VillageNo:        strings.TrimSpace(req.VillageNo),
+		VillageName:      strings.TrimSpace(req.VillageName),
+		Alley:            strings.TrimSpace(req.Alley),
+		Road:             strings.TrimSpace(req.Road),
+		SubDistrict:      strings.TrimSpace(req.SubDistrict),
+		District:         cleanDistrict,
+		Province:         cleanProvince,
+		PostalCode:       cleanPostal,
+		Address:          composedAddr,
 		PhoneNumber:      req.PhoneNumber,
 		EmergencyContact: req.EmergencyContact,
 		SchemeType:       req.SchemeType,
@@ -144,10 +269,15 @@ func RegisterPatient(c *gin.Context) {
 	}
 	config.DB.Create(&initialEligibility)
 
-	// สร้างคิวรอคัดกรองให้อัตโนมัติ เพื่อส่งต่อเข้าสู่ระบบคัดกรองทันที
-	var qCount int64
-	config.DB.Model(&models.Queue{}).Count(&qCount)
-	queueNo := fmt.Sprintf("Q%04d", qCount+1)
+	// สร้างคิวรอคัดกรองให้อัตโนมัติ เพื่อส่งต่อเข้าสู่ระบบคัดกรองทันที (Atomic Daily Sequential Queue)
+	nowBkk := time.Now().In(services.BangkokLocation())
+	serviceDate := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
+	queueNo, qErr := services.NextQueueNumber(config.DB, nowBkk)
+	if qErr != nil {
+		var qCount int64
+		config.DB.Model(&models.Queue{}).Where("service_date = ?", serviceDate).Count(&qCount)
+		queueNo = fmt.Sprintf("Q%04X", qCount+1)
+	}
 
 	var creatorID uint = 2
 	if val, exists := c.Get("userID"); exists {
@@ -162,9 +292,12 @@ func RegisterPatient(c *gin.Context) {
 		PatientID:       newPatient.ID,
 		CreatedByUserID: creatorID,
 		QueueNumber:     queueNo,
+		ServiceDate:     serviceDate,
 		Status:          "รอคัดกรอง",
 		Department:      "จุดคัดกรอง",
 		Note:            "ส่งเข้าคิวจากการลงทะเบียน",
+		CreatedAt:       nowBkk,
+		UpdatedAt:       nowBkk,
 	}
 	config.DB.Create(&newQueue)
 	ws.BroadcastEvent("QUEUE_CREATED", newQueue)

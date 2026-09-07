@@ -139,9 +139,10 @@ export const VitalsPage: React.FC = () => {
   // ดึงรายการคิวจาก Backend DB
   const fetchQueues = useCallback(async () => {
     try {
-      const data = await queueApi.getList();
-      if (Array.isArray(data) && data.length > 0) {
-        const mapped = data.map(mapBackendQueueToPatientItem);
+      const res = await queueApi.getList();
+      const rawList = Array.isArray(res) ? res : (res && typeof res === 'object' && 'data' in res ? (res as any).data : []);
+      if (Array.isArray(rawList) && rawList.length > 0) {
+        const mapped = rawList.map(mapBackendQueueToPatientItem);
         setQueueList(mapped);
         return mapped;
       } else {
@@ -208,14 +209,11 @@ export const VitalsPage: React.FC = () => {
       fetchQueues();
     });
 
-    // Fallback polling ทุก 30 วินาที
-    const interval = setInterval(fetchQueues, 30000);
     return () => {
       unsubCreated();
       unsubUpdated();
       unsubReset();
       unsubPatient();
-      clearInterval(interval);
     };
   }, [fetchQueues, fetchDoctors, subscribe]);
 

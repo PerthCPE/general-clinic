@@ -165,6 +165,15 @@ export interface BackendPatient {
   fullname: string;
   gender: string;
   birthdate: string;
+  house_no?: string;
+  village_no?: string;
+  village_name?: string;
+  alley?: string;
+  road?: string;
+  sub_district?: string;
+  district?: string;
+  province?: string;
+  postal_code?: string;
   address: string;
   phone_number: string;
   emergency_contact: string;
@@ -183,7 +192,16 @@ export const patientApi = {
     fullname: string;
     gender: string;
     birthdate: string;
-    address: string;
+    house_no?: string;
+    village_no?: string;
+    village_name?: string;
+    alley?: string;
+    road?: string;
+    sub_district?: string;
+    district?: string;
+    province?: string;
+    postal_code?: string;
+    address?: string;
     phone_number: string;
     emergency_contact: string;
     scheme_type?: string;
@@ -220,8 +238,52 @@ export interface BackendQueue {
   };
 }
 
+export interface QueueStats {
+  total: number;
+  active: number;
+  waitingScreening: number;
+  waitingDoctor: number;
+  inExamination: number;
+  waitingTreatment: number;
+  waitingBilling: number;
+  waitingPharmacy: number;
+  completed: number;
+  cancelled: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  stats?: QueueStats;
+}
+
 export const queueApi = {
-  getList: () => request<BackendQueue[]>('/api/queue/list'),
+  getList: (
+    params?: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      search?: string;
+      category?: string;
+    },
+    options?: { signal?: AbortSignal }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      if (params.page !== undefined) searchParams.set('page', String(params.page));
+      if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+      if (params.status) searchParams.set('status', params.status);
+      if (params.search) searchParams.set('search', params.search);
+      if (params.category) searchParams.set('category', params.category);
+    }
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<BackendQueue[] | PaginatedResponse<BackendQueue>>(`/api/queue/list${query}`, {
+      signal: options?.signal,
+    });
+  },
   create: (patientId: number, department?: string, note?: string) =>
     request<{ message: string; queue: BackendQueue }>('/api/queue/create', {
       method: 'POST',
@@ -370,7 +432,29 @@ export const vitalsApi = {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  getAllHistory: () => request<BackendScreening[]>('/api/nurse/vitals/history'),
+  getAllHistory: (
+    params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      triage?: string;
+      date_preset?: string;
+    },
+    options?: { signal?: AbortSignal }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      if (params.page !== undefined) searchParams.set('page', String(params.page));
+      if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+      if (params.search) searchParams.set('search', params.search);
+      if (params.triage) searchParams.set('triage', params.triage);
+      if (params.date_preset) searchParams.set('date_preset', params.date_preset);
+    }
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<BackendScreening[] | PaginatedResponse<BackendScreening>>(`/api/nurse/vitals/history${query}`, {
+      signal: options?.signal,
+    });
+  },
   getPatientHistory: (patientId: number | string) =>
     request<{ patient_id: string; history: BackendScreening[] }>(`/api/nurse/vitals/history/${patientId}`),
 };
@@ -400,10 +484,16 @@ export interface StorageStats {
 export interface BackendUser {
   id: number;
   username: string;
-  fullname?: string;
+  fullname: string;
   full_name?: string;
   role: string;
-  phone?: string;
+  phone: string;
+  email?: string;
+  employee_id?: string;
+  status?: string;
+  system_accesses?: Array<{ access_level?: number | string; [key: string]: any }>;
+  created_at: string;
+  updated_at?: string;
 }
 
 export interface BackendDocument {
@@ -505,6 +595,7 @@ export interface BackendDoctorScreening {
   medical_history: string;
   nurse_notes: string;
   triage_level: string;
+  triage_level_num?: number;
   triage_code: string;
   triage_priority: string;
   bp: string;

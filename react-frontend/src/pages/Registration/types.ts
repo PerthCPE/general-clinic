@@ -16,8 +16,19 @@ export interface Patient {
   phone: string;
   emergencyContact: string;
   address: string;
+  // Structured Address Fields (Sprint 3)
+  houseNo?: string;
+  villageNo?: string;
+  villageName?: string;
+  alley?: string;
+  road?: string;
+  subDistrict?: string;
+  district?: string;
+  province?: string;
+  postalCode?: string;
   schemeType: SchemeType;
   chronicDiseases?: string;
   allergies?: string;
   registeredAt: string;
 }
+

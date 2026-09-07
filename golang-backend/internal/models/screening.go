@@ -123,3 +123,52 @@ type Screening struct {
 	ScreenedBy     User        `gorm:"foreignKey:ScreenedByUserID" json:"screened_by"` // ดึงข้อมูลพยาบาลผู้คัดกรอง
 	AssignedDoctor User        `gorm:"foreignKey:AssignedDoctorID" json:"assigned_doctor"`
 }
+
+// TriageLabelTH returns the canonical Thai label for triage level 1-4 (default "ไม่ระบุ")
+func TriageLabelTH(level int) string {
+	switch level {
+	case 1:
+		return "ฉุกเฉินวิกฤต"
+	case 2:
+		return "ฉุกเฉินเร่งด่วน"
+	case 3:
+		return "กึ่งฉุกเฉิน"
+	case 4:
+		return "ปกติ"
+	default:
+		return "ไม่ระบุ"
+	}
+}
+
+// TriageLabelEN returns the canonical English label for triage level 1-4 (default "Unknown")
+func TriageLabelEN(level int) string {
+	switch level {
+	case 1:
+		return "Resuscitation"
+	case 2:
+		return "Emergency-Urgent"
+	case 3:
+		return "Semi-Urgent"
+	case 4:
+		return "Non-Urgent"
+	default:
+		return "Unknown"
+	}
+}
+
+// TriageInfoFromLevel returns doctor UI triage code, priority, Thai label, and English label
+func TriageInfoFromLevel(level int) (code string, priority string, labelTH string, labelEN string) {
+	switch level {
+	case 1:
+		return "Level 1: Resuscitation", "High", "ฉุกเฉินวิกฤต", "Resuscitation"
+	case 2:
+		return "Level 2: Emergency", "High", "ฉุกเฉินเร่งด่วน", "Emergency-Urgent"
+	case 3:
+		return "Level 3: Urgent", "Medium", "กึ่งฉุกเฉิน", "Semi-Urgent"
+	case 4:
+		return "Level 4: Less Urgent", "Low", "ปกติ", "Non-Urgent"
+	default:
+		return "", "", "ไม่ระบุ", "Unknown"
+	}
+}
+

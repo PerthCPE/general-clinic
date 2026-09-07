@@ -14,6 +14,7 @@ import { ScreeningDetailModal } from './components/ScreeningDetailModal';
 import { vitalsApi, type BackendScreening } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatQueueNo, formatNationalId, formatPhone, formatHN, maskNationalId } from '../../utils/formatters';
+import Pagination from '../../components/Pagination/Pagination';
 import './ScreeningHistoryPage.css';
 
 export { formatQueueNo };
@@ -137,9 +138,10 @@ export const ScreeningHistoryPage: React.FC = () => {
   const fetchHistory = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await vitalsApi.getAllHistory();
-      if (Array.isArray(data)) {
-        setRecords(data.map(mapBackendScreeningToUI));
+      const res = await vitalsApi.getAllHistory();
+      const rawList = Array.isArray(res) ? res : (res && typeof res === 'object' && 'data' in res ? (res as any).data : []);
+      if (Array.isArray(rawList)) {
+        setRecords(rawList.map(mapBackendScreeningToUI));
       }
     } catch (err) {
       console.warn('Could not fetch screening history from backend:', err);
@@ -732,46 +734,14 @@ export const ScreeningHistoryPage: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination Bar */}
-        {filteredRecords.length > 0 && (
-          <div className="scr-pagination-bar">
-            <div className="pagination-info">
-              แสดงหน้า <strong>{currentPage}</strong> จากทั้งหมด <strong>{totalPages}</strong> หน้า (
-              {filteredRecords.length} รายการ)
-            </div>
-
-            <div className="pagination-buttons">
-              <button
-                type="button"
-                className="page-btn nav-btn"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-              >
-                Previous
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                <button
-                  key={pageNum}
-                  type="button"
-                  className={`page-btn num-btn ${currentPage === pageNum ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(pageNum)}
-                >
-                  {pageNum}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="page-btn nav-btn"
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Modern Reusable Pagination Component */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredRecords.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={(p) => setCurrentPage(p)}
+        />
           </div>
         )}
       </div>

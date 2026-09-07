@@ -69,8 +69,33 @@
 
 ---
 
+## 6. Local Docker Postgres Dev/Test Environment & Migration Runner
+
+### การเปลี่ยนแปลง (Changes)
+- **Docker Compose**: ให้บริการ PostgreSQL 16 (`localhost:5433`, container: `clinic_postgres`) และ Adminer Web GUI (`http://localhost:8081`, container: `clinic_adminer`)
+- **Automated Migration Runner**: `golang-backend/cmd/migrate/main.go` ทำการรันไฟล์ migrations ทั้งหมด (001-006) และบันทึกลงตาราง `schema_migrations` เพื่อรับประกันความเป็น Idempotent
+- **Comprehensive Clean Seed**: `golang-backend/cmd/clean_seed/main.go` ล้างข้อมูล transactional และ seed บัญชีทดสอบครบทุก role (password: `password`), ผู้ป่วย 20 คน, สิทธิ์การรักษา, คิว 15 คิว และการคัดกรองสัญญาณชีพ
+- **Environment Management**: แยก `.env.example`, `.env.local` (สำหรับ Docker Dev) และ `.env.test` (สำหรับ Local Go Test)
+
+---
+
+## 7. Supabase Egress Protection & Query Optimization
+
+### มาตรการและกลไกป้องกัน (Protective Mechanisms)
+1. **Supabase Production Guard (`internal/testutils/guard.go`)**:
+   - ป้องกันการรัน Test ใดๆ กับ Supabase Production โดยจะ abort ทันทีหากตรวจพบว่า `DB_HOST` มีคำว่า `supabase`
+2. **Server-Side Pagination**:
+   - `GET /api/queue/list` รองรับ query `?page=1&limit=10` และส่งกลับโครงสร้าง `{ data: [...], total: N, page: 1, limit: 10 }` (ลด payload จาก ~85KB เหลือ ~4.2KB ต่อ request)
+   - `GET /api/nurse/vitals/history` รองรับ `?page=1&limit=10` ลดขนาด payload ลงมากกว่า 90%
+3. **Removal of Redundant Polling**:
+   - ยกเลิก `setInterval` polling ทุก 30 วินาทีในหน้าจอคิวและซักประวัติ โดยใช้ WebSocket Event-Driven architecture แทนเพื่อลด egress โดยสิ้นเชิง
+
+---
+
 ## 👥 คำแนะนำสำหรับทีม Doctor, Pharmacy และ Billing (Teammate Notes)
-1. **Doctor Module (`toScreeningBrief`)**: มีการปรับฟิลด์ `triage_level` จากเดิม `string` เป็น `int` (1–4) โดยฟังก์ชัน `toScreeningBrief` ใน `doctor_controller.go` ได้แมปค่าตัวเลขเป็น Label ภาษาไทยให้เรียบร้อยแล้ว หากโมดูลหมอต้องการค่าตัวเลขตรงๆ สามารถอ่านจาก struct `Screening.TriageLevel` (int) ได้ทันที
-2. **Queue Number**: หมายเลขคิวในตาราง `queues` และ `visit_records` จะมีรูปแบบ `Q` + 4-digit hex (เช่น `Q0001`, `Q000A`, `Q0010`)
-3. **Visit Records**: สามารถเชื่อมโยงและสืบค้นกลับไปยังคิวต้นทางได้โดยตรงผ่านฟิลด์ `queue_id` และ `queue_number` บน `VisitRecord`
-4. **Billing & Registrar RBAC Guard**: สิทธิ์การเข้าถึง `/api/billing/*` ถูกจำกัดให้เฉพาะ `cashier` และ `admin` เท่านั้น และ `/api/registrar/*` แยกสิทธิ์การเขียน (`POST /api/registrar/*`) ให้เฉพาะ `registrar` เท่านั้น (พยาบาลสามารถ `GET` เพื่อดูประวัติผู้ป่วยได้)
+1. **การรัน Dev/Test ภายในทีม**: ให้เปิด `docker compose up -d` และรัน `go run ./cmd/migrate/main.go` เพื่อให้ได้ Database Local บนเครื่องตัวเอง โดยไม่ต้องกังวลเรื่อง Supabase Quota เต็ม
+2. **Doctor Module (`toScreeningBrief`)**: มีการปรับฟิลด์ `triage_level` จากเดิม `string` เป็น `int` (1–4) โดยฟังก์ชัน `toScreeningBrief` ใน `doctor_controller.go` ได้แมปค่าตัวเลขเป็น Label ภาษาไทยให้เรียบร้อยแล้ว หากโมดูลหมอต้องการค่าตัวเลขตรงๆ สามารถอ่านจาก struct `Screening.TriageLevel` (int) ได้ทันที
+3. **Queue Number**: หมายเลขคิวในตาราง `queues` และ `visit_records` จะมีรูปแบบ `Q` + 4-digit hex (เช่น `Q0001`, `Q000A`, `Q0010`)
+4. **Visit Records**: สามารถเชื่อมโยงและสืบค้นกลับไปยังคิวต้นทางได้โดยตรงผ่านฟิลด์ `queue_id` และ `queue_number` บน `VisitRecord`
+5. **Billing & Registrar RBAC Guard**: สิทธิ์การเข้าถึง `/api/billing/*` ถูกจำกัดให้เฉพาะ `cashier` และ `admin` เท่านั้น และ `/api/registrar/*` แยกสิทธิ์การเขียน (`POST /api/registrar/*`) ให้เฉพาะ `registrar` เท่านั้น (พยาบาลสามารถ `GET` เพื่อดูประวัติผู้ป่วยได้)
+

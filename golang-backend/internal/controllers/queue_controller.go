@@ -3,7 +3,9 @@ package controllers
 import (
 	"fmt"
 	"log"
+	"math"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,20 +30,159 @@ type UpdateQueueStatusReq struct {
 	Note       string `json:"note"`
 }
 
-// GetQueueList - ดึงรายการคิวทั้งหมด พร้อมข้อมูลผู้ป่วย (Optimize Query)
+// GetQueueList - ดึงรายการคิวทั้งหมด พร้อมข้อมูลผู้ป่วย (Server-Side Pagination & Filtered COUNT)
 func GetQueueList(c *gin.Context) {
+	pageStr := c.Query("page")
+	limitStr := c.Query("limit")
+	status := strings.TrimSpace(c.Query("status"))
+	search := strings.TrimSpace(c.Query("search"))
+	category := strings.TrimSpace(c.Query("category"))
+
+	// Base query with joined patient table for search
+	baseQuery := config.DB.Model(&models.Queue{}).Joins("LEFT JOIN patients ON patients.id = queues.patient_id")
+
+	// 1. Status & Category Filtering
+	if status != "" && status != "all" {
+		if strings.Contains(status, ",") {
+			statuses := strings.Split(status, ",")
+			baseQuery = baseQuery.Where("queues.status IN ?", statuses)
+		} else if status == "in_service_all" {
+			baseQuery = baseQuery.Where("queues.status IN ?", []string{"รอคัดกรอง", "รอพบแพทย์", "กำลังตรวจ", "รอทำหัตถการ"})
+		} else if status == "cash_pharmacy_all" {
+			baseQuery = baseQuery.Where("queues.status IN ?", []string{"รอชำระเงิน", "รอรับยา"})
+		} else if status == "completed_cancelled_all" {
+			baseQuery = baseQuery.Where("queues.status IN ?", []string{"เสร็จสิ้น", "ยกเลิกคิว"})
+		} else {
+			baseQuery = baseQuery.Where("queues.status = ?", status)
+		}
+	} else if category != "" {
+		if category == "all" {
+			baseQuery = baseQuery.Where("queues.status NOT IN ?", []string{"เสร็จสิ้น", "ยกเลิกคิว"})
+		} else if category == "in_service" {
+			baseQuery = baseQuery.Where("queues.status IN ?", []string{"รอคัดกรอง", "รอพบแพทย์", "กำลังตรวจ", "รอทำหัตถการ"})
+		} else if category == "cash_pharmacy" {
+			baseQuery = baseQuery.Where("queues.status IN ?", []string{"รอชำระเงิน", "รอรับยา"})
+		} else if category == "completed_cancelled" {
+			baseQuery = baseQuery.Where("queues.status IN ?", []string{"เสร็จสิ้น", "ยกเลิกคิว"})
+		}
+	}
+
+	// 2. Search Query Filtering (Queue Number, Patient Name, National ID, Phone)
+	if search != "" {
+		searchTerm := "%" + search + "%"
+		cleanSearch := strings.ReplaceAll(strings.ReplaceAll(search, "-", ""), " ", "")
+		baseQuery = baseQuery.Where(
+			"queues.queue_number ILIKE ? OR patients.full_name ILIKE ? OR REPLACE(REPLACE(patients.national_id, '-', ''), ' ', '') ILIKE ? OR patients.phone_number ILIKE ?",
+			searchTerm, searchTerm, "%"+cleanSearch+"%", searchTerm,
+		)
+	}
+
+	// A3. Backward compatibility: If no page or limit param is provided, return unpaginated array
+	if pageStr == "" && limitStr == "" {
+		var queues []models.Queue
+		if err := baseQuery.Preload("Patient").Order("queues.created_at ASC, queues.id ASC").Find(&queues).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถดึงรายการคิวได้"})
+			return
+		}
+		if queues == nil {
+			queues = []models.Queue{}
+		}
+		c.JSON(http.StatusOK, queues)
+		return
+	}
+
+	// A1. Server-side Pagination with Parameter Clamping
+	page, _ := strconv.Atoi(pageStr)
+	if page < 1 {
+		page = 1
+	}
+
+	rawLimit, _ := strconv.Atoi(limitStr)
+	var limit int
+	if rawLimit <= 10 {
+		limit = 10
+	} else if rawLimit <= 25 {
+		limit = 25
+	} else {
+		limit = 50
+	}
+
+	// Filtered COUNT (Counts matching rows only)
+	var total int64
+	if err := baseQuery.Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถนับจำนวนคิวได้"})
+		return
+	}
+
+	totalPages := int(math.Ceil(float64(total) / float64(limit)))
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	offset := (page - 1) * limit
 	var queues []models.Queue
-
-	err := config.DB.Preload("Patient").
-		Order("created_at asc").
-		Find(&queues).Error
-
-	if err != nil {
+	if err := baseQuery.Preload("Patient").Order("queues.created_at ASC, queues.id ASC").Limit(limit).Offset(offset).Find(&queues).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถดึงรายการคิวได้"})
 		return
 	}
 
-	c.JSON(http.StatusOK, queues)
+	if queues == nil {
+		queues = []models.Queue{}
+	}
+
+	// Calculate overall statistics for top cards without full table egress
+	type StatusCount struct {
+		Status string
+		Count  int
+	}
+	var statusCounts []StatusCount
+	config.DB.Model(&models.Queue{}).Select("status, count(*) as count").Group("status").Scan(&statusCounts)
+
+	stats := gin.H{
+		"total":            0,
+		"active":           0,
+		"waitingScreening": 0,
+		"waitingDoctor":    0,
+		"inExamination":    0,
+		"waitingTreatment": 0,
+		"waitingBilling":   0,
+		"waitingPharmacy":  0,
+		"completed":        0,
+		"cancelled":        0,
+	}
+	totalAll := 0
+	for _, sc := range statusCounts {
+		totalAll += sc.Count
+		switch sc.Status {
+		case "รอคัดกรอง":
+			stats["waitingScreening"] = sc.Count
+		case "รอพบแพทย์":
+			stats["waitingDoctor"] = sc.Count
+		case "กำลังตรวจ":
+			stats["inExamination"] = sc.Count
+		case "รอทำหัตถการ":
+			stats["waitingTreatment"] = sc.Count
+		case "รอชำระเงิน":
+			stats["waitingBilling"] = sc.Count
+		case "รอรับยา":
+			stats["waitingPharmacy"] = sc.Count
+		case "เสร็จสิ้น":
+			stats["completed"] = sc.Count
+		case "ยกเลิกคิว":
+			stats["cancelled"] = sc.Count
+		}
+	}
+	stats["total"] = totalAll
+	stats["active"] = totalAll - (stats["completed"].(int) + stats["cancelled"].(int))
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":        queues,
+		"total":       total,
+		"page":        page,
+		"limit":       limit,
+		"total_pages": totalPages,
+		"stats":       stats,
+	})
 }
 
 // CreateQueue - ออกบัตรคิวใหม่ (Atomic Daily Sequential Numbering)
