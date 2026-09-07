@@ -404,6 +404,11 @@ export interface BackendUser {
   full_name?: string;
   role: string;
   phone?: string;
+  employee_id?: string;
+  email?: string;
+  status?: string;
+  system_accesses?: any[];
+  created_at?: string;
 }
 
 export interface BackendDocument {

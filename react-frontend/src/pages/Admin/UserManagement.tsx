@@ -55,14 +55,14 @@ const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
   return {
     internalId: u.id,
     id: u.employee_id || `EMP-${u.id}`,
-    name: u.fullname,
+    name: u.fullname || u.full_name || u.username || '',
     email: u.email || `${u.username}@clinic.com`,
-    phone: u.phone,
+    phone: u.phone || '-',
     role: thaiRole,
     department: defaultDept,
     status: u.status === 'active' ? 'กำลังใช้งาน' : (u.status === 'suspended' ? 'ระงับใช้งาน' : 'รอการยืนยัน'),
     avatar: randomColor,
-    createdAt: new Date(u.created_at).toLocaleDateString('en-GB'),
+    createdAt: u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
     username: u.username,
   };
 };

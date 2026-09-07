@@ -10,6 +10,7 @@ import {
   markDocumentMessageAsRead,
   markAllDocumentMessagesAsRead,
 } from '../../services/documentMessageStorage';
+import { useWebSocket } from '../../context/WebSocketContext';
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -47,7 +48,45 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   const [isAdminFontEnabled, setIsAdminFontEnabled] = useState(false);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const searchRef = useRef<HTMLDivElement>(null);
+  const { subscribe } = useWebSocket();
 
+  useEffect(() => {
+    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', (data: any) => {
+      setNotifications(prev => [{
+        id: Date.now().toString() + Math.random(),
+        category: 'ห้องยา',
+        message: `มีใบสั่งยาใหม่ส่งมาจากห้องตรวจแพทย์ รอจัดยาสำหรับ ${data?.patient_name || 'ผู้ป่วย'}`,
+        time: 'เมื่อสักครู่',
+        isUnread: true,
+      }, ...prev]);
+    });
+
+    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      setNotifications(prev => [{
+        id: Date.now().toString() + Math.random(),
+        category: 'การชำระเงิน',
+        message: `รอชำระเงินสำหรับ ${data?.patient_name || 'ผู้ป่วย'}`,
+        time: 'เมื่อสักครู่',
+        isUnread: true,
+      }, ...prev]);
+    });
+
+    const unsubPay = subscribe('PAYMENT_CONFIRMED', (data: any) => {
+      setNotifications(prev => [{
+        id: Date.now().toString() + Math.random(),
+        category: 'การชำระเงิน',
+        message: `ชำระเงินเรียบร้อยแล้ว ออกใบเสร็จสำเร็จ`,
+        time: 'เมื่อสักครู่',
+        isUnread: true,
+      }, ...prev]);
+    });
+
+    return () => {
+      unsubMedQ();
+      unsubBill();
+      unsubPay();
+    };
+  }, [subscribe]);
   // Sync Document Messages from storage & events
   useEffect(() => {
     const handleMessageUpdate = () => {

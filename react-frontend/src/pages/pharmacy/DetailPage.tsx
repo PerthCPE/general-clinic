@@ -452,7 +452,6 @@ export default function DetailPage({
     const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', () => {
       fetchQueues();
       triggerToast('ได้รับใบสั่งยาเรียบร้อยแล้ว', 'doctor');
-      playPharmacyNotification('มีผู้ป่วยใหม่ ส่งมาที่ห้องยาค่ะ');
     });
 
     return () => {

@@ -18,9 +18,9 @@ export function playPharmacyNotification(message?: string): Promise<void> {
       }
       
       // ตั้งค่ารูปแบบเสียงแจ้งเตือน (ห้องยา)
-      const USE_MP3 = true; 
+      const USE_MP3 = false; 
       const MP3_FILE_PATH = '/audio/pin_a1.mp3'; 
-      const WAIT_BEFORE_TTS_MS = 3000; 
+      const WAIT_BEFORE_TTS_MS = 1500; 
 
       // ตั้งค่าเสียงสังเคราะห์
       const TONE_1_FREQ = 659.25; 
@@ -45,9 +45,9 @@ export function playBillingNotification(message?: string): Promise<void> {
       }
       
       // ตั้งค่ารูปแบบเสียงแจ้งเตือน (ห้องการเงิน)
-      const USE_MP3 = true; 
+      const USE_MP3 = false; 
       const MP3_FILE_PATH = '/audio/pin_a1.mp3'; // สามารถเปลี่ยนเป็นไฟล์อื่นได้ เช่น /audio/billing.mp3
-      const WAIT_BEFORE_TTS_MS = 3000; 
+      const WAIT_BEFORE_TTS_MS = 1500; 
 
       // ตั้งค่าเสียงสังเคราะห์
       const TONE_1_FREQ = 659.25; 

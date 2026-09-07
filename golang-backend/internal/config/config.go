@@ -25,16 +25,36 @@ var AppConfig *Config
 // Load data from .env for database
 func LoadConfig() {
 	// ค้นหาและโหลดไฟล์ .env จากหลายตำแหน่งที่อาจรันคำสั่ง
-	if err := godotenv.Load(); err != nil {
-		if err2 := godotenv.Load("golang-backend/.env"); err2 != nil {
-			if err3 := godotenv.Load("../.env"); err3 != nil {
-				if err4 := godotenv.Load("../../.env"); err4 != nil {
-					if err5 := godotenv.Load("../../golang-backend/.env"); err5 != nil {
-						log.Println("Notice: No .env file found in default paths, checking environment variables or fallback defaults.")
-					}
-				}
+	loadEnvFile := func(path string) bool {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return false
+		}
+		// Strip UTF-8 BOM if present
+		content := string(data)
+		if len(content) >= 3 && content[0] == 0xEF && content[1] == 0xBB && content[2] == 0xBF {
+			content = content[3:]
+		}
+		envMap, err := godotenv.Unmarshal(content)
+		if err != nil {
+			return false
+		}
+		for k, v := range envMap {
+			if os.Getenv(k) == "" {
+				os.Setenv(k, v)
 			}
 		}
+		return true
+	}
+
+	loaded := loadEnvFile(".env") ||
+		loadEnvFile("golang-backend/.env") ||
+		loadEnvFile("../.env") ||
+		loadEnvFile("../../.env") ||
+		loadEnvFile("../../golang-backend/.env")
+
+	if !loaded {
+		log.Println("Notice: No .env file found in default paths, checking environment variables or fallback defaults.")
 	}
 
 	AppConfig = &Config{

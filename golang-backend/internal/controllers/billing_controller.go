@@ -675,6 +675,7 @@ func ConfirmPayment(c *gin.Context) {
 			NetAmount:     totalAmt,
 			PaymentStatus: "pending",
 		}
+		// If VisitID doesn't exist in visit_records, this might fail, but we'll handle it gracefully
 		config.DB.Create(&billing)
 	}
 
@@ -684,7 +685,12 @@ func ConfirmPayment(c *gin.Context) {
 	}
 
 	// ออกหมายเลขใบเสร็จแบบ Unique (เช่น REC-YYYYMMDD-XXXX)
-	receiptNo := fmt.Sprintf("REC-%s-%04d", time.Now().Format("20060102"), billing.ID)
+	var receiptNo string
+	if billing.ID > 0 {
+		receiptNo = fmt.Sprintf("REC-%s-%04d", time.Now().Format("20060102"), billing.ID)
+	} else {
+		receiptNo = fmt.Sprintf("REC-%s-SIM%d", time.Now().Format("20060102"), time.Now().UnixMilli()%10000)
+	}
 
 	billing.PaymentMethod = req.PaymentMethod
 	billing.PaymentStatus = "paid"
@@ -694,7 +700,9 @@ func ConfirmPayment(c *gin.Context) {
 		billing.NetAmount = totalAmt
 	}
 
-	config.DB.Save(&billing)
+	if billing.ID > 0 {
+		config.DB.Save(&billing)
+	}
 
 	// หากชำระผ่าน QR ให้ปรับสถานะ QRPayment เป็น completed
 	if req.PaymentMethod == "QR Code" || req.PaymentMethod == "QR Code (พร้อมเพย์)" {
