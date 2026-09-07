@@ -19,7 +19,7 @@ export function playPharmacyNotification(message?: string): Promise<void> {
       
       // ตั้งค่ารูปแบบเสียงแจ้งเตือน (ห้องยา)
       const USE_MP3 = true; 
-      const MP3_FILE_PATH = '/audio/char_0.mp3'; 
+      const MP3_FILE_PATH = '/audio/pin_a1.mp3'; 
       const WAIT_BEFORE_TTS_MS = 3000; 
 
       // ตั้งค่าเสียงสังเคราะห์

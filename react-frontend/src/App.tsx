@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { WebSocketProvider } from './context/WebSocketContext';
 import Sidebar from './components/Sidebar/Sidebar';
 import Topbar from './components/Topbar/Topbar';
+import { GlobalAudioListener } from './components/GlobalAudioListener/GlobalAudioListener';
 
 import LoginPage from './pages/Login/LoginPage';
 import UnauthorizedPage from './pages/Unauthorized/UnauthorizedPage';
@@ -255,6 +256,7 @@ function App() {
   return (
     <AuthProvider>
       <WebSocketProvider>
+        <GlobalAudioListener />
         <MainApp />
       </WebSocketProvider>
     </AuthProvider>
