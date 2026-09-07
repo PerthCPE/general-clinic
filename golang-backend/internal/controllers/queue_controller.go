@@ -218,6 +218,21 @@ func CreateQueue(c *gin.Context) {
 	nowBkk := time.Now().In(services.BangkokLocation())
 	serviceDate := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
 
+	// ตรวจสอบคิว Active เดิมในวันเดียวกัน (BUG-C1-03 / งาน D1)
+	var existingActiveQueue models.Queue
+	errActive := config.DB.Where("patient_id = ? AND service_date = ? AND status NOT IN (?, ?, ?)",
+		req.PatientID, serviceDate, "เสร็จสิ้น", "ยกเลิกคิว", "ยกเลิก",
+	).Order("id DESC").First(&existingActiveQueue).Error
+
+	if errActive == nil && existingActiveQueue.ID > 0 {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":          fmt.Sprintf("คนไข้รายนี้มีคิว %s สถานะ %s อยู่แล้ว", existingActiveQueue.QueueNumber, existingActiveQueue.Status),
+			"code":           "DUPLICATE_ACTIVE_QUEUE",
+			"existing_queue": existingActiveQueue,
+		})
+		return
+	}
+
 	var createdQueue models.Queue
 	maxRetries := 5
 	var lastErr error
@@ -296,6 +311,46 @@ func UpdateQueueStatus(c *gin.Context) {
 	if err := config.DB.First(&queue, queueID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบคิวที่ระบุ"})
 		return
+	}
+
+	// State Machine Transition Guard (BUG-C1-04 / งาน C)
+	validTransitions := map[string][]string{
+		"รอคัดกรอง":    {"รอพบแพทย์", "กำลังตรวจ", "ยกเลิกคิว", "ยกเลิก"},
+		"รอพบแพทย์":    {"กำลังตรวจ", "ยกเลิกคิว", "ยกเลิก"},
+		"กำลังตรวจ":    {"รอทำหัตถการ", "รอชำระเงิน", "รอรับยา", "เสร็จสิ้น", "ยกเลิกคิว", "ยกเลิก"},
+		"รอทำหัตถการ":  {"รอชำระเงิน", "รอรับยา", "กำลังตรวจ", "เสร็จสิ้น", "ยกเลิกคิว", "ยกเลิก"},
+		"รอชำระเงิน":   {"รอรับยา", "เสร็จสิ้น", "ยกเลิกคิว", "ยกเลิก"},
+		"รอรับยา":      {"เสร็จสิ้น", "ยกเลิกคิว", "ยกเลิก"},
+		"เสร็จสิ้น":    {}, // Terminal
+		"ยกเลิกคิว":    {}, // Terminal
+		"ยกเลิก":        {}, // Terminal
+	}
+
+	curStatus := strings.TrimSpace(queue.Status)
+	if curStatus == "" {
+		curStatus = "รอคัดกรอง"
+	}
+	newStatus := strings.TrimSpace(req.Status)
+
+	if curStatus != newStatus {
+		allowedNext, exists := validTransitions[curStatus]
+		isAllowed := false
+		if exists {
+			for _, allowed := range allowedNext {
+				if allowed == newStatus {
+					isAllowed = true
+					break
+				}
+			}
+		}
+
+		if !isAllowed {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": fmt.Sprintf("ไม่สามารถเปลี่ยนสถานะจาก \"%s\" เป็น \"%s\" ได้", curStatus, newStatus),
+				"code":  "INVALID_STATE_TRANSITION",
+			})
+			return
+		}
 	}
 
 	queue.Status = req.Status

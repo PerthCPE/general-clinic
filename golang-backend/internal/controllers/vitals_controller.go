@@ -121,7 +121,24 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		return
 	}
 
-	// 1. ตรวจสอบและแปลงระดับ Triage เป็น Canonical Integer (1..4)
+	// 1. ตรวจสอบความถูกต้องของสัญญาณชีพทางการแพทย์ (Clinical Bounds Validation)
+	if err := services.ValidateClinicalVitals(
+		req.Weight,
+		req.Height,
+		req.Temperature,
+		req.SystolicBP,
+		req.DiastolicBP,
+		req.HeartRate,
+		req.SpO2,
+		req.RespiratoryRate,
+		req.PainScore,
+		req.BloodSugar,
+	); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 2. ตรวจสอบและแปลงระดับ Triage เป็น Canonical Integer (1..4)
 	triageInt, err := parseTriageLevel(req.TriageLevel, req.SystolicBP, req.DiastolicBP, req.HeartRate, req.SpO2, req.Temperature)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -138,7 +155,7 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		}
 	}
 
-	// 2. เริ่ม Transaction พร้อม Row-Locking เพื่อป้องกัน Race Condition & Duplicate Visit
+	// 3. เริ่ม Transaction พร้อม Row-Locking เพื่อป้องกัน Race Condition & Duplicate Visit
 	tx := config.DB.Begin()
 	if tx.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถเริ่ม Transaction ได้"})
@@ -174,8 +191,18 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		tx.Clauses(clause.Locking{Strength: "UPDATE"}).Preload("Patient").Where("queue_number IN ?", candidateQueueNumbers).Order("id asc").First(&targetQueue)
 	}
 
-	// Idempotency Check: ตรวจสอบกรณีเคยบันทึกคัดกรองแล้ว
+	// ตรวจสอบสถานะคิว (BUG-C1-01 / งาน F)
 	if targetQueue.ID > 0 {
+		if targetQueue.Status == "ยกเลิก" || targetQueue.Status == "ยกเลิกคิว" || strings.EqualFold(targetQueue.Status, "cancelled") {
+			tx.Rollback()
+			c.JSON(http.StatusConflict, gin.H{
+				"error":        "คิวนี้ถูกยกเลิกแล้ว ไม่สามารถบันทึกสัญญาณชีพได้",
+				"code":         "QUEUE_CANCELLED",
+				"queue_number": targetQueue.QueueNumber,
+			})
+			return
+		}
+
 		var existingVisit models.VisitRecord
 		hasExistingVisit := false
 		if targetQueue.VisitID != nil && *targetQueue.VisitID > 0 {
@@ -189,7 +216,7 @@ func RecordVitalsAndTriage(c *gin.Context) {
 			}
 		}
 
-		isPreScreeningStatus := targetQueue.Status == "" || targetQueue.Status == "รอคัดกรอง" || targetQueue.Status == "รอซักประวัติ" || targetQueue.Status == "รอเรียก" || targetQueue.Status == "Waiting"
+		isPreScreeningStatus := targetQueue.Status == "" || targetQueue.Status == "รอคัดกรอง" || targetQueue.Status == "รอซักประวัติ" || targetQueue.Status == "รอเรียก" || strings.EqualFold(targetQueue.Status, "waiting")
 		if hasExistingVisit || !isPreScreeningStatus {
 			var existingScreening models.Screening
 			if existingVisit.ID > 0 {

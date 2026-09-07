@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useWebSocket } from '../../context/WebSocketContext';
 import type {
   QueuePatientItem,
   TriageLevelNum,
@@ -13,9 +14,9 @@ import { BMIWidget } from './components/BMIWidget';
 import { TriageWidget } from './components/TriageWidget';
 import { VitalsFormCard } from './components/VitalsFormCard';
 import { queueApi, vitalsApi, type BackendQueue } from '../../services/api';
-import { useWebSocket } from '../../context/WebSocketContext';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
 import { clinicMockStore, type MockQueue } from '../../mocks/clinicMockStore';
+import { validateVitalsInput } from '../../utils/clinicalValidation';
 import './VitalsPage.css';
 
 export { formatHN, formatQueueNo };
@@ -250,9 +251,24 @@ export const VitalsPage: React.FC = () => {
   const [assignedDoctorId, setAssignedDoctorId] = useState<number>(() => initialDraft?.assignedDoctorId || 4);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(() => initialDraft?.savedAt || null);
 
-  // Accordion and UI States
+  // Accordion, Error and UI States
   const [isFormOpen, setIsFormOpen] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [errorToast, setErrorToast] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [pendingWarnings, setPendingWarnings] = useState<Array<{ field: string; message: string }> | null>(null);
+
+  // Clear form errors when input values change
+  const clearFieldError = (field: string) => {
+    if (formErrors[field]) {
+      setFormErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
 
   // Searchable Queue Dropdown State
   const [searchQuery, setSearchQuery] = useState<string>(() => initialDraft?.searchQuery || '');
@@ -523,6 +539,10 @@ export const VitalsPage: React.FC = () => {
 
   // Handle Form Change
   const handleChangeField = (field: string, val: string | number) => {
+    clearFieldError(field);
+    if (errorToast) {
+      setErrorToast(null);
+    }
     switch (field) {
       case 'weight':
         setWeight(String(val));
@@ -617,6 +637,8 @@ export const VitalsPage: React.FC = () => {
     setSpo2(randSpo2);
     setPainScore(randPain);
     setBloodSugar(randDTX);
+    setFormErrors({});
+    setErrorToast(null);
     if (!chiefComplaint || chiefComplaint.trim() === '') {
       setChiefComplaint(randComplaint);
     }
@@ -633,6 +655,9 @@ export const VitalsPage: React.FC = () => {
     } catch {
       // ignore
     }
+    setFormErrors({});
+    setErrorToast(null);
+    setPendingWarnings(null);
     setSelectedPatientId('');
     setSearchQuery('');
     setWeight('');
@@ -656,34 +681,34 @@ export const VitalsPage: React.FC = () => {
     setDraftSavedAt(null);
   };
 
-  // Submit Handler
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Submit Logic Execution
+  const executeSubmit = async () => {
     if (!selectedPatient) {
-      alert('กรุณาเลือกคิวคนไข้ก่อนบันทึก');
+      setErrorToast('กรุณาเลือกคิวคนไข้ก่อนบันทึก');
       return;
     }
 
     setIsSaving(true);
+    setErrorToast(null);
 
     const docObj = doctorList.find((d) => d.doctorId === assignedDoctorId) || doctorList[0] || DEFAULT_DOCTORS[0];
 
-    const numWeight = parseFloat(weight) || 0;
-    const numHeight = parseFloat(height) || 0;
-    const numTemp = parseFloat(temperature) || 36.5;
-    const numSys = parseInt(systolicBP, 10) || 120;
-    const numDia = parseInt(diastolicBP, 10) || 80;
-    const numHR = parseInt(heartRate, 10) || 75;
-    const numRR = parseInt(respiratoryRate, 10) || 18;
-    const numSpO2 = parseInt(spo2, 10) || 98;
-    const numPain = parseInt(painScore, 10) || 0;
-    const numBS = parseInt(bloodSugar, 10) || 0;
+    const numWeight = parseFloat(weight);
+    const numHeight = parseFloat(height);
+    const numTemp = parseFloat(temperature);
+    const numSys = parseInt(systolicBP, 10);
+    const numDia = parseInt(diastolicBP, 10);
+    const numHR = parseInt(heartRate, 10);
+    const numRR = respiratoryRate ? parseInt(respiratoryRate, 10) : 0;
+    const numSpO2 = parseInt(spo2, 10);
+    const numPain = painScore ? parseInt(painScore, 10) : 0;
+    const numBS = bloodSugar ? parseInt(bloodSugar, 10) : 0;
 
     const targetPatientId = selectedPatient.patientId || parseInt(selectedPatient.id, 10) || 1;
     const targetQueueId = selectedPatient.queueId || (typeof selectedPatient.id === 'number' ? selectedPatient.id : parseInt(selectedPatient.id, 10));
 
     try {
-      const res = await vitalsApi.record({
+      await vitalsApi.record({
         queue_id: targetQueueId,
         patient_id: targetPatientId,
         queue_number: selectedPatient.queueNo,
@@ -729,26 +754,50 @@ export const VitalsPage: React.FC = () => {
       }
     } catch (err: any) {
       console.warn('Record vitals API error:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูลสัญญาณชีพ';
+      setErrorToast(errMsg);
+      // DO NOT reset form, DO NOT fake-update queue status!
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-      // Local fallback กรณีเครือข่ายมีปัญหา (อัปเดตเฉพาะคิวที่เลือกเท่านั้น ไม่อ้างอิงตาม patientId)
-      const updatedQueueList = queueList.map((q) =>
-        q.id === selectedPatient.id || (selectedPatient.queueId && q.queueId === selectedPatient.queueId) || q.queueNo === selectedPatient.queueNo
-          ? { ...q, queueStatus: 'รอพบแพทย์' as const }
-          : q
-      );
-      setQueueList(updatedQueueList);
-      handleResetForm();
-
-      const remainingQueues = updatedQueueList.filter((q) => q.queueStatus === 'รอคัดกรอง');
-      if (remainingQueues.length > 0) {
-        handleSelectPatient(remainingQueues[0]);
-      } else {
-        setSelectedPatientId('');
-        setSearchQuery('');
-      }
+  // Submit Handler
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPatient) {
+      setErrorToast('กรุณาเลือกคิวคนไข้ก่อนบันทึก');
+      return;
     }
 
-    setIsSaving(false);
+    const validation = validateVitalsInput({
+      weight,
+      height,
+      temperature,
+      systolicBP,
+      diastolicBP,
+      heartRate,
+      spo2,
+      respiratoryRate,
+      painScore,
+      bloodSugar,
+    });
+
+    if (!validation.isValid) {
+      setFormErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      setErrorToast(firstError || 'กรุณาตรวจสอบข้อมูลสัญญาณชีพให้ถูกต้อง');
+      return;
+    }
+
+    setFormErrors({});
+
+    if (validation.warnings.length > 0) {
+      setPendingWarnings(validation.warnings);
+      return;
+    }
+
+    executeSubmit();
   };
 
   return (
@@ -799,6 +848,84 @@ export const VitalsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Error Toast Banner */}
+      {errorToast && (
+        <div className="vitals-error-banner">
+          <div className="vitals-error-banner-content">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>{errorToast}</span>
+          </div>
+          <button
+            type="button"
+            className="vitals-error-banner-close"
+            onClick={() => setErrorToast(null)}
+            aria-label="Close error message"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
+
+      {/* Warning Confirmation Modal */}
+      {pendingWarnings && (
+        <div className="vitals-modal-overlay">
+          <div className="vitals-modal-card">
+            <div className="vitals-modal-header">
+              <div className="vitals-modal-icon-wrap">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <div className="vitals-modal-header-text">
+                <h3 className="vitals-modal-title">
+                  ยืนยันค่าสัญญาณชีพผิดปกติ
+                </h3>
+                <p className="vitals-modal-desc">
+                  พบค่าสัญญาณชีพที่อยู่นอกเกณฑ์ปกติ กรุณาตรวจสอบก่อนบันทึก
+                </p>
+              </div>
+            </div>
+
+            <div className="vitals-modal-list-box">
+              <ul className="vitals-modal-list">
+                {pendingWarnings.map((w, idx) => (
+                  <li key={idx}>{w.message}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="vitals-modal-actions">
+              <button
+                type="button"
+                className="vitals-modal-btn-cancel"
+                onClick={() => setPendingWarnings(null)}
+              >
+                กลับไปแก้ไข
+              </button>
+              <button
+                type="button"
+                className="vitals-modal-btn-confirm"
+                onClick={() => {
+                  setPendingWarnings(null);
+                  executeSubmit();
+                }}
+              >
+                ยืนยันข้อมูลและบันทึก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 2. Main Two-Column Layout (Unified Screening Console) */}
       <div className="vitals-main-grid">
         {/* Left Column: Vital Signs Recording Form with Integrated Queue Selector */}
@@ -841,6 +968,7 @@ export const VitalsPage: React.FC = () => {
             onReset={handleResetForm}
             isSaving={isSaving}
             savedDraftTime={draftSavedAt}
+            formErrors={formErrors}
           />
         </div>
 

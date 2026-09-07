@@ -41,6 +41,7 @@ interface VitalsFormCardProps {
   onReset: () => void;
   isSaving: boolean;
   savedDraftTime?: string | null;
+  formErrors?: Record<string, string>;
 }
 
 export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
@@ -81,6 +82,7 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
   onReset,
   isSaving,
   savedDraftTime,
+  formErrors = {},
 }) => {
   // Clinical flags
   const tempNum = parseFloat(temperature);
@@ -345,7 +347,15 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                   }}
                   title="สุ่มกรอกข้อมูลสัญญาณชีพและอาการสำคัญสำหรับการทดสอบ"
                 >
-                  🎲 สุ่มข้อมูลสัญญาณชีพ
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"></circle>
+                    <circle cx="15.5" cy="8.5" r="1.5" fill="currentColor"></circle>
+                    <circle cx="15.5" cy="15.5" r="1.5" fill="currentColor"></circle>
+                    <circle cx="8.5" cy="15.5" r="1.5" fill="currentColor"></circle>
+                    <circle cx="12" cy="12" r="1.5" fill="currentColor"></circle>
+                  </svg>
+                  <span>สุ่มข้อมูลสัญญาณชีพ</span>
                 </button>
               )}
             </div>
@@ -358,18 +368,20 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
-                    type="number"
-                    step="0.1"
-                    min="1"
-                    max="300"
-                    className="vitals-input"
+                    type="text"
+                    inputMode="decimal"
+                    className={`vitals-input ${formErrors.weight ? 'input-danger' : ''}`}
                     placeholder="เช่น 65.5"
                     value={weight}
                     onChange={(e) => onChangeField('weight', e.target.value)}
-                    required
                   />
                   <span className="vitals-input-suffix">kg</span>
                 </div>
+                {formErrors.weight && (
+                  <span className="input-error-hint" style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {formErrors.weight}
+                  </span>
+                )}
               </div>
 
               {/* Height */}
@@ -381,14 +393,18 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                   <input
                     type="text"
                     inputMode="decimal"
-                    className="vitals-input"
+                    className={`vitals-input ${formErrors.height ? 'input-danger' : ''}`}
                     placeholder="เช่น 170"
                     value={height}
                     onChange={(e) => onChangeField('height', e.target.value)}
-                    required
                   />
                   <span className="vitals-input-suffix">cm</span>
                 </div>
+                {formErrors.height && (
+                  <span className="input-error-hint" style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {formErrors.height}
+                  </span>
+                )}
               </div>
 
               {/* Body Temperature */}
@@ -400,18 +416,20 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
-                    type="number"
-                    step="0.1"
-                    min="30"
-                    max="45"
-                    className={`vitals-input ${isHighFever ? 'input-danger' : isFever ? 'input-warning' : ''}`}
+                    type="text"
+                    inputMode="decimal"
+                    className={`vitals-input ${formErrors.temperature ? 'input-danger' : isHighFever ? 'input-danger' : isFever ? 'input-warning' : ''}`}
                     placeholder="เช่น 36.8"
                     value={temperature}
                     onChange={(e) => onChangeField('temperature', e.target.value)}
-                    required
                   />
                   <span className="vitals-input-suffix">°C</span>
                 </div>
+                {formErrors.temperature && (
+                  <span className="input-error-hint" style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {formErrors.temperature}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -429,17 +447,20 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
-                    type="number"
-                    min="50"
-                    max="300"
-                    className={`vitals-input ${isCrisisBP ? 'input-danger' : isHighBP ? 'input-warning' : ''}`}
+                    type="text"
+                    inputMode="numeric"
+                    className={`vitals-input ${formErrors.systolicBP ? 'input-danger' : isCrisisBP ? 'input-danger' : isHighBP ? 'input-warning' : ''}`}
                     placeholder="เช่น 120"
                     value={systolicBP}
                     onChange={(e) => onChangeField('systolicBP', e.target.value)}
-                    required
                   />
                   <span className="vitals-input-suffix">mmHg</span>
                 </div>
+                {formErrors.systolicBP && (
+                  <span className="input-error-hint" style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {formErrors.systolicBP}
+                  </span>
+                )}
               </div>
 
               {/* Diastolic BP */}
@@ -449,17 +470,20 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
-                    type="number"
-                    min="30"
-                    max="200"
-                    className={`vitals-input ${isCrisisBP ? 'input-danger' : isHighBP ? 'input-warning' : ''}`}
+                    type="text"
+                    inputMode="numeric"
+                    className={`vitals-input ${formErrors.diastolicBP ? 'input-danger' : isCrisisBP ? 'input-danger' : isHighBP ? 'input-warning' : ''}`}
                     placeholder="เช่น 80"
                     value={diastolicBP}
                     onChange={(e) => onChangeField('diastolicBP', e.target.value)}
-                    required
                   />
                   <span className="vitals-input-suffix">mmHg</span>
                 </div>
+                {formErrors.diastolicBP && (
+                  <span className="input-error-hint" style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {formErrors.diastolicBP}
+                  </span>
+                )}
               </div>
 
               {/* Heart Rate / Pulse */}
@@ -471,38 +495,45 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
-                    type="number"
-                    min="30"
-                    max="220"
-                    className={`vitals-input ${isTachycardia ? 'input-warning' : ''}`}
+                    type="text"
+                    inputMode="numeric"
+                    className={`vitals-input ${formErrors.heartRate ? 'input-danger' : isTachycardia ? 'input-warning' : ''}`}
                     placeholder="เช่น 75"
                     value={heartRate}
                     onChange={(e) => onChangeField('heartRate', e.target.value)}
-                    required
                   />
                   <span className="vitals-input-suffix">bpm</span>
                 </div>
+                {formErrors.heartRate && (
+                  <span className="input-error-hint" style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {formErrors.heartRate}
+                  </span>
+                )}
               </div>
             </div>
 
-            {/* Row 3: Optional Clinical Metrics (SpO2, Respiratory Rate) */}
+            {/* Row 3: Required SpO2 & Optional Respiratory Rate */}
             <div className="vitals-grid-2">
               <div className="vitals-form-group">
                 <label className="vitals-form-label">
-                  <span className="vitals-label-title">ออกซิเจนในเลือด (SpO2)</span>
+                  <span className="vitals-label-title">ออกซิเจนในเลือด (SpO2) <span className="text-required">*</span></span>
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
-                    type="number"
-                    min="50"
-                    max="100"
-                    className="vitals-input"
+                    type="text"
+                    inputMode="numeric"
+                    className={`vitals-input ${formErrors.spo2 ? 'input-danger' : ''}`}
                     placeholder="เช่น 98"
                     value={spo2}
                     onChange={(e) => onChangeField('spo2', e.target.value)}
                   />
                   <span className="vitals-input-suffix">%</span>
                 </div>
+                {formErrors.spo2 && (
+                  <span className="input-error-hint" style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {formErrors.spo2}
+                  </span>
+                )}
               </div>
 
               <div className="vitals-form-group">
@@ -511,16 +542,20 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
-                    type="number"
-                    min="8"
-                    max="60"
-                    className="vitals-input"
+                    type="text"
+                    inputMode="numeric"
+                    className={`vitals-input ${formErrors.respiratoryRate ? 'input-danger' : ''}`}
                     placeholder="เช่น 18"
                     value={respiratoryRate}
                     onChange={(e) => onChangeField('respiratoryRate', e.target.value)}
                   />
                   <span className="vitals-input-suffix">ครั้ง/นาที</span>
                 </div>
+                {formErrors.respiratoryRate && (
+                  <span className="input-error-hint" style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {formErrors.respiratoryRate}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -532,16 +567,20 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
-                    type="number"
-                    min="0"
-                    max="10"
-                    className="vitals-input"
+                    type="text"
+                    inputMode="numeric"
+                    className={`vitals-input ${formErrors.painScore ? 'input-danger' : ''}`}
                     placeholder="เช่น 0 - 10"
                     value={painScore}
                     onChange={(e) => onChangeField('painScore', e.target.value)}
                   />
                   <span className="vitals-input-suffix">/10</span>
                 </div>
+                {formErrors.painScore && (
+                  <span className="input-error-hint" style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {formErrors.painScore}
+                  </span>
+                )}
               </div>
 
               <div className="vitals-form-group">
@@ -550,16 +589,20 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 </label>
                 <div className="vitals-input-suffix-wrap">
                   <input
-                    type="number"
-                    min="20"
-                    max="600"
-                    className="vitals-input"
-                    placeholder="เช่น 105"
+                    type="text"
+                    inputMode="numeric"
+                    className={`vitals-input ${formErrors.bloodSugar ? 'input-danger' : ''}`}
+                    placeholder="เช่น 100"
                     value={bloodSugar}
                     onChange={(e) => onChangeField('bloodSugar', e.target.value)}
                   />
                   <span className="vitals-input-suffix">mg/dL</span>
                 </div>
+                {formErrors.bloodSugar && (
+                  <span className="input-error-hint" style={{ color: '#DC2626', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    {formErrors.bloodSugar}
+                  </span>
+                )}
               </div>
             </div>
           </div>
