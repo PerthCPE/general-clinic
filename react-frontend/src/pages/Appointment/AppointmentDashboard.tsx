@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Stethoscope, Activity, FileText, UserPlus, BarChart2, CheckCircle2, ChevronRight, Pin } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { appointmentApi, type BackendAppointment } from '../../services/api';
 import './AppointmentDashboard.css';
 
 const timeSlots = [
@@ -16,17 +18,76 @@ const getTodayDateString = () => {
 };
 
 export default function AppointmentDashboard() {
-  const { currentUser, patientQueue, updateAppointment } = useAuth();
+  const { currentUser } = useAuth();
   
+  const [appointments, setAppointments] = useState<BackendAppointment[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
   
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 8; // เพิ่มจำนวนการแสดงผลต่อหน้าจาก 4 เป็น 8 รายการ
+  const itemsPerPage = 8; 
 
   const isDoctor = currentUser?.role === 'doctor';
-  const isRegistrar = currentUser?.role === 'registrar';
+  const isRegistrar = currentUser?.role === 'registrar' || currentUser?.role === 'admin';
 
-  // กรองข้อมูลเฉพาะวันที่เลือก และทำการ "เรียงลำดับตามเวลา (time)" จากเช้าไปเย็น
+  const fetchAppointments = async () => {
+    try {
+      const data = await appointmentApi.getList();
+      if (data) {
+        setAppointments(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch appointments", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchAppointments();
+
+    const wsUrl = `ws://localhost:8080/ws`;
+    const ws = new WebSocket(wsUrl);
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'APPOINTMENT_CREATED' || payload.type === 'APPOINTMENT_UPDATED') {
+          fetchAppointments();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    return () => { ws.close(); };
+  }, []);
+
+  const mapBackendToRow = (a: BackendAppointment) => {
+    const pName = a.patient?.fullname || 'Unknown';
+    const initialText = pName.length >= 2 ? pName.substring(0, 2) : 'คน';
+    const timeStr = a.appointment_time ? a.appointment_time.substring(0, 5) : '-'; 
+    let deptName = a.clinical_note || 'โรคทั่วไป';
+    let deptColor = 'primary';
+    
+    let statusColor = 'default';
+    if (a.status === 'เข้ารับการรักษาแล้ว') statusColor = 'success';
+    else if (a.status === 'ยืนยันที่จะมาวันนี้') statusColor = 'info';
+    else if (a.status === 'ยกเลิกนัด') statusColor = 'error';
+    else if (a.status === 'ติดต่อไม่ได้') statusColor = 'warning';
+    else if (a.status === 'รอยืนยัน') statusColor = 'info';
+
+    return {
+      id: a.id,
+      name: pName,
+      initial: initialText,
+      dept: deptName,
+      date: a.appointment_date ? a.appointment_date.substring(0, 10) : '-',
+      time: timeStr,
+      phone: a.patient?.phone_number || '-',
+      status: a.status || '-',
+      statusColor,
+      deptColor
+    };
+  };
+
+  const patientQueue = appointments.map(mapBackendToRow);
+
   const filteredQueue = patientQueue
     .filter(p => p.date === selectedDate)
     .sort((a, b) => a.time.localeCompare(b.time));
@@ -39,11 +100,10 @@ export default function AppointmentDashboard() {
   const confirmedCount = filteredQueue.filter(p => p.status === 'ยืนยันที่จะมาวันนี้').length;
   const unreachableCount = filteredQueue.filter(p => p.status === 'ติดต่อไม่ได้').length;
 
-  // จำนวนผู้ป่วยแยกตามแผนก
   const generalCount = filteredQueue.filter(p => p.dept === 'โรคทั่วไป').length;
-  const medicineCount = filteredQueue.filter(p => p.dept === 'อายุรกรรม').length;
-  const psychCount = filteredQueue.filter(p => p.dept === 'จิตวิทยา').length;
-  const physicalCount = filteredQueue.filter(p => p.dept === 'กายภาพบำบัด').length;
+  const erCount = filteredQueue.filter(p => p.dept === 'ฉุกเฉิน (ER)').length;
+  const surgeryCount = filteredQueue.filter(p => p.dept === 'ศัลยกรรม').length;
+  const childCount = filteredQueue.filter(p => p.dept === 'กุมารเวช').length;
 
   const progressPercent = netActiveAppointments > 0 ? ((arrivedCount / netActiveAppointments) * 100).toFixed(1) : '0';
 
@@ -51,24 +111,32 @@ export default function AppointmentDashboard() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentTableData = filteredQueue.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleStatusChange = (id: number, newStatus: string) => {
-    let newColor = 'default';
-    if (newStatus === 'เข้ารับการรักษาแล้ว') newColor = 'success';
-    else if (newStatus === 'ยืนยันที่จะมาวันนี้') newColor = 'info';
-    else if (newStatus === 'ยกเลิกนัด') newColor = 'error';
-    else if (newStatus === 'ติดต่อไม่ได้') newColor = 'warning';
-    else if (newStatus === 'รอยืนยัน') newColor = 'info';
-
-    updateAppointment(id, { status: newStatus, statusColor: newColor });
+  const handleStatusChange = async (id: number, newStatus: string) => {
+    try {
+      await appointmentApi.updateStatus(id, { status: newStatus });
+      fetchAppointments();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleTimeChange = (id: number, newTime: string) => {
-    updateAppointment(id, { time: newTime });
+  const handleTimeChange = async (id: number, newTime: string) => {
+    try {
+      await appointmentApi.updateSchedule(id, { appointment_time: newTime });
+      fetchAppointments();
+    } catch (err) {
+      console.error(err);
+      alert('ไม่สามารถอัปเดตเวลาได้');
+    }
   };
 
-  const handleDateSelected = (id: number, newDate: string) => {
-    if (newDate) {
-      updateAppointment(id, { date: newDate });
+  const handleDateSelected = async (id: number, newDate: string) => {
+    try {
+      await appointmentApi.updateSchedule(id, { appointment_date: newDate });
+      fetchAppointments();
+    } catch (err) {
+      console.error(err);
+      alert('ไม่สามารถอัปเดตวันที่ได้');
     }
   };
 
@@ -108,34 +176,42 @@ export default function AppointmentDashboard() {
       </div>
 
       {/* 2. สถิติจำนวนผู้ป่วยแยกตามแผนก */}
-      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary, #94A3B8)', marginBottom: '8px', paddingLeft: '4px' }}>
-        📊 สถิติผู้ป่วยแยกตามแผนกการรักษา
+      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary, #94A3B8)', marginBottom: '8px', paddingLeft: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <BarChart2 size={18} strokeWidth={2.5} /> สถิติผู้ป่วยแยกตามแผนกการรักษา
       </div>
       <div className="appt-metrics-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '16px' }}>
         <div className="appt-card metric-card" style={{ padding: '16px', borderLeft: '4px solid #2563EB' }}>
-          <span className="metric-label" style={{ fontSize: '0.85rem' }}>🏥 โรคทั่วไป</span>
+          <span className="metric-label" style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Stethoscope size={16} strokeWidth={2.5} /> โรคทั่วไป
+          </span>
           <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#2563EB', marginTop: '4px' }}>{generalCount} คน</div>
         </div>
 
-        <div className="appt-card metric-card" style={{ padding: '16px', borderLeft: '4px solid #D97706' }}>
-          <span className="metric-label" style={{ fontSize: '0.85rem' }}>🩺 อายุรกรรม</span>
-          <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#D97706', marginTop: '4px' }}>{medicineCount} คน</div>
+        <div className="appt-card metric-card" style={{ padding: '16px', borderLeft: '4px solid #F59E0B' }}>
+          <span className="metric-label" style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Activity size={16} strokeWidth={2.5} /> ฉุกเฉิน (ER)
+          </span>
+          <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#D97706', marginTop: '4px' }}>{erCount} คน</div>
         </div>
 
         <div className="appt-card metric-card" style={{ padding: '16px', borderLeft: '4px solid #9333EA' }}>
-          <span className="metric-label" style={{ fontSize: '0.85rem' }}>🧠 จิตวิทยา</span>
-          <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#9333EA', marginTop: '4px' }}>{psychCount} คน</div>
+          <span className="metric-label" style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <FileText size={16} strokeWidth={2.5} /> ศัลยกรรม
+          </span>
+          <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#9333EA', marginTop: '4px' }}>{surgeryCount} คน</div>
         </div>
 
         <div className="appt-card metric-card" style={{ padding: '16px', borderLeft: '4px solid #16A34A' }}>
-          <span className="metric-label" style={{ fontSize: '0.85rem' }}>🌿 กายภาพบำบัด</span>
-          <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#16A34A', marginTop: '4px' }}>{physicalCount} คน</div>
+          <span className="metric-label" style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <UserPlus size={16} strokeWidth={2.5} /> กุมารเวช
+          </span>
+          <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#16A34A', marginTop: '4px' }}>{childCount} คน</div>
         </div>
       </div>
 
       {/* 3. สถิติตามสถานะการนัดหมาย */}
-      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary, #94A3B8)', marginBottom: '8px', paddingLeft: '4px' }}>
-        📌 สถานะการมาใช้บริการ
+      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary, #94A3B8)', marginBottom: '8px', paddingLeft: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Pin size={18} strokeWidth={2.5} /> สถานะการมาใช้บริการ
       </div>
       <div className="appt-metrics-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '28px' }}>
         <div className="appt-card metric-card" style={{ padding: '14px 18px' }}>

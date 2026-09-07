@@ -23,7 +23,7 @@ export interface PatientQueueItem {
 interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
-  login: (roleOrUsername: string, password?: string) => Promise<boolean>;
+  login: (roleOrUsername: string, password?: string) => Promise<{ success: boolean; requiresPasswordChange?: boolean }>;
   switchRole: (role: UserRole) => Promise<void>;
   logout: () => void;
   hasAccess: (pageId: string) => boolean;
@@ -101,8 +101,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPatientQueue(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
   };
 
+  // ของใหม่: ระบบข้อมูลแบบ Real-time (WebSocket)
+  useEffect(() => {
+    if (!currentUser) return; // เฉพาะตอนล็อกอินถึงจะเชื่อมต่อ WS
+
+    // เชื่อมต่อไปยัง Go Backend WebSocket
+    const wsUrl = `ws://localhost:8080/ws`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('✅ WebSocket Connected (Real-time Sync Active)');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        console.log('📩 รับข้อมูลแบบ Real-time ผ่าน WebSocket:', payload);
+
+        // คุณสามารถนำข้อมูลนี้ไปอัปเดต State หรือโชว์ Notification ได้ที่นี่
+        if (payload.type === 'QUEUE_CREATED') {
+          // ตัวอย่าง: ถ้าเป็นข้อมูลคิวที่เพิ่มเข้ามาใหม่ สามารถเรียก addAppointment ได้
+          // addAppointment({...});
+        }
+      } catch (err) {
+        console.error('WebSocket message parse error', err);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('❌ WebSocket Disconnected');
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [currentUser]);
+
   // ของเพื่อน: ระบบล็อกอิน
-  const login = async (roleOrUsername: string, password?: string): Promise<boolean> => {
+  const login = async (roleOrUsername: string, password?: string): Promise<{ success: boolean; requiresPasswordChange?: boolean }> => {
     try {
       let usernameToSend = roleOrUsername;
       if (roleOrUsername === 'registrar') usernameToSend = 'registrar1';
@@ -126,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           avatarColor: fallback.avatarColor,
         };
         setCurrentUser(loggedInUser);
-        return true;
+        return { success: true, requiresPasswordChange: res.requires_password_change };
       }
     } catch (err) {
       console.warn('Backend login error, checking fallback:', err);
@@ -141,9 +177,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (matchedUser) {
       setCurrentUser(matchedUser);
-      return true;
+      return { success: true, requiresPasswordChange: false };
     }
-    return false;
+    return { success: false };
   };
 
   const switchRole = async (role: UserRole) => {

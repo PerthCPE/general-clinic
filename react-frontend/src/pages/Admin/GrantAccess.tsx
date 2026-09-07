@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { adminApi, type BackendUser } from '../../services/api';
 import './GrantAccess.css';
 
 interface SystemUser {
+  internalId: number;
   id: string;
   name: string;
   role: string;
@@ -20,15 +22,58 @@ interface UserPermissions {
   };
 }
 
-const GrantAccess: React.FC = () => {
-  const [personnel, setPersonnel] = useState<SystemUser[]>([
-    { id: 'DOC-2026-001', name: 'นพ. วีรยุทธ อารีใจ', role: 'แพทย์', avatar: '#4F46E5', status: 'กำลังใช้งาน', currentLevel: 4 }, 
-    { id: 'REG-2026-001', name: 'คุณ กรุณา ดีดี', role: 'เจ้าหน้าที่เวชระเบียน', avatar: '#10B981', status: 'รอการยืนยัน', currentLevel: 1 }, // 🟡 ยังไม่ให้สิทธิ์
-    { id: 'NUR-2026-001', name: 'พว. รังสิมา สุขใจ', role: 'พยาบาลวิชาชีพ', avatar: '#F59E0B', status: 'กำลังใช้งาน', currentLevel: 5 }, // 🚨 สูงไป
-    { id: 'TEC-2026-001', name: 'คุณ สมชาย มั่นคง', role: 'ช่างเทคนิคการแพทย์', avatar: '#6B7280', status: 'กำลังใช้งาน', currentLevel: 1 } // ⚠️ ต่ำไป (เทคนิคควรได้ Lv2)
-  ]);
+const englishToRole: Record<string, string> = {
+  'doctor': 'แพทย์', 'nurse': 'พยาบาลและผู้ช่วยพยาบาล', 'nurse_assistant': 'พยาบาลและผู้ช่วยพยาบาล',
+  'pharmacist': 'เภสัชกร', 'registrar': 'พนักงานเวชระเบียน', 'cashier': 'พนักงานธุรการการเงิน',
+  'lab_technician': 'นักเทคนิคการแพทย์', 'admin': 'ผู้ดูแลระบบ', 'officer': 'พนักงานเวชระเบียน'
+};
 
-  const [activeUserId, setActiveUserId] = useState<string>(personnel[1].id); 
+const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
+  const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'];
+  const randomColor = colors[u.id % colors.length];
+  
+  let level = 1;
+  // SAFE CHECK HERE
+  if (u.system_accesses && u.system_accesses.length > 0 && u.system_accesses[0]) {
+    level = Number(u.system_accesses[0].access_level) || 1;
+  }
+  
+  const thaiRole = englishToRole[u.role] || u.role;
+
+  return {
+    internalId: u.id,
+    id: u.employee_id || `EMP-${u.id}`,
+    name: u.fullname,
+    role: thaiRole,
+    avatar: randomColor,
+    status: (u.status === 'active' || u.status === 'suspended') ? 'กำลังใช้งาน' : 'รอการยืนยัน',
+    currentLevel: level
+  };
+};
+
+const GrantAccess: React.FC = () => {
+  const [personnel, setPersonnel] = useState<SystemUser[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await adminApi.getAccounts();
+      if (data) {
+        setPersonnel(data.map(mapBackendToSystemUser));
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const [activeUserId, setActiveUserId] = useState<string>(''); 
   const [searchTerm, setSearchTerm] = useState('');
   
   // === ปรับปรุง State ตัวกรองให้มี 'pending' (รอให้สิทธิ์) แบบแยกชัดเจน ===
@@ -70,8 +115,15 @@ const GrantAccess: React.FC = () => {
     return true; 
   });
 
-  const activeUser = personnel.find(p => p.id === activeUserId) || personnel[0];
-  const recommendedLvl = getRecommendedLevel(activeUser.role);
+  // Set default active user when data loads
+  useEffect(() => {
+    if (personnel.length > 0 && !activeUserId) {
+      setActiveUserId(personnel[0].id);
+    }
+  }, [personnel, activeUserId]);
+
+  const activeUser = personnel.find(p => p.id === activeUserId) || personnel[0] || {} as SystemUser;
+  const recommendedLvl = activeUser.role ? getRecommendedLevel(activeUser.role) : 1;
   
   const isLevelTooLow = perms.level < recommendedLvl;
   const isLevelTooHigh = perms.level > recommendedLvl;
@@ -105,10 +157,12 @@ const GrantAccess: React.FC = () => {
   };
 
   useEffect(() => {
-    if (activeUser.status === 'รอการยืนยัน') {
-      handleLevelChange(1);
-    } else {
-      handleLevelChange(activeUser.currentLevel);
+    if (activeUser && activeUser.status) {
+      if (activeUser.status === 'รอการยืนยัน') {
+        handleLevelChange(1);
+      } else {
+        handleLevelChange(activeUser.currentLevel);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeUserId]);
@@ -120,7 +174,7 @@ const GrantAccess: React.FC = () => {
     setPerms(prev => ({ ...prev, data: { ...prev.data, [category]: { ...prev.data[category], [action]: !prev.data[category][action] } } }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (isLevelTooLow) {
       if (!window.confirm(`⚠️ ระดับสิทธิ์ต่ำกว่ามาตรฐานของ "${activeUser.role}" คุณแน่ใจหรือไม่ว่าต้องการบันทึกสิทธิ์นี้?`)) return;
     }
@@ -128,15 +182,32 @@ const GrantAccess: React.FC = () => {
       if (!window.confirm(`🚨 คำเตือนความปลอดภัย: คุณกำลังมอบสิทธิ์ที่สูงเกินความจำเป็นให้กับตำแหน่ง "${activeUser.role}" ยืนยันการดำเนินการหรือไม่?`)) return;
     }
     
-    setPersonnel(prev => prev.map(p => p.id === activeUser.id ? { ...p, status: 'กำลังใช้งาน', currentLevel: perms.level } : p));
-    alert(`✅ บันทึกสิทธิ์ของ "${activeUser.name}" สำเร็จ! (Level ${perms.level})`);
+    try {
+      await adminApi.createSystemAccess({
+        user_id: activeUser.internalId,
+        access_level: perms.level,
+        module_name: 'All'
+      });
+      if (activeUser.status === 'รอการยืนยัน') {
+        await adminApi.updateAccountStatus(activeUser.internalId, 'active');
+      }
+      alert(`✅ บันทึกสิทธิ์ของ "${activeUser.name}" สำเร็จ! (Level ${perms.level})`);
+      fetchUsers();
+    } catch (err: any) {
+      alert("Error: " + err.message);
+    }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (window.confirm(`⚠️ คุณต้องการเพิกถอนสิทธิ์ของ "${activeUser.name}" และเปลี่ยนสถานะกลับเป็น "รอการยืนยัน" ใช่หรือไม่?`)) {
-      handleLevelChange(1); 
-      setPersonnel(prev => prev.map(p => p.id === activeUser.id ? { ...p, status: 'รอการยืนยัน', currentLevel: 1 } : p));
-      alert(`🔄 เพิกถอนสิทธิ์สำเร็จ สถานะกลับเป็น "รอการยืนยัน"`);
+      try {
+        await adminApi.updateAccountStatus(activeUser.internalId, 'pending');
+        handleLevelChange(1); 
+        alert(`🔄 เพิกถอนสิทธิ์สำเร็จ สถานะกลับเป็น "รอการยืนยัน"`);
+        fetchUsers();
+      } catch (err: any) {
+        alert("Error: " + err.message);
+      }
     }
   };
 
@@ -174,7 +245,7 @@ const GrantAccess: React.FC = () => {
 
           <div className="personnel-list">
             {filteredPersonnel.length === 0 ? (
-              <div style={{textAlign: 'center', padding: '12px', fontSize: '12px', color: '#6b7280'}}>ไม่พบบัญชีที่ตรงกับเงื่อนไข</div>
+              <div style={{textAlign: 'center', padding: '12px', fontSize: '12px', color: '#62748E'}}>ไม่พบบัญชีที่ตรงกับเงื่อนไข</div>
             ) : (
               filteredPersonnel.map(p => (
                 <div key={p.id} onClick={() => setActiveUserId(p.id)} className={`personnel-item ${p.id === activeUserId ? 'active' : ''}`}>
@@ -202,12 +273,12 @@ const GrantAccess: React.FC = () => {
         <div className="access-content">
           <div className="content-header">
             <div className="user-title">
-              <div className="avatar-large" style={{ backgroundColor: activeUser.avatar }}>
-                {activeUser.name.split(' ')[1]?.charAt(0) || activeUser.name.charAt(0)}
+              <div className="avatar-large" style={{ backgroundColor: activeUser.avatar || '#ccc' }}>
+                {activeUser.name ? (activeUser.name.split(' ')[1]?.charAt(0) || activeUser.name.charAt(0)) : '?'}
               </div>
               <div>
                 <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-                  <h2>สิทธิ์การเข้าถึง: {activeUser.name}</h2>
+                  <h2>สิทธิ์เข้าถึงของ: {activeUser.name || 'กำลังโหลด...'}</h2>
                   <span className={`status-badge-lg ${activeUser.status === 'กำลังใช้งาน' ? 'badge-active' : 'badge-pending'}`}>
                     {activeUser.status === 'กำลังใช้งาน' ? '🟢 กำลังใช้งาน' : '🟡 รอการยืนยันสิทธิ์'}
                   </span>
@@ -253,7 +324,7 @@ const GrantAccess: React.FC = () => {
               </div>
               
               {activeUser.status === 'รอการยืนยัน' ? (
-                 <div className="level-warning" style={{backgroundColor: '#eff6ff', borderColor: '#93c5fd', color: '#1d4ed8'}}>
+                 <div className="level-warning" style={{backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', color: '#15803D'}}>
                    <strong>💡 บัญชีใหม่:</strong> กรุณาเลือกระดับ Level ที่เหมาะสม (ระบบแนะนำ Level {recommendedLvl}) แล้วกดบันทึกเพื่อเปิดใช้งาน
                  </div>
               ) : isLevelTooLow ? (

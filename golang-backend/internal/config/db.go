@@ -57,6 +57,8 @@ func ConnectDB() {
 		&models.DoctorSchedule{},
 		&models.LeaveRequest{},
 		&models.ShiftSwapRequest{},
+		&models.Appointment{},
+		&models.SystemAccess{},
 	)
 
 	// if error founded, notice
@@ -76,14 +78,15 @@ func seedDatabase() {
 
 	// 1. Seed Users & Doctors (Always ensure all required roles and doctors exist in DB)
 	users := []models.User{
-		{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
-		{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
-		{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
-		{Username: "pharmacist1", Password: passStr, Role: "pharmacist", FullName: "ภก.บุญชู เภสัชกร", Phone: "081-333-0001"},
-		{Username: "cashier1", Password: passStr, Role: "cashier", FullName: "นส.รวย การเงิน", Phone: "081-444-0001"},
-		{Username: "doctor1", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
-		{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
-		{Username: "doctor3", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
+		{Username: "registrar1", Email: "registrar1@clinic.com", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
+		{Username: "nurse1", Email: "nurse1@clinic.com", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
+		{Username: "assistant1", Email: "assistant1@clinic.com", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
+		{Username: "pharmacist1", Email: "pharmacist1@clinic.com", Password: passStr, Role: "pharmacist", FullName: "ภก.บุญชู เภสัชกร", Phone: "081-333-0001"},
+		{Username: "cashier1", Email: "cashier1@clinic.com", Password: passStr, Role: "cashier", FullName: "นส.รวย การเงิน", Phone: "081-444-0001"},
+		{Username: "doctor1", Email: "doctor1@clinic.com", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
+		{Username: "doctor2", Email: "doctor2@clinic.com", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
+		{Username: "doctor3", Email: "doctor3@clinic.com", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
+		{Username: "admin1", Email: "admin1@clinic.com", Password: passStr, Role: "admin", FullName: "ผู้ดูแลระบบ", Phone: "081-000-0000"},
 	}
 	for i := range users {
 		var existing models.User
@@ -491,5 +494,47 @@ func seedDatabase() {
 			}
 			log.Println("QRPayments seeded successfully.")
 		}
+		
+		// 8. Seed Appointments
+		var apptCount int64
+		DB.Model(&models.Appointment{}).Count(&apptCount)
+		if apptCount == 0 {
+			appointments := []models.Appointment{
+				{DoctorID: users[5].ID, PatientID: patients[0].ID, RegisterID: users[0].ID, AppointmentDate: getTodayStr(), AppointmentTime: "09:00:00", Status: "รอรับบริการ", ClinicalNote: "โรคทั่วไป"},
+				{DoctorID: users[6].ID, PatientID: patients[1].ID, RegisterID: users[0].ID, AppointmentDate: getTodayStr(), AppointmentTime: "09:30:00", Status: "รอรับบริการ", ClinicalNote: "อายุรกรรม"},
+				{DoctorID: users[5].ID, PatientID: patients[2].ID, RegisterID: users[0].ID, AppointmentDate: getTodayStr(), AppointmentTime: "10:00:00", Status: "ยืนยันที่จะมาวันนี้", ClinicalNote: "โรคทั่วไป"},
+				{DoctorID: users[7].ID, PatientID: patients[3].ID, RegisterID: users[0].ID, AppointmentDate: getTodayStr(), AppointmentTime: "10:30:00", Status: "เข้ารับการรักษาแล้ว", ClinicalNote: "ศัลยกรรม"},
+				{DoctorID: users[6].ID, PatientID: patients[4].ID, RegisterID: users[0].ID, AppointmentDate: getTodayStr(), AppointmentTime: "11:00:00", Status: "ยกเลิกนัด", ClinicalNote: "กุมารเวช"},
+				{DoctorID: users[5].ID, PatientID: patients[5].ID, RegisterID: users[0].ID, AppointmentDate: getTodayStr(), AppointmentTime: "13:00:00", Status: "รอรับบริการ", ClinicalNote: "โรคทั่วไป"},
+			}
+			for i := range appointments {
+				DB.Create(&appointments[i])
+			}
+			log.Println("Appointments seeded successfully.")
+		}
+
+		// 9. Seed System Access
+		var accessCount int64
+		DB.Model(&models.SystemAccess{}).Count(&accessCount)
+		if accessCount == 0 {
+			accesses := []models.SystemAccess{
+				{UserID: users[0].ID, AccessLevel: 5, ModuleName: "All"}, // Registrar
+				{UserID: users[1].ID, AccessLevel: 3, ModuleName: "All"}, // Nurse
+				{UserID: users[2].ID, AccessLevel: 2, ModuleName: "All"}, // Assistant
+				{UserID: users[3].ID, AccessLevel: 3, ModuleName: "All"}, // Pharmacist
+				{UserID: users[4].ID, AccessLevel: 2, ModuleName: "All"}, // Cashier
+				{UserID: users[5].ID, AccessLevel: 4, ModuleName: "All"}, // Doctor 1
+				{UserID: users[6].ID, AccessLevel: 4, ModuleName: "All"}, // Doctor 2
+				{UserID: users[7].ID, AccessLevel: 4, ModuleName: "All"}, // Doctor 3
+			}
+			for i := range accesses {
+				DB.Create(&accesses[i])
+			}
+			log.Println("System Access seeded successfully.")
+		}
 	}
+}
+
+func getTodayStr() string {
+	return time.Now().Format("2006-01-02")
 }

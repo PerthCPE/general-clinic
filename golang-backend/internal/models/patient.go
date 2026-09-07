@@ -16,6 +16,8 @@ type Patient struct {
 	SchemeType       string    `json:"scheme_type"`
 	Allergies        string    `json:"allergies"`
 	ChronicDiseases  string    `json:"chronic_diseases"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	CreatedAt        time.Time     `json:"created_at"`
+	UpdatedAt        time.Time     `json:"updated_at"`
+
+	Appointments     []Appointment `gorm:"foreignKey:PatientID" json:"appointments"`
 }

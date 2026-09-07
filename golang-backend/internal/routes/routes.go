@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"clinic-backend/internal/config"
 	"clinic-backend/internal/controllers"
 	"clinic-backend/internal/middleware"
 	"clinic-backend/internal/ws"
@@ -23,6 +24,11 @@ func SetUpRoutes(r *gin.Engine) {
 	// check jwt bearer token และแจก role
 	api.Use(middleware.AuthRequired())
 	
+	authRoutes := api.Group("/auth")
+	{
+		authRoutes.PUT("/change-password", controllers.ChangePassword)
+	}
+
 	// Common Endpoints
 	api.GET("/doctors", controllers.GetDoctors)
 
@@ -86,5 +92,30 @@ func SetUpRoutes(r *gin.Engine) {
 	{
 		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
 		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
+	}
+
+	// ===== 6. Admin System =====
+	// Initialize struct-based controllers
+	adminCtrl := controllers.NewAdminController(config.DB)
+	adminRoutes := api.Group("/admin")
+	adminRoutes.Use(middleware.RoleRequired("admin", "registrar"))
+	{
+		adminRoutes.GET("/accounts", adminCtrl.GetAccounts)
+		adminRoutes.POST("/accounts", adminCtrl.CreateAccount)
+		adminRoutes.PUT("/accounts/:id/status", adminCtrl.UpdateAccountStatus)
+		adminRoutes.POST("/system-access", adminCtrl.CreateSystemAccess)
+		adminRoutes.GET("/treatment-rights", adminCtrl.GetTreatmentRights)
+		adminRoutes.POST("/treatment-rights", adminCtrl.CreateTreatmentRight)
+	}
+
+	// ===== 7. Appointment System =====
+	appointmentCtrl := controllers.NewAppointmentController(config.DB)
+	appointmentRoutes := api.Group("/appointments")
+	appointmentRoutes.Use(middleware.RoleRequired("registrar", "doctor", "admin"))
+	{
+		appointmentRoutes.GET("", appointmentCtrl.GetAppointments)
+		appointmentRoutes.POST("", appointmentCtrl.CreateAppointment)
+		appointmentRoutes.PUT("/:id/status", appointmentCtrl.UpdateAppointmentStatus)
+		appointmentRoutes.PUT("/:id/schedule", appointmentCtrl.UpdateAppointmentSchedule)
 	}
 }
