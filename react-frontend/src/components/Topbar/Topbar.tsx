@@ -98,12 +98,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
           return false;
         }
       }
-      // 2. Filter category
+      // 2. Filter category (Only 'all' and 'unread')
       if (allDocsFilter === 'unread') return msg.isUnread;
-      if (allDocsFilter === 'urgent') return msg.priority === 'urgent' || msg.priority === 'emergency';
-      if (allDocsFilter === 'lab') return msg.type.includes('ผลตรวจ') || msg.type.includes('แล็บ');
-      if (allDocsFilter === 'refer') return msg.type.includes('ส่งตัว');
-      if (allDocsFilter === 'report') return msg.type.includes('รายงาน');
       return true;
     });
   }, [docMessages, allDocsSearch, allDocsFilter]);
@@ -999,18 +995,25 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
           <div className="doc-msg-modal-box" onClick={(e) => e.stopPropagation()}>
             <div className="doc-msg-modal-header">
               <div className="doc-msg-modal-header-left">
-                <div className={`doc-msg-priority-icon ${selectedDocMessageModal.priority}`}>
-                  {selectedDocMessageModal.priority === 'emergency' ? '🚨' : selectedDocMessageModal.priority === 'urgent' ? '⚡' : '📄'}
+                <div className="doc-header-icon-badge">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                    <polyline points="10 9 9 9 8 9" />
+                  </svg>
                 </div>
                 <div>
-                  <h3 className="doc-msg-modal-title">รายละเอียดเอกสารเข้า</h3>
+                  <h3 className="doc-msg-modal-title">รายละเอียดเอกสาร</h3>
                   <p className="doc-msg-modal-subtitle">รหัสอ้างอิง: {selectedDocMessageModal.id}</p>
                 </div>
               </div>
               <button
                 type="button"
-                className="doc-msg-modal-close"
+                className="doc-modal-close-btn"
                 onClick={() => setSelectedDocMessageModal(null)}
+                title="ปิดหน้าต่าง"
               >
                 ✕
               </button>
@@ -1070,19 +1073,24 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
       {isAllDocsModalOpen && (
         <div className="doc-msg-modal-overlay" onClick={() => setIsAllDocsModalOpen(false)}>
           <div className="doc-all-modal-box" onClick={(e) => e.stopPropagation()}>
+            {/* Header: Cohesive Clinic Modal Design */}
             <div className="doc-all-modal-header">
               <div className="doc-all-modal-header-left">
-                <div className="doc-all-header-icon">📁</div>
+                <div className="doc-header-icon-badge">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                </div>
                 <div>
-                  <h3 className="doc-all-modal-title">คลังเอกสารและข้อความทั้งหมด</h3>
+                  <h3 className="doc-all-modal-title">คลังเอกสารและข้อความ</h3>
                   <p className="doc-all-modal-subtitle">
-                    เอกสารที่ส่งถึงคุณ ({currentUser?.fullName || currentUser?.username}) &bull; ทั้งหมด {docMessages.length} รายการ {unreadDocMessageCount > 0 && `(${unreadDocMessageCount} ยังไม่ได้อ่าน)`}
+                    เอกสารที่ส่งถึงคุณ ({currentUser?.fullName || currentUser?.username}) &bull; ทั้งหมด {docMessages.length} รายการ
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                className="doc-msg-modal-close"
+                className="doc-modal-close-btn"
                 onClick={() => setIsAllDocsModalOpen(false)}
                 title="ปิดหน้าต่าง"
               >
@@ -1090,8 +1098,43 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
               </button>
             </div>
 
-            {/* Filter & Search Toolbar */}
+            {/* Filter & Search Toolbar (Only 2 Tabs: เอกสารทั้งหมด & ยังไม่อ่าน) */}
             <div className="doc-all-toolbar">
+              <div className="doc-all-toolbar-row">
+                <div className="doc-all-segment-tabs">
+                  <button
+                    type="button"
+                    className={`doc-all-tab-btn ${allDocsFilter === 'all' ? 'active' : ''}`}
+                    onClick={() => setAllDocsFilter('all')}
+                  >
+                    <span>เอกสารทั้งหมด</span>
+                    <span className="doc-all-tab-badge">{docMessages.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`doc-all-tab-btn ${allDocsFilter === 'unread' ? 'active' : ''}`}
+                    onClick={() => setAllDocsFilter('unread')}
+                  >
+                    <span>ยังไม่อ่าน</span>
+                    {unreadDocMessageCount > 0 && (
+                      <span className="doc-all-tab-badge unread">{unreadDocMessageCount}</span>
+                    )}
+                  </button>
+                </div>
+
+                {unreadDocMessageCount > 0 && (
+                  <button
+                    type="button"
+                    className="doc-all-quick-readall-btn"
+                    onClick={handleMarkAllMessagesRead}
+                    title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด"
+                  >
+                    ✓ ทำเครื่องหมายอ่านแล้วทั้งหมด
+                  </button>
+                )}
+              </div>
+
+              {/* Search Bar */}
               <div className="doc-all-search-wrap">
                 <svg className="doc-all-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
@@ -1099,7 +1142,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 <input
                   type="text"
                   className="doc-all-search-input"
-                  placeholder="ค้นหาชื่อเอกสาร, ผู้ส่ง, ประเภท หรือข้อความ..."
+                  placeholder="ค้นหาชื่อเอกสาร, ผู้ส่ง หรือข้อความ..."
                   value={allDocsSearch}
                   onChange={(e) => setAllDocsSearch(e.target.value)}
                 />
@@ -1108,55 +1151,11 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                     type="button"
                     className="doc-all-search-clear"
                     onClick={() => setAllDocsSearch('')}
+                    title="ล้างคำค้นหา"
                   >
                     ✕
                   </button>
                 )}
-              </div>
-
-              <div className="doc-all-filter-chips">
-                <button
-                  type="button"
-                  className={`doc-all-chip ${allDocsFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => setAllDocsFilter('all')}
-                >
-                  ทั้งหมด ({docMessages.length})
-                </button>
-                <button
-                  type="button"
-                  className={`doc-all-chip ${allDocsFilter === 'unread' ? 'active' : ''}`}
-                  onClick={() => setAllDocsFilter('unread')}
-                >
-                  ยังไม่อ่าน ({unreadDocMessageCount})
-                </button>
-                <button
-                  type="button"
-                  className={`doc-all-chip ${allDocsFilter === 'urgent' ? 'active' : ''}`}
-                  onClick={() => setAllDocsFilter('urgent')}
-                >
-                  ⚡ ด่วน / ฉุกเฉิน
-                </button>
-                <button
-                  type="button"
-                  className={`doc-all-chip ${allDocsFilter === 'lab' ? 'active' : ''}`}
-                  onClick={() => setAllDocsFilter('lab')}
-                >
-                  🔬 ผลตรวจ/แล็บ
-                </button>
-                <button
-                  type="button"
-                  className={`doc-all-chip ${allDocsFilter === 'refer' ? 'active' : ''}`}
-                  onClick={() => setAllDocsFilter('refer')}
-                >
-                  🏥 ใบส่งตัว
-                </button>
-                <button
-                  type="button"
-                  className={`doc-all-chip ${allDocsFilter === 'report' ? 'active' : ''}`}
-                  onClick={() => setAllDocsFilter('report')}
-                >
-                  📊 รายงาน
-                </button>
               </div>
             </div>
 
@@ -1165,8 +1164,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
               {filteredAllDocs.length === 0 ? (
                 <div className="doc-all-empty">
                   <div className="doc-all-empty-icon">📭</div>
-                  <h4>ไม่พบเอกสารที่ตรงกับเงื่อนไข</h4>
-                  <p>ลองเปลี่ยนคำค้นหาหรือเลือกแท็บตัวกรองอื่น</p>
+                  <h4>{allDocsFilter === 'unread' ? 'ไม่มีเอกสารที่ยังไม่ได้อ่าน' : 'ไม่พบเอกสารที่ค้นหา'}</h4>
+                  <p>{allDocsFilter === 'unread' ? 'คุณได้อ่านเอกสารทั้งหมดครบถ้วนแล้ว' : 'ลองเปลี่ยนคำค้นหาใหม่อีกครั้ง'}</p>
                 </div>
               ) : (
                 <div className="doc-all-grid">
@@ -1174,9 +1173,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                     <div
                       key={msg.id}
                       className={`doc-all-card ${msg.isUnread ? 'unread' : ''}`}
-                      onClick={() => {
-                        handleOpenMessageItem(msg);
-                      }}
+                      onClick={() => handleOpenMessageItem(msg)}
                     >
                       <div className="doc-all-card-top">
                         <div className="doc-all-card-badges">
@@ -1220,15 +1217,6 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             {/* Modal Footer */}
             <div className="doc-all-modal-footer">
               <div className="doc-all-footer-left">
-                {unreadDocMessageCount > 0 && (
-                  <button
-                    type="button"
-                    className="doc-all-footer-readall-btn"
-                    onClick={handleMarkAllMessagesRead}
-                  >
-                    ✓ ทำเครื่องหมายอ่านแล้วทั้งหมด
-                  </button>
-                )}
                 {currentUser?.role === 'officer' && onNavigate && (
                   <button
                     type="button"
