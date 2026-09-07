@@ -135,7 +135,6 @@ export const authApi = {
         username: string;
         fullname: string;
         role: string;
-      requires_password_change?: boolean;
         phone: string;
       };
     }>('/login', {
@@ -218,7 +217,6 @@ export interface BackendQueue {
     username: string;
     fullname: string;
     role: string;
-      requires_password_change?: boolean;
   };
 }
 
@@ -315,14 +313,12 @@ export interface BackendScreening {
     username: string;
     fullname: string;
     role: string;
-      requires_password_change?: boolean;
   };
   assigned_doctor?: {
     id: number;
     username: string;
     fullname: string;
     role: string;
-      requires_password_change?: boolean;
   };
 }
 
@@ -331,7 +327,6 @@ export interface BackendDoctor {
   username: string;
   fullname: string;
   role: string;
-      requires_password_change?: boolean;
   phone: string;
 }
 
@@ -404,7 +399,6 @@ export interface BackendUser {
   fullname?: string;
   full_name?: string;
   role: string;
-      requires_password_change?: boolean;
   phone?: string;
 }
 
@@ -645,7 +639,6 @@ export interface BackendDoctorProfile {
   fullname: string;
   phone: string;
   role: string;
-      requires_password_change?: boolean;
   doctor_id?: number;
   license_number?: string;
   specialty?: string;
@@ -952,5 +945,55 @@ export const examinationApi = {
       `/api/doctor/patients/${patientId}/visits`
     ),
 };
+export const adminApi = {
+    getAccounts: () => request<BackendUser[]>('/api/admin/accounts'),
+    createAccount: (payload: { username: string; password?: string; role: string; fullname: string; employee_id: string; phone: string; }) =>
+      request<BackendUser>('/api/admin/accounts', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    updateAccountStatus: (id: number | string, status: string) =>
+      request<{ message: string }>('/api/admin/accounts/' + id + '/status', {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      }),
+    createSystemAccess: (payload: { user_id: number; access_level: number; module_name: string; }) =>
+      request<any>('/api/admin/system-access', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+  };
 
+export interface BackendAppointment {
+  id: number;
+  doctor_id: number;
+  patient_id: number;
+  register_id: number;
+  appointment_date: string;
+  appointment_time: string;
+  status: string;
+  clinical_note: string;
+  doctor?: BackendUser;
+  patient?: BackendPatient;
+  register?: BackendUser;
+}
+
+export const appointmentApi = {
+  getList: () => request<BackendAppointment[]>('/api/appointments'),
+  create: (payload: { doctor_id: number; patient_id: number; register_id: number; appointment_date: string; appointment_time: string; clinical_note: string; }) =>
+    request<BackendAppointment>('/api/appointments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateStatus: (id: number | string, payload: { status: string; clinical_note?: string; }) =>
+    request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/status', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  updateSchedule: (id: number | string, payload: { appointment_date?: string; appointment_time?: string; }) =>
+    request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/schedule', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+};
 
