@@ -428,6 +428,17 @@ export const vitalsApi = {
     allergies?: string;
     medical_history?: string;
     nurse_notes?: string;
+    herbal_medicines?: string;
+    dietary_supplements?: string;
+    has_uri?: boolean | null;
+    has_tb?: boolean | null;
+    on_anticoagulant?: boolean | null;
+    precaution_type?: string;
+    is_pregnant?: boolean | null;
+    is_breastfeeding?: boolean | null;
+    last_menstrual_period?: string;
+    q2_depressed?: boolean | null;
+    q2_anhedonia?: boolean | null;
     assigned_doctor_id?: number;
     triage_level?: number | string;
   }) =>

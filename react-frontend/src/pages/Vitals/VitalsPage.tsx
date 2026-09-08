@@ -44,6 +44,18 @@ interface VitalsDraftPayload {
   currentMedications: string;
   smokingHistory: string;
   alcoholHistory: string;
+  nurseNotes?: string;
+  herbalMedicines?: string;
+  dietarySupplements?: string;
+  hasURI?: boolean | null;
+  hasTB?: boolean | null;
+  onAnticoagulant?: boolean | null;
+  precautionType?: string;
+  isPregnant?: boolean | null;
+  isBreastfeeding?: boolean | null;
+  lastMenstrualPeriod?: string;
+  q2Depressed?: boolean | null;
+  q2Anhedonia?: boolean | null;
   selectedTriage: TriageLevelNum;
   assignedDoctorId: number;
   savedAt: string;
@@ -247,6 +259,19 @@ export const VitalsPage: React.FC = () => {
   const [currentMedications, setCurrentMedications] = useState<string>(() => initialDraft?.currentMedications || '');
   const [smokingHistory, setSmokingHistory] = useState<string>(() => initialDraft?.smokingHistory || '');
   const [alcoholHistory, setAlcoholHistory] = useState<string>(() => initialDraft?.alcoholHistory || '');
+  // Advanced screening state (EXPAND-1)
+  const [nurseNotes, setNurseNotes] = useState<string>(() => initialDraft?.nurseNotes || '');
+  const [herbalMedicines, setHerbalMedicines] = useState<string>(() => initialDraft?.herbalMedicines || '');
+  const [dietarySupplements, setDietarySupplements] = useState<string>(() => initialDraft?.dietarySupplements || '');
+  const [hasURI, setHasURI] = useState<boolean | null>(() => (initialDraft?.hasURI !== undefined ? initialDraft.hasURI : null));
+  const [hasTB, setHasTB] = useState<boolean | null>(() => (initialDraft?.hasTB !== undefined ? initialDraft.hasTB : null));
+  const [onAnticoagulant, setOnAnticoagulant] = useState<boolean | null>(() => (initialDraft?.onAnticoagulant !== undefined ? initialDraft.onAnticoagulant : null));
+  const [precautionType, setPrecautionType] = useState<string>(() => initialDraft?.precautionType || '');
+  const [isPregnant, setIsPregnant] = useState<boolean | null>(() => (initialDraft?.isPregnant !== undefined ? initialDraft.isPregnant : null));
+  const [isBreastfeeding, setIsBreastfeeding] = useState<boolean | null>(() => (initialDraft?.isBreastfeeding !== undefined ? initialDraft.isBreastfeeding : null));
+  const [lastMenstrualPeriod, setLastMenstrualPeriod] = useState<string>(() => initialDraft?.lastMenstrualPeriod || '');
+  const [q2Depressed, setQ2Depressed] = useState<boolean | null>(() => (initialDraft?.q2Depressed !== undefined ? initialDraft.q2Depressed : null));
+  const [q2Anhedonia, setQ2Anhedonia] = useState<boolean | null>(() => (initialDraft?.q2Anhedonia !== undefined ? initialDraft.q2Anhedonia : null));
   const [selectedTriage, setSelectedTriage] = useState<TriageLevelNum>(() => initialDraft?.selectedTriage || 4);
   const [assignedDoctorId, setAssignedDoctorId] = useState<number>(() => initialDraft?.assignedDoctorId || 4);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(() => initialDraft?.savedAt || null);
@@ -358,7 +383,19 @@ export const VitalsPage: React.FC = () => {
       Boolean(medicalHistory) ||
       Boolean(currentMedications) ||
       Boolean(smokingHistory) ||
-      Boolean(alcoholHistory);
+      Boolean(alcoholHistory) ||
+      Boolean(nurseNotes) ||
+      Boolean(herbalMedicines) ||
+      Boolean(dietarySupplements) ||
+      hasURI !== null ||
+      hasTB !== null ||
+      onAnticoagulant !== null ||
+      Boolean(precautionType) ||
+      isPregnant !== null ||
+      isBreastfeeding !== null ||
+      Boolean(lastMenstrualPeriod) ||
+      q2Depressed !== null ||
+      q2Anhedonia !== null;
 
     if (hasData) {
       const timer = setTimeout(() => {
@@ -385,6 +422,18 @@ export const VitalsPage: React.FC = () => {
             currentMedications,
             smokingHistory,
             alcoholHistory,
+            nurseNotes,
+            herbalMedicines,
+            dietarySupplements,
+            hasURI,
+            hasTB,
+            onAnticoagulant,
+            precautionType,
+            isPregnant,
+            isBreastfeeding,
+            lastMenstrualPeriod,
+            q2Depressed,
+            q2Anhedonia,
             selectedTriage,
             assignedDoctorId,
             savedAt: nowStr,
@@ -418,6 +467,18 @@ export const VitalsPage: React.FC = () => {
     currentMedications,
     smokingHistory,
     alcoholHistory,
+    nurseNotes,
+    herbalMedicines,
+    dietarySupplements,
+    hasURI,
+    hasTB,
+    onAnticoagulant,
+    precautionType,
+    isPregnant,
+    isBreastfeeding,
+    lastMenstrualPeriod,
+    q2Depressed,
+    q2Anhedonia,
     selectedTriage,
     assignedDoctorId,
   ]);
@@ -538,7 +599,7 @@ export const VitalsPage: React.FC = () => {
   }, [temperature, systolicBP, diastolicBP, heartRate, spo2]);
 
   // Handle Form Change
-  const handleChangeField = (field: string, val: string | number) => {
+  const handleChangeField = (field: string, val: any) => {
     clearFieldError(field);
     if (errorToast) {
       setErrorToast(null);
@@ -594,6 +655,42 @@ export const VitalsPage: React.FC = () => {
         break;
       case 'alcoholHistory':
         setAlcoholHistory(String(val));
+        break;
+      case 'nurseNotes':
+        setNurseNotes(String(val));
+        break;
+      case 'herbalMedicines':
+        setHerbalMedicines(String(val));
+        break;
+      case 'dietarySupplements':
+        setDietarySupplements(String(val));
+        break;
+      case 'hasURI':
+        setHasURI(val);
+        break;
+      case 'hasTB':
+        setHasTB(val);
+        break;
+      case 'onAnticoagulant':
+        setOnAnticoagulant(val);
+        break;
+      case 'precautionType':
+        setPrecautionType(String(val));
+        break;
+      case 'isPregnant':
+        setIsPregnant(val);
+        break;
+      case 'isBreastfeeding':
+        setIsBreastfeeding(val);
+        break;
+      case 'lastMenstrualPeriod':
+        setLastMenstrualPeriod(String(val));
+        break;
+      case 'q2Depressed':
+        setQ2Depressed(val);
+        break;
+      case 'q2Anhedonia':
+        setQ2Anhedonia(val);
         break;
       case 'assignedDoctorId':
         setAssignedDoctorId(Number(val));
@@ -677,6 +774,18 @@ export const VitalsPage: React.FC = () => {
     setCurrentMedications('');
     setSmokingHistory('');
     setAlcoholHistory('');
+    setNurseNotes('');
+    setHerbalMedicines('');
+    setDietarySupplements('');
+    setHasURI(null);
+    setHasTB(null);
+    setOnAnticoagulant(null);
+    setPrecautionType('');
+    setIsPregnant(null);
+    setIsBreastfeeding(null);
+    setLastMenstrualPeriod('');
+    setQ2Depressed(null);
+    setQ2Anhedonia(null);
     setSelectedTriage(4);
     setDraftSavedAt(null);
   };
@@ -729,6 +838,18 @@ export const VitalsPage: React.FC = () => {
         current_medications: currentMedications.trim(),
         smoking_history: smokingHistory.trim(),
         alcohol_history: alcoholHistory.trim(),
+        nurse_notes: nurseNotes.trim() || undefined,
+        herbal_medicines: herbalMedicines.trim() || undefined,
+        dietary_supplements: dietarySupplements.trim() || undefined,
+        has_uri: hasURI !== null ? hasURI : undefined,
+        has_tb: hasTB !== null ? hasTB : undefined,
+        on_anticoagulant: onAnticoagulant !== null ? onAnticoagulant : undefined,
+        precaution_type: precautionType || undefined,
+        is_pregnant: (selectedPatient.gender === 'หญิง' && isPregnant !== null) ? isPregnant : undefined,
+        is_breastfeeding: (selectedPatient.gender === 'หญิง' && isBreastfeeding !== null) ? isBreastfeeding : undefined,
+        last_menstrual_period: (selectedPatient.gender === 'หญิง' && lastMenstrualPeriod) ? lastMenstrualPeriod : undefined,
+        q2_depressed: q2Depressed !== null ? q2Depressed : undefined,
+        q2_anhedonia: q2Anhedonia !== null ? q2Anhedonia : undefined,
         assigned_doctor_id: docObj.doctorId,
         triage_level: selectedTriage,
       });
@@ -958,6 +1079,18 @@ export const VitalsPage: React.FC = () => {
             currentMedications={currentMedications}
             smokingHistory={smokingHistory}
             alcoholHistory={alcoholHistory}
+            nurseNotes={nurseNotes}
+            herbalMedicines={herbalMedicines}
+            dietarySupplements={dietarySupplements}
+            hasURI={hasURI}
+            hasTB={hasTB}
+            onAnticoagulant={onAnticoagulant}
+            precautionType={precautionType}
+            isPregnant={isPregnant}
+            isBreastfeeding={isBreastfeeding}
+            lastMenstrualPeriod={lastMenstrualPeriod}
+            q2Depressed={q2Depressed}
+            q2Anhedonia={q2Anhedonia}
             assignedDoctorId={assignedDoctorId}
             doctorOptions={doctorList}
             isAccordionOpen={isFormOpen}

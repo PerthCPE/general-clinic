@@ -777,7 +777,8 @@ body.dark-mode .vitals-draft-badge {
 }
 
 .vitals-card-body.expanded {
-  max-height: 2000px;
+  max-height: none;
+  overflow: visible;
   padding: 28px 36px 36px;
 }
 
@@ -2865,4 +2866,292 @@ body.dark-mode .vitals-modal-btn-confirm {
 
 body.dark-mode .vitals-modal-btn-confirm:hover {
   background: #1D4ED8;
+}
+
+/* ================================================================
+   ===== 12. ADVANCED SCREENING & 2Q DEPRESSION STYLES =====
+   ================================================================ */
+.vitals-advanced-screening-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
+.vitals-screening-subcard {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vitals-screening-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vitals-subcard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vitals-subcard-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1E293B;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vitals-subcard-icon {
+  width: 18px;
+  height: 18px;
+  color: #2563EB;
+  flex-shrink: 0;
+}
+
+.vitals-tristate-group {
+  display: flex;
+  width: 100%;
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+  box-sizing: border-box;
+}
+
+.vitals-tristate-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  font-family: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vitals-tristate-btn:hover {
+  color: #1E293B;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.vitals-tristate-btn.active.unassessed {
+  background: #FFFFFF;
+  color: #475569;
+  border-color: #CBD5E1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.vitals-tristate-btn.active.yes,
+.vitals-tristate-btn.active.no,
+.vitals-tristate-btn.active.custom-pregnant,
+.vitals-tristate-btn.active.custom-anticoag {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #1D4ED8;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+}
+
+.vitals-banner-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #FFFBEB;
+  border: 1.5px solid #F59E0B;
+  color: #92400E;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  animation: fadeIn 0.25s ease;
+}
+
+.vitals-banner-positive {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #FFF7ED;
+  border: 1.5px solid #EA580C;
+  color: #9A3412;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  animation: fadeIn 0.25s ease;
+}
+
+.vitals-banner-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.vitals-date-input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+.vitals-2q-card {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.25s ease;
+}
+
+.vitals-2q-card.positive-alert {
+  background: #FFF7ED;
+  border-color: #FDBA74;
+}
+
+.vitals-2q-card.positive-alert .vitals-subcard-title {
+  color: #C2410C;
+}
+
+.vitals-2q-card.positive-alert .vitals-subcard-icon {
+  color: #EA580C;
+}
+
+.vitals-2q-desc {
+  font-size: 13px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.vitals-2q-card.positive-alert .vitals-2q-desc {
+  color: #9A3412;
+}
+
+.vitals-2q-item {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vitals-2q-question-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1E293B;
+  line-height: 1.45;
+}
+
+/* Elevated Dark Slate Theme for Advanced Screening */
+body.dark-mode .vitals-screening-subcard {
+  background: #1C2230;
+  border-color: #333F53;
+}
+
+body.dark-mode .vitals-subcard-title {
+  color: #F8FAFC;
+}
+
+body.dark-mode .vitals-subcard-icon {
+  color: #60A5FA;
+}
+
+body.dark-mode .vitals-tristate-group {
+  background: #212836;
+  border-color: #333F53;
+}
+
+body.dark-mode .vitals-tristate-btn {
+  color: #94A3B8;
+}
+
+body.dark-mode .vitals-tristate-btn:hover {
+  color: #F8FAFC;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .vitals-tristate-btn.active.unassessed {
+  background: #2D3748;
+  color: #E2E8F0;
+  border-color: #4B5563;
+}
+
+body.dark-mode .vitals-tristate-btn.active.yes,
+body.dark-mode .vitals-tristate-btn.active.no,
+body.dark-mode .vitals-tristate-btn.active.custom-pregnant,
+body.dark-mode .vitals-tristate-btn.active.custom-anticoag {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #3B82F6;
+}
+
+body.dark-mode .vitals-banner-warning {
+  background: rgba(217, 119, 6, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #FCD34D;
+}
+
+body.dark-mode .vitals-banner-positive {
+  background: rgba(234, 88, 12, 0.18);
+  border-color: rgba(249, 115, 22, 0.45);
+  color: #FDBA74;
+}
+
+body.dark-mode .vitals-2q-card {
+  background: #1C2230;
+  border-color: #333F53;
+}
+
+body.dark-mode .vitals-2q-card.positive-alert {
+  background: rgba(234, 88, 12, 0.12);
+  border-color: rgba(249, 115, 22, 0.45);
+}
+
+body.dark-mode .vitals-2q-card.positive-alert .vitals-subcard-title {
+  color: #FDBA74;
+}
+
+body.dark-mode .vitals-2q-card.positive-alert .vitals-subcard-icon {
+  color: #FB923C;
+}
+
+body.dark-mode .vitals-2q-card.positive-alert .vitals-2q-desc {
+  color: #FCD34D;
+}
+
+body.dark-mode .vitals-2q-desc {
+  color: #94A3B8;
+}
+
+body.dark-mode .vitals-2q-item {
+  background: #212836;
+  border-color: #333F53;
+}
+
+body.dark-mode .vitals-2q-question-text {
+  color: #F8FAFC;
 }

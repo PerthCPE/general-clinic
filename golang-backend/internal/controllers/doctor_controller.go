@@ -305,6 +305,7 @@ func toScreeningBrief(s models.Screening) dto.ScreeningBrief {
 		DietarySupplements: s.DietarySupplements,
 		Q2Depressed:        s.Q2Depressed,
 		Q2Anhedonia:        s.Q2Anhedonia,
+		ScreeningPositive:  s.ScreeningPositive,
 
 		FoodAllergies:      s.FoodAllergies,
 		CurrentMedications: s.CurrentMedications,

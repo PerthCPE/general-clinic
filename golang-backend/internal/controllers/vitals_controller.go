@@ -19,29 +19,40 @@ import (
 )
 
 type RecordVitalsReq struct {
-	QueueID            uint    `json:"queue_id"`
-	PatientID          uint    `json:"patient_id"`
-	QueueNumber        string  `json:"queue_number"`
-	ChiefComplaint     string  `json:"chief_complaint"`
-	Weight             float64 `json:"weight"`
-	Height             float64 `json:"height"`
-	Temperature        float64 `json:"temperature"`
-	SystolicBP         int     `json:"systolic_bp"`
-	DiastolicBP        int     `json:"diastolic_bp"`
-	HeartRate          int     `json:"heart_rate"`
-	RespiratoryRate    int     `json:"respiratory_rate"`
-	SpO2               int     `json:"spo2"`
-	PainScore          int     `json:"pain_score"`
-	BloodSugar         int     `json:"blood_sugar"`
-	FoodAllergies      string  `json:"food_allergies"`
-	CurrentMedications string  `json:"current_medications"`
-	SmokingHistory     string  `json:"smoking_history"`
-	AlcoholHistory     string  `json:"alcohol_history"`
-	Allergies          string  `json:"allergies"`
-	MedicalHistory     string  `json:"medical_history"`
-	NurseNotes         string  `json:"nurse_notes"`
-	AssignedDoctorID   uint    `json:"assigned_doctor_id"`
-	TriageLevel        any     `json:"triage_level"` // Supports int 1-4 or legacy string with deprecation warning
+	QueueID             uint    `json:"queue_id"`
+	PatientID           uint    `json:"patient_id"`
+	QueueNumber         string  `json:"queue_number"`
+	ChiefComplaint      string  `json:"chief_complaint"`
+	Weight              float64 `json:"weight"`
+	Height              float64 `json:"height"`
+	Temperature         float64 `json:"temperature"`
+	SystolicBP          int     `json:"systolic_bp"`
+	DiastolicBP         int     `json:"diastolic_bp"`
+	HeartRate           int     `json:"heart_rate"`
+	RespiratoryRate     int     `json:"respiratory_rate"`
+	SpO2                int     `json:"spo2"`
+	PainScore           int     `json:"pain_score"`
+	BloodSugar          int     `json:"blood_sugar"`
+	FoodAllergies       string  `json:"food_allergies"`
+	CurrentMedications  string  `json:"current_medications"`
+	SmokingHistory      string  `json:"smoking_history"`
+	AlcoholHistory      string  `json:"alcohol_history"`
+	Allergies           string  `json:"allergies"`
+	MedicalHistory      string  `json:"medical_history"`
+	NurseNotes          string  `json:"nurse_notes"`
+	HerbalMedicines     string  `json:"herbal_medicines"`
+	DietarySupplements  string  `json:"dietary_supplements"`
+	HasURI              *bool   `json:"has_uri"`
+	HasTB               *bool   `json:"has_tb"`
+	OnAnticoagulant     *bool   `json:"on_anticoagulant"`
+	PrecautionType      string  `json:"precaution_type"`
+	IsPregnant          *bool   `json:"is_pregnant"`
+	IsBreastfeeding     *bool   `json:"is_breastfeeding"`
+	LastMenstrualPeriod string  `json:"last_menstrual_period"`
+	Q2Depressed         *bool   `json:"q2_depressed"`
+	Q2Anhedonia         *bool   `json:"q2_anhedonia"`
+	AssignedDoctorID    uint    `json:"assigned_doctor_id"`
+	TriageLevel         any     `json:"triage_level"` // Supports int 1-4 or legacy string with deprecation warning
 }
 
 // triageLabelFromInt returns the human-readable Thai label for triage level 1-4
@@ -143,6 +154,26 @@ func RecordVitalsAndTriage(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// 2.1 ตรวจสอบ PrecautionType
+	cleanPrecaution := strings.TrimSpace(req.PrecautionType)
+	if cleanPrecaution != "" {
+		switch strings.ToLower(cleanPrecaution) {
+		case "standard":
+			cleanPrecaution = "Standard"
+		case "contact":
+			cleanPrecaution = "Contact"
+		case "droplet":
+			cleanPrecaution = "Droplet"
+		case "airborne":
+			cleanPrecaution = "Airborne"
+		case "none", "ยังไม่ระบุ":
+			cleanPrecaution = ""
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ประเภทข้อควรระวัง (Precaution Type) ไม่ถูกต้อง"})
+			return
+		}
 	}
 
 	// ตรวจสอบพยาบาลผู้คัดกรอง
@@ -290,6 +321,45 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		return
 	}
 
+	// 2.2 ตรวจสอบข้อมูลคัดกรองเพศหญิงกับเพศของผู้ป่วย
+	isMale := strings.Contains(patient.Gender, "ชาย") || strings.EqualFold(patient.Gender, "male") || strings.EqualFold(patient.Gender, "m")
+	if isMale {
+		if req.IsPregnant != nil || req.IsBreastfeeding != nil || strings.TrimSpace(req.LastMenstrualPeriod) != "" {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "ไม่สามารถระบุข้อมูลนี้สำหรับผู้ป่วยชาย"})
+			return
+		}
+	}
+
+	// 2.3 ตรวจสอบวันที่มีประจำเดือนครั้งสุดท้าย (LMP)
+	var lmpText string
+	if strings.TrimSpace(req.LastMenstrualPeriod) != "" {
+		lmpDate, err := services.ParseFlexibleDate(req.LastMenstrualPeriod)
+		if err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("วันที่มีประจำเดือนครั้งสุดท้ายไม่ถูกต้อง: %v", err)})
+			return
+		}
+		nowBkk := time.Now().In(services.BangkokLocation())
+		today := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 23, 59, 59, 0, nowBkk.Location())
+		if lmpDate.After(today) {
+			tx.Rollback()
+			c.JSON(http.StatusBadRequest, gin.H{"error": "วันที่มีประจำเดือนครั้งสุดท้ายต้องไม่อยู่ในอนาคต"})
+			return
+		}
+		lmpText = lmpDate.Format("2006-01-02")
+	}
+
+	// 2.4 คำนวณผลประเมิน 2Q (screening_positive)
+	var screeningPositive *bool
+	if (req.Q2Depressed != nil && *req.Q2Depressed) || (req.Q2Anhedonia != nil && *req.Q2Anhedonia) {
+		pos := true
+		screeningPositive = &pos
+	} else if (req.Q2Depressed != nil && !*req.Q2Depressed) && (req.Q2Anhedonia != nil && !*req.Q2Anhedonia) {
+		pos := false
+		screeningPositive = &pos
+	}
+
 	// 3. คำนวณ BMI (Asian WHO standard)
 	HeightMeter := req.Height / 100
 	BMI := 0.0
@@ -400,29 +470,41 @@ func RecordVitalsAndTriage(c *gin.Context) {
 	}
 
 	newScreening := models.Screening{
-		VisitID:            newVisitRecord.ID,
-		ScreenedByUserID:   nurseID,
-		AssignedDoctorID:   assignedDoctorID,
-		TriageLevel:        triageInt,
-		ChiefComplaint:     cc,
-		Allergies:          req.Allergies,
-		MedicalHistory:     req.MedicalHistory,
-		NurseNotes:         req.NurseNotes,
-		Weight:             req.Weight,
-		Height:             req.Height,
-		BMI:                BMI,
-		Temperature:        temp,
-		SystolicBP:         req.SystolicBP,
-		DiastolicBP:        req.DiastolicBP,
-		HeartRate:          req.HeartRate,
-		RespiratoryRate:    req.RespiratoryRate,
-		SpO2:               req.SpO2,
-		PainScore:          req.PainScore,
-		BloodSugar:         req.BloodSugar,
-		FoodAllergies:      req.FoodAllergies,
-		CurrentMedications: req.CurrentMedications,
-		SmokingHistory:     req.SmokingHistory,
-		AlcoholHistory:     req.AlcoholHistory,
+		VisitID:             newVisitRecord.ID,
+		ScreenedByUserID:    nurseID,
+		AssignedDoctorID:    assignedDoctorID,
+		TriageLevel:         triageInt,
+		ChiefComplaint:      cc,
+		Allergies:           req.Allergies,
+		MedicalHistory:      req.MedicalHistory,
+		NurseNotes:          strings.TrimSpace(req.NurseNotes),
+		Weight:              req.Weight,
+		Height:              req.Height,
+		BMI:                 BMI,
+		Temperature:         temp,
+		SystolicBP:          req.SystolicBP,
+		DiastolicBP:         req.DiastolicBP,
+		HeartRate:           req.HeartRate,
+		RespiratoryRate:     req.RespiratoryRate,
+		SpO2:                req.SpO2,
+		PainScore:           req.PainScore,
+		BloodSugar:          req.BloodSugar,
+		FoodAllergies:       req.FoodAllergies,
+		CurrentMedications:  req.CurrentMedications,
+		SmokingHistory:      req.SmokingHistory,
+		AlcoholHistory:      req.AlcoholHistory,
+		HerbalMedicines:     strings.TrimSpace(req.HerbalMedicines),
+		DietarySupplements:  strings.TrimSpace(req.DietarySupplements),
+		HasURI:              req.HasURI,
+		HasTB:               req.HasTB,
+		OnAnticoagulant:     req.OnAnticoagulant,
+		PrecautionType:      cleanPrecaution,
+		IsPregnant:          req.IsPregnant,
+		IsBreastfeeding:     req.IsBreastfeeding,
+		LastMenstrualPeriod: lmpText,
+		Q2Depressed:         req.Q2Depressed,
+		Q2Anhedonia:         req.Q2Anhedonia,
+		ScreeningPositive:   screeningPositive,
 	}
 
 	if err := tx.Create(&newScreening).Error; err != nil {
@@ -471,12 +553,14 @@ func RecordVitalsAndTriage(c *gin.Context) {
 	ws.BroadcastEvent("VITALS_RECORDED", newScreening)
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message":      "บันทึกข้อมูลการคัดกรองและส่งต่อคิวเรียบร้อยแล้ว",
-		"screening_id": newScreening.ID,
-		"visit_id":     newVisitRecord.ID,
-		"queue_number": qNo,
-		"bmi":          BMI,
-		"triage_level": triageInt,
+		"message":            "บันทึกข้อมูลการคัดกรองและส่งต่อคิวเรียบร้อยแล้ว",
+		"screening_id":       newScreening.ID,
+		"visit_id":           newVisitRecord.ID,
+		"queue_number":       qNo,
+		"bmi":                BMI,
+		"triage_level":       triageInt,
+		"screening_positive": screeningPositive,
+		"screening":          newScreening,
 	})
 }
 

@@ -113,8 +113,9 @@ type Screening struct {
 	// ใช้ *bool 3 สถานะ nil = ยังไม่ได้ถาม
 	// ตรงนี้สำคัญกว่าข้ออื่นด้วยซ้ำ เพราะ "ไม่ได้ถาม" กับ "ถามแล้วตอบไม่มี"
 	// ต่างกันที่ว่าผู้ป่วยเคยมีโอกาสบอกหรือยัง
-	Q2Depressed *bool `json:"q2_depressed"`
-	Q2Anhedonia *bool `json:"q2_anhedonia"`
+	Q2Depressed       *bool `json:"q2_depressed"`
+	Q2Anhedonia       *bool `json:"q2_anhedonia"`
+	ScreeningPositive *bool `json:"screening_positive"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
