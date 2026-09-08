@@ -4,6 +4,7 @@ import { useWebSocket } from '../../context/WebSocketContext';
 import { formatNationalId } from '../../utils/formatters';
 import { clinicMockStore } from '../../mocks/clinicMockStore';
 import { validateThaiNationalID } from '../../utils/thaiIdValidator';
+import Pagination from '../../components/Pagination/Pagination';
 import './EligibilityPage.css';
 
 export type SchemeType =
@@ -80,7 +81,7 @@ const EligibilityPage: React.FC = () => {
   const [historySearch, setHistorySearch] = useState('');
   const [schemeFilter, setSchemeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 6;
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10);
 
   // State Modal รายละเอียดสิทธิ์
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<EligibilityHistoryItem | null>(null);
@@ -292,8 +293,10 @@ const EligibilityPage: React.FC = () => {
     return matchSearch && matchScheme;
   });
 
-  const totalPages = Math.ceil(filteredHistory.length / itemsPerPage) || 1;
-  const startIndex = (currentPage - 1) * itemsPerPage;
+  const totalItems = filteredHistory.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages || 1);
+  const startIndex = (validCurrentPage - 1) * itemsPerPage;
   const currentHistoryItems = filteredHistory.slice(startIndex, startIndex + itemsPerPage);
 
   const getSchemeBadgeClass = (scheme: string) => {
@@ -669,8 +672,16 @@ const EligibilityPage: React.FC = () => {
                   }}
                 />
                 {historySearch && (
-                  <button className="clear-filter-btn" onClick={() => setHistorySearch('')}>
-                    ✕
+                  <button
+                    type="button"
+                    className="clear-filter-btn"
+                    onClick={() => setHistorySearch('')}
+                    aria-label="ล้างคำค้นหา"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                   </button>
                 )}
               </div>
@@ -690,6 +701,27 @@ const EligibilityPage: React.FC = () => {
                 <option value="สิทธิ์ข้าราชการ">สิทธิ์ข้าราชการ</option>
                 <option value="ประกันสุขภาพเอกชน">ประกันสุขภาพเอกชน</option>
               </select>
+
+              {/* Items Per Page Dropdown (Like Queue Table) */}
+              <div className="queue-items-per-page-wrap">
+                <label htmlFor="eligibility-items-per-page" className="queue-items-per-page-label">
+                  แสดง:
+                </label>
+                <select
+                  id="eligibility-items-per-page"
+                  className="queue-items-per-page-select"
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  aria-label="จำนวนแถวที่แสดงต่อหน้า"
+                >
+                  <option value={10}>10 แถว</option>
+                  <option value={25}>25 แถว</option>
+                  <option value={50}>50 แถว</option>
+                </select>
+              </div>
             </div>
 
             <button
@@ -784,41 +816,14 @@ const EligibilityPage: React.FC = () => {
               </table>
             </div>
 
-            {/* Pagination Footer (Identical to Queue Management Table) */}
-            <div className="table-pagination-footer">
-              <div className="pagination-info">
-                แสดง {filteredHistory.length > 0 ? startIndex + 1 : 0} ถึง{' '}
-                {Math.min(startIndex + itemsPerPage, filteredHistory.length)} จาก {filteredHistory.length} รายการ
-              </div>
-              <div className="pagination-controls">
-                <button
-                  type="button"
-                  className="pagination-btn pagination-prev"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                >
-                  ย้อนกลับ
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                  <button
-                    key={pageNum}
-                    type="button"
-                    className={`pagination-btn pagination-num ${currentPage === pageNum ? 'active' : ''}`}
-                    onClick={() => setCurrentPage(pageNum)}
-                  >
-                    {pageNum}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="pagination-btn pagination-next"
-                  disabled={currentPage === totalPages || totalPages === 0}
-                  onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                >
-                  ถัดไป
-                </button>
-              </div>
-            </div>
+            {/* Modern Pagination Footer (5-slot sliding window, jump input, auto-clamp - Matching Queue Table) */}
+            <Pagination
+              currentPage={validCurrentPage}
+              totalPages={totalPages}
+              totalItems={totalItems}
+              itemsPerPage={itemsPerPage}
+              onPageChange={(p) => setCurrentPage(p)}
+            />
           </div>
         )}
       </div>
