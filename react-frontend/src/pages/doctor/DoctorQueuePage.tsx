@@ -21,7 +21,7 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
      (ดูคำอธิบายเต็มใน utils/scrollLockGuard.ts) */
   useUnlockPageScroll();
 
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const {
     patients,
     setActiveExamPatient,
@@ -52,6 +52,7 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
 
   const totalToday = patients.length;
   const currentlyWaiting = patients.filter((p) => p.status === 'Waiting').length;
+  const currentlyExamining = patients.filter((p) => p.status === 'Examining').length;
   const completedVisits = patients.filter((p) => p.status === 'Completed').length;
 
   const handleStartExamination = (patient: Patient) => {
@@ -106,7 +107,7 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
     <div className="max-w-7xl mx-auto space-y-8">
       <section className="space-y-4">
         <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t('quickStats')}</h1>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <StatCard
             title={t('totalPatientsToday')}
             value={totalToday}
@@ -120,6 +121,13 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
             iconType="clock"
             activeFilter={statusFilter === 'Waiting' ? 'Waiting' : undefined}
             onClick={() => setStatusFilter(statusFilter === 'Waiting' ? 'All' : 'Waiting')}
+          />
+          <StatCard
+            title={language === 'th' ? 'ผู้ป่วยกำลังตรวจ' : 'Currently Examining'}
+            value={currentlyExamining}
+            iconType="stethoscope"
+            activeFilter={statusFilter === 'Examining' ? 'Examining' : undefined}
+            onClick={() => setStatusFilter(statusFilter === 'Examining' ? 'All' : 'Examining')}
           />
           <StatCard
             title={t('completedVisits')}

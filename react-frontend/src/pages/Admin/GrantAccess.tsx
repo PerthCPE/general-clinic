@@ -43,7 +43,7 @@ const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
   return {
     internalId: u.id,
     id: u.employee_id || `EMP-${u.id}`,
-    name: u.fullname,
+    name: u.fullname || u.full_name || u.username || '',
     role: thaiRole,
     avatar: randomColor,
     status: (u.status === 'active' || u.status === 'suspended') ? 'กำลังใช้งาน' : 'รอการยืนยัน',

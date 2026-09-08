@@ -1,10 +1,10 @@
 import React from 'react';
-import { Users, Clock, CheckCircle } from 'lucide-react';
+import { Users, Clock, CheckCircle, Stethoscope } from 'lucide-react';
 
 interface StatCardProps {
   title: string;
   value: number;
-  iconType: 'users' | 'clock' | 'check';
+  iconType: 'users' | 'clock' | 'check' | 'stethoscope';
   activeFilter?: string;
   onClick?: () => void;
 }
@@ -24,6 +24,8 @@ export const StatCard: React.FC<StatCardProps> = ({
         return <Clock className="w-6 h-6 text-blue-600" />;
       case 'check':
         return <CheckCircle className="w-6 h-6 text-blue-600" />;
+      case 'stethoscope':
+        return <Stethoscope className="w-6 h-6 text-blue-600" />;
       default:
         return <Users className="w-6 h-6 text-blue-600" />;
     }

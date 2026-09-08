@@ -221,7 +221,7 @@ export const QueueTable: React.FC<QueueTableProps> = ({
           ตัวกรองระดับไม่ยอมให้หด (shrink-0) ถ้าจอแคบจะตัดลงบรรทัดใหม่แทน
           เพราะถ้าปล่อยให้หด ปุ่มจะถูกบีบจนต้องมีแถบเลื่อนซึ่งผู้ใช้มักมองไม่เห็น */}
       <div className="px-6 py-3 flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/40">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
+        <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"

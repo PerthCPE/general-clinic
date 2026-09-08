@@ -8,7 +8,8 @@ import { PharmacyDetailSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 import { API_BASE_URL } from '../../services/api';
-import { playPharmacyNotification } from '../../utils/audioQueue';
+// เสียงแจ้งเตือน "ใบสั่งยาใหม่" เล่นจาก GlobalAudioListener ที่เดียว (ฟัง event MEDICINE_QUEUE_CREATED)
+// ไม่เล่นซ้ำที่หน้านี้อีก เพื่อไม่ให้เสียงซ้อนกันสองรอบ
 
 interface ToastState {
   message: string;
@@ -449,10 +450,9 @@ export default function DetailPage({
       }
     });
 
-    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', () => {
+    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', (data: any) => {
       fetchQueues();
-      triggerToast('ได้รับใบสั่งยาเรียบร้อยแล้ว', 'doctor');
-      playPharmacyNotification('มีผู้ป่วยใหม่ ส่งมาที่ห้องยาค่ะ');
+      triggerToast(`ได้รับใบสั่งยาเรียบร้อย — ${data?.patient_name || 'ผู้ป่วย'}`, 'doctor');
     });
 
     return () => {
@@ -615,18 +615,21 @@ export default function DetailPage({
       });
 
       if (!res.ok) {
-        await fetch('/api/system/dispense', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Dispense failed');
+      } else {
+        const data = await res.json();
+        if (data.warnings && data.warnings.length > 0) {
+           let msg = 'มียาบางรายการจ่ายได้ไม่ครบตามจำนวน:\n';
+           data.warnings.forEach((w: any) => {
+             msg += `- ${w.name}: สั่ง ${w.requested} จ่ายจริง ${w.dispensed}\n`;
+           });
+           alert(msg);
+        }
       }
-    } catch {
-      await fetch('/api/system/dispense', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).catch(() => {});
+    } catch (err) {
+       console.error('Dispense failed:', err);
+       alert('ไม่สามารถยืนยันการจ่ายยาได้: ' + (err as Error).message);
     } finally {
       // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;

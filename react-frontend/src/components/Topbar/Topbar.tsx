@@ -10,6 +10,8 @@ import {
   markDocumentMessageAsRead,
   markAllDocumentMessagesAsRead,
 } from '../../services/documentMessageStorage';
+import { useWebSocket } from '../../context/WebSocketContext';
+import { getSharedAudioContext } from '../../utils/audioContext';
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -47,7 +49,53 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   const [isAdminFontEnabled, setIsAdminFontEnabled] = useState(false);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const searchRef = useRef<HTMLDivElement>(null);
+  const { subscribe } = useWebSocket();
 
+  useEffect(() => {
+    // WebSocket ยิงหา client ทุกตัว จึงต้องกรองตาม role ไม่งั้นกระดิ่งของทุก role จะเด้งพร้อมกัน
+    const role = currentUser?.role;
+    const isPharmacy = role === 'pharmacist' || role === 'admin';
+    const isCashier = role === 'cashier' || role === 'admin';
+
+    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', (data: any) => {
+      if (!isPharmacy) return;
+      setNotifications(prev => [{
+        id: Date.now().toString() + Math.random(),
+        category: 'ห้องยา',
+        message: `มีใบสั่งยาใหม่ส่งมาจากห้องตรวจแพทย์ รอจัดยาสำหรับ ${data?.patient_name || 'ผู้ป่วย'}`,
+        time: 'เมื่อสักครู่',
+        isUnread: true,
+      }, ...prev]);
+    });
+
+    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      if (!isCashier) return;
+      setNotifications(prev => [{
+        id: Date.now().toString() + Math.random(),
+        category: 'การชำระเงิน',
+        message: `รอชำระเงินสำหรับ ${data?.patient_name || 'ผู้ป่วย'}`,
+        time: 'เมื่อสักครู่',
+        isUnread: true,
+      }, ...prev]);
+    });
+
+    const unsubPay = subscribe('PAYMENT_CONFIRMED', () => {
+      if (!isCashier) return;
+      setNotifications(prev => [{
+        id: Date.now().toString() + Math.random(),
+        category: 'การชำระเงิน',
+        message: `ชำระเงินเรียบร้อยแล้ว ออกใบเสร็จสำเร็จ`,
+        time: 'เมื่อสักครู่',
+        isUnread: true,
+      }, ...prev]);
+    });
+
+    return () => {
+      unsubMedQ();
+      unsubBill();
+      unsubPay();
+    };
+  }, [subscribe, currentUser?.role]);
   // Sync Document Messages from storage & events
   useEffect(() => {
     const handleMessageUpdate = () => {
@@ -295,20 +343,19 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
 
   const playBeep = () => {
     try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        gain.gain.setValueAtTime(0.05, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.1);
-      }
+      // ใช้ AudioContext กลาง ห้ามสร้างใหม่ทุกครั้ง (Chrome จำกัด ~6 context ต่อแท็บ)
+      const ctx = getSharedAudioContext();
+      if (!ctx || ctx.state !== 'running') return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
     } catch {
       // ละเว้น
     }

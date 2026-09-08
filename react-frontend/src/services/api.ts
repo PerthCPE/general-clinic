@@ -497,12 +497,12 @@ export interface BackendUser {
   fullname: string;
   full_name?: string;
   role: string;
-  phone: string;
+  phone?: string;
   email?: string;
   employee_id?: string;
   status?: string;
   system_accesses?: Array<{ access_level?: number | string; [key: string]: any }>;
-  created_at: string;
+  created_at?: string;
   updated_at?: string;
 }
 

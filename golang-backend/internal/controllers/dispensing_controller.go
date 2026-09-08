@@ -14,6 +14,7 @@ import (
 	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type RecordDispenseRequest struct {
@@ -337,70 +338,8 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		}
 	}
 
-	// 1. ตรวจสอบ / ดึงข้อมูลคนไข้จริงจาก Database
-	var patient models.Patient
-	if req.VisitID > 0 {
-		var visit models.VisitRecord
-		if err := config.DB.Preload("Patient").First(&visit, req.VisitID).Error; err == nil {
-			patient = visit.Patient
-		}
-	}
-	cleanHN := strings.TrimLeft(strings.TrimPrefix(strings.TrimPrefix(req.HN, "HN-"), "HN"), "0")
-	var hnVariants []string
-	if req.HN != "" {
-		hnVariants = append(hnVariants, req.HN)
-	}
-	if cleanHN != "" {
-		hnVariants = append(hnVariants, "HN"+cleanHN, "HN-"+cleanHN, fmt.Sprintf("HN%04s", cleanHN), fmt.Sprintf("HN-%04s", cleanHN), cleanHN)
-	}
-
-	if patient.ID == 0 && len(hnVariants) > 0 {
-		config.DB.Where("hn IN ?", hnVariants).First(&patient)
-	}
-	if patient.ID == 0 && req.PatientName != "" {
-		config.DB.Where("full_name = ?", req.PatientName).First(&patient)
-	}
-	if patient.ID == 0 && req.NationalID != "" && req.NationalID != "-" {
-		config.DB.Where("national_id = ?", req.NationalID).First(&patient)
-	}
-	if patient.ID == 0 && req.PatientName != "" {
-		newHN := req.HN
-		if newHN == "" {
-			newHN = "HN0001"
-		}
-		patient = models.Patient{
-			HN:              newHN,
-			FullName:        req.PatientName,
-			NationalID:      req.NationalID,
-			Gender:          req.Gender,
-			SchemeType:      req.SchemeType,
-			Allergies:       req.Allergies,
-			ChronicDiseases: req.ChronicDiseases,
-			PhoneNumber:     req.PhoneNumber,
-		}
-		config.DB.Create(&patient)
-	}
-
-	// 2. ตรวจสอบ / สร้าง VisitRecord เพื่อป้องกัน Foreign Key Constraint Error
-	var visit models.VisitRecord
-	if req.VisitID > 0 {
-		config.DB.First(&visit, req.VisitID)
-	}
-	if visit.ID == 0 && patient.ID > 0 {
-		config.DB.Where("patient_id = ?", patient.ID).Order("id desc").First(&visit)
-	}
-	if visit.ID == 0 && patient.ID > 0 {
-		visit = models.VisitRecord{
-			PatientID: patient.ID,
-			VisitDate: time.Now(),
-			Status:    "completed",
-			VN:        fmt.Sprintf("VN%d", time.Now().Unix()),
-		}
-		config.DB.Create(&visit)
-	}
-	if visit.ID > 0 {
-		req.VisitID = visit.ID
-	}
+	visit, patient := ResolveOrCreateVisit(req.HN, req.PatientName, req.NationalID, req.VisitID)
+	req.VisitID = visit.ID
 
 	var dispensings []models.Dispensing
 	if req.VisitID > 0 {
@@ -478,10 +417,18 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 				}
 
 				// ตัดสต็อกยา
-				if med.StockQuantity >= qty {
-					med.StockQuantity -= qty
-					tx.Save(&med)
+				dispensedQty := qty
+				res := tx.Model(&models.Medicine{}).Where("id = ? AND stock_quantity >= ?", med.ID, qty).Update("stock_quantity", gorm.Expr("stock_quantity - ?", qty))
+				if res.RowsAffected == 0 {
+					var stockMed models.Medicine
+					tx.First(&stockMed, med.ID)
+					dispensedQty = stockMed.StockQuantity
+					if dispensedQty > qty {
+						dispensedQty = qty
+					}
+					tx.Model(&models.Medicine{}).Where("id = ?", med.ID).Update("stock_quantity", gorm.Expr("GREATEST(stock_quantity - ?, 0)", qty))
 				}
+				qty = dispensedQty
 				
 				price := med.UnitPrice
 				if price <= 0 {
@@ -510,10 +457,18 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		for _, d := range dispensings {
 			var med models.Medicine
 			if err := tx.Where("id = ?", d.MedicineID).First(&med).Error; err == nil {
-				if med.StockQuantity >= d.Quantity {
-					med.StockQuantity -= d.Quantity
-					tx.Save(&med)
+				dispensedQty := d.Quantity
+				res := tx.Model(&models.Medicine{}).Where("id = ? AND stock_quantity >= ?", med.ID, d.Quantity).Update("stock_quantity", gorm.Expr("stock_quantity - ?", d.Quantity))
+				if res.RowsAffected == 0 {
+					var stockMed models.Medicine
+					tx.First(&stockMed, med.ID)
+					dispensedQty = stockMed.StockQuantity
+					if dispensedQty > d.Quantity {
+						dispensedQty = d.Quantity
+					}
+					tx.Model(&models.Medicine{}).Where("id = ?", med.ID).Update("stock_quantity", gorm.Expr("GREATEST(stock_quantity - ?, 0)", d.Quantity))
 				}
+				d.Quantity = dispensedQty
 				price := med.UnitPrice
 				if price <= 0 {
 					price = 10.0
@@ -545,6 +500,14 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 			config.DB.Where("visit_id = ?", req.VisitID).Order("id desc").First(&mq)
 		}
 		if mq.ID == 0 {
+			cleanHN := strings.TrimLeft(strings.TrimPrefix(strings.TrimPrefix(req.HN, "HN-"), "HN"), "0")
+			var hnVariants []string
+			if req.HN != "" {
+				hnVariants = append(hnVariants, req.HN)
+			}
+			if cleanHN != "" {
+				hnVariants = append(hnVariants, "HN"+cleanHN, "HN-"+cleanHN, fmt.Sprintf("HN%04s", cleanHN), fmt.Sprintf("HN-%04s", cleanHN), cleanHN)
+			}
 			config.DB.Where("hn IN ? OR patient_name = ?", hnVariants, req.PatientName).Order("id desc").First(&mq)
 		}
 		if mq.Medications != "" && mq.Medications != "[]" {
@@ -588,14 +551,27 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 	var billing models.Billing
 	if req.VisitID > 0 {
-		billing = models.Billing{
-			VisitID:                 req.VisitID,
-			TotalAmount:             totalAmount,
-			DiscountFromEligibility: 0,
-			NetAmount:               totalAmount,
-			PaymentStatus:           "pending",
+		tx.Where("visit_id = ?", req.VisitID).First(&billing)
+		if billing.ID == 0 {
+			billing = models.Billing{
+				VisitID:                 req.VisitID,
+				TotalAmount:             totalAmount,
+				DiscountFromEligibility: 0,
+				NetAmount:               totalAmount,
+				PaymentStatus:           "pending",
+				ReceiptNumber:           "",
+			}
+			if err := tx.Create(&billing).Error; err != nil {
+				tx.Rollback()
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing record: " + err.Error()})
+				return
+			}
+		} else {
+			tx.Model(&billing).Updates(map[string]interface{}{
+				"total_amount": totalAmount,
+				"net_amount":   totalAmount,
+			})
 		}
-		tx.Create(&billing)
 	}
 
 	targetHN := strings.TrimSpace(req.HN)
@@ -662,27 +638,43 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 	// บันทึกลงตาราง BillingQueue โมเดลคิวการเงินโดยเฉพาะ
 	medsJSON, _ := json.Marshal(medList)
-	billingQueue := models.BillingQueue{
-		QueueNumber:  bQueueNo,
-		HN:           targetHN,
-		PatientName:  targetName,
-		NationalID:   nationalID,
-		Gender:       req.Gender,
-		Age:          age,
-		SchemeType:   schemeType,
-		VisitID:      req.VisitID,
-		TotalAmount:  totalAmount,
-		Status:       "pending",
-		DoctorAdvice: req.DoctorAdvice,
-		Medications:  string(medsJSON),
+	var billingQueue models.BillingQueue
+	if req.VisitID > 0 {
+		tx.Where("visit_id = ?", req.VisitID).First(&billingQueue)
 	}
-	// บันทึกลงตาราง BillingQueue ตรงผ่าน config.DB เพื่อการันตี 100% ว่าเข้าฐานข้อมูล
-	if err := config.DB.Create(&billingQueue).Error; err != nil {
-		fmt.Printf("Error creating billing queue: %v\n", err)
+
+	if billingQueue.ID == 0 {
+		billingQueue = models.BillingQueue{
+			QueueNumber:  bQueueNo,
+			HN:           targetHN,
+			PatientName:  targetName,
+			NationalID:   nationalID,
+			Gender:       req.Gender,
+			Age:          age,
+			SchemeType:   schemeType,
+			VisitID:      req.VisitID,
+			TotalAmount:  totalAmount,
+			Status:       "pending",
+			DoctorAdvice: req.DoctorAdvice,
+			Medications:  string(medsJSON),
+		}
+		if err := tx.Create(&billingQueue).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing queue: " + err.Error()})
+			return
+		}
+	} else {
+		// Update existing queue
+		tx.Model(&billingQueue).Updates(map[string]interface{}{
+			"total_amount":  totalAmount,
+			"doctor_advice": req.DoctorAdvice,
+			"medications":   string(medsJSON),
+			"status":        "pending",
+		})
 	}
 
 	// อัปเดต/สร้างลงตาราง patient_medicines ใน Supabase DB ทันที!
-	cleanHN = strings.TrimPrefix(targetHN, "HN-")
+	cleanHN := strings.TrimPrefix(targetHN, "HN-")
 	cleanHN = strings.TrimPrefix(cleanHN, "HN")
 	var patMed models.PatientMedicine
 	if err := config.DB.Where("hn = ? OR hn = ? OR hn = ?", targetHN, "HN"+cleanHN, "HN-"+cleanHN).First(&patMed).Error; err != nil {
@@ -735,7 +727,6 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		config.DB.Save(&patMed)
 	}
 
-	tx.Commit()
 	ws.BroadcastEvent("PATIENT_MEDICINE_UPDATED", patMed)
 
 	billingPayload := gin.H{
@@ -759,30 +750,35 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 	// ปรับสถานะใน medicine_queues เป็น dispensed
 	if req.VisitID > 0 {
-		config.DB.Model(&models.MedicineQueue{}).Where("visit_id = ?", req.VisitID).Update("status", "dispensed")
+		tx.Model(&models.MedicineQueue{}).Where("visit_id = ?", req.VisitID).Update("status", "dispensed")
 	}
 	if req.QueueNumber != "" {
-		config.DB.Model(&models.MedicineQueue{}).Where("queue_number = ?", req.QueueNumber).Update("status", "dispensed")
+		tx.Model(&models.MedicineQueue{}).Where("queue_number = ?", req.QueueNumber).Update("status", "dispensed")
 	}
 	if req.HN != "" {
-		config.DB.Model(&models.MedicineQueue{}).Where("hn = ?", req.HN).Update("status", "dispensed")
+		tx.Model(&models.MedicineQueue{}).Where("hn = ?", req.HN).Update("status", "dispensed")
 	}
 	if qID > 0 {
-		config.DB.Model(&models.MedicineQueue{}).Where("id = ?", qID).Update("status", "dispensed")
+		tx.Model(&models.MedicineQueue{}).Where("id = ?", qID).Update("status", "dispensed")
 	}
 
 	// ปรับสถานะคิวตรวจของคลินิกเป็น รอชำระเงิน ให้ย้ายออกจากห้องยา 100%
 	if req.VisitID > 0 {
-		config.DB.Model(&models.Queue{}).Where("visit_id = ?", req.VisitID).Update("status", "รอชำระเงิน")
+		tx.Model(&models.Queue{}).Where("visit_id = ?", req.VisitID).Update("status", "รอชำระเงิน")
 	}
 	if patient.ID > 0 {
-		config.DB.Model(&models.Queue{}).Where("patient_id = ? AND status NOT IN ('เสร็จสิ้น', 'ยกเลิกคิว')", patient.ID).Update("status", "รอชำระเงิน")
+		tx.Model(&models.Queue{}).Where("patient_id = ? AND status NOT IN ('เสร็จสิ้น', 'ยกเลิกคิว')", patient.ID).Update("status", "รอชำระเงิน")
 	}
 	if req.QueueNumber != "" {
-		config.DB.Model(&models.Queue{}).Where("queue_number = ?", req.QueueNumber).Update("status", "รอชำระเงิน")
+		tx.Model(&models.Queue{}).Where("queue_number = ?", req.QueueNumber).Update("status", "รอชำระเงิน")
 	}
 	if qID > 0 {
-		config.DB.Model(&models.Queue{}).Where("id = ?", qID).Update("status", "รอชำระเงิน")
+		tx.Model(&models.Queue{}).Where("id = ?", qID).Update("status", "รอชำระเงิน")
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to commit transaction: " + err.Error()})
+		return
 	}
 
 	ws.BroadcastEvent("DISPENSE_RECORDED", gin.H{"visit_id": req.VisitID, "action": "dispensed"})
@@ -790,7 +786,6 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 	ws.BroadcastEvent("QUEUE_UPDATED", gin.H{"action": "status_changed", "status": "รอชำระเงิน", "visit_id": req.VisitID})
 
 	InvalidatePharmacyQueueCache()
-	InvalidateMedicinesCache()
 	InvalidateBillingQueueCache()
 
 	c.JSON(http.StatusOK, gin.H{

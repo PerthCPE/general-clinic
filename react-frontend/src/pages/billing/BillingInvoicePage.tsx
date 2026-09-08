@@ -583,14 +583,12 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
-        await fetch('/api/system/billing/confirm', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const errorData = await res.json();
+        throw new Error(errorData.error || 'Payment failed');
       }
     } catch (err) {
       console.error('Failed to confirm payment:', err);
+      alert('ไม่สามารถยืนยันการชำระเงินได้: ' + (err as Error).message);
     } finally {
       // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;
