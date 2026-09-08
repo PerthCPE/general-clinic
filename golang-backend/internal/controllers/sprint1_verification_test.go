@@ -519,9 +519,15 @@ func TestC1_CollisionRetry(t *testing.T) {
 	routes.SetUpRoutes(r)
 	regToken := generateTestToken(1, "registrar")
 
-	// Get a test patient
-	var p models.Patient
-	db.First(&p)
+	// Create a fresh test patient for queue creation
+	p := models.Patient{
+		HN:         fmt.Sprintf("HN%04X", time.Now().UnixNano()%0xFFFF),
+		NationalID: fmt.Sprintf("1%012d", time.Now().UnixNano()%1000000000000),
+		FullName:   "นายทดสอบ คิวใหม่เฉพาะกิจ",
+		Gender:     "ชาย",
+		BirthDate:  time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC),
+	}
+	db.Create(&p)
 
 	// Call CreateQueue
 	payload := map[string]any{
