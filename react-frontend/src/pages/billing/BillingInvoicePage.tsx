@@ -9,6 +9,7 @@ import { BillingInvoiceSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 import { playBillingNotification } from '../../utils/audioQueue';
+import { formatNationalId } from '../../utils/formatters';
 
 interface BillingInvoicePageProps {
   selectedPatientId?: string;
@@ -588,7 +589,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
       }
     } catch (err) {
       console.error('Failed to confirm payment:', err);
-      alert('ไม่สามารถยืนยันการชำระเงินได้: ' + (err as Error).message);
+      if ((err as Error).message.includes('Invalid or Expired token')) { alert('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'); localStorage.removeItem('token'); localStorage.removeItem('clinic_auth_token'); window.location.href = '/login'; } else { alert('ไม่สามารถยืนยันการชำระเงินได้: ' + (err as Error).message); }
     } finally {
       // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;
@@ -809,7 +810,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '0.9rem', color: '#64748B' }}>
-                <span><strong>เลขประจำตัวประชาชน:</strong> {activePatient.nationalId || '-'}</span>
+                <span><strong>เลขประจำตัวประชาชน:</strong> {formatNationalId(activePatient.nationalId)}</span>
                 <span>•</span>
                 <span><strong>วันที่รับบริการ:</strong> {activePatient.visitDate || new Date().toISOString().split('T')[0]} ({activePatient.visitTime || '10:30'})</span>
               </div>
@@ -867,7 +868,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                 color: isPaymentConfirmed ? '#15803D' : '#DC2626',
                 border: `1.5px solid ${isPaymentConfirmed ? '#86EFAC' : '#FCA5A5'}`, 
                 padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '800',
-                display: 'inline-flex', alignItems: 'center', gap: '6px', height: '36px', boxSizing: 'border-box'
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '120px', height: '36px', boxSizing: 'border-box'
               }}>
                 {isPaymentConfirmed ? (
                   <>
@@ -1221,7 +1222,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                         </div>
                         <div style={{ fontSize: '13px', lineHeight: '1.6', marginBottom: '14px' }}>
                           <div><strong>ชื่อผู้ป่วย:</strong> {activePatient.name}</div>
-                          <div><strong>HN:</strong> {activePatient.hn} | <strong>บัตรประชาชน:</strong> {activePatient.nationalId}</div>
+                          <div><strong>HN:</strong> {activePatient.hn} | <strong>บัตรประชาชน:</strong> {formatNationalId(activePatient.nationalId)}</div>
                           <div><strong>วันที่:</strong> {activePatient.visitDate} ({activePatient.visitTime})</div>
                           <div><strong>วิธีชำระเงิน:</strong> {paymentMethod === 'qr' ? 'PromptPay QR Code' : 'เงินสด'}</div>
                         </div>
@@ -1546,7 +1547,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                     <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1E40AF' }}>{activePatient.hn}</span>
                     {activePatient.nationalId && (
                       <span style={{ color: '#64748B', marginLeft: '10px' }}>
-                        (เลขบัตร: {activePatient.nationalId})
+                        (เลขบัตร: {formatNationalId(activePatient.nationalId)})
                       </span>
                     )}
                   </div>

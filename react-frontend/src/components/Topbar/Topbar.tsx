@@ -46,7 +46,6 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   const docMessageRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
-  const [isAdminFontEnabled, setIsAdminFontEnabled] = useState(false);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const searchRef = useRef<HTMLDivElement>(null);
   const { subscribe } = useWebSocket();
@@ -155,27 +154,9 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   }, [docMessages, allDocsSearch, allDocsFilter]);
 
   useEffect(() => {
-    const isFontEnabled = localStorage.getItem('adminFontEnabled') === 'true';
-    setIsAdminFontEnabled(isFontEnabled);
-    if (isFontEnabled) {
-      document.body.classList.add('admin-font-theme');
-    }
-
     const soundSetting = localStorage.getItem('notificationSoundEnabled');
     setIsSoundEnabled(soundSetting !== 'false'); // Default true
   }, []);
-
-  const toggleAdminFont = () => {
-    const isEnabled = !isAdminFontEnabled;
-    setIsAdminFontEnabled(isEnabled);
-    if (isEnabled) {
-      document.body.classList.add('admin-font-theme');
-      localStorage.setItem('adminFontEnabled', 'true');
-    } else {
-      document.body.classList.remove('admin-font-theme');
-      localStorage.removeItem('adminFontEnabled');
-    }
-  };
 
   const toggleNotificationSound = () => {
     const newVal = !isSoundEnabled;
@@ -1020,25 +1001,6 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 </span>
               </button>
 
-              {/* 3. สลับรูปแบบตัวอักษร (ทดสอบ) */}
-              <button
-                className="dropdown-menu-item dropdown-item-3"
-                onClick={() => {
-                  toggleAdminFont();
-                  setIsDropdownOpen(false);
-                }}
-              >
-                <span className="theme-toggle-text">
-                  {isAdminFontEnabled ? 'ยกเลิกฟอนต์ทดสอบ' : 'ทดสอบฟอนต์ระบบจัดการสิทธิ์'}
-                </span>
-                <span className="theme-toggle-icon-wrapper" style={{ marginLeft: '8px' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="4 7 4 4 20 4 20 7"></polyline>
-                    <line x1="9" y1="20" x2="15" y2="20"></line>
-                    <line x1="12" y1="4" x2="12" y2="20"></line>
-                  </svg>
-                </span>
-              </button>
 
               {/* 4. เปิด/ปิด เสียงแจ้งเตือน */}
               <button

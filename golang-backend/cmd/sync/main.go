@@ -39,6 +39,11 @@ func main() {
 
 	// 3. ทำ AutoMigrate ใน Local เพื่อสร้าง Table ทั้งหมด
 	fmt.Println("⏳ กำลังเตรียมโครงสร้างตาราง (Migrate) ใน Local Database...")
+	
+	localDB.Exec("SET DateStyle = 'DMY';")
+	localDB.Exec("DROP TABLE IF EXISTS screenings CASCADE;")
+	localDB.Exec("DROP TABLE IF EXISTS medical_eligibilities CASCADE;")
+	
 	err = localDB.AutoMigrate(
 		&models.User{},
 		&models.Doctor{},

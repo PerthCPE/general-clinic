@@ -17,8 +17,8 @@
 @import "tailwindcss/utilities";
 
 @theme {
-  /* กำหนด font-sans ของ Tailwind ให้ตรงกับระบบหลัก (IBM Plex Sans Thai + Plus Jakarta Sans + Inter) */
-  --font-sans: 'IBM Plex Sans Thai', 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
+  /* กำหนด font-sans ของ Tailwind ให้ตรงกับระบบหลัก (Inter + Prompt + Kanit) */
+  --font-sans: 'Inter', 'Prompt', 'Kanit', system-ui, -apple-system, sans-serif;
   --font-heading: 'Plus Jakarta Sans', 'Prompt', 'Kanit', sans-serif;
 
   /* ต้องระบุ font-mono เป็นชื่อฟอนต์จริง ห้ามปล่อยให้เหลือคำว่า monospace เดี่ยว ๆ
@@ -193,8 +193,8 @@
 
 :root {
   /* Modern Medical Typography System */
-  /* ฟอนต์หลัก (Primary): IBM Plex Sans Thai (ไทย) + Plus Jakarta Sans / Inter (อังกฤษ) — อ่านง่ายที่สุด คมชัดระดับโปรแกรมการแพทย์ */
-  --font-primary: 'IBM Plex Sans Thai', 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* ฟอนต์หลัก (Primary): Inter (ตัวเลขอังกฤษและสากลปกติ) + Prompt / Kanit (ภาษาไทยโมเดิร์นแบบระบบจัดการสิทธิ์) */
+  --font-primary: 'Inter', 'Prompt', 'Kanit', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
   /* ฟอนต์รอง / หัวข้อ (Secondary / Headings): Plus Jakarta Sans (อังกฤษ) + Prompt / Kanit (ไทย) — โมเดิร์น พรีเมียม หนักแน่น */
   --font-heading: 'Plus Jakarta Sans', 'Prompt', 'Kanit', sans-serif;
@@ -309,8 +309,8 @@ body.dark-mode thead th {
 }
 
 
-/* ͺ͹кѴԷ (Prompt) */
+/* ฟอนต์ระบบจัดการสิทธิ์ (Prompt + Inter สำหรับตัวเลขปกติ) */
 body.admin-font-theme {
-  --font-primary: 'Prompt', 'Kanit', sans-serif !important;
-  --font-heading: 'Prompt', 'Kanit', sans-serif !important;
+  --font-primary: 'Inter', 'Prompt', 'Kanit', sans-serif !important;
+  --font-heading: 'Plus Jakarta Sans', 'Prompt', 'Kanit', sans-serif !important;
 }

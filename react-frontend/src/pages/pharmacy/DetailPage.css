@@ -877,8 +877,8 @@ body.dark-mode .detail-page-container table {
 }
 
 .detail-page-container table th {
-  font-size: 0.92rem !important;
-  font-weight: 500 !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
 }
 
 body.dark-mode .detail-page-container table th {
@@ -887,7 +887,7 @@ body.dark-mode .detail-page-container table th {
 }
 
 .detail-page-container table td {
-  font-size: 0.95rem;
+  font-size: 13.5px !important;
 }
 
 body.dark-mode .detail-page-container table tr {
@@ -1055,6 +1055,12 @@ body.dark-mode .detail-page-container input[type="text"] {
   background-color: #0F172A !important;
   border-color: #334155 !important;
   color: #F8FAFC !important;
+}
+
+body.dark-mode .detail-page-container .search-card button {
+  background-color: #1E293B !important;
+  border-color: #334155 !important;
+  color: #E2E8F0 !important;
 }
 
 /* Recent Patients Table Smooth Scrollbar */
