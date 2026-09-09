@@ -45,7 +45,24 @@ func main() {
 		}
 	}
 
-	log.Println("All transactional test data cleaned! Now seeding fresh clean records...")
+	// Reset primary key sequences for transactional tables so IDs start cleanly from 1
+	seqs := []string{
+		"patients_id_seq",
+		"queues_id_seq",
+		"visit_records_id_seq",
+		"screenings_id_seq",
+		"medical_eligibilities_id_seq",
+		"diagnoses_id_seq",
+		"examinations_id_seq",
+		"patient_medicines_id_seq",
+		"billings_id_seq",
+		"medicine_queues_id_seq",
+	}
+	for _, seq := range seqs {
+		db.Exec("ALTER SEQUENCE IF EXISTS " + seq + " RESTART WITH 1")
+	}
+
+	log.Println("All transactional test data cleaned and sequences reset! Now seeding fresh clean records...")
 
 	// 2. Seed All Required Users with default password "password"
 	hashPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), 10)
@@ -89,6 +106,28 @@ func main() {
 	db.Where("username = ?", "doctor1").First(&doc1)
 	db.Where("username = ?", "doctor2").First(&doc2)
 	db.Where("username = ?", "doctor3").First(&doc3)
+
+	// Ensure Doctor profiles
+	doctorProfiles := []models.Doctor{
+		{UserID: doc1.ID, FullName: doc1.FullName, LicenseNumber: "ว.11234", Specialty: "อายุรกรรมทั่วไป", Room: "ห้องตรวจ 1", Phone: doc1.Phone, IsActive: true},
+		{UserID: doc2.ID, FullName: doc2.FullName, LicenseNumber: "ว.22345", Specialty: "เวชศาสตร์ครอบครัว", Room: "ห้องตรวจ 2", Phone: doc2.Phone, IsActive: true},
+		{UserID: doc3.ID, FullName: doc3.FullName, LicenseNumber: "ว.33456", Specialty: "กุมารเวชกรรม", Room: "ห้องตรวจ 3", Phone: doc3.Phone, IsActive: true},
+	}
+	for _, dp := range doctorProfiles {
+		var existingDP models.Doctor
+		if err := db.Where("user_id = ?", dp.UserID).First(&existingDP).Error; err != nil {
+			db.Create(&dp)
+		} else {
+			db.Model(&existingDP).Updates(map[string]interface{}{
+				"full_name":      dp.FullName,
+				"license_number": dp.LicenseNumber,
+				"specialty":      dp.Specialty,
+				"room":           dp.Room,
+				"phone":          dp.Phone,
+				"is_active":      true,
+			})
+		}
+	}
 
 	parseDate := func(d string) time.Time {
 		t, _ := time.Parse("2006-01-02", d)
@@ -303,6 +342,6 @@ func main() {
 	log.Printf("Seeded %d screenings successfully (Triage 1-4).", len(screeningsData))
 
 	fmt.Println("\n=======================================================")
-	fmt.Println("🎉 Database reset and clean seeding completed successfully!")
+	fmt.Println("[SUCCESS] Database reset and clean seeding completed successfully!")
 	fmt.Println("=======================================================")
 }

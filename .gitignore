@@ -22,8 +22,10 @@ golang-backend/golang-backend
 golang-backend/*.exe
 *.exe
 *.exe~
-*.tmp
 *.log
+backups/
+golang-backend/backups/
+
 
 # OS specific
 .DS_Store
