@@ -293,9 +293,6 @@ func RegisterPatient(c *gin.Context) {
 	}
 	config.DB.Create(&initialEligibility)
 
-	// ส่ง WebSocket Broadcast แจ้งเตือนทุกเครื่องว่ามีผู้ป่วยใหม่ลงทะเบียน
-	ws.BroadcastEvent("PATIENT_REGISTERED", newPatient)
-
 	// Sprint 3.2: ตรวจสอบ issue_queue flag (Default = false: ไม่ออกคิว)
 	if req.IssueQueue {
 		// สร้างคิวรอคัดกรองให้อัตโนมัติ เพื่อส่งต่อเข้าสู่ระบบคัดกรองทันที (Atomic Daily Sequential Queue)
@@ -329,6 +326,9 @@ func RegisterPatient(c *gin.Context) {
 			UpdatedAt:       nowBkk,
 		}
 		config.DB.Create(&newQueue)
+
+		// ส่ง WebSocket Broadcast แจ้งเตือนทุกเครื่องว่ามีผู้ป่วยใหม่และมีการสร้างคิว
+		ws.BroadcastEvent("PATIENT_REGISTERED", newPatient)
 		ws.BroadcastEvent("QUEUE_CREATED", newQueue)
 
 		// คืน Response พร้อมข้อมูลคิวและ flag queue_issued: true
@@ -346,6 +346,8 @@ func RegisterPatient(c *gin.Context) {
 	}
 
 	// กรณี issue_queue == false (หรือไม่ได้ส่งมา): ออกแค่ HN และไม่ออกคิว
+	ws.BroadcastEvent("PATIENT_REGISTERED", newPatient)
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message":      "ลงทะเบียนคนไข้ใหม่สำเร็จ (ยังไม่ออกบัตรคิว)",
 		"patient":      newPatient,

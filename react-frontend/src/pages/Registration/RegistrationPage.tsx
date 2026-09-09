@@ -5,7 +5,6 @@ import type { Patient, SchemeType } from './types';
 import { patientApi, queueApi, type BackendPatient, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
-import { clinicMockStore } from '../../mocks/clinicMockStore';
 import './RegistrationPage.css';
 
 export { formatHN, formatQueueNo, formatNationalId, formatPhone };
@@ -80,6 +79,8 @@ function RegistrationPage() {
   const [allPatients, setAllPatients] = useState<Patient[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [tableFilter, setTableFilter] = useState<'unqueued' | 'all'>('unqueued');
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searchResult, setSearchResult] = useState<Patient | null>(null);
   const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
@@ -91,134 +92,43 @@ function RegistrationPage() {
 
   const formSectionRef = useRef<HTMLDivElement>(null);
 
-  // ดึงรายชื่อผู้ป่วยทั้งหมด และคิวที่กำลัง active จาก Backend DB จริง
+  // ดึงรายชื่อผู้ป่วยทั้งหมด และคิวที่กำลัง active จาก Backend DB จริง (Zero Mock)
   const fetchPatients = useCallback(async () => {
     setIsLoading(true);
+    setFetchError(null);
     try {
       const [patientsData, queuesData] = await Promise.all([
         patientApi.getAll(),
         queueApi.getList().catch(() => [] as BackendQueue[]),
       ]);
 
-      if (Array.isArray(patientsData) && patientsData.length > 0) {
+      if (Array.isArray(patientsData)) {
         const allMapped = patientsData.map(mapBackendPatientToUI);
         setAllPatients(allMapped);
 
         // หา ID ของผู้ป่วยทั้งหมดที่มีคิวแล้วในระบบ
+        const queueList = Array.isArray(queuesData)
+          ? queuesData
+          : queuesData && typeof queuesData === 'object' && Array.isArray((queuesData as any).data)
+          ? (queuesData as any).data
+          : [];
+
         const queuedPatientIds = new Set(
-          (Array.isArray(queuesData) ? queuesData : []).map((q) => q.patient_id)
+          queueList.map((q: any) => q.patient_id)
         );
 
         // กรองเอาเฉพาะผู้ป่วยที่ยังไม่ได้ออกบัตรคิวเข้าตรวจ
         const unqueued = patientsData.filter((p) => !queuedPatientIds.has(p.id));
         setPatients(unqueued.map(mapBackendPatientToUI));
-        const mockAll = clinicMockStore.getPatients().map((p) => ({
-          id: p.id,
-          hn: formatHN(p.hn),
-          fullName: p.fullName,
-          nationalId: formatNationalId(p.nationalId),
-          dob: p.dob,
-          age: p.age,
-          gender: p.gender,
-          phone: formatPhone(p.phone),
-          emergencyContact: p.emergencyContact,
-          houseNo: p.houseNo || '',
-          villageNo: p.villageNo || '',
-          villageName: p.villageName || '',
-          alley: p.alley || '',
-          road: p.road || '',
-          subDistrict: p.subDistrict || '',
-          district: p.district || '',
-          province: p.province || '',
-          postalCode: p.postalCode || '',
-          address: p.address,
-          schemeType: p.schemeType as SchemeType,
-          chronicDiseases: p.chronicDiseases,
-          allergies: p.allergies,
-          registeredAt: p.registeredAt,
-        }));
-        setAllPatients(mockAll);
-        const mockUnqueued = clinicMockStore.getUnqueuedPatients().map((p) => ({
-          id: p.id,
-          hn: formatHN(p.hn),
-          fullName: p.fullName,
-          nationalId: formatNationalId(p.nationalId),
-          dob: p.dob,
-          age: p.age,
-          gender: p.gender,
-          phone: formatPhone(p.phone),
-          emergencyContact: p.emergencyContact,
-          houseNo: p.houseNo || '',
-          villageNo: p.villageNo || '',
-          villageName: p.villageName || '',
-          alley: p.alley || '',
-          road: p.road || '',
-          subDistrict: p.subDistrict || '',
-          district: p.district || '',
-          province: p.province || '',
-          postalCode: p.postalCode || '',
-          address: p.address,
-          schemeType: p.schemeType as SchemeType,
-          chronicDiseases: p.chronicDiseases,
-          allergies: p.allergies,
-          registeredAt: p.registeredAt,
-        }));
-        setPatients(mockUnqueued);
+      } else {
+        setAllPatients([]);
+        setPatients([]);
       }
     } catch (err) {
-      console.warn('Could not fetch patients from backend, using clinicMockStore:', err);
-      const mockAll = clinicMockStore.getPatients().map((p) => ({
-        id: p.id,
-        hn: formatHN(p.hn),
-        fullName: p.fullName,
-        nationalId: formatNationalId(p.nationalId),
-        dob: p.dob,
-        age: p.age,
-        gender: p.gender,
-        phone: formatPhone(p.phone),
-        emergencyContact: p.emergencyContact,
-        houseNo: p.houseNo || '',
-        villageNo: p.villageNo || '',
-        villageName: p.villageName || '',
-        alley: p.alley || '',
-        road: p.road || '',
-        subDistrict: p.subDistrict || '',
-        district: p.district || '',
-        province: p.province || '',
-        postalCode: p.postalCode || '',
-        address: p.address,
-        schemeType: p.schemeType as SchemeType,
-        chronicDiseases: p.chronicDiseases,
-        allergies: p.allergies,
-        registeredAt: p.registeredAt,
-      }));
-      setAllPatients(mockAll);
-      const mockUnqueued = clinicMockStore.getUnqueuedPatients().map((p) => ({
-        id: p.id,
-        hn: formatHN(p.hn),
-        fullName: p.fullName,
-        nationalId: formatNationalId(p.nationalId),
-        dob: p.dob,
-        age: p.age,
-        gender: p.gender,
-        phone: formatPhone(p.phone),
-        emergencyContact: p.emergencyContact,
-        houseNo: p.houseNo || '',
-        villageNo: p.villageNo || '',
-        villageName: p.villageName || '',
-        alley: p.alley || '',
-        road: p.road || '',
-        subDistrict: p.subDistrict || '',
-        district: p.district || '',
-        province: p.province || '',
-        postalCode: p.postalCode || '',
-        address: p.address,
-        schemeType: p.schemeType as SchemeType,
-        chronicDiseases: p.chronicDiseases,
-        allergies: p.allergies,
-        registeredAt: p.registeredAt,
-      }));
-      setPatients(mockUnqueued);
+      console.error('Could not fetch patients from backend:', err);
+      setFetchError('ไม่สามารถโหลดรายชื่อผู้ป่วยจากระบบได้ กรุณากดลองใหม่อีกครั้ง');
+      setAllPatients([]);
+      setPatients([]);
     } finally {
       setIsLoading(false);
     }
@@ -545,7 +455,7 @@ function RegistrationPage() {
       {/* 2. New Patient Registration Form Section */}
       <PatientFormCard onSubmit={handleFormSubmit} formRef={formSectionRef} />
 
-      {/* 3. Recent Registered Patients Dropdown Accordion Card */}
+      {/* 3. Patient List & Unqueued Table Accordion Card */}
       <div className="reg-card">
         <div className="reg-card-header" onClick={() => setIsRecentOpen(!isRecentOpen)}>
           <div className="reg-header-title-wrap">
@@ -561,12 +471,14 @@ function RegistrationPage() {
               </svg>
             </div>
             <div>
-              <h2 className="reg-card-title">รายชื่อผู้ป่วยที่ลงทะเบียนล่าสุด (Recent Patients)</h2>
-              <p className="reg-card-subtitle">รายการผู้ป่วยที่บันทึกข้อมูลเข้าสู่ระบบคลินิก</p>
+              <h2 className="reg-card-title">รายชื่อผู้ป่วยรอออกบัตรคิว (Unqueued Patients)</h2>
+              <p className="reg-card-subtitle">รายการผู้ป่วยที่บันทึกข้อมูลเข้าสู่ระบบแล้ว แต่ยังไม่ได้ออกบัตรคิวเข้าห้องตรวจ</p>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span className="reg-count-pill">{patients.length} คนไข้</span>
+            <span className="reg-count-pill">
+              {tableFilter === 'unqueued' ? `${patients.length} รอคิว` : `${allPatients.length} ทั้งหมด`}
+            </span>
             <button className={`reg-card-toggle reg-recent-toggle ${isRecentOpen ? 'open' : ''}`} aria-label="Toggle Dropdown">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -576,6 +488,49 @@ function RegistrationPage() {
         </div>
 
         <div className={`reg-card-body reg-recent-body ${isRecentOpen ? 'expanded' : ''}`} style={{ padding: isRecentOpen ? '0' : '0' }}>
+          {/* Table View Filter Tabs */}
+          <div className="reg-table-filter-bar">
+            <button
+              type="button"
+              className={`reg-table-tab-btn ${tableFilter === 'unqueued' ? 'active' : ''}`}
+              onClick={() => setTableFilter('unqueued')}
+            >
+              <span>ผู้ป่วยรอออกบัตรคิว</span>
+              <span className="reg-table-tab-count">{patients.length}</span>
+            </button>
+            <button
+              type="button"
+              className={`reg-table-tab-btn ${tableFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setTableFilter('all')}
+            >
+              <span>ผู้ป่วยทั้งหมดในระบบ</span>
+              <span className="reg-table-tab-count">{allPatients.length}</span>
+            </button>
+          </div>
+
+          {/* Error Banner with Retry */}
+          {fetchError && (
+            <div style={{ padding: '12px 24px 0 24px' }}>
+              <div className="reg-fetch-error-banner">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>{fetchError}</span>
+                </div>
+                <button
+                  type="button"
+                  className="reg-retry-btn"
+                  onClick={fetchPatients}
+                >
+                  ลองใหม่อีกครั้ง
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="table-responsive">
             <table className="reg-recent-table">
               <thead>
@@ -589,7 +544,7 @@ function RegistrationPage() {
                 </tr>
               </thead>
               <tbody>
-                {patients.length === 0 ? (
+                {(tableFilter === 'unqueued' ? patients : allPatients).length === 0 ? (
                   <tr>
                     <td colSpan={6} className="reg-empty-table-cell">
                       <div className="reg-empty-wrap">
@@ -602,63 +557,81 @@ function RegistrationPage() {
                             strokeLinejoin="round"
                           />
                         </svg>
-                        <p>ไม่มีรายชื่อผู้ป่วยรอเข้าคิว (ผู้ป่วยทั้งหมดถูกส่งเข้าคิวตรวจแล้ว)</p>
+                        <p>
+                          {isLoading
+                            ? 'กำลังโหลดรายชื่อผู้ป่วยจากระบบ...'
+                            : tableFilter === 'unqueued'
+                            ? 'ไม่มีรายชื่อผู้ป่วยรอออกบัตรคิว (ผู้ป่วยทั้งหมดถูกส่งเข้าห้องตรวจเรียบร้อยแล้ว)'
+                            : 'ยังไม่มีข้อมูลผู้ป่วยในระบบ กรุณาลงทะเบียนผู้ป่วยใหม่'}
+                        </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  patients.map((p) => (
-                    <tr key={p.hn} className="reg-table-row">
-                      <td className="col-reg-hn">
-                        <span className="reg-hn-tag">{p.hn}</span>
-                      </td>
-                      <td className="col-reg-patient">
-                        <div className="reg-patient-cell">
-                          <span className="patient-name-link" onClick={() => setSelectedPatientModal(p)}>
-                            {p.fullName}
+                  (tableFilter === 'unqueued' ? patients : allPatients).map((p) => {
+                    const isQueued = !patients.some((u) => u.hn === p.hn);
+                    return (
+                      <tr key={p.hn} className="reg-table-row">
+                        <td className="col-reg-hn">
+                          <span className="reg-hn-tag">{p.hn}</span>
+                        </td>
+                        <td className="col-reg-patient">
+                          <div className="reg-patient-cell">
+                            <span className="patient-name-link" onClick={() => setSelectedPatientModal(p)}>
+                              {p.fullName}
+                            </span>
+                            <span className="patient-sub-meta">
+                              <span className="font-mono">{p.nationalId}</span> • เพศ {p.gender}, {p.age} ปี
+                            </span>
+                          </div>
+                        </td>
+                        <td className="col-reg-phone">
+                          <span className="font-phone">{p.phone}</span>
+                        </td>
+                        <td className="col-reg-scheme">
+                          <span className={`scheme-pill ${getSchemeClass(p.schemeType)}`}>
+                            {p.schemeType}
                           </span>
-                          <span className="patient-sub-meta">
-                            <span className="font-mono">{p.nationalId}</span> • เพศ {p.gender}, {p.age} ปี
-                          </span>
-                        </div>
-                      </td>
-                      <td className="col-reg-phone">
-                        <span className="font-phone">{p.phone}</span>
-                      </td>
-                      <td className="col-reg-scheme">
-                        <span className={`scheme-pill ${getSchemeClass(p.schemeType)}`}>
-                          {p.schemeType}
-                        </span>
-                      </td>
-                      <td className="col-reg-time">
-                        <div className="reg-time-cell">
-                          <span className="time-main-text">
-                            {p.registeredAt.includes(' ') ? p.registeredAt.split(' ')[1] : p.registeredAt}
-                          </span>
-                          {p.registeredAt.includes(' ') && (
-                            <span className="time-sub-date">{p.registeredAt.split(' ')[0]}</span>
+                        </td>
+                        <td className="col-reg-time">
+                          <div className="reg-time-cell">
+                            <span className="time-main-text">
+                              {p.registeredAt.includes(' ') ? p.registeredAt.split(' ')[1] : p.registeredAt}
+                            </span>
+                            {p.registeredAt.includes(' ') && (
+                              <span className="time-sub-date">{p.registeredAt.split(' ')[0]}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="col-reg-action">
+                          {isQueued && tableFilter === 'all' ? (
+                            <span className="reg-status-queued-badge">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                              <span>อยู่ในคิวแล้ว</span>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-quick-assign-queue"
+                              title="ส่งเข้าคิวตรวจทันที"
+                              onClick={() => handleAssignQueue(p)}
+                            >
+                              <svg viewBox="0 0 20 20" fill="currentColor" className="btn-icon-svg">
+                                <path
+                                  fillRule="evenodd"
+                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                              <span>เข้าคิว</span>
+                            </button>
                           )}
-                        </div>
-                      </td>
-                      <td className="col-reg-action">
-                        <button
-                          type="button"
-                          className="btn-quick-assign-queue"
-                          title="ส่งเข้าคิวตรวจทันที"
-                          onClick={() => handleAssignQueue(p)}
-                        >
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="btn-icon-svg">
-                            <path
-                              fillRule="evenodd"
-                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          <span>เข้าคิว</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

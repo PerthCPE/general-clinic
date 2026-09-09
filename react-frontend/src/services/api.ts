@@ -328,6 +328,9 @@ export const eligibilityApi = {
       national_id: string;
       scheme_type: string;
       coverage_details: string;
+      hospital_name?: string;
+      expire_date?: string;
+      status?: string;
       verified_at: string;
     }>(`/api/registrar/eligibility/check/${nationalId.replace(/[-\s]/g, '')}`),
   save: (payload: {

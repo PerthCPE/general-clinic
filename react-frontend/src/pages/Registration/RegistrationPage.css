@@ -1394,6 +1394,13 @@
   font-weight: 600;
 }
 
+.reg-modal-row .modal-val.font-mono {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+
 .reg-modal-footer {
   padding: 14px 24px;
   border-top: 1px solid #F1F5F9;
@@ -2063,5 +2070,139 @@ body.dark-mode .reg-success-queue-val {
 
 body.dark-mode .reg-success-queue-dept {
   color: #94A3B8;
+}
+
+/* ===== Table Filter Tabs & Error Banner ===== */
+.reg-table-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-bottom: 1px solid #F1F5F9;
+  background: #FFFFFF;
+}
+
+.reg-table-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #E2E8F0;
+  background: #FFFFFF;
+  color: #64748B;
+  font-family: var(--font-primary);
+  font-weight: 500;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.reg-table-tab-btn:hover {
+  background: #F8FAFC;
+  border-color: #CBD5E1;
+  color: #334155;
+}
+
+.reg-table-tab-btn.active {
+  background: #EFF6FF;
+  border-color: #2563EB;
+  color: #2563EB;
+  font-weight: 600;
+}
+
+.reg-table-tab-count {
+  font-size: 12px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: #F1F5F9;
+  color: #64748B;
+  font-weight: 700;
+}
+
+.reg-table-tab-btn.active .reg-table-tab-count {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+.reg-fetch-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 10px;
+  color: #DC2626;
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.reg-retry-btn {
+  padding: 6px 14px;
+  background: #DC2626;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.reg-retry-btn:hover {
+  background: #B91C1C;
+}
+
+.reg-status-queued-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #EFF6FF;
+  color: #2563EB;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Dark Mode Overrides for Table Filter */
+body.dark-mode .reg-table-filter-bar {
+  background: #212836;
+  border-color: #333F53;
+}
+
+body.dark-mode .reg-table-tab-btn {
+  background: #1C2230;
+  border-color: #333F53;
+  color: #94A3B8;
+}
+
+body.dark-mode .reg-table-tab-btn:hover {
+  background: #2A3447;
+  color: #F1F5F9;
+}
+
+body.dark-mode .reg-table-tab-btn.active {
+  background: rgba(37, 99, 235, 0.2);
+  border-color: #3B82F6;
+  color: #60A5FA;
+}
+
+body.dark-mode .reg-table-tab-count {
+  background: #2A3447;
+  color: #94A3B8;
+}
+
+body.dark-mode .reg-table-tab-btn.active .reg-table-tab-count {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+body.dark-mode .reg-status-queued-badge {
+  background: rgba(37, 99, 235, 0.2);
+  color: #93C5FD;
 }
 
