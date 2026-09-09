@@ -3,11 +3,12 @@ import './DetailPage.css';
 import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
-import { Check, Plus, Minus, Loader2, Search, RefreshCw } from 'lucide-react';
+import { Check, Plus, Minus, Loader2, RefreshCw } from 'lucide-react';
 import { PharmacyDetailSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 import { API_BASE_URL } from '../../services/api';
+import { formatNationalId } from '../../utils/formatters';
 // เสียงแจ้งเตือน "ใบสั่งยาใหม่" เล่นจาก GlobalAudioListener ที่เดียว (ฟัง event MEDICINE_QUEUE_CREATED)
 // ไม่เล่นซ้ำที่หน้านี้อีก เพื่อไม่ให้เสียงซ้อนกันสองรอบ
 
@@ -629,7 +630,7 @@ export default function DetailPage({
       }
     } catch (err) {
        console.error('Dispense failed:', err);
-       alert('ไม่สามารถยืนยันการจ่ายยาได้: ' + (err as Error).message);
+       if ((err as Error).message.includes('Invalid or Expired token')) { alert('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'); localStorage.removeItem('token'); localStorage.removeItem('clinic_auth_token'); window.location.href = '/login'; } else { alert('ไม่สามารถยืนยันการจ่ายยาได้: ' + (err as Error).message); }
     } finally {
       // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;
@@ -847,40 +848,95 @@ export default function DetailPage({
         
         {isSearchExpanded && (
           <div style={{ padding: '20px 24px' }}>
-            {/* Filter Search Input */}
-            <div style={{ marginBottom: '20px', display: 'flex', gap: '12px', alignItems: 'stretch' }}>
-              <input 
-                type="text" 
-                placeholder="ค้นหาด้วยข้อมูลเลขบัตรประชาชน, HN หรือ ชื่อ-นามสกุล..." 
-                value={patientIdInput} 
-                onChange={(e) => {
-                  setPatientIdInput(e.target.value);
-                  if (e.target.value === '') {
+            {/* Filter Search Input (รูปแบบเหมือนระบบจัดการเงิน) */}
+            <div style={{ marginBottom: '16px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <input 
+                  type="text" 
+                  placeholder="ค้นหา HN หรือ ชื่อผู้ป่วย..." 
+                  value={patientIdInput} 
+                  onChange={(e) => {
+                    setPatientIdInput(e.target.value);
+                    if (e.target.value === '') {
+                      fetchQueues(false, '');
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleRefresh();
+                    }
+                  }}
+                  style={{ 
+                    width: '100%',
+                    padding: '10px 14px 10px 38px', 
+                    borderRadius: '8px', 
+                    border: '1px solid #CBD5E1', 
+                    fontSize: '13.5px', 
+                    height: '42px', 
+                    outline: 'none',
+                    boxSizing: 'border-box' 
+                  }}
+                />
+                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', color: '#64748B', pointerEvents: 'none' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                </span>
+              </div>
+              {patientIdInput && (
+                <button
+                  onClick={() => {
+                    setPatientIdInput('');
                     fetchQueues(false, '');
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSearch();
-                  }
-                }}
-                style={{ flex: 1, padding: '10px 16px', border: '1.5px solid #CBD5E1', borderRadius: '10px', fontSize: '14px', height: '42px', boxSizing: 'border-box' }}
-              />
-              <button 
-                onClick={handleSearch}
-                disabled={isRefreshing}
-                style={{ padding: '0 20px', background: '#2563EB', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: '700', fontSize: '14px', height: '42px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)' }}
-              >
-                <Search size={16} />
-                <span>ค้นหา / คิวรี</span>
-              </button>
+                  }}
+                  style={{
+                    padding: '0 14px',
+                    borderRadius: '8px',
+                    border: '1px solid #CBD5E1',
+                    background: '#F1F5F9',
+                    color: '#475569',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    height: '42px',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                  ล้าง
+                </button>
+              )}
               <button 
                 onClick={handleRefresh}
                 disabled={isRefreshing}
                 title="รีเฟรชข้อมูลคิวล่าสุดจากระบบแพทย์"
-                style={{ padding: '0 16px', background: '#F1F5F9', color: '#334155', border: '1.5px solid #CBD5E1', borderRadius: '10px', cursor: 'pointer', fontWeight: '600', fontSize: '14px', height: '42px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s ease' }}
+                style={{ 
+                  padding: '0 16px', 
+                  background: '#F1F5F9', 
+                  color: '#334155', 
+                  border: '1.5px solid #CBD5E1', 
+                  borderRadius: '8px', 
+                  cursor: 'pointer', 
+                  fontWeight: '600', 
+                  fontSize: '13.5px', 
+                  height: '42px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  gap: '6px', 
+                  transition: 'all 0.2s ease', 
+                  flexShrink: 0, 
+                  boxSizing: 'border-box' 
+                }}
               >
-                <RefreshCw size={16} className={isRefreshing ? 'animate-spin' : ''} style={{ color: '#2563EB' }} />
+                <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} style={{ color: '#2563EB' }} />
                 <span>รีเฟรชข้อมูล</span>
               </button>
             </div>
@@ -889,7 +945,7 @@ export default function DetailPage({
             <div 
               className="recent-patients-scroll-container"
               style={{ 
-                overflowX: 'hidden', 
+                overflowX: 'auto', 
                 overflowY: 'auto', 
                 overscrollBehavior: 'auto',
                 maxHeight: '340px', 
@@ -897,17 +953,17 @@ export default function DetailPage({
                 borderRadius: '10px' 
               }}
             >
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px', tableLayout: 'fixed' }}>
+              <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-card, #F8FAFC)' }}>
-                  <tr style={{ color: 'var(--text-primary)', background: 'var(--bg-card, #F8FAFC)', borderBottom: '2px solid #E2E8F0', height: '48px', whiteSpace: 'nowrap' }}>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '8%', textAlign: 'center' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '10%', textAlign: 'center' }}>HN</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '10%', textAlign: 'center' }}>VN</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '14%', textAlign: 'center' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 16px 12px 30px', fontWeight: '700', fontSize: '14.5px', width: '22%', textAlign: 'left' }}>ชื่อ-นามสกุล</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '12%', textAlign: 'center' }}>สถานะ</th>
-                    <th style={{ padding: '12px 14px', fontWeight: '700', fontSize: '14.5px', width: '10%', textAlign: 'center' }}>เวลารอ</th>
-                    <th style={{ padding: '12px 16px', fontWeight: '700', fontSize: '14.5px', width: '14%', textAlign: 'center' }}>การดำเนินการ</th>
+                  <tr style={{ color: 'var(--text-primary)', background: 'var(--bg-card, #F8FAFC)', borderBottom: '2px solid #E2E8F0', height: '46px', whiteSpace: 'nowrap' }}>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', width: '90px', textAlign: 'center' }}>ลำดับคิว</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', width: '100px', textAlign: 'center' }}>HN</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', width: '100px', textAlign: 'center' }}>VN</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', width: '140px', textAlign: 'center' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '12px 14px 12px 30px', fontWeight: '700', fontSize: '13.5px', minWidth: '180px', textAlign: 'left' }}>ชื่อ-นามสกุล</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', width: '110px', textAlign: 'center' }}>สถานะ</th>
+                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', width: '90px', textAlign: 'center' }}>เวลารอ</th>
+                    <th style={{ padding: '12px 12px', fontWeight: '700', fontSize: '13.5px', width: '130px', textAlign: 'center' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -918,88 +974,91 @@ export default function DetailPage({
                       if (statFilter === 'completed') return p.status === 'completed';
                       return true;
                     })
-                    .filter(p => 
-                      patientIdInput === '' ||
-                      p.id.toLowerCase().includes(patientIdInput.toLowerCase()) || 
-                      p.hn.toLowerCase().includes(patientIdInput.toLowerCase()) ||
-                      p.nationalId.includes(patientIdInput) ||
-                      p.name.toLowerCase().includes(patientIdInput.toLowerCase())
-                    )
+                    .filter(p => {
+                      if (!patientIdInput) return true;
+                      const q = patientIdInput.toLowerCase().trim();
+                      const matchHn = (p.hn || '').toLowerCase().includes(q) || (p.hn || '').toLowerCase().replace(/^hn-?/, '').includes(q.replace(/^hn-?/, ''));
+                      const matchName = (p.name || '').toLowerCase().includes(q);
+                      const matchId = (p.id || '').toLowerCase().includes(q);
+                      const matchQueue = (p.queueNumber || '').toLowerCase().includes(q);
+                      const matchVn = (p.vn || '').toLowerCase().includes(q);
+                      const matchCard = (p.nationalId || '').replace(/-/g, '').includes(q.replace(/-/g, ''));
+                      return matchHn || matchName || matchId || matchQueue || matchVn || matchCard;
+                    })
                     .map((p, index) => {
                       const isCompleted = p.status === 'completed';
                       const isDispensed = p.status === 'dispensed' || isCompleted;
+                      const isSelected = localPatientId === p.id;
                       return (
                         <tr 
                           key={p.id + '_' + index}
-                          className={localPatientId === p.id ? 'active-row' : ''}
+                          className={isSelected ? 'active-row' : ''}
                           style={{ 
                             borderBottom: '1px solid #F1F5F9', 
                             whiteSpace: 'nowrap', 
-                            height: '56px',
-                            
+                            background: isSelected ? '#EFF6FF' : (isCompleted ? 'var(--bg-card, #F8FAFC)' : undefined),
+                            transition: 'background 0.15s ease'
                           }}
                         >
-                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
+                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
                             <span style={{ 
-                              color: isCompleted ? '#16A34A' : (isDispensed ? '#64748B' : '#2563EB'), 
+                              color: isCompleted ? '#64748B' : '#2563EB', 
                               fontWeight: '700', 
-                              fontSize: '15px',
-                              fontFamily: 'monospace'
+                              fontSize: '14px',
+                              fontFamily: 'monospace',
+                              whiteSpace: 'nowrap',
+                              display: 'inline-block'
                             }}>
                               {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : `Q${String(index + 1).padStart(4, '0')}`}
                             </span>
                           </td>
-                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
+                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
                             <div style={{ display: 'inline-flex', justifyContent: 'center' }}>
-                              <CopyableText value={p.hn.replace(/[-]/g, '')} />
+                              <CopyableText value={(p.hn || '').replace(/[-]/g, '')} color={isCompleted ? '#64748B' : '#2563EB'} />
                             </div>
                           </td>
-                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
-                            <span style={{ color: isCompleted ? '#64748B' : 'var(--text-primary)', fontWeight: '600', fontFamily: 'monospace', fontSize: '13.5px' }}>
+                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
+                            <span style={{ color: isCompleted ? '#94A3B8' : 'var(--text-primary)', fontWeight: '600', fontFamily: 'monospace', fontSize: '12.5px' }}>
                               <CopyableText value={p.vn || '-'} />
                             </span>
                           </td>
-                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
+                          <td className="patient-table-sub" style={{ padding: '10px 10px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center', color: isCompleted ? '#94A3B8' : '#475569' }}>
                             {p.nationalId && p.nationalId !== '-' ? (
                               <div style={{ display: 'inline-flex', justifyContent: 'center' }}>
-                                <CopyableText value={p.nationalId} color="#475569" />
+                                <CopyableText 
+                                  value={p.nationalId.replace(/-/g, '')} 
+                                  displayValue={formatNationalId(p.nationalId)} 
+                                  color={isCompleted ? '#94A3B8' : '#475569'} 
+                                />
                               </div>
                             ) : (
                               <span style={{ color: '#94A3B8' }}>-</span>
                             )}
                           </td>
-                          <td style={{ padding: '12px 16px 12px 30px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                              <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '14px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
-                              {p.doctorAdvice && (
-                                <span style={{ fontSize: '12px', color: '#64748B', maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {cleanDoctorAdvice(p.doctorAdvice)}
-                                </span>
-                              )}
-                            </div>
+                          <td style={{ padding: '10px 14px 10px 30px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'left' }}>
+                            <span style={{ fontWeight: '700', color: 'var(--text-primary)', fontSize: '13.5px', whiteSpace: 'nowrap' }}>{p.name}</span>
                           </td>
-                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
+                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center', verticalAlign: 'middle' }}>
                             <span style={{ 
                               display: 'inline-flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              width: '100%',
-                              maxWidth: '105px',
-                              padding: '4px 10px',
-                              boxSizing: 'border-box',
                               borderRadius: '9999px',
                               fontSize: '12px',
                               fontWeight: '700',
                               background: isCompleted ? '#DCFCE7' : (isDispensed ? '#F0FDF4' : '#DBEAFE'),
                               color: isCompleted ? '#166534' : (isDispensed ? '#15803D' : '#1E40AF'),
                               border: `1.5px solid ${isCompleted ? '#34D399' : (isDispensed ? '#86EFAC' : '#93C5FD')}`,
-                              whiteSpace: 'nowrap'
+                              whiteSpace: 'nowrap',
+                              width: '108px',
+                              height: '28px',
+                              boxSizing: 'border-box'
                             }}>
                               {isCompleted ? '✓ เสร็จสิ้น/รับยา' : (isDispensed ? '✓ จ่ายยาแล้ว' : 'รอจัดยา')}
                             </span>
                           </td>
-                          <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
-                            <span style={{ color: isCompleted ? '#94A3B8' : '#EF4444', fontWeight: '600', fontSize: '13px' }}>
+                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
+                            <span style={{ color: isCompleted ? '#94A3B8' : '#EF4444', fontWeight: '600', fontSize: '12.5px' }}>
                               {(() => {
                                 if (isCompleted) return '-';
                                 // Simple fallback for wait time calculation
@@ -1009,7 +1068,7 @@ export default function DetailPage({
                               })()}
                             </span>
                           </td>
-                          <td style={{ padding: '12px 16px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
+                          <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap', verticalAlign: 'middle' }}>
                             {isDispensed ? (
                               <button 
                                 onClick={() => {
@@ -1017,17 +1076,17 @@ export default function DetailPage({
                                   if (onSelectPatientId) onSelectPatientId(p.id);
                                 }}
                                 style={{ 
-                                  width: '100%',
-                                  maxWidth: '125px',
-                                  height: '34px',
+                                  width: '115px',
+                                  height: '32px',
                                   background: localPatientId === p.id ? '#0D9488' : '#F0FDFA', 
                                   color: localPatientId === p.id ? '#FFFFFF' : '#0F766E', 
                                   border: '1.5px solid #99F6E4', borderRadius: '8px', 
-                                  cursor: 'pointer', fontWeight: '700', fontSize: '13px',
+                                  cursor: 'pointer', fontWeight: '700', fontSize: '12.5px',
                                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                                   whiteSpace: 'nowrap',
                                   boxShadow: localPatientId === p.id ? '0 2px 4px rgba(13, 148, 136, 0.25)' : 'none',
-                                  transition: 'all 0.15s ease'
+                                  transition: 'all 0.15s ease',
+                                  boxSizing: 'border-box'
                                 }}
                                 title="คลิกเพื่อดูประวัติใบสั่งยาที่ส่งไปการเงินแล้ว"
                               >
@@ -1041,16 +1100,16 @@ export default function DetailPage({
                                   if (onSelectPatientId) onSelectPatientId(p.id);
                                 }}
                                 style={{ 
-                                  width: '100%',
-                                  maxWidth: '125px',
-                                  height: '34px',
+                                  width: '115px',
+                                  height: '32px',
                                   background: localPatientId === p.id ? '#10B981' : '#2563EB', 
                                   color: 'white', border: 'none', borderRadius: '8px', 
-                                  cursor: 'pointer', fontWeight: '700', fontSize: '13.5px',
+                                  cursor: 'pointer', fontWeight: '700', fontSize: '12.5px',
                                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
                                   whiteSpace: 'nowrap',
                                   boxShadow: localPatientId === p.id ? '0 2px 6px rgba(16, 185, 129, 0.25)' : '0 2px 6px rgba(37, 99, 235, 0.25)',
-                                  transition: 'all 0.15s ease'
+                                  transition: 'all 0.15s ease',
+                                  boxSizing: 'border-box'
                                 }}
                               >
                                 {localPatientId === p.id ? '✓ เลือกอยู่' : 'จัดยา'}
@@ -1122,7 +1181,12 @@ export default function DetailPage({
                   <>
                     <span style={{ color: '#CBD5E1' }}>•</span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '600' }}>
-                      <CopyableText label="เลขบัตร ปชช." value={activePatient.nationalId} color="#0F172A" />
+                      <CopyableText 
+                        label="เลขบัตร ปชช." 
+                        value={activePatient.nationalId.replace(/-/g, '')} 
+                        displayValue={formatNationalId(activePatient.nationalId)} 
+                        color="#0F172A" 
+                      />
                     </span>
                   </>
                 )}
@@ -1284,18 +1348,48 @@ export default function DetailPage({
                               <td style={{ padding: '12px', textAlign: 'center' }}>
                                 <CopyableText value={med.medId} color="#2563EB" />
                               </td>
-                              <td style={{ padding: '12px' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                                  <CopyableText value={med.name} mono={false} color="#2563EB" />
-                                  <span 
+                              <td style={{ padding: '12px 16px' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <CopyableText value={med.name} mono={false} color="#2563EB" />
+                                  </div>
+                                  <div 
                                     style={{ 
-                                      fontSize: '12.5px', color: '#0284C7', fontWeight: '600', 
-                                      cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' 
+                                      fontSize: '12px', 
+                                      color: '#475569', 
+                                      display: 'inline-flex', 
+                                      alignItems: 'center', 
+                                      gap: '6px',
+                                      cursor: 'pointer' 
                                     }}
                                     onClick={() => setSelectedMedInfo({ name: med.name, medId: med.medId, properties: med.properties })}
+                                    title="คลิกเพื่อดูรายละเอียดสรรพคุณ"
                                   >
-                                    (คลิกดูสรรพคุณ)
-                                  </span>
+                                    <span style={{ 
+                                      background: '#E0F2FE', 
+                                      color: '#0369A1', 
+                                      fontSize: '11px', 
+                                      fontWeight: '700', 
+                                      padding: '1px 7px', 
+                                      borderRadius: '4px',
+                                      border: '1px solid #BAE6FD',
+                                      flexShrink: 0
+                                    }}>
+                                      สรรพคุณ
+                                    </span>
+                                    <span style={{ 
+                                      color: '#0284C7', 
+                                      fontWeight: '500', 
+                                      maxWidth: '280px', 
+                                      overflow: 'hidden', 
+                                      textOverflow: 'ellipsis', 
+                                      whiteSpace: 'nowrap',
+                                      textDecoration: 'underline',
+                                      textUnderlineOffset: '2px'
+                                    }}>
+                                      {med.properties || 'คลิกเพื่อดูรายละเอียดสรรพคุณ'}
+                                    </span>
+                                  </div>
                                 </div>
                               </td>
                               <td style={{ padding: '12px' }}>

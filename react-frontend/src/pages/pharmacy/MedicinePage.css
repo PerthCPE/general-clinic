@@ -103,8 +103,8 @@ body.dark-mode .medicine-page-container .success-badge {
   margin-bottom: 24px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   display: flex;
-  gap: 20px;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 16px;
   border: 1px solid #E2E8F0;
   transition: background-color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
 }
@@ -113,6 +113,33 @@ body.dark-mode .medicine-page-container .search-card {
   background-color: #1E1E1E;
   border-color: #2D2D2D;
   box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+body.dark-mode .medicine-page-container .downward-dropdown-btn {
+  background: #2D2D2D !important;
+  border-color: #475569 !important;
+  color: #F8FAFC !important;
+}
+
+body.dark-mode .medicine-page-container .downward-dropdown-menu {
+  background: #1E293B !important;
+  border-color: #334155 !important;
+  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.5) !important;
+}
+
+body.dark-mode .medicine-page-container .downward-dropdown-item {
+  background: #1E293B !important;
+  color: #E2E8F0 !important;
+}
+
+body.dark-mode .medicine-page-container .downward-dropdown-item.selected {
+  background: #1E3A8A !important;
+  color: #93C5FD !important;
+}
+
+body.dark-mode .medicine-page-container .downward-dropdown-item:hover:not(.selected) {
+  background: #334155 !important;
+  color: #60A5FA !important;
 }
 
 .medicine-page-container .search-inputs {
