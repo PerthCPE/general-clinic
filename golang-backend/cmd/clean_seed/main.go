@@ -7,6 +7,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/services"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -222,7 +223,8 @@ func main() {
 	log.Printf("Seeded %d eligibilities successfully.", len(patients))
 
 	// 5. Seed 15 Queues Today (Q0001 - Q000F in Hex) with mixed clinical statuses
-	today := time.Now().Truncate(24 * time.Hour)
+	nowBkk := time.Now().In(services.BangkokLocation())
+	today := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
 	queueDefs := []struct {
 		QueueNo string
 		Status  string

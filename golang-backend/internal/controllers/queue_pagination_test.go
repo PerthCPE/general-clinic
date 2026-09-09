@@ -429,13 +429,25 @@ func TestQueuePagination_IdenticalTimestamps_DeterministicTieBreaker(t *testing.
 	// 2. Insert 80 queues with the EXACT SAME created_at timestamp
 	fixedTimestamp := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
 	var insertedQueueIDs []uint
+	config.DB.Where("queue_number LIKE ?", "QTEST%").Delete(&models.Queue{})
+
+	defer func() {
+		// Clean up created test queues and patient
+		if len(insertedQueueIDs) > 0 {
+			config.DB.Where("id IN ?", insertedQueueIDs).Delete(&models.Queue{})
+		}
+		config.DB.Where("queue_number LIKE ?", "QTEST%").Delete(&models.Queue{})
+		config.DB.Where("id = ?", mockPatient.ID).Delete(&models.Patient{})
+	}()
+
 	for i := 1; i <= 80; i++ {
 		q := models.Queue{
 			PatientID:       mockPatient.ID,
 			CreatedByUserID: defaultUser.ID,
 			QueueNumber:     fmt.Sprintf("QTEST%03d", i),
 			Department:      "จุดคัดกรอง",
-			Status:          "รอคัดกรอง",
+			Status:          "เสร็จสิ้น",
+			ServiceDate:     fixedTimestamp,
 			CreatedAt:       fixedTimestamp,
 			UpdatedAt:       fixedTimestamp,
 		}
@@ -444,12 +456,6 @@ func TestQueuePagination_IdenticalTimestamps_DeterministicTieBreaker(t *testing.
 		}
 		insertedQueueIDs = append(insertedQueueIDs, q.ID)
 	}
-
-	defer func() {
-		// Clean up created test queues and patient
-		config.DB.Where("id IN ?", insertedQueueIDs).Delete(&models.Queue{})
-		config.DB.Where("id = ?", mockPatient.ID).Delete(&models.Patient{})
-	}()
 
 	t.Logf("================================================================================")
 	t.Logf("  [STRESS TEST] 80 Queues inserted with IDENTICAL timestamp: %v", fixedTimestamp)
