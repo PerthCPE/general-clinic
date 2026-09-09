@@ -1,9 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import PatientSearchCard from './components/PatientSearchCard';
 import PatientFormCard from './components/PatientFormCard';
+import { Pagination } from '../../components/Pagination/Pagination';
 import type { Patient, SchemeType } from './types';
 import { patientApi, queueApi, type BackendPatient, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { useToast } from '../../components/Toast/ToastProvider';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
 import './RegistrationPage.css';
 
@@ -80,15 +82,16 @@ function RegistrationPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [tableFilter, setTableFilter] = useState<'unqueued' | 'all'>('unqueued');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(15);
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searchResult, setSearchResult] = useState<Patient | null>(null);
   const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
   const [regSuccessModal, setRegSuccessModal] = useState<RegSuccessResult | null>(null);
-  const [errorToast, setErrorToast] = useState<string | null>(null);
   const [isRecentOpen, setIsRecentOpen] = useState(true);
   const { subscribe } = useWebSocket();
+  const { showToast } = useToast();
 
   const formSectionRef = useRef<HTMLDivElement>(null);
 
@@ -127,12 +130,13 @@ function RegistrationPage() {
     } catch (err) {
       console.error('Could not fetch patients from backend:', err);
       setFetchError('ไม่สามารถโหลดรายชื่อผู้ป่วยจากระบบได้ กรุณากดลองใหม่อีกครั้ง');
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดรายชื่อผู้ป่วยจากระบบได้' });
       setAllPatients([]);
       setPatients([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     fetchPatients();
@@ -237,7 +241,7 @@ function RegistrationPage() {
         throw new Error('ไม่พบข้อมูลรหัสผู้ป่วยในระบบ');
       }
 
-      await queueApi.create(patientId, 'แผนกคัดกรอง', 'ส่งเข้าคิวจากการลงทะเบียน');
+      const qRes = await queueApi.create(patientId, 'แผนกคัดกรอง', 'ส่งเข้าคิวจากการลงทะเบียน');
 
       // เอาผู้ป่วยออกจากรายการ "ผู้ป่วยที่ยังไม่ได้เข้าคิว" เมื่อสำเร็จเท่านั้น
       setPatients((prev) =>
@@ -249,6 +253,12 @@ function RegistrationPage() {
       setNotFoundQuery(null);
       setSelectedPatientModal(null);
       fetchPatients();
+
+      const qNum = qRes?.queue?.queue_number || '';
+      showToast({
+        type: 'success',
+        message: qNum ? `ส่งเข้าคิวสำเร็จ ${qNum}` : `ส่งเข้าคิวสำเร็จ ${patient.fullName}`,
+      });
     } catch (err: any) {
       console.error('Queue assign error:', err);
       const errMsg =
@@ -256,7 +266,7 @@ function RegistrationPage() {
         err?.response?.data?.message ||
         err?.message ||
         'เกิดข้อผิดพลาดในการส่งผู้ป่วยเข้าคิว';
-      setErrorToast(errMsg);
+      showToast({ type: 'error', message: errMsg });
       // ห้ามลบคนไข้ออกจาก setPatients เพื่อคงสถานะเดิมไว้
     }
   };
@@ -269,10 +279,8 @@ function RegistrationPage() {
 
   // ลงทะเบียนผู้ป่วยใหม่ บันทึกลง Database จริง (Sprint 3.2: รองรับ issueQueue flag)
   const handleFormSubmit = async (formData: Partial<Patient> & { issueQueue?: boolean }) => {
-    setErrorToast(null);
-
     if (!formData.dob || !formData.dob.trim()) {
-      setErrorToast('กรุณาระบุวันเกิดของผู้ป่วย');
+      showToast({ type: 'error', message: 'กรุณาระบุวันเกิดของผู้ป่วย' });
       return;
     }
 
@@ -334,6 +342,18 @@ function RegistrationPage() {
           queueIssued: res.queue_issued,
           queueNumber: res.queue_number,
         });
+
+        if (res.queue_issued && res.queue_number) {
+          showToast({
+            type: 'success',
+            message: `ลงทะเบียนสำเร็จ HN${newUI.hn.replace('HN', '')} คิว ${res.queue_number}`,
+          });
+        } else {
+          showToast({
+            type: 'success',
+            message: `ลงทะเบียนสำเร็จ HN${newUI.hn.replace('HN', '')}`,
+          });
+        }
         return;
       }
     } catch (err: any) {
@@ -342,7 +362,7 @@ function RegistrationPage() {
         err?.response?.data?.error ||
         err?.message ||
         'เกิดข้อผิดพลาดในการลงทะเบียนผู้ป่วย กรุณาตรวจสอบข้อมูลหรือการเชื่อมต่อระบบ';
-      setErrorToast(errMsg);
+      showToast({ type: 'error', message: errMsg });
     }
   };
 
@@ -366,6 +386,15 @@ function RegistrationPage() {
     gov: pool.filter((p) => p.schemeType === 'สิทธิ์ข้าราชการ').length,
   };
 
+  // Client-side pagination สำหรับตารางผู้ป่วยรอออกบัตรคิว (Unqueued Patients)
+  const totalItems = patients.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const validCurrentPage = Math.max(1, Math.min(currentPage, totalPages));
+  const paginatedPatients = useMemo(() => {
+    const start = (validCurrentPage - 1) * itemsPerPage;
+    return patients.slice(start, start + itemsPerPage);
+  }, [patients, validCurrentPage, itemsPerPage]);
+
   return (
     <div className="registration-page">
 
@@ -376,54 +405,6 @@ function RegistrationPage() {
           ค้นหาประวัติผู้ป่วยเดิมเพื่อส่งเข้าคิว หรือลงทะเบียนออกรหัส HN ผู้ป่วยใหม่เข้าสู่ระบบคลินิก
         </p>
       </div>
-
-      {/* Error Alert Banner (Strict Error Feedback) */}
-      {errorToast && (
-        <div
-          role="alert"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '12px 16px',
-            marginBottom: '16px',
-            borderRadius: '8px',
-            backgroundColor: '#FEF2F2',
-            border: '1px solid #FECACA',
-            color: '#DC2626',
-            fontSize: '14px',
-            fontWeight: 500,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span>{errorToast}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setErrorToast(null)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#DC2626',
-              cursor: 'pointer',
-              padding: '4px',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-            aria-label="ปิดแจ้งเตือน"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      )}
 
       {/* Stats Summary Grid */}
       <div className="reg-stats-grid">
@@ -483,7 +464,7 @@ function RegistrationPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span className="reg-count-pill">
-              {tableFilter === 'unqueued' ? `${patients.length} รอคิว` : `${allPatients.length} ทั้งหมด`}
+              {patients.length} รอคิว
             </span>
             <button className={`reg-card-toggle reg-recent-toggle ${isRecentOpen ? 'open' : ''}`} aria-label="Toggle Dropdown">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -493,25 +474,33 @@ function RegistrationPage() {
           </div>
         </div>
 
-        <div className={`reg-card-body reg-recent-body ${isRecentOpen ? 'expanded' : ''}`} style={{ padding: isRecentOpen ? '0' : '0' }}>
-          {/* Table View Filter Tabs */}
-          <div className="reg-table-filter-bar">
-            <button
-              type="button"
-              className={`reg-table-tab-btn ${tableFilter === 'unqueued' ? 'active' : ''}`}
-              onClick={() => setTableFilter('unqueued')}
-            >
-              <span>ผู้ป่วยรอออกบัตรคิว</span>
-              <span className="reg-table-tab-count">{patients.length}</span>
-            </button>
-            <button
-              type="button"
-              className={`reg-table-tab-btn ${tableFilter === 'all' ? 'active' : ''}`}
-              onClick={() => setTableFilter('all')}
-            >
-              <span>ผู้ป่วยทั้งหมดในระบบ</span>
-              <span className="reg-table-tab-count">{allPatients.length}</span>
-            </button>
+        <div className={`reg-card-body reg-recent-body ${isRecentOpen ? 'expanded' : ''}`}>
+          {/* Table Controls Bar (Items Per Page Selector) */}
+          <div className="reg-table-controls-bar">
+            <div className="reg-table-info-wrap">
+              <span className="reg-table-desc">
+                รายชื่อผู้ป่วยรอออกบัตรคิวทั้งหมด {totalItems} คน
+              </span>
+            </div>
+            <div className="reg-items-per-page-wrap">
+              <label htmlFor="reg-items-per-page" className="reg-items-per-page-label">
+                แสดง:
+              </label>
+              <select
+                id="reg-items-per-page"
+                className="reg-items-per-page-select"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                aria-label="จำนวนแถวที่แสดงต่อหน้า"
+              >
+                <option value={10}>10 แถว</option>
+                <option value={15}>15 แถว</option>
+                <option value={25}>25 แถว</option>
+              </select>
+            </div>
           </div>
 
           {/* Error Banner with Retry */}
@@ -550,7 +539,7 @@ function RegistrationPage() {
                 </tr>
               </thead>
               <tbody>
-                {(tableFilter === 'unqueued' ? patients : allPatients).length === 0 ? (
+                {paginatedPatients.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="reg-empty-table-cell">
                       <div className="reg-empty-wrap">
@@ -566,16 +555,13 @@ function RegistrationPage() {
                         <p>
                           {isLoading
                             ? 'กำลังโหลดรายชื่อผู้ป่วยจากระบบ...'
-                            : tableFilter === 'unqueued'
-                            ? 'ไม่มีรายชื่อผู้ป่วยรอออกบัตรคิว (ผู้ป่วยทั้งหมดถูกส่งเข้าห้องตรวจเรียบร้อยแล้ว)'
-                            : 'ยังไม่มีข้อมูลผู้ป่วยในระบบ กรุณาลงทะเบียนผู้ป่วยใหม่'}
+                            : 'ไม่มีรายชื่อผู้ป่วยรอออกบัตรคิว (ผู้ป่วยทั้งหมดถูกส่งเข้าห้องตรวจเรียบร้อยแล้ว)'}
                         </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  (tableFilter === 'unqueued' ? patients : allPatients).map((p) => {
-                    const isQueued = !patients.some((u) => u.hn === p.hn);
+                  paginatedPatients.map((p) => {
                     return (
                       <tr key={p.hn} className="reg-table-row">
                         <td className="col-reg-hn">
@@ -610,30 +596,21 @@ function RegistrationPage() {
                           </div>
                         </td>
                         <td className="col-reg-action">
-                          {isQueued && tableFilter === 'all' ? (
-                            <span className="reg-status-queued-badge">
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                              <span>อยู่ในคิวแล้ว</span>
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              className="btn-quick-assign-queue"
-                              title="ส่งเข้าคิวตรวจทันที"
-                              onClick={() => handleAssignQueue(p)}
-                            >
-                              <svg viewBox="0 0 20 20" fill="currentColor" className="btn-icon-svg">
-                                <path
-                                  fillRule="evenodd"
-                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                                  clipRule="evenodd"
-                                />
-                              </svg>
-                              <span>เข้าคิว</span>
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            className="btn-quick-assign-queue"
+                            title="ส่งเข้าคิวตรวจทันที"
+                            onClick={() => handleAssignQueue(p)}
+                          >
+                            <svg viewBox="0 0 20 20" fill="currentColor" className="btn-icon-svg">
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            <span>เข้าคิว</span>
+                          </button>
                         </td>
                       </tr>
                     );
@@ -642,6 +619,15 @@ function RegistrationPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Client-side Pagination Component */}
+          <Pagination
+            currentPage={validCurrentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(p) => setCurrentPage(p)}
+          />
         </div>
       </div>
 

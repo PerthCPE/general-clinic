@@ -247,13 +247,20 @@
 }
 
 .reg-card-body.expanded {
-  max-height: 1600px;
+  max-height: none;
+  overflow: visible;
   padding: 24px 24px 28px;
 }
 
 /* Custom smooth transitions specifically for Recent Patients card */
 .reg-card-body.reg-recent-body {
   transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1), padding 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reg-card-body.reg-recent-body.expanded {
+  max-height: none;
+  overflow: visible;
+  padding: 0 0 16px 0;
 }
 
 .reg-recent-toggle {
@@ -2072,57 +2079,62 @@ body.dark-mode .reg-success-queue-dept {
   color: #94A3B8;
 }
 
-/* ===== Table Filter Tabs & Error Banner ===== */
-.reg-table-filter-bar {
+/* ===== Table Controls Bar (Sprint UI-3) ===== */
+.reg-table-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid #F1F5F9;
+  background: #FFFFFF;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.reg-table-info-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 24px;
-  border-bottom: 1px solid #F1F5F9;
-  background: #FFFFFF;
 }
 
-.reg-table-tab-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: 6px;
-  border: 1px solid #E2E8F0;
-  background: #FFFFFF;
-  color: #64748B;
+.reg-table-desc {
   font-family: var(--font-primary);
+  font-size: 14px;
   font-weight: 500;
-  font-size: 13.5px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.reg-table-tab-btn:hover {
-  background: #F8FAFC;
-  border-color: #CBD5E1;
-  color: #334155;
-}
-
-.reg-table-tab-btn.active {
-  background: #EFF6FF;
-  border-color: #2563EB;
-  color: #2563EB;
-  font-weight: 600;
-}
-
-.reg-table-tab-count {
-  font-size: 12px;
-  padding: 1px 7px;
-  border-radius: 10px;
-  background: #F1F5F9;
   color: #64748B;
-  font-weight: 700;
 }
 
-.reg-table-tab-btn.active .reg-table-tab-count {
-  background: #2563EB;
-  color: #FFFFFF;
+.reg-items-per-page-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reg-items-per-page-label {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748B;
+}
+
+.reg-items-per-page-select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: #1E293B;
+  font-family: var(--font-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.reg-items-per-page-select:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
 .reg-fetch-error-banner {
@@ -2156,53 +2168,25 @@ body.dark-mode .reg-success-queue-dept {
   background: #B91C1C;
 }
 
-.reg-status-queued-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: #EFF6FF;
-  color: #2563EB;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-
-/* Dark Mode Overrides for Table Filter */
-body.dark-mode .reg-table-filter-bar {
+/* Dark Mode Overrides for Table Controls Bar */
+body.dark-mode .reg-table-controls-bar {
   background: #212836;
   border-color: #333F53;
 }
 
-body.dark-mode .reg-table-tab-btn {
-  background: #1C2230;
-  border-color: #333F53;
+body.dark-mode .reg-table-desc,
+body.dark-mode .reg-items-per-page-label {
   color: #94A3B8;
 }
 
-body.dark-mode .reg-table-tab-btn:hover {
-  background: #2A3447;
+body.dark-mode .reg-items-per-page-select {
+  background-color: #1C2230;
+  border-color: #333F53;
   color: #F1F5F9;
 }
 
-body.dark-mode .reg-table-tab-btn.active {
-  background: rgba(37, 99, 235, 0.2);
+body.dark-mode .reg-items-per-page-select:focus {
   border-color: #3B82F6;
-  color: #60A5FA;
-}
-
-body.dark-mode .reg-table-tab-count {
-  background: #2A3447;
-  color: #94A3B8;
-}
-
-body.dark-mode .reg-table-tab-btn.active .reg-table-tab-count {
-  background: #2563EB;
-  color: #FFFFFF;
-}
-
-body.dark-mode .reg-status-queued-badge {
-  background: rgba(37, 99, 235, 0.2);
-  color: #93C5FD;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
