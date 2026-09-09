@@ -50,3 +50,7 @@ project_spec.md
 package.json
 frontend/
 TEAM_RULES.md
+
+docker-compose.yml
+vercel.json
+**/vercel.json
