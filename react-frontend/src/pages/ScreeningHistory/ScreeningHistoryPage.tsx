@@ -72,24 +72,29 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
   else bmiCat = 'อ้วนระดับ 2';
 
   const rawDocId = s.assigned_doctor_id || s.assigned_doctor?.id || 1;
-  let roomNum = 1;
-  let defaultDocName = 'พญ.สุดา สุขสมบูรณ์';
-  if (rawDocId === 1 || rawDocId === 4) {
-    roomNum = 1;
-    defaultDocName = 'พญ.สุดา สุขสมบูรณ์';
-  } else if (rawDocId === 2 || rawDocId === 5) {
-    roomNum = 2;
-    defaultDocName = 'นพ.วิชัย ชาญการแพทย์';
-  } else if (rawDocId === 3 || rawDocId === 6) {
-    roomNum = 3;
-    defaultDocName = 'พญ.เกศรา รักษาดี';
-  } else {
-    roomNum = ((rawDocId - 1) % 3) + 1;
-    defaultDocName = roomNum === 1 ? 'พญ.สุดา สุขสมบูรณ์' : roomNum === 2 ? 'นพ.วิชัย ชาญการแพทย์' : 'พญ.เกศรา รักษาดี';
+  const docName =
+    s.assigned_doctor?.fullname ||
+    (rawDocId === 15 || rawDocId === 4 || rawDocId === 1
+      ? 'พญ.สุดา สุขสมบูรณ์'
+      : rawDocId === 16 || rawDocId === 5 || rawDocId === 2
+      ? 'นพ.วิชัย ชาญการแพทย์'
+      : rawDocId === 17 || rawDocId === 6 || rawDocId === 3
+      ? 'พญ.เกศรา รักษาดี'
+      : 'พญ.สุดา สุขสมบูรณ์');
+
+  let roomName = 'ห้องตรวจ 1';
+  const visitDept = s.visit_record?.department || '';
+  if (visitDept.includes('ห้องตรวจ 3') || docName.includes('เกศรา') || rawDocId === 17 || rawDocId === 6 || rawDocId === 3) {
+    roomName = 'ห้องตรวจ 3';
+  } else if (visitDept.includes('ห้องตรวจ 2') || docName.includes('วิชัย') || rawDocId === 16 || rawDocId === 5 || rawDocId === 2) {
+    roomName = 'ห้องตรวจ 2';
+  } else if (visitDept.includes('ห้องตรวจ 1') || docName.includes('สุดา') || rawDocId === 15 || rawDocId === 4 || rawDocId === 1) {
+    roomName = 'ห้องตรวจ 1';
+  } else if (visitDept.includes('ห้องตรวจ')) {
+    const match = visitDept.match(/ห้องตรวจ\s*\d+/);
+    roomName = match ? match[0] : 'ห้องตรวจ 1';
   }
 
-  const docName = s.assigned_doctor?.fullname || defaultDocName;
-  const roomName = `ห้องตรวจ ${roomNum}`;
   const rawQueueNo = s.visit_record?.queue_number || '';
   const queueFormatted = rawQueueNo ? formatQueueNo(rawQueueNo) : formatQueueNo(s.visit_id || s.id || 1);
   const hnFormatted = patient?.hn ? formatHN(patient.hn) : formatHN(s.visit_record?.patient_id || s.id || 1);
@@ -130,7 +135,19 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
     currentMedications: s.current_medications || 'ไม่มี',
     smokingHistory: s.smoking_history || 'ไม่สูบ',
     alcoholHistory: s.alcohol_history || 'ไม่ดื่ม',
-    nurseNotes: s.nurse_notes || 'สัญญาณชีพและประวัติได้รับการบันทึกเรียบร้อย',
+    nurseNotes: s.nurse_notes || '',
+    herbalMedicines: s.herbal_medicines || '',
+    dietarySupplements: s.dietary_supplements || '',
+    hasURI: s.has_uri,
+    hasTB: s.has_tb,
+    onAnticoagulant: s.on_anticoagulant,
+    precautionType: s.precaution_type || '',
+    isPregnant: s.is_pregnant,
+    isBreastfeeding: s.is_breastfeeding,
+    lastMenstrualPeriod: s.last_menstrual_period || '',
+    q2Depressed: s.q2_depressed,
+    q2Anhedonia: s.q2_anhedonia,
+    screeningPositive: s.screening_positive,
     screenedByUserName: s.screened_by?.fullname || 'พว. กานดา คัดกรอง',
     screenedByRole: s.screened_by?.role === 'nurse' ? 'พยาบาลคัดกรอง' : 'ผู้ช่วยพยาบาล',
     assignedDoctorId: s.assigned_doctor_id || 1,
