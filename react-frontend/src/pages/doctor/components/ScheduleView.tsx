@@ -405,151 +405,60 @@ export const ScheduleView: React.FC = () => {
       )}
 
       {/* Page Title & Main Action Buttons */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-2xs">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-              {language === 'th' ? `ตารางงาน ${loggedInDoctor.name}` : `Work Schedule: ${loggedInDoctor.name}`}
-            </h1>
-          </div>
-          <p className="text-xs text-slate-500 mt-1">
-            {loggedInDoctor.department} • {loggedInDoctor.roomLocation}
+          <h1 style={{ fontFamily: 'var(--font-heading, "Kanit", "Plus Jakarta Sans", sans-serif)', fontSize: '30px', fontWeight: 700, lineHeight: '38px', color: '#0F172A', margin: '0 0 4px 0' }}>
+            {language === 'th' 
+              ? `ตารางงาน ${scheduleScope === 'mine' ? loggedInDoctor.name : (selectedDoctorFilter === 'All' ? 'แพทย์ทั้งหมด' : selectedDoctorFilter)}` 
+              : `Work Schedule: ${scheduleScope === 'mine' ? loggedInDoctor.name : (selectedDoctorFilter === 'All' ? 'All Doctors' : selectedDoctorFilter)}`}
+          </h1>
+          <p style={{ fontFamily: 'var(--font-primary, "IBM Plex Sans Thai", "Inter", sans-serif)', fontWeight: 400, fontSize: '15px', lineHeight: '22px', color: '#64748B', margin: 0 }}>
+            {scheduleScope === 'mine' 
+              ? `${loggedInDoctor.department} • ${loggedInDoctor.roomLocation}`
+              : (selectedDoctorFilter === 'All' 
+                  ? (language === 'th' ? 'รวมทุกแผนก' : 'All Departments') 
+                  : (() => {
+                      const d = SYSTEM_DOCTORS.find(doc => doc.name === selectedDoctorFilter);
+                      return d ? `${d.department} • ${d.roomLocation}` : '';
+                    })()
+                )
+            }
           </p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* ปุ่มสลับมุมมอง */}
-          <StatusFilterTabs
-            value={viewMode}
-            onChange={(next) => setViewMode(next as 'month' | 'week' | 'list')}
-            options={[
-              { value: 'month', label: t('monthlyView'), icon: <CalendarRange className="w-3.5 h-3.5" /> },
-              { value: 'week', label: t('weeklyView'), icon: <CalendarDays className="w-3.5 h-3.5" /> },
-              { value: 'list', label: t('dutyList'), icon: <ListFilter className="w-3.5 h-3.5" /> },
-            ]}
-          />
-
-          {/* Add Shift Button */}
-          <button
-            onClick={() => handleOpenAddModal()}
-            className="px-4 py-2 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-2xs flex items-center gap-2 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>{t('addShiftBtn')}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Stats Cards Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <CalendarIcon className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">
-              {scheduleScope === 'mine' ? (language === 'th' ? 'เวรของคุณในเดือนนี้' : 'My Monthly Duties') : t('totalScheduledShifts')}
-            </span>
-            <span className="text-lg font-extrabold text-slate-900">{filteredShifts.length} {language === 'th' ? 'กะ' : 'Shifts'}</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-            <User className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('myManagedShifts')}</span>
-            <span className="text-lg font-extrabold text-slate-900">{myShiftsCount} {language === 'th' ? 'กะ' : 'Duties'}</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-            <Stethoscope className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('opdSessions')}</span>
-            <span className="text-lg font-extrabold text-slate-900">{totalOPDShifts} {language === 'th' ? 'กะ' : 'Sessions'}</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-            <Clock className="w-5 h-5" />
-          </div>
-          <div>
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-wide block">{t('emergencyOnCall')}</span>
-            <span className="text-lg font-extrabold text-slate-900">{onCallCount} {language === 'th' ? 'กะ' : 'Duties'}</span>
-          </div>
-        </div>
+        
       </div>
 
       {/* Control Filter Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Doctor Scope Buttons (My Schedule vs Other Doctors) */}
+        {/* Doctor Filter Dropdown */}
         <div className="flex items-center gap-2.5 w-full md:w-auto flex-wrap">
-          <button
-            type="button"
-            onClick={() => {
-              setScheduleScope('mine');
-              setSelectedDoctorFilter(loggedInDoctor.name);
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              scheduleScope === 'mine'
-                ? 'bg-[#2563eb] text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <User className="w-3.5 h-3.5" />
-            <span>{language === 'th' ? `ตารางงานของฉัน (${loggedInDoctor.name})` : `My Schedule (${loggedInDoctor.name})`}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setScheduleScope('all');
-              setSelectedDoctorFilter('All');
-            }}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              scheduleScope === 'all'
-                ? 'bg-[#2563eb] text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>{language === 'th' ? 'ดูตารางแพทย์ท่านอื่น' : 'View Other Doctors'}</span>
-          </button>
-
-          {/* Doctor Filter Selector (Shown when viewing other doctors) */}
-          {scheduleScope === 'all' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>
+              {language === 'th' ? 'แพทย์:' : 'Doctor:'}
+            </span>
             <select
-              value={selectedDoctorFilter}
-              onChange={(e) => setSelectedDoctorFilter(e.target.value)}
-              className="p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer animate-in fade-in"
+              value={scheduleScope === 'mine' ? loggedInDoctor.name : selectedDoctorFilter}
+              onChange={(e) => {
+                if (e.target.value === loggedInDoctor.name) {
+                  setScheduleScope('mine');
+                  setSelectedDoctorFilter(e.target.value);
+                } else {
+                  setScheduleScope('all');
+                  setSelectedDoctorFilter(e.target.value);
+                }
+              }}
+              className="p-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer"
+              style={{ minWidth: '220px' }}
             >
-              <option value="All">{t('allDoctors')}</option>
+              <option value="All">{language === 'th' ? 'ดูตารางแพทย์ทั้งหมด' : 'All Doctors'}</option>
               {SYSTEM_DOCTORS.map((doc) => (
                 <option key={doc.id} value={doc.name}>
-                  {doc.name} — {doc.department} {doc.name === loggedInDoctor.name ? (language === 'th' ? '⭐ (บัญชีของคุณ)' : '⭐ (Your Account)') : ''}
+                  {doc.name} — {doc.department} {doc.name === loggedInDoctor.name ? (language === 'th' ? '(ของคุณ)' : '(You)') : ''}
                 </option>
               ))}
             </select>
-          )}
-
-          {/* Shift Type Filter */}
-          <select
-            value={filterShiftType}
-            onChange={(e) => setFilterShiftType(e.target.value)}
-            className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:bg-white cursor-pointer focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
-          >
-            <option value="All">{t('allShiftTypes')}</option>
-            {SHIFT_TYPES.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
+          </div>
         </div>
 
         {/* Search input */}
@@ -1041,10 +950,10 @@ export const ScheduleView: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-sm leading-tight">
-                    {editingShift ? 'แก้ไขกะการออกตรวจ' : 'เพิ่มกะการออกตรวจใหม่'}
+                    ขอแลกเปลี่ยนเวร
                   </h3>
                   <p className="text-[11px] text-blue-200/80 mt-0.5">
-                    {editingShift ? 'ปรับปรุงรายละเอียดเวลาหรือสถานที่ปฏิบัติงาน' : 'กำหนดช่วงเวลาและห้องตรวจของแพทย์'}
+                    เลือกแพทย์ที่เข้าเวรในวันเดียวกันเพื่อส่งคำขอสลับกะการปฏิบัติงาน
                   </p>
                 </div>
               </div>
@@ -1057,176 +966,54 @@ export const ScheduleView: React.FC = () => {
               </button>
             </div>
 
-            {/* ===== Form ===== */}
-            <form onSubmit={handleSaveShift} className="flex flex-col flex-1 min-h-0">
-              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
+            {/* ===== Swap Request Form ===== */}
+            <form onSubmit={(e) => { e.preventDefault(); setToastMessage('ส่งคำขอแลกเวรเรียบร้อยแล้ว ระบบจะแจ้งเตือนเมื่อได้รับการพิจารณาอนุมัติ'); setTimeout(() => setToastMessage(null), 3000); setIsModalOpen(false); }} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
 
-                {/* แพทย์เจ้าของตาราง */}
-                <div className="p-3.5 bg-blue-50/70 border border-blue-100 rounded-2xl flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0">
-                    <UserCheck className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-[11px] font-bold text-blue-700 block leading-tight">บัญชีแพทย์ประจำตาราง</span>
-                    <span className="text-sm font-extrabold text-slate-900">{loggedInDoctor.name}</span>
-                    <span className="text-xs text-slate-500 ml-1.5">({loggedInDoctor.department})</span>
-                  </div>
+                <div className="text-xs font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">
+                  แพทย์ที่ปฏิบัติงานในวันที่ {editingShift ? new Date(editingShift.date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
                 </div>
 
-                {/* กลุ่ม 1 — ประเภทกะและสถานที่ */}
-                <section className="rounded-2xl border border-slate-200 overflow-hidden">
-                  <header className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
-                    <Stethoscope className="w-4 h-4 text-slate-500 shrink-0" />
-                    <h4 className="text-xs font-bold text-slate-700">ประเภทกะและสถานที่</h4>
-                  </header>
-                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                        ประเภทกะการออกตรวจ <span className="text-rose-500">*</span>
-                      </label>
-                      <select
-                        value={formShiftType}
-                        onChange={(e) => setFormShiftType(e.target.value as any)}
-                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer"
-                      >
-                        {SHIFT_TYPES.map((type) => (
-                          <option key={type} value={type}>
-                            {type}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                {(() => {
+                  if (!editingShift) return null;
+                  const sameDayShifts = shifts.filter(s => s.date === editingShift.date && s.id !== editingShift.id);
+                  if (sameDayShifts.length === 0) {
+                    return (
+                      <div className="text-center text-slate-500 text-xs py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                        ไม่มีแพทย์ท่านอื่นเข้าเวรในวันนี้
+                      </div>
+                    );
+                  }
 
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                        ห้อง / สถานที่ปฏิบัติงาน <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={formRoomLocation}
-                        onChange={(e) => setFormRoomLocation(e.target.value)}
-                        placeholder="เช่น ห้องตรวจ 1, ห้องหัตถการ 2"
-                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 placeholder:font-normal placeholder:text-slate-400"
-                      />
-                    </div>
-                  </div>
-                </section>
+                  return sameDayShifts.map(s => (
+                    <label key={s.id} className="flex items-center justify-between p-3.5 bg-white border border-slate-200 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50/50 transition-all has-[:checked]:border-blue-600 has-[:checked]:bg-blue-50/50 has-[:checked]:ring-1 has-[:checked]:ring-blue-600 mb-2">
+                      <div className="flex items-center gap-3">
+                        <input type="radio" name="swapDoctor" value={s.id} className="w-4 h-4 text-blue-600 border-slate-300 focus:ring-blue-600" required />
+                        <div>
+                          <div className="text-[13px] font-bold text-slate-900">{s.doctorName}</div>
+                          <div className="text-[11px] text-slate-500">{s.department} • {s.shiftType} ({s.startTime} - {s.endTime})</div>
+                        </div>
+                      </div>
+                      <div className="text-[11px] font-bold px-2 py-1 bg-slate-100 text-slate-600 rounded-lg">
+                        {s.roomLocation}
+                      </div>
+                    </label>
+                  ));
+                })()}
 
-                {/* กลุ่ม 2 — วันและเวลา */}
-                <section className="rounded-2xl border border-slate-200 overflow-hidden">
-                  <header className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-slate-500 shrink-0" />
-                      <h4 className="text-xs font-bold text-slate-700">วันและเวลาปฏิบัติงาน (2 กะมาตรฐาน)</h4>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => { setFormStartTime('07:00'); setFormEndTime('12:00'); }}
-                        className="px-2 py-0.5 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                      >
-                        ☀️ กะเช้า (07:00-12:00)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setFormStartTime('13:00'); setFormEndTime('18:00'); }}
-                        className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
-                      >
-                        🌤️ กะบ่าย (13:00-18:00)
-                      </button>
-                    </div>
-                  </header>
-                  <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                        วันที่ออกตรวจ <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        value={formDate}
-                        onChange={(e) => setFormDate(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                        เวลาเริ่มต้น <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={formStartTime}
-                        onChange={(e) => setFormStartTime(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                        เวลาสิ้นสุด <span className="text-rose-500">*</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={formEndTime}
-                        onChange={(e) => setFormEndTime(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
-                      />
-                    </div>
-                  </div>
-                </section>
-
-                {/* กลุ่ม 3 — จำนวนผู้ป่วยและสถานะ */}
-                <section className="rounded-2xl border border-slate-200 overflow-hidden">
-                  <header className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
-                    <Users className="w-4 h-4 text-slate-500 shrink-0" />
-                    <h4 className="text-xs font-bold text-slate-700">ขีดความสามารถและสถานะ</h4>
-                  </header>
-                  <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                        จำนวนผู้ป่วยสูงสุด (คน)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        value={formMaxPatients}
-                        onChange={(e) => setFormMaxPatients(Number(e.target.value))}
-                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                        สถานะกะ
-                      </label>
-                      <select
-                        value={formStatus}
-                        onChange={(e) => setFormStatus(e.target.value as any)}
-                        className="w-full px-3 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 cursor-pointer"
-                      >
-                        <option value="Scheduled">Scheduled (รอดำเนินการ)</option>
-                        <option value="In Progress">In Progress (กำลังดำเนินการ)</option>
-                        <option value="Completed">Completed (เสร็จสิ้น)</option>
-                        <option value="Cancelled">Cancelled (ยกเลิก)</option>
-                      </select>
-                    </div>
-                  </div>
-                </section>
-
-                {/* กลุ่ม 4 — หมายเหตุเพิ่มเติม */}
-                <div>
+                {/* เหตุผลในการแลกเวร */}
+                <div className="mt-4 pt-4 border-t border-slate-100">
                   <label className="text-[11px] font-bold text-slate-600 block mb-1.5">
-                    หมายเหตุเพิ่มเติม (ถ้ามี)
+                    เหตุผลในการแลกเวร <span className="text-red-500">*</span>
                   </label>
                   <textarea
                     rows={2}
-                    value={formNote}
-                    onChange={(e) => setFormNote(e.target.value)}
-                    placeholder="เช่น เตรียมเครื่องมืออัลตราซาวด์, ตรวจเคสส่งต่อ ฯลฯ"
+                    required
+                    placeholder="ระบุเหตุผลในการขอแลกเปลี่ยนเวร (เช่น ติดธุระด่วน, ป่วย ฯลฯ)"
                     className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none transition focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 placeholder:text-slate-400 resize-none"
                   />
                 </div>
+
               </div>
 
               {/* ===== Footer ===== */}
@@ -1243,7 +1030,7 @@ export const ScheduleView: React.FC = () => {
                   className="px-5 py-2.5 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md active:scale-95 transition-all cursor-pointer inline-flex items-center gap-2 whitespace-nowrap"
                 >
                   <Check className="w-4 h-4 shrink-0" />
-                  <span>{editingShift ? 'บันทึกการแก้ไข' : 'สร้างกะการออกตรวจ'}</span>
+                  <span>ส่งคำขอแลกเวร</span>
                 </button>
               </div>
             </form>

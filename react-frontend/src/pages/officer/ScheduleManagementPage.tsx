@@ -328,20 +328,10 @@ export const ScheduleManagementPage: React.FC = () => {
   return (
     <div className="schedule-container">
       {/* 1. Page Header */}
-      <div className="page-header-container">
-        <div className="page-title-group">
-          <div className="page-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" width="24" height="24">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-          </div>
-          <div>
-            <h1 className="page-main-title">จัดการตารางงานแพทย์ (Doctor Schedule Management)</h1>
-            <p className="page-sub-title">จัดสรรตารางเวร ประจำวัน/สัปดาห์ และพิจารณาคำขอแลกเวรของแพทย์</p>
-          </div>
+      <div className="page-header" style={{ marginBottom: '24px' }}>
+        <div className="header-titles">
+          <h1 className="page-title">จัดการตารางงานแพทย์</h1>
+          <p className="page-subtitle">จัดสรรตารางเวร ประจำวัน/สัปดาห์ และพิจารณาคำขอแลกเวรของแพทย์</p>
         </div>
 
         <div className="page-header-actions">
@@ -365,51 +355,65 @@ export const ScheduleManagementPage: React.FC = () => {
       </div>
 
       {/* 2. Top Summary KPI Cards */}
-      <div className="dms-metrics-grid">
-        <div className="dms-card metric-card">
-          <div className="metric-icon-wrapper blue-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="24" height="24">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div 
+          className="stat-card-box interactive"
+          onClick={() => {}}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>จำนวนแพทย์ในระบบ</span>
+            <div className="stat-icon-wrap icon-blue" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#3B82F6' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">จำนวนแพทย์ในระบบ</span>
-            <span className="metric-value">{schedules.length} ท่าน</span>
-            <span className="metric-subtext blue-text">ครอบคลุมทุกแผนก</span>
-          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{schedules.length} <span style={{ fontSize: '16px', fontWeight: '500', color: '#64748B' }}>ท่าน</span></div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>ครอบคลุมทุกแผนกในระบบ</div>
         </div>
 
-        <div className="dms-card metric-card interactive" onClick={() => setActiveModal('swapRequests')}>
-          <div className="metric-icon-wrapper red-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" width="24" height="24">
-              <polyline points="17 1 21 5 17 9"/>
-              <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-              <polyline points="7 23 3 19 7 15"/>
-              <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-            </svg>
+        <div 
+          className="stat-card-box interactive"
+          onClick={() => setActiveModal('swapRequests')}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>คำขอแลกเวรรออนุมัติ</span>
+            <div className="stat-icon-wrap icon-amber" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#FFFBEB', color: '#F59E0B' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </div>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">คำขอแลกเวรรออนุมัติ</span>
-            <span className="metric-value">{swapRequests.filter(r => r.status === 'pending').length} รายการ</span>
-            <span className="metric-subtext red-text">คลิกเพื่อพิจารณา</span>
-          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{swapRequests.filter(r => r.status === 'pending').length} <span style={{ fontSize: '16px', fontWeight: '500', color: '#64748B' }}>รายการ</span></div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>คลิกเพื่อพิจารณาคำขอแลกเวร</div>
         </div>
 
-        <div className="dms-card metric-card interactive" onClick={() => setActiveModal('attendance')}>
-          <div className="metric-icon-wrapper green-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" width="24" height="24">
-              <circle cx="12" cy="12" r="10"/>
-              <polyline points="12 6 12 12 14 14"/>
-            </svg>
+        <div 
+          className="stat-card-box interactive"
+          onClick={() => setActiveModal('attendance')}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>อัตราการเข้าเวรตรงเวลา</span>
+            <div className="stat-icon-wrap icon-green" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#ECFDF5', color: '#10B981' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+            </div>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">อัตราการเข้าเวรตรงเวลา</span>
-            <span className="metric-value">98.5%</span>
-            <span className="metric-subtext green-text">มาตรฐานดีเยี่ยม</span>
-          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>98.5<span style={{ fontSize: '20px', fontWeight: '600' }}>%</span></div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>มาตรฐานดีเยี่ยมในสัปดาห์นี้</div>
         </div>
       </div>
 

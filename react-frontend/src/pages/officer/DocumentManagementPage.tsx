@@ -991,87 +991,96 @@ export const DocumentManagementPage: React.FC = () => {
   return (
     <div className="dms-container">
       {/* 1. Page Header according to frontend.md */}
-      <div className="page-header-container">
-        <div className="page-title-group">
-          <div className="page-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" width="24" height="24">
-              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M16 13H8M16 17H8M10 9H8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <div>
-            <h1 className="page-main-title">การจัดการเอกสาร (Document Management)</h1>
-            <p className="page-sub-title">จัดการ จัดเก็บ ตรวจสอบ และอนุมัติเอกสารสำคัญของคลินิก</p>
-          </div>
+      <div className="page-header" style={{ marginBottom: '24px' }}>
+        <div className="header-titles">
+          <h1 className="page-title">การจัดการเอกสาร</h1>
+          <p className="page-subtitle">จัดการ จัดเก็บ ตรวจสอบ และอนุมัติเอกสารสำคัญของคลินิก</p>
         </div>
       </div>
 
       {/* 2. Metrics Cards */}
-      <div className="dms-metrics-grid">
-        <div className="dms-card metric-card interactive" onClick={() => setActiveModal('all')}>
-          <div className="metric-icon-wrapper blue-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="24" height="24">
-              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <div className="metric-info">
-            <span className="metric-label">จำนวนเอกสารทั้งหมด</span>
-            <span className="metric-value">{docs.length}</span>
-            <span className="metric-subtext blue-text">คลิกเพื่อดูทั้งหมด</span>
-          </div>
-        </div>
-
-        <div className="dms-card metric-card interactive" onClick={() => setActiveModal('reviewing')}>
-          <div className="metric-icon-wrapper red-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" width="24" height="24">
-              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <div className="metric-info">
-            <span className="metric-label">เอกสารรอตรวจสอบ</span>
-            <span className="metric-value">{reviewingDocs.length}</span>
-            <span className="metric-subtext red-text">ต้องดำเนินการอนุมัติ</span>
-          </div>
-        </div>
-
-        <div className="dms-card metric-card interactive" onClick={() => setActiveModal('recent')}>
-          <div className="metric-icon-wrapper green-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" width="24" height="24">
-              <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <div className="metric-info">
-            <span className="metric-label">เพิ่มเข้ามาล่าสุด</span>
-            <span className="metric-value">+{addedRecentlyDocs.length}</span>
-            <span className="metric-subtext green-text">ในเดือนนี้</span>
-          </div>
-        </div>
-
-        <div className="dms-card metric-card interactive" onClick={() => setActiveModal('storage')}>
-          <div className="metric-icon-wrapper gray-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2" width="24" height="24">
-              <path d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <div className="metric-info">
-            <span className="metric-label">พื้นที่จัดเก็บ (Supabase)</span>
-            <span className="metric-value">
-              {storageStats ? `${storageStats.used_mb.toFixed(2)} MB` : `${((docs.reduce((acc, d) => acc + (d.fileSize || 1500000), 0)) / (1024 * 1024)).toFixed(2)} MB`}
-            </span>
-            <div className="storage-progress-bar">
-              <div
-                className="storage-progress-fill"
-                style={{
-                  width: `${Math.min(100, Math.max(storageStats ? storageStats.percentage : ((docs.reduce((acc, d) => acc + (d.fileSize || 1500000), 0)) / 524288000) * 100, 1.5))}%`
-                }}
-              ></div>
+<div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div 
+          className="stat-card-box interactive"
+          onClick={() => setActiveModal('all')}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>จำนวนเอกสารทั้งหมด</span>
+            <div className="stat-icon-wrap icon-blue" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#3B82F6' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/><path d="M16 13H8M16 17H8M10 9H8" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
-            <span className="metric-subtext gray-text">
-              {storageStats
-                ? `ใช้ไป ${storageStats.percentage.toFixed(1)}% (เหลือ ${storageStats.remaining_mb.toFixed(1)} MB)`
-                : 'โควต้า 500 MB (Free Tier)'}
-            </span>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{docs.length}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>คลิกเพื่อดูเอกสารทั้งหมด</div>
+        </div>
+
+        <div 
+          className="stat-card-box interactive"
+          onClick={() => setActiveModal('reviewing')}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>เอกสารรอตรวจสอบ</span>
+            <div className="stat-icon-wrap icon-amber" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#FFFBEB', color: '#F59E0B' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{reviewingDocs.length}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>ต้องดำเนินการอนุมัติ</div>
+        </div>
+
+        <div 
+          className="stat-card-box interactive"
+          onClick={() => setActiveModal('recent')}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>เพิ่มเข้ามาล่าสุด</span>
+            <div className="stat-icon-wrap icon-green" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#ECFDF5', color: '#10B981' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>+{addedRecentlyDocs.length}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>ในเดือนนี้</div>
+        </div>
+
+        <div 
+          className="stat-card-box interactive"
+          onClick={() => setActiveModal('storage')}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>พื้นที่จัดเก็บ (Supabase)</span>
+            <div className="stat-icon-wrap icon-teal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#F0FDFA', color: '#0D9488' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>
+            {storageStats ? `${storageStats.used_mb.toFixed(2)} MB` : `${((docs.reduce((acc, d) => acc + (d.fileSize || 1500000), 0)) / (1024 * 1024)).toFixed(2)} MB`}
+          </div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>
+            ใช้ไป {storageStats ? `${storageStats.percentage.toFixed(1)}%` : '0.0%'} ของพื้นที่ทั้งหมด
           </div>
         </div>
       </div>

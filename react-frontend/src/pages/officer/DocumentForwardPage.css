@@ -2171,3 +2171,36 @@ body.dark-mode .staff-forward-action-btn:hover {
     margin: 8px 0;
   }
 }
+
+
+/* Copied Header Styles */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.page-title {
+  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 38px;
+  color: #0F172A;
+  margin: 0 0 4px 0;
+  transition: color 0.5s ease;
+}
+body.dark-mode .page-title {
+  color: #F8FAFC;
+}
+.page-subtitle {
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 22px;
+  color: #64748B;
+  margin: 0;
+  transition: color 0.5s ease;
+}
+body.dark-mode .page-subtitle {
+  color: #94A3B8;
+}

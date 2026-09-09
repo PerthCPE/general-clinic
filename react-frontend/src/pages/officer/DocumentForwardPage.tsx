@@ -1114,18 +1114,10 @@ export const DocumentForwardPage: React.FC = () => {
   return (
     <div className="forward-container">
       {/* 1. Page Header */}
-      <div className="page-header-container">
-        <div className="page-title-group">
-          <div className="page-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" width="24" height="24">
-              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <div>
-            <div className="page-badge-label">ระบบบริหารจัดการเอกสาร DMS</div>
-            <h1 className="page-main-title">ส่งต่อเอกสาร (Document Forwarding)</h1>
-            <p className="page-sub-title">ระบบรับเข้าและส่งต่อเอกสาร บันทึกข้อความ ใบสั่งยา และผลตรวจระหว่างแผนกคลินิก</p>
-          </div>
+      <div className="page-header" style={{ marginBottom: '24px' }}>
+        <div className="header-titles">
+          <h1 className="page-title">ส่งต่อเอกสาร</h1>
+          <p className="page-subtitle">ระบบรับเข้าและส่งต่อเอกสาร บันทึกข้อความ ใบสั่งยา และผลตรวจระหว่างแผนกคลินิก</p>
         </div>
 
         <div className="page-header-actions">
@@ -1168,91 +1160,85 @@ export const DocumentForwardPage: React.FC = () => {
       </div>
 
       {/* 2. Interactive Metrics Cards Grid */}
-      <div className="dms-metrics-grid">
-        <div
-          className="dms-card metric-card interactive"
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div 
+          className="stat-card-box interactive"
           onClick={() => setActiveMetricModal('system_docs')}
-          title="คลิกเพื่อดูเอกสารทั้งหมดในระบบที่พร้อมส่งต่อ"
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
         >
-          <div className="metric-icon-wrapper blue-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="24" height="24">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 02 2h12a2 2 0 0 02-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-            </svg>
-          </div>
-          <div className="metric-info">
-            <div className="metric-label-row">
-              <span className="metric-label">เอกสารทั้งหมดในระบบ (พร้อมส่งต่อ)</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>เอกสารทั้งหมด (พร้อมส่งต่อ)</span>
+            <div className="stat-icon-wrap icon-blue" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#3B82F6' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 02 2h12a2 2 0 0 02-2V8z" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
             </div>
-            <span className="metric-value">{systemDocuments.length}</span>
-            <span className="metric-subtext blue-text">
-              คลิกเพื่อเลือกส่งต่อเอกสาร →
-            </span>
           </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{systemDocuments.length}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>คลิกเพื่อเลือกส่งต่อเอกสาร →</div>
         </div>
 
-        <div
-          className="dms-card metric-card interactive"
+        <div 
+          className="stat-card-box interactive"
           onClick={() => setActiveMetricModal('pending')}
-          title="คลิกเพื่อดูรายการที่รอปลายทางรับทราบ"
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
         >
-          <div className="metric-icon-wrapper amber-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" width="24" height="24">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>รอปลายทางรับทราบ</span>
+            <div className="stat-icon-wrap icon-amber" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#FFFBEB', color: '#F59E0B' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">รอปลายทางรับทราบ</span>
-            <span className="metric-value">{totalPendingCount}</span>
-            <span className="metric-subtext amber-text">
-              อยู่ระหว่างรอปลายทางรับมอบ →
-            </span>
-          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{totalPendingCount}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>อยู่ระหว่างรอปลายทางรับมอบ →</div>
         </div>
 
-        <div
-          className="dms-card metric-card interactive"
+        <div 
+          className="stat-card-box interactive"
           onClick={() => setActiveMetricModal('completed')}
-          title="คลิกเพื่อดูเอกสารที่ปลายทางได้รับแล้ว"
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
         >
-          <div className="metric-icon-wrapper green-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" width="24" height="24">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round" strokeLinejoin="round"/>
-              <polyline points="22 4 12 14.01 9 11.01"></polyline>
-            </svg>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>ได้รับแล้ว (รับทราบสำเร็จ)</span>
+            <div className="stat-icon-wrap icon-teal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#F0FDFA', color: '#0D9488' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round" strokeLinejoin="round"/><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </div>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">ได้รับแล้ว (รับทราบสำเร็จ)</span>
-            <span className="metric-value">{totalCompletedCount}</span>
-            <span className="metric-subtext green-text">
-              ปลายทางรับทราบเรียบร้อย →
-            </span>
-          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{totalCompletedCount}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>ปลายทางรับทราบเรียบร้อย →</div>
         </div>
 
-        <div
-          className="dms-card metric-card interactive"
+        <div 
+          className="stat-card-box interactive"
           onClick={() => setActiveMetricModal('recipients')}
-          title="คลิกเพื่อดูรายชื่อบุคลากรและแผนก"
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
         >
-          <div className="metric-icon-wrapper blue-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="24" height="24">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>บุคลากรปลายทางในระบบ</span>
+            <div className="stat-icon-wrap icon-green" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#ECFDF5', color: '#10B981' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">บุคลากรปลายทางในระบบ</span>
-            <span className="metric-value">{recipientsList.length > 0 ? recipientsList.length : 8}</span>
-            <span className="metric-subtext blue-text">
-              ดูรายชื่อแผนกและผู้รับ →
-            </span>
-          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{recipientsList.length > 0 ? recipientsList.length : 8}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>ดูรายชื่อแผนกและผู้รับ →</div>
         </div>
       </div>
 

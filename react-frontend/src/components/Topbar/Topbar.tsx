@@ -714,9 +714,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            {unreadDocMessageCount > 0 && (
-              <span className="doc-message-badge">{unreadDocMessageCount > 9 ? '9+' : unreadDocMessageCount}</span>
-            )}
+            {unreadDocMessageCount > 0 && <span className="notice-badge" />}
           </button>
 
           {/* Message Dropdown Menu */}
@@ -1315,7 +1313,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
                           <polyline points="20 6 9 17 4 12" />
                         </svg>
-                        <span>✓ รับทราบเอกสาร (บันทึกว่าได้รับแล้ว)</span>
+                        <span>รับทราบเอกสาร (บันทึกว่าได้รับแล้ว)</span>
                       </>
                     )}
                   </button>
