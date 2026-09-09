@@ -172,8 +172,13 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
 
           {/* Quick Doctor Accounts to test individual doctor schedules */}
           <div style={{ marginTop: '12px', padding: '10px 12px', background: '#FEF2F2', borderRadius: '12px', border: '1px solid #FECACA' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#991B1B', display: 'block', marginBottom: '6px' }}>
-              🩺 เลือกแพทย์ในระบบเข้าสู่ระบบโดยตรง (ทดสอบตารางงานเฉพาะบุคคล):
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#991B1B', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
+                <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
+                <circle cx="20" cy="10" r="2" />
+              </svg>
+              เลือกแพทย์ในระบบเข้าสู่ระบบโดยตรง (ทดสอบตารางงานเฉพาะบุคคล):
             </span>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               <button

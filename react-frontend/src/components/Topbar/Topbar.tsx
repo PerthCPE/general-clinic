@@ -705,7 +705,12 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
 
               {/* Sub-header info bar */}
               <div className="doc-message-info-bar">
-                <span>📁 เอกสารที่ส่งต่อจากเจ้าหน้าที่ธุรการ</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  เอกสารที่ส่งต่อจากเจ้าหน้าที่ธุรการ
+                </span>
               </div>
 
               {/* Message List */}
@@ -726,7 +731,19 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                       onClick={() => handleOpenMessageItem(msg)}
                     >
                       <div className="doc-message-item-icon">
-                        {msg.priority === 'emergency' ? '🚨' : msg.priority === 'urgent' ? '⚡' : '📄'}
+                        {msg.priority === 'emergency' ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                          </svg>
+                        ) : msg.priority === 'urgent' ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                          </svg>
+                        )}
                       </div>
                       <div className="doc-message-item-content">
                         <div className="doc-message-item-top">
@@ -927,8 +944,11 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                   ทำเครื่องหมายอ่านแล้วทั้งหมด
                 </button>
                 {(speakingId || isSpeakingAll) && (
-                  <button className="stop-speech-footer-btn" onClick={stopSpeech}>
-                    ⏹️ หยุดการอ่านเสียง
+                  <button className="stop-speech-footer-btn" onClick={stopSpeech} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="4" y="4" width="16" height="16" rx="2" />
+                    </svg>
+                    หยุดการอ่านเสียง
                   </button>
                 )}
               </div>
@@ -1251,7 +1271,12 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             <div className="doc-all-modal-body">
               {filteredAllDocs.length === 0 ? (
                 <div className="doc-all-empty">
-                  <div className="doc-all-empty-icon">📭</div>
+                  <div className="doc-all-empty-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 12h-6l-2 3h-4l-2-3H2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-7z" />
+                      <path d="M5.45 5.11L2 12v0h20v0l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                    </svg>
+                  </div>
                   <h4>{allDocsFilter === 'unread' ? 'ไม่มีเอกสารที่ยังไม่ได้อ่าน' : 'ไม่พบเอกสารที่ค้นหา'}</h4>
                   <p>{allDocsFilter === 'unread' ? 'คุณได้อ่านเอกสารทั้งหมดครบถ้วนแล้ว' : 'ลองเปลี่ยนคำค้นหาใหม่อีกครั้ง'}</p>
                 </div>
@@ -1266,7 +1291,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                       <div className="doc-all-card-top">
                         <div className="doc-all-card-badges">
                           <span className={`doc-message-tag ${msg.priority}`}>
-                            {msg.priority === 'emergency' ? '🚨 ฉุกเฉินมาก' : msg.priority === 'urgent' ? '⚡ ด่วน' : 'ปกติ'}
+                            {msg.priority === 'emergency' ? 'ฉุกเฉินมาก' : msg.priority === 'urgent' ? 'ด่วน' : 'ปกติ'}
                           </span>
                           <span className="doc-all-type-tag">{msg.type}</span>
                           {msg.isUnread && <span className="doc-all-unread-badge">ยังไม่ได้อ่าน</span>}
@@ -1313,8 +1338,13 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                       setIsAllDocsModalOpen(false);
                       onNavigate('dms-documents');
                     }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
-                    📋 ไปที่หน้าจัดการเอกสารธุรการ &rarr;
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                    </svg>
+                    ไปที่หน้าจัดการเอกสารธุรการ &rarr;
                   </button>
                 )}
               </div>
