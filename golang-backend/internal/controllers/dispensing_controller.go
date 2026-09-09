@@ -763,17 +763,21 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 	}
 
 	// ปรับสถานะคิวตรวจของคลินิกเป็น รอชำระเงิน ให้ย้ายออกจากห้องยา 100%
+	queueUpdates := map[string]interface{}{
+		"status":     "รอชำระเงิน",
+		"department": ResolveDepartmentForStatus(models.Queue{}, "รอชำระเงิน"),
+	}
 	if req.VisitID > 0 {
-		tx.Model(&models.Queue{}).Where("visit_id = ?", req.VisitID).Update("status", "รอชำระเงิน")
+		tx.Model(&models.Queue{}).Where("visit_id = ?", req.VisitID).Updates(queueUpdates)
 	}
 	if patient.ID > 0 {
-		tx.Model(&models.Queue{}).Where("patient_id = ? AND status NOT IN ('เสร็จสิ้น', 'ยกเลิกคิว')", patient.ID).Update("status", "รอชำระเงิน")
+		tx.Model(&models.Queue{}).Where("patient_id = ? AND status NOT IN ('เสร็จสิ้น', 'ยกเลิกคิว')", patient.ID).Updates(queueUpdates)
 	}
 	if req.QueueNumber != "" {
-		tx.Model(&models.Queue{}).Where("queue_number = ?", req.QueueNumber).Update("status", "รอชำระเงิน")
+		tx.Model(&models.Queue{}).Where("queue_number = ?", req.QueueNumber).Updates(queueUpdates)
 	}
 	if qID > 0 {
-		tx.Model(&models.Queue{}).Where("id = ?", qID).Update("status", "รอชำระเงิน")
+		tx.Model(&models.Queue{}).Where("id = ?", qID).Updates(queueUpdates)
 	}
 
 	if err := tx.Commit().Error; err != nil {

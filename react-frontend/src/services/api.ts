@@ -374,6 +374,18 @@ export interface BackendScreening {
   current_medications?: string;
   smoking_history?: string;
   alcohol_history?: string;
+  herbal_medicines?: string;
+  dietary_supplements?: string;
+  has_uri?: boolean | null;
+  has_tb?: boolean | null;
+  on_anticoagulant?: boolean | null;
+  precaution_type?: string;
+  is_pregnant?: boolean | null;
+  is_breastfeeding?: boolean | null;
+  last_menstrual_period?: string;
+  q2_depressed?: boolean | null;
+  q2_anhedonia?: boolean | null;
+  screening_positive?: boolean | null;
   created_at: string;
   updated_at: string;
   visit_record?: {
@@ -383,6 +395,7 @@ export interface BackendScreening {
     visit_date: string;
     queue_id?: number;
     queue_number?: string;
+    department?: string;
     patient?: BackendPatient;
   };
   screened_by?: {
