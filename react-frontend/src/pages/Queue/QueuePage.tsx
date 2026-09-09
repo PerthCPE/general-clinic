@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { queueApi, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { useToast } from '../../components/Toast/ToastProvider';
 import { formatQueueNo, formatNationalId, maskNationalId } from '../../utils/formatters';
 import { callQueueAudio, getSpokenDepartmentText } from '../../utils/audioQueue';
 import Pagination from '../../components/Pagination/Pagination';
@@ -163,23 +164,7 @@ const QueuePage: React.FC = () => {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [statusNote, setStatusNote] = useState('');
 
-  // Toast Notifications State
-  const [successToast, setSuccessToast] = useState<string | null>(null);
-  const [errorToast, setErrorToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (successToast) {
-      const timer = setTimeout(() => setSuccessToast(null), 4000);
-      return () => clearTimeout(timer);
-    }
-  }, [successToast]);
-
-  useEffect(() => {
-    if (errorToast) {
-      const timer = setTimeout(() => setErrorToast(null), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [errorToast]);
+  const { showToast } = useToast();
 
   // State สำหรับดูข้อความเต็มของจุดบริการ & การคัดกรอง
   const [detailModalQueue, setDetailModalQueue] = useState<QueueItem | null>(null);
@@ -242,13 +227,13 @@ const QueuePage: React.FC = () => {
       setQueueList([]);
       setTotalItems(0);
       setTotalPages(1);
-      setErrorToast('ไม่สามารถโหลดรายการคิวจากระบบได้ กรุณาลองใหม่อีกครั้ง');
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดรายการคิวจากระบบได้' });
     } finally {
       if (requestId === latestRequestIdRef.current) {
         setIsLoading(false);
       }
     }
-  }, [currentPage, itemsPerPage, statusFilter, searchQuery, selectedCategory]);
+  }, [currentPage, itemsPerPage, statusFilter, searchQuery, selectedCategory, showToast]);
 
   useEffect(() => {
     fetchQueues(currentPage);
@@ -348,7 +333,10 @@ const QueuePage: React.FC = () => {
       );
 
       setIsModalOpen(false);
-      setSuccessToast(`อัปเดตสถานะคิว ${selectedQueue.queueNo} เป็น "${newStatus}" เรียบร้อยแล้ว`);
+      showToast({
+        type: 'success',
+        message: `เปลี่ยนสถานะคิวเป็น "${newStatus}" สำเร็จ`,
+      });
       fetchQueues();
     } catch (err: any) {
       console.error('Update queue status error:', err);
@@ -357,7 +345,7 @@ const QueuePage: React.FC = () => {
         err?.response?.data?.message ||
         err?.message ||
         'ไม่สามารถเปลี่ยนสถานะคิวได้';
-      setErrorToast(errMsg);
+      showToast({ type: 'error', message: errMsg });
       // ห้ามแตะ setQueueList เพื่อคง state เดิมไว้
     }
   };
@@ -393,24 +381,6 @@ const QueuePage: React.FC = () => {
 
   return (
     <div className="queue-page">
-      {/* Toast Notifications */}
-      {successToast && (
-        <div className="queue-toast queue-toast-success" role="status">
-          <svg className="toast-icon" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-          </svg>
-          <span>{successToast}</span>
-        </div>
-      )}
-      {errorToast && (
-        <div className="queue-toast queue-toast-error" role="alert">
-          <svg className="toast-icon" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-          <span>{errorToast}</span>
-        </div>
-      )}
-
       {/* Page Header */}
       <div className="queue-page-header">
         <div className="queue-header-left">

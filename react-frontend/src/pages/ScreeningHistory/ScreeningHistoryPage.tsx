@@ -13,6 +13,7 @@ import { PatientVitalsTrendCard } from './components/PatientVitalsTrendCard';
 import { ScreeningDetailModal } from './components/ScreeningDetailModal';
 import { vitalsApi, type BackendScreening } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { useToast } from '../../components/Toast/ToastProvider';
 import { formatQueueNo, formatNationalId, formatPhone, formatHN, maskNationalId } from '../../utils/formatters';
 import Pagination from '../../components/Pagination/Pagination';
 import './ScreeningHistoryPage.css';
@@ -140,6 +141,7 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
 
 export const ScreeningHistoryPage: React.FC = () => {
   const { currentUser } = useAuth();
+  const { showToast } = useToast();
 
   // Records State from Live Backend
   const [records, setRecords] = useState<ScreeningHistoryItem[]>([]);
@@ -156,10 +158,11 @@ export const ScreeningHistoryPage: React.FC = () => {
       }
     } catch (err) {
       console.warn('Could not fetch screening history from backend:', err);
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดประวัติการคัดกรองได้' });
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   const { subscribe } = useWebSocket();
 

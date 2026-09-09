@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { eligibilityApi, patientApi, type BackendEligibility } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { useToast } from '../../components/Toast/ToastProvider';
 import { formatNationalId } from '../../utils/formatters';
 import { validateThaiNationalID } from '../../utils/thaiIdValidator';
 import Pagination from '../../components/Pagination/Pagination';
@@ -72,6 +73,8 @@ const EligibilityPage: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const { showToast } = useToast();
+
   // Accordion Dropdown States สำหรับการ์ดทั้ง 2 ใบ
   const [isCheckCardOpen, setIsCheckCardOpen] = useState(true);
   const [isHistoryCardOpen, setIsHistoryCardOpen] = useState(true);
@@ -96,9 +99,10 @@ const EligibilityPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Could not fetch eligibility history from backend:', err);
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดประวัติการตรวจสอบสิทธิ์ได้' });
       setHistoryList([]);
     }
-  }, []);
+  }, [showToast]);
 
   const { subscribe } = useWebSocket();
 
@@ -137,12 +141,14 @@ const EligibilityPage: React.FC = () => {
 
     if (!cleanId) {
       setErrorMessage('กรุณาระบุเลขประจำตัวประชาชน 13 หลัก');
+      showToast({ type: 'error', message: 'กรุณาระบุเลขประจำตัวประชาชน 13 หลัก' });
       setCurrentResult(null);
       return;
     }
 
     if (!/^\d{13}$/.test(cleanId)) {
       setErrorMessage('กรุณาระบุเลขประจำตัวประชาชน 13 หลัก (ตัวเลขเท่านั้น)');
+      showToast({ type: 'error', message: 'กรุณาระบุเลขประจำตัวประชาชน 13 หลัก (ตัวเลขเท่านั้น)' });
       setCurrentResult(null);
       return;
     }
@@ -168,6 +174,7 @@ const EligibilityPage: React.FC = () => {
           status: 'ใช้งานได้',
           expireDate: res.expire_date || '31/12/2026',
         });
+        showToast({ type: 'success', message: 'ตรวจสอบสิทธิ์สำเร็จ' });
       }
     } catch (err: any) {
       console.error('Check eligibility error:', err);
@@ -175,6 +182,7 @@ const EligibilityPage: React.FC = () => {
         err?.response?.data?.error ||
         'ไม่พบข้อมูลสิทธิ์ของผู้ป่วยรายนี้ในระบบ หรือเกิดข้อผิดพลาดในการเชื่อมต่อ';
       setErrorMessage(errMsg);
+      showToast({ type: 'error', message: errMsg });
       setCurrentResult(null);
     } finally {
       setIsSearching(false);
@@ -209,8 +217,11 @@ const EligibilityPage: React.FC = () => {
         });
         fetchHistory();
       }
-    } catch (err) {
+      showToast({ type: 'success', message: 'บันทึกข้อมูลสิทธิ์สำเร็จ' });
+    } catch (err: any) {
       console.warn('Save eligibility error:', err);
+      const errMsg = err?.response?.data?.error || err?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูลสิทธิ์';
+      showToast({ type: 'error', message: errMsg });
     }
 
     const now = new Date();

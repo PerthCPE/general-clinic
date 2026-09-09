@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { useToast } from '../../components/Toast/ToastProvider';
 import type {
   QueuePatientItem,
   TriageLevelNum,
@@ -129,6 +130,7 @@ const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
 
 export const VitalsPage: React.FC = () => {
   const { currentUser } = useAuth();
+  const { showToast } = useToast();
   const initialDraft = useMemo(() => getInitialDraft(), []);
 
   // Queue & Patient State (Auto-restored from draft if available)
@@ -151,11 +153,11 @@ export const VitalsPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Could not load queues in vitals from backend:', err);
-      setErrorToast('ไม่สามารถโหลดรายการคิวได้ กรุณาลองใหม่อีกครั้ง');
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดรายการคิวได้' });
       setQueueList([]);
       return [];
     }
-  }, []);
+  }, [showToast]);
 
   // ดึงรายชื่อแพทย์ประจำห้องตรวจจาก Backend DB
   const fetchDoctors = useCallback(async () => {
@@ -253,8 +255,6 @@ export const VitalsPage: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
-  const [errorToast, setErrorToast] = useState<string | null>(null);
-  const [successToast, setSuccessToast] = useState<string | null>(null);
   const [pendingWarnings, setPendingWarnings] = useState<Array<{ field: string; message: string }> | null>(null);
 
   // Clear form errors when input values change
@@ -574,9 +574,6 @@ export const VitalsPage: React.FC = () => {
   // Handle Form Change
   const handleChangeField = (field: string, val: any) => {
     clearFieldError(field);
-    if (errorToast) {
-      setErrorToast(null);
-    }
     switch (field) {
       case 'weight':
         setWeight(String(val));
@@ -708,7 +705,6 @@ export const VitalsPage: React.FC = () => {
     setPainScore(randPain);
     setBloodSugar(randDTX);
     setFormErrors({});
-    setErrorToast(null);
     if (!chiefComplaint || chiefComplaint.trim() === '') {
       setChiefComplaint(randComplaint);
     }
@@ -726,7 +722,6 @@ export const VitalsPage: React.FC = () => {
       // ignore
     }
     setFormErrors({});
-    setErrorToast(null);
     setPendingWarnings(null);
     setSelectedPatientId('');
     setSearchQuery('');
@@ -766,12 +761,11 @@ export const VitalsPage: React.FC = () => {
   // Submit Logic Execution
   const executeSubmit = async () => {
     if (!selectedPatient) {
-      setErrorToast('กรุณาเลือกคิวคนไข้ก่อนบันทึก');
+      showToast({ type: 'error', message: 'กรุณาเลือกคิวคนไข้ก่อนบันทึก' });
       return;
     }
 
     setIsSaving(true);
-    setErrorToast(null);
 
     const docObj = doctorList.find((d) => d.doctorId === assignedDoctorId) || doctorList[0] || DEFAULT_DOCTORS[0];
 
@@ -827,13 +821,19 @@ export const VitalsPage: React.FC = () => {
         triage_level: selectedTriage,
       });
 
-      // 1. ดึงรายการคิวล่าสุดจากฐานข้อมูลทันที
+      // 1. แจ้งเตือน Toast สำเร็จ
+      showToast({
+        type: 'success',
+        message: `บันทึกข้อมูลการคัดกรองและส่งต่อคิว ${selectedPatient.queueNo} เรียบร้อย`,
+      });
+
+      // 2. ดึงรายการคิวล่าสุดจากฐานข้อมูลทันที
       const freshQueues = await fetchQueues();
 
-      // 2. เคลียร์ฟอร์ม
+      // 3. เคลียร์ฟอร์ม
       handleResetForm();
 
-      // 3. หาคิวที่ยังรอคัดกรองอยู่จริง
+      // 4. หาคิวที่ยังรอคัดกรองอยู่จริง
       if (freshQueues && freshQueues.length > 0) {
         const remainingWaiting = freshQueues.filter((q) => q.queueStatus === 'รอคัดกรอง');
         if (remainingWaiting.length > 0) {
@@ -849,7 +849,7 @@ export const VitalsPage: React.FC = () => {
     } catch (err: any) {
       console.warn('Record vitals API error:', err);
       const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูลสัญญาณชีพ';
-      setErrorToast(errMsg);
+      showToast({ type: 'error', message: errMsg });
       // DO NOT reset form, DO NOT fake-update queue status!
     } finally {
       setIsSaving(false);
@@ -860,7 +860,7 @@ export const VitalsPage: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedPatient) {
-      setErrorToast('กรุณาเลือกคิวคนไข้ก่อนบันทึก');
+      showToast({ type: 'error', message: 'กรุณาเลือกคิวคนไข้ก่อนบันทึก' });
       return;
     }
 
@@ -880,13 +880,14 @@ export const VitalsPage: React.FC = () => {
     if (!validation.isValid) {
       setFormErrors(validation.errors);
       const firstError = Object.values(validation.errors)[0];
-      setErrorToast(firstError || 'กรุณาตรวจสอบข้อมูลสัญญาณชีพให้ถูกต้อง');
+      showToast({ type: 'error', message: firstError || 'กรุณาตรวจสอบข้อมูลสัญญาณชีพให้ถูกต้อง' });
       return;
     }
 
     setFormErrors({});
 
     if (validation.warnings.length > 0) {
+      showToast({ type: 'warning', message: 'พบค่าสัญญาณชีพผิดปกติ กรุณาตรวจสอบและยืนยัน' });
       setPendingWarnings(validation.warnings);
       return;
     }
@@ -941,31 +942,6 @@ export const VitalsPage: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Error Toast Banner */}
-      {errorToast && (
-        <div className="vitals-error-banner">
-          <div className="vitals-error-banner-content">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span>{errorToast}</span>
-          </div>
-          <button
-            type="button"
-            className="vitals-error-banner-close"
-            onClick={() => setErrorToast(null)}
-            aria-label="Close error message"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      )}
 
       {/* Warning Confirmation Modal */}
       {pendingWarnings && (
