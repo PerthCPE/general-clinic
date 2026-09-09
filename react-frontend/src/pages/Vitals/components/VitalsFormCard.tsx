@@ -303,25 +303,33 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                       })
                     ) : (
                       <div className="combobox-empty-item" style={{ padding: '20px 16px', textAlign: 'center' }}>
-                        <div style={{ color: '#64748B', fontSize: '13px', marginBottom: '10px' }}>
-                          ไม่พบคิวผู้ป่วยที่ตรงกับคำค้นหา "{searchQuery}"
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => onSearchQueryChange('')}
-                          style={{
-                            background: '#EFF6FF',
-                            color: '#2563EB',
-                            border: '1px solid #BFDBFE',
-                            borderRadius: '8px',
-                            padding: '6px 16px',
-                            fontSize: '13px',
-                            fontWeight: '700',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          คลิกดูคิวที่รอคัดกรองทั้งหมด ({waitingCount} คิว)
-                        </button>
+                        {searchQuery ? (
+                          <>
+                            <div style={{ color: '#64748B', fontSize: '13px', marginBottom: '10px' }}>
+                              ไม่พบคิวผู้ป่วยที่ตรงกับคำค้นหา "{searchQuery}"
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => onSearchQueryChange('')}
+                              style={{
+                                background: '#EFF6FF',
+                                color: '#2563EB',
+                                border: '1px solid #BFDBFE',
+                                borderRadius: '8px',
+                                padding: '6px 16px',
+                                fontSize: '13px',
+                                fontWeight: '700',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              คลิกดูคิวที่รอคัดกรองทั้งหมด ({waitingCount} คิว)
+                            </button>
+                          </>
+                        ) : (
+                          <div style={{ color: '#64748B', fontSize: '13px', padding: '8px 0' }}>
+                            ไม่มีคิวรอรับบริการในขณะนี้
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1109,12 +1117,17 @@ export const VitalsFormCard: React.FC<VitalsFormCardProps> = ({
                 value={assignedDoctorId}
                 onChange={(e) => onChangeField('assignedDoctorId', Number(e.target.value))}
                 required
+                disabled={doctorOptions.length === 0}
               >
-                {doctorOptions.map((doc) => (
-                  <option key={doc.doctorId} value={doc.doctorId}>
-                    {doc.roomName} — {doc.fullName} ({doc.specialty})
-                  </option>
-                ))}
+                {doctorOptions.length === 0 ? (
+                  <option value="">กำลังโหลดรายชื่อแพทย์...</option>
+                ) : (
+                  doctorOptions.map((doc) => (
+                    <option key={doc.doctorId} value={doc.doctorId}>
+                      {doc.roomName} — {doc.fullName} ({doc.specialty})
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           </div>

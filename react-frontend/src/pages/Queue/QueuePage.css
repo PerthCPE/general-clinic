@@ -34,6 +34,16 @@
   animation: toastSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+.queue-toast.queue-toast-error {
+  background: #EF4444;
+  box-shadow: 0 10px 25px rgba(239, 68, 68, 0.3);
+}
+
+[data-theme="dark"] .queue-toast.queue-toast-error {
+  background: #DC2626;
+  box-shadow: 0 10px 25px rgba(220, 38, 38, 0.4);
+}
+
 .toast-icon {
   width: 20px;
   height: 20px;

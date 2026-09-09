@@ -222,37 +222,43 @@ function RegistrationPage() {
     setNotFoundQuery(null);
   };
 
-  // ส่งต่อเข้าคิวตรวจ -> ยิง Backend ออกบัตรคิวจริง และลบออกจากรายชื่อรอเข้าคิวทันที
+  // ส่งต่อเข้าคิวตรวจ -> ยิง Backend ออกบัตรคิวจริง และลบออกจากรายชื่อรอเข้าคิวทันทีเฉพาะเมื่อสำเร็จ
   const handleAssignQueue = async (patient: Patient) => {
     try {
       let patientId = patient.id;
       if (!patientId) {
-        try {
-          const res = await patientApi.search(patient.nationalId.replace(/[-\s]/g, ''));
-          if (res) {
-            patientId = Array.isArray(res) ? res[0]?.id : res.id;
-          }
-        } catch {
-          // ignore
+        const res = await patientApi.search(patient.nationalId.replace(/[-\s]/g, ''));
+        if (res) {
+          patientId = Array.isArray(res) ? res[0]?.id : res.id;
         }
       }
 
-      if (patientId) {
-        await queueApi.create(patientId, 'แผนกคัดกรอง', 'ส่งเข้าคิวจากการลงทะเบียน');
+      if (!patientId) {
+        throw new Error('ไม่พบข้อมูลรหัสผู้ป่วยในระบบ');
       }
-    } catch (err) {
-      console.warn('Queue assign error:', err);
+
+      await queueApi.create(patientId, 'แผนกคัดกรอง', 'ส่งเข้าคิวจากการลงทะเบียน');
+
+      // เอาผู้ป่วยออกจากรายการ "ผู้ป่วยที่ยังไม่ได้เข้าคิว" เมื่อสำเร็จเท่านั้น
+      setPatients((prev) =>
+        prev.filter((p) => p.hn !== patient.hn && p.nationalId !== patient.nationalId && (!patient.id || p.id !== patient.id))
+      );
+
+      // ปิดข้อมูลผู้ป่วยที่เปิดอยู่ใน search / modal
+      setSearchResult(null);
+      setNotFoundQuery(null);
+      setSelectedPatientModal(null);
+      fetchPatients();
+    } catch (err: any) {
+      console.error('Queue assign error:', err);
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'เกิดข้อผิดพลาดในการส่งผู้ป่วยเข้าคิว';
+      setErrorToast(errMsg);
+      // ห้ามลบคนไข้ออกจาก setPatients เพื่อคงสถานะเดิมไว้
     }
-
-    // เอาผู้ป่วยออกจากรายการ "ผู้ป่วยที่ยังไม่ได้เข้าคิว" ทันที
-    setPatients((prev) =>
-      prev.filter((p) => p.hn !== patient.hn && p.nationalId !== patient.nationalId && (!patient.id || p.id !== patient.id))
-    );
-
-    // ปิดข้อมูลผู้ป่วยที่เปิดอยู่ใน search / modal
-    setSearchResult(null);
-    setNotFoundQuery(null);
-    setSelectedPatientModal(null);
   };
 
   // ส่งต่อเข้าคิวจาก Success Modal (กรณีเลือกส่งเข้าคิวทันทีหลังลงทะเบียนแบบไม่ออกคิว)

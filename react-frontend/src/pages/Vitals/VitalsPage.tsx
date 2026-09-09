@@ -15,7 +15,6 @@ import { TriageWidget } from './components/TriageWidget';
 import { VitalsFormCard } from './components/VitalsFormCard';
 import { queueApi, vitalsApi, type BackendQueue } from '../../services/api';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
-import { clinicMockStore, type MockQueue } from '../../mocks/clinicMockStore';
 import { validateVitalsInput } from '../../utils/clinicalValidation';
 import './VitalsPage.css';
 
@@ -73,7 +72,7 @@ const getInitialDraft = (): VitalsDraftPayload | null => {
   return null;
 };
 
-// Initial Fallback Doctors
+// Initial Fallback Doctors (Matches seed users doctor1-3)
 const DEFAULT_DOCTORS: DoctorOption[] = [
   { doctorId: 4, fullName: 'พญ.สุดา สุขสมบูรณ์', specialty: 'เวชปฏิบัติทั่วไป', roomName: 'ห้องตรวจ 1 (พญ.สุดา)' },
   { doctorId: 5, fullName: 'นพ.วิชัย ชาญการแพทย์', specialty: 'อายุรกรรมทั่วไป', roomName: 'ห้องตรวจ 2 (นพ.วิชัย)' },
@@ -128,29 +127,6 @@ const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
   };
 };
 
-const mapMockQueueToPatientItem = (q: MockQueue): QueuePatientItem => {
-  const queueFormatted = formatQueueNo(q.queueNo);
-  const hnFormatted = q.patient?.hn ? formatHN(q.patient.hn) : formatHN(q.patientId || q.id || 1);
-
-  return {
-    id: String(q.id),
-    queueId: q.id,
-    patientId: q.patientId,
-    queueNo: queueFormatted,
-    hn: hnFormatted,
-    fullName: q.patient?.fullName || `ผู้ป่วยคิว ${queueFormatted}`,
-    nationalId: formatNationalId(q.patient?.nationalId),
-    gender: (q.patient?.gender as 'ชาย' | 'หญิง' | 'อื่นๆ') || 'ชาย',
-    age: q.patient?.age || 35,
-    phone: formatPhone(q.patient?.phone),
-    schemeType: q.patient?.schemeType || 'บัตรทอง (สปสช.)',
-    allergies: q.patient?.allergies || 'ปฏิเสธการแพ้ยา',
-    chronicDiseases: q.patient?.chronicDiseases || 'ไม่มี',
-    registeredTime: q.createdAt || '08:30 น.',
-    queueStatus: (q.status as 'รอคัดกรอง' | 'รอพบแพทย์' | 'กำลังตรวจ' | 'เสร็จสิ้น') || 'รอคัดกรอง',
-  };
-};
-
 export const VitalsPage: React.FC = () => {
   const { currentUser } = useAuth();
   const initialDraft = useMemo(() => getInitialDraft(), []);
@@ -160,27 +136,24 @@ export const VitalsPage: React.FC = () => {
   const [selectedPatientId, setSelectedPatientId] = useState<string>(() => initialDraft?.selectedPatientId || '');
   const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTORS);
 
-  // ดึงรายการคิวจาก Backend DB
+  // ดึงรายการคิวจริงจาก Backend DB (Zero Mock)
   const fetchQueues = useCallback(async () => {
     try {
       const res = await queueApi.getList();
       const rawList = Array.isArray(res) ? res : (res && typeof res === 'object' && 'data' in res ? (res as any).data : []);
-      if (Array.isArray(rawList) && rawList.length > 0) {
+      if (Array.isArray(rawList)) {
         const mapped = rawList.map(mapBackendQueueToPatientItem);
         setQueueList(mapped);
         return mapped;
       } else {
-        const mockQueues = clinicMockStore.getQueues();
-        const mapped = mockQueues.map(mapMockQueueToPatientItem);
-        setQueueList(mapped);
-        return mapped;
+        setQueueList([]);
+        return [];
       }
     } catch (err) {
-      console.warn('Could not load queues in vitals, using clinicMockStore:', err);
-      const mockQueues = clinicMockStore.getQueues();
-      const mapped = mockQueues.map(mapMockQueueToPatientItem);
-      setQueueList(mapped);
-      return mapped;
+      console.error('Could not load queues in vitals from backend:', err);
+      setErrorToast('ไม่สามารถโหลดรายการคิวได้ กรุณาลองใหม่อีกครั้ง');
+      setQueueList([]);
+      return [];
     }
   }, []);
 
