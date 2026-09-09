@@ -1,17 +1,9 @@
-﻿/**
+/**
  * Smart Audio Queue Calling with 100% Genuine Studio Google Thai Female Voice Pack
  * Plays gentle 3-tone hospital melodic chime + Studio Thai Female voice audio clips (.mp3)
  */
 
 import { getSharedAudioContext } from './audioContext';
-
-// =========================================================================
-// สวิตช์เลือกรูปแบบเสียงแจ้งเตือน (แก้ตรงนี้ที่เดียว มีผลทั้งห้องยา + ห้องการเงิน)
-//   true  = เล่นไฟล์ MP3 (/audio/pin_a1.mp3) เป็นหลัก  ← ค่าเริ่มต้น เหมือนระบบเดิม (เสียงดึงๆ)
-//   false = เล่นเสียงสังเคราะห์ 2 tone เป็นหลัก
-// อีกฝั่งจะถูกใช้เป็น fallback อัตโนมัติถ้าทางหลักเล่นไม่ได้
-// =========================================================================
-const USE_MP3 = false;
 
 // Global audio element reference to prevent overlapping voices
 let currentAudioElement: HTMLAudioElement | null = null;
@@ -20,22 +12,15 @@ let isAudioSequencePlaying = false;
 // =========================================================================
 // 1. ระบบเสียงแจ้งเตือนสำหรับ "ห้องยา" (Pharmacy)
 // =========================================================================
-export function playPharmacyNotification(message?: string): Promise<void> {
+export function playPharmacyNotification(_message?: string): Promise<void> {
   return new Promise((resolve) => {
     try {
       if (localStorage.getItem('notificationSoundEnabled') === 'false') {
-        resolve(); return;
+        resolve();
+        return;
       }
-
-      // ตั้งค่ารูปแบบเสียงแจ้งเตือน (ห้องยา)
-      const MP3_FILE_PATH = '/audio/pin_a1.mp3';
-      const WAIT_BEFORE_TTS_MS = 3000;
-
-      // ตั้งค่าเสียงสังเคราะห์
-      const TONE_1_FREQ = 659.25;
-      const TONE_2_FREQ = 523.25;
-
-      executeAudioPlay(MP3_FILE_PATH, WAIT_BEFORE_TTS_MS, TONE_1_FREQ, TONE_2_FREQ, message, resolve);
+      playSynthNotification(659.25, 523.25);
+      resolve();
     } catch (e) {
       console.error('Pharmacy audio play failed', e);
       resolve();
@@ -46,22 +31,15 @@ export function playPharmacyNotification(message?: string): Promise<void> {
 // =========================================================================
 // 2. ระบบเสียงแจ้งเตือนสำหรับ "ห้องการเงิน" (Billing)
 // =========================================================================
-export function playBillingNotification(message?: string): Promise<void> {
+export function playBillingNotification(_message?: string): Promise<void> {
   return new Promise((resolve) => {
     try {
       if (localStorage.getItem('notificationSoundEnabled') === 'false') {
-        resolve(); return;
+        resolve();
+        return;
       }
-
-      // ตั้งค่ารูปแบบเสียงแจ้งเตือน (ห้องการเงิน)
-      const MP3_FILE_PATH = '/audio/pin_a1.mp3'; // สามารถเปลี่ยนเป็นไฟล์อื่นได้ เช่น /audio/billing.mp3
-      const WAIT_BEFORE_TTS_MS = 1500;
-
-      // ตั้งค่าเสียงสังเคราะห์
-      const TONE_1_FREQ = 659.25;
-      const TONE_2_FREQ = 523.25;
-
-      executeAudioPlay(MP3_FILE_PATH, WAIT_BEFORE_TTS_MS, TONE_1_FREQ, TONE_2_FREQ, message, resolve);
+      playSynthNotification(659.25, 523.25);
+      resolve();
     } catch (e) {
       console.error('Billing audio play failed', e);
       resolve();
@@ -69,14 +47,16 @@ export function playBillingNotification(message?: string): Promise<void> {
   });
 }
 
-// Helper alias สำหรับเสียงแจ้งเตือนแบบ ding-dong (เล่นไฟล์ MP3 เหมือนระบบเดิม)
-export function playNotificationDingDong(message?: string): Promise<void> {
+// Helper alias สำหรับเสียงแจ้งเตือนแบบ ding-dong (เสียงสังเคราะห์ 2-tone มาตรฐาน)
+export function playNotificationDingDong(_message?: string): Promise<void> {
   return new Promise((resolve) => {
     try {
       if (localStorage.getItem('notificationSoundEnabled') === 'false') {
-        resolve(); return;
+        resolve();
+        return;
       }
-      executeAudioPlay('/audio/pin_a1.mp3', 3000, 659.25, 523.25, message, resolve);
+      playSynthNotification(659.25, 523.25);
+      resolve();
     } catch (e) {
       console.error('Notification audio play failed', e);
       resolve();
@@ -85,82 +65,39 @@ export function playNotificationDingDong(message?: string): Promise<void> {
 }
 
 // =========================================================================
-// Core Logic สำหรับเล่นเสียงแจ้งเตือน (ใช้ร่วมกันทั้งห้องยา / ห้องการเงิน)
-//
-// เล่นเสียง "แจ้งเตือน 1 ครั้ง" เท่านั้น — ไม่วนลูป และไม่อ่านข้อความ (ไม่มี TTS)
-//   USE_MP3 = true  → เล่นไฟล์ MP3 ครั้งเดียว, ถ้าถูกบล็อก fallback เป็นเสียงสังเคราะห์
-//   USE_MP3 = false → เล่นเสียงสังเคราะห์ 2 tone, ถ้า AudioContext ยังไม่ถูกปลุก fallback เป็น MP3
-// พารามิเตอร์ WAIT_BEFORE_TTS_MS / message ยังรับไว้เพื่อความเข้ากันได้ แต่ไม่ถูกใช้แล้ว
+// Core Logic สำหรับเล่นเสียงแจ้งเตือนสังเคราะห์ 2 tone ผ่าน Web Audio API
 // =========================================================================
-function executeAudioPlay(
-  MP3_FILE_PATH: string,
-  _WAIT_BEFORE_TTS_MS: number,
-  TONE_1_FREQ: number,
-  TONE_2_FREQ: number,
-  _message: string | undefined,
-  resolve: (value: void | PromiseLike<void>) => void
-) {
-  // เสียงสังเคราะห์ 2 tone ผ่าน AudioContext กลาง (ไม่สร้างใหม่ ไม่ close) — เล่นครั้งเดียว
-  const playSynthTone = () => {
-    const ctx = getSharedAudioContext();
-    if (!ctx || ctx.state !== 'running') return;
+function playSynthNotification(tone1Freq: number = 659.25, tone2Freq: number = 523.25) {
+  const ctx = getSharedAudioContext();
+  if (!ctx) return;
 
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(TONE_1_FREQ, ctx.currentTime);
-    gain1.gain.setValueAtTime(0.5, ctx.currentTime);
-    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start();
-    osc1.stop(ctx.currentTime + 0.5);
-
-    const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(TONE_2_FREQ, ctx.currentTime + 0.15);
-    gain2.gain.setValueAtTime(0, ctx.currentTime);
-    gain2.gain.setValueAtTime(0.5, ctx.currentTime + 0.15);
-    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.65);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(ctx.currentTime + 0.15);
-    osc2.stop(ctx.currentTime + 0.65);
-  };
-
-  // เล่นไฟล์ MP3 ผ่าน <audio> element — ครั้งเดียว ไม่วนลูป
-  const playMp3 = (): boolean => {
-    try {
-      if (currentAudioElement) {
-        try { currentAudioElement.pause(); } catch { /* ignore */ }
-      }
-      const audio = new Audio(MP3_FILE_PATH);
-      audio.loop = false;
-      currentAudioElement = audio;
-      audio.play().catch((e) => {
-        console.warn('[audio] mp3 blocked, falling back to synth:', e);
-        playSynthTone();
-      });
-      return true;
-    } catch (e) {
-      console.warn('[audio] mp3 element failed:', e);
-      return false;
-    }
-  };
-
-  if (USE_MP3) {
-    if (!playMp3()) playSynthTone();
-  } else {
-    const ctx = getSharedAudioContext();
-    if (ctx && ctx.state === 'running') {
-      playSynthTone();
-    } else {
-      playMp3();
-    }
+  if (ctx.state === 'suspended') {
+    ctx.resume().catch(() => {});
   }
 
-  resolve();
+  const now = ctx.currentTime;
+  const osc1 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  osc1.type = 'sine';
+  osc1.frequency.setValueAtTime(tone1Freq, now);
+  gain1.gain.setValueAtTime(0.35, now);
+  gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+  osc1.connect(gain1);
+  gain1.connect(ctx.destination);
+  osc1.start(now);
+  osc1.stop(now + 0.5);
+
+  const osc2 = ctx.createOscillator();
+  const gain2 = ctx.createGain();
+  osc2.type = 'sine';
+  osc2.frequency.setValueAtTime(tone2Freq, now + 0.15);
+  gain2.gain.setValueAtTime(0.0001, now);
+  gain2.gain.setValueAtTime(0.35, now + 0.15);
+  gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+  osc2.connect(gain2);
+  gain2.connect(ctx.destination);
+  osc2.start(now + 0.15);
+  osc2.stop(now + 0.65);
 }
 
 /**
@@ -172,16 +109,13 @@ export function playHospitalChime(): Promise<void> {
     try {
       // ใช้ AudioContext กลาง ห้ามสร้างใหม่/ปิด เพื่อไม่ให้ชนลิมิต ~6 context ต่อแท็บ
       const ctx = getSharedAudioContext();
-      if (!ctx || ctx.state !== 'running') {
-        // context ยังไม่พร้อม (ผู้ใช้ยังไม่คลิกหน้าจอ) → เล่นไฟล์เสียงสำรองแทน
-        try {
-          const audio = new Audio('/audio/pin_a1.mp3');
-          audio.play().catch(() => {});
-        } catch {
-          // ignore
-        }
-        setTimeout(resolve, 1000);
+      if (!ctx) {
+        setTimeout(resolve, 800);
         return;
+      }
+
+      if (ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
       }
 
       const now = ctx.currentTime;
