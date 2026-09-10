@@ -73,6 +73,7 @@ const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
@@ -91,9 +92,11 @@ const UserManagement: React.FC = () => {
       const data = await adminApi.getAccounts();
       if (data) {
         setUsers(data.map(mapBackendToSystemUser));
+        setErrorMsg(null);
       }
     } catch (err) {
       console.error("Failed to fetch accounts", err);
+      setErrorMsg('ไม่สามารถโหลดรายชื่อบุคลากรได้ กรุณาลองรีเฟรชหน้านี้ใหม่อีกครั้ง');
     } finally {
       setLoading(false);
     }
@@ -246,7 +249,7 @@ const UserManagement: React.FC = () => {
   };
 
   const handleDeleteUser = async (userId: string, userName: string, internalId: number) => {
-    if (window.confirm(`⚠️ คุณแน่ใจหรือไม่ว่าต้องการระงับบัญชีของ "${userName}"?`)) {
+    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการระงับบัญชีของ "${userName}"?`)) {
       try {
         await adminApi.updateAccountStatus(internalId, 'suspended');
         fetchUsers();
@@ -272,6 +275,12 @@ const UserManagement: React.FC = () => {
           <button className="btn-primary" onClick={openAddModal}>+ เพิ่มบัญชีใหม่</button>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="um-error-banner">
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
       <div className="stats-container">
         <div className={`stat-card clickable ${activeFilter === 'ทั้งหมด' ? 'card-active-blue' : ''}`} onClick={() => setActiveFilter('ทั้งหมด')}>
@@ -329,7 +338,14 @@ const UserManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.length === 0 ? (
+              {loading ? (
+                <tr><td colSpan={6}>
+                  <div className="um-loading-row">
+                    <span className="um-spinner" />
+                    <span>กำลังโหลดรายชื่อบุคลากร...</span>
+                  </div>
+                </td></tr>
+              ) : filteredUsers.length === 0 ? (
                 <tr><td colSpan={6} style={{textAlign: 'center', padding: '24px', color: '#62748E'}}>ไม่มีข้อมูลผู้ใช้งานที่ตรงตามเงื่อนไข</td></tr>
               ) : (
                 filteredUsers.slice(0, itemsPerPage).map((user) => (
