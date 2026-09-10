@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Autocomplete, TextField, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
-import { patientApi, adminApi, appointmentApi, type BackendPatient, type BackendUser } from '../../services/api';
+import { patientApi, vitalsApi, appointmentApi, type BackendPatient, type BackendDoctor } from '../../services/api';
 import './AppointmentForm.css';
 
 interface PatientOption {
@@ -55,10 +55,10 @@ export default function AppointmentForm() {
         }));
         setPatientOptions(opts);
 
-        // Load doctors from DB
-        const uData: BackendUser[] = await adminApi.getAccounts();
-        const doctors = uData.filter(u => u.role === 'doctor');
-        const docOpts: DoctorOption[] = doctors.map(d => ({
+        // Load doctors from DB — /api/doctors ไม่จำกัด role จึงใช้ได้ทั้ง doctor/nurse/registrar ฯลฯ
+        // (ต่างจาก /api/admin/users ที่จำกัดเฉพาะ admin และหน้านี้แพทย์เข้าถึงไม่ได้)
+        const dData: BackendDoctor[] = await vitalsApi.getDoctors();
+        const docOpts: DoctorOption[] = dData.map(d => ({
           label: d.fullname || d.username,
           id: d.id,
           name: d.fullname || d.username,
