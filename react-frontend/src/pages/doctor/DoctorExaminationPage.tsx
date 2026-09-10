@@ -183,12 +183,11 @@ const DoctorExaminationPage: React.FC<DoctorExaminationPageProps> = ({ onNavigat
               handleUpdateStatus(activeExamPatient.id, nextStatus, note);
             }
 
-            // ปิดเคสแล้วไม่ต้องค้างผู้ป่วยคนเดิมไว้ในหน้าตรวจ
-            // (ฉบับร่างยังเก็บไว้ เพราะแพทย์ต้องกลับมาทำต่อ)
-            // ออกแบบคืนคิวหรือยกเลิกก็ต้องล้างเช่นกัน ไม่งั้นกดเมนูกลับมาจะเจอฟอร์มเดิมค้าง
-            if (activeExamPatient.status === 'Completed' || nextStatus) {
-              setActiveExamPatient(null);
-            }
+            // ทุกเส้นทางที่ออกจากหน้าตรวจต้องล้างการเลือกผู้ป่วยออกจากหน้าฟอร์ม
+            // รวมถึงการบันทึกฉบับร่างด้วย ข้อมูลร่างยังอยู่ในฐานข้อมูลและกลับมาทำต่อ
+            // ได้จากปุ่ม "ตรวจต่อ" ในหน้าคิว แต่เมื่อกดเมนูบันทึกการตรวจโดยตรง
+            // ต้องเห็นสถานะ "ยังไม่ได้เลือกผู้ป่วย" ไม่ใช่ฟอร์มของคนเดิมค้างอยู่
+            setActiveExamPatient(null);
             onNavigate('doctor-queue');
           }}
           onSavePatient={handleSavePatient}

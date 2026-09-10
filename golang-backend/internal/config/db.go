@@ -100,10 +100,32 @@ func ConnectDB() {
 		log.Println("Database Migration Complete.")
 	} else {
 		// Always ensure new models are migrated
-		database.AutoMigrate(&models.Medicine{}, &models.PatientMedicine{}, &models.BillingQueue{}, &models.MedicineQueue{}, &models.QueueCounter{}, &models.Appointment{}, &models.SystemAccess{}, &models.TreatmentRight{}, &models.Billing{}, &models.BillingHistory{}, &models.QRPayment{}, &models.Dispensing{})
+		database.AutoMigrate(
+			&models.Medicine{},
+			&models.PatientMedicine{},
+			&models.BillingQueue{},
+			&models.MedicineQueue{},
+			&models.QueueCounter{},
+			&models.Appointment{},
+			&models.SystemAccess{},
+			&models.TreatmentRight{},
+			&models.Billing{},
+			&models.BillingHistory{},
+			&models.QRPayment{},
+			&models.Dispensing{},
+			&models.Document{},
+			&models.DocumentForward{},
+		)
 		log.Println("Database schema already up to date. Skipped redundant AutoMigrate.")
 	}
 
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS description text DEFAULT ''")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_size bigint DEFAULT 0")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS doc_type text DEFAULT 'เอกสารทั่วไป'")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS status text DEFAULT 'reviewing'")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS external_doc_ref text DEFAULT ''")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_url text DEFAULT ''")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS approved_by integer")
 	database.Exec("ALTER TABLE medicines ADD COLUMN IF NOT EXISTS usage_method text DEFAULT ''")
 	database.Exec("UPDATE medicines SET usage_method = 'ชงดื่ม' WHERE (usage_method IS NULL OR usage_method = '') AND medicine_code = 'MED-011'")
 	database.Exec("UPDATE medicines SET usage_method = 'เคี้ยวให้ละเอียดก่อนกลืน' WHERE (usage_method IS NULL OR usage_method = '') AND medicine_code = 'MED-012'")

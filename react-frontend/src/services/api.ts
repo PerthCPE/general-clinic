@@ -53,6 +53,7 @@ export class ApiRequestError extends Error {
     super(message);
     this.name = 'ApiRequestError';
     this.status = status;
+
   }
 }
 
@@ -631,6 +632,14 @@ export const dmsApi = {
   acknowledgeForward: (id: number | string) =>
     request<{ message: string; forward: BackendDocumentForward }>(`/api/officer/documents/forwards/${id}/ack`, {
       method: 'PUT',
+    }),
+  deleteForward: (id: number | string) =>
+    request<{ message: string }>(`/api/officer/documents/forwards/${id}`, {
+      method: 'DELETE',
+    }),
+  deleteDocument: (id: number | string) =>
+    request<{ message: string }>(`/api/officer/documents/${id}`, {
+      method: 'DELETE',
     }),
   getRecipients: () => request<BackendUser[]>('/api/officer/recipients'),
 };

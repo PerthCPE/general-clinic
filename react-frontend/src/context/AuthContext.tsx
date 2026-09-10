@@ -125,13 +125,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('✅ WebSocket Connected (Real-time Sync Active)');
+      console.log('[WS] Connected (Real-time Sync Active)');
     };
 
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
-        console.log('📩 รับข้อมูลแบบ Real-time ผ่าน WebSocket:', payload);
+        console.log('[WS] Received real-time event:', payload);
 
         // คุณสามารถนำข้อมูลนี้ไปอัปเดต State หรือโชว์ Notification ได้ที่นี่
         if (payload.type === 'QUEUE_CREATED') {
@@ -144,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     ws.onclose = () => {
-      console.log('❌ WebSocket Disconnected');
+      console.log('[WS] Disconnected');
     };
 
     return () => {

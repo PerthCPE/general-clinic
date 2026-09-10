@@ -192,6 +192,10 @@ func RegisterPatient(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "รูปแบบวันเกิดไม่ถูกต้อง กรุณาใช้ DD/MM/YYYY หรือ YYYY-MM-DD"})
 		return
 	}
+	if parsedBirthDate.After(time.Now()) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "วันเกิดต้องไม่อยู่ในอนาคต"})
+		return
+	}
 
 	// query checking in DB
 	var existingPatient models.Patient
@@ -201,7 +205,7 @@ func RegisterPatient(c *gin.Context) {
 		return
 	}
 
-	// Auto generate HN if empty (strictly HN + 4-digit decimal format: HN0001, HN0002, etc.)
+	// Auto generate HN if empty (strictly HN + 4-digit hexadecimal format: HN0001 through HNFFFF)
 	hn := req.HN
 	if strings.TrimSpace(hn) == "" {
 		var allPatients []models.Patient
@@ -210,14 +214,11 @@ func RegisterPatient(c *gin.Context) {
 		for _, p := range allPatients {
 			clean := strings.TrimPrefix(strings.TrimPrefix(strings.ToUpper(p.HN), "HN-"), "HN")
 			var num int
-			if _, err := fmt.Sscanf(clean, "%d", &num); err == nil && num > maxNum {
+			if _, err := fmt.Sscanf(clean, "%X", &num); err == nil && num > maxNum {
 				maxNum = num
 			}
-			if int(p.ID) > maxNum {
-				maxNum = int(p.ID)
-			}
 		}
-		hn = fmt.Sprintf("HN%04d", maxNum+1)
+		hn = fmt.Sprintf("HN%04X", maxNum+1)
 	}
 
 	composedAddr := composeAddress(
@@ -257,8 +258,21 @@ func RegisterPatient(c *gin.Context) {
 		ChronicDiseases:  req.ChronicDiseases,
 	}
 
+	// Atomic Transaction (P1c): Enforce all-or-nothing for Patient + Initial Eligibility + Queue
+	tx := config.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถเริ่ม Transaction ได้"})
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
 	// add new patient to DB
-	if err := config.DB.Create(&newPatient).Error; err != nil {
+	if err := tx.Create(&newPatient).Error; err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถบันทึกข้อมูลคนไข้ได้"})
 		return
 	}
@@ -291,18 +305,22 @@ func RegisterPatient(c *gin.Context) {
 		ExpireDate:      &defaultExp,
 		VerifiedAt:      time.Now(),
 	}
-	config.DB.Create(&initialEligibility)
+	if err := tx.Create(&initialEligibility).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถสร้างข้อมูลสิทธิ์การรักษาได้"})
+		return
+	}
 
 	// Sprint 3.2: ตรวจสอบ issue_queue flag (Default = false: ไม่ออกคิว)
 	if req.IssueQueue {
 		// สร้างคิวรอคัดกรองให้อัตโนมัติ เพื่อส่งต่อเข้าสู่ระบบคัดกรองทันที (Atomic Daily Sequential Queue)
 		nowBkk := time.Now().In(services.BangkokLocation())
 		serviceDate := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
-		queueNo, qErr := services.NextQueueNumber(config.DB, nowBkk)
+		queueNo, qErr := services.NextQueueNumber(tx, nowBkk)
 		if qErr != nil {
-			var qCount int64
-			config.DB.Model(&models.Queue{}).Where("service_date = ?", serviceDate).Count(&qCount)
-			queueNo = fmt.Sprintf("Q%04X", qCount+1)
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("ไม่สามารถออกบัตรคิวได้: %v", qErr)})
+			return
 		}
 
 		var creatorID uint = 2
@@ -325,7 +343,17 @@ func RegisterPatient(c *gin.Context) {
 			CreatedAt:       nowBkk,
 			UpdatedAt:       nowBkk,
 		}
-		config.DB.Create(&newQueue)
+		if err := tx.Create(&newQueue).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถสร้างคิวได้"})
+			return
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถบันทึกข้อมูลได้"})
+			return
+		}
 
 		// ส่ง WebSocket Broadcast แจ้งเตือนทุกเครื่องว่ามีผู้ป่วยใหม่และมีการสร้างคิว
 		ws.BroadcastEvent("PATIENT_REGISTERED", newPatient)
@@ -342,6 +370,12 @@ func RegisterPatient(c *gin.Context) {
 			"queue_issued": true,
 			"queue":        newQueue,
 		})
+		return
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถบันทึกข้อมูลได้"})
 		return
 	}
 
@@ -457,6 +491,10 @@ func UpdatePatient(c *gin.Context) {
 		parsedBirthDate, err := services.ParseFlexibleDate(req.BirthDate)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "รูปแบบวันเกิดไม่ถูกต้อง กรุณาใช้ DD/MM/YYYY หรือ YYYY-MM-DD"})
+			return
+		}
+		if parsedBirthDate.After(time.Now()) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "วันเกิดต้องไม่อยู่ในอนาคต"})
 			return
 		}
 		patient.BirthDate = parsedBirthDate

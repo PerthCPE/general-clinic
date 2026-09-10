@@ -14,6 +14,7 @@ import (
 	"clinic-backend/internal/controllers"
 	"clinic-backend/internal/models"
 	"clinic-backend/internal/routes"
+	"clinic-backend/internal/testutils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -25,6 +26,7 @@ import (
 // TestSprint3_TaskA_Migration006_Audit verifies that migration 006 runs cleanly
 // and that all 9 new address columns exist in the database.
 func TestSprint3_TaskA_Migration006_Audit(t *testing.T) {
+	testutils.GuardAgainstProductionDB(t)
 	db := config.DB
 	if db == nil {
 		t.Fatal("Database connection not initialized")
@@ -460,6 +462,7 @@ func TestSprint31_UpdatePatient_AddressOverwrite(t *testing.T) {
 
 // TestSprint32_TaskC_AutoQueueVerification tests the issue_queue flag, response format, duplicate handling, and regression
 func TestSprint32_TaskC_AutoQueueVerification(t *testing.T) {
+	testutils.GuardAgainstProductionDB(t)
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	routes.SetUpRoutes(r)

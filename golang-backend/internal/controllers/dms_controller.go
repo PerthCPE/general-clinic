@@ -413,3 +413,61 @@ func GetRecipients(c *gin.Context) {
 
 	c.JSON(http.StatusOK, users)
 }
+
+// 7. DeleteDocumentForward - ลบรายการส่งต่อเอกสาร
+func DeleteDocumentForward(c *gin.Context) {
+	idParam := c.Param("id")
+	forwardID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสการส่งต่อไม่ถูกต้อง"})
+		return
+	}
+
+	var forward models.DocumentForward
+	if err := config.DB.First(&forward, uint(forwardID)).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบรายการส่งต่อเอกสาร"})
+		return
+	}
+
+	if err := config.DB.Delete(&forward).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถลบรายการส่งต่อเอกสารได้"})
+		return
+	}
+
+	ws.BroadcastEvent("DOCUMENT_FORWARD_DELETED", gin.H{"id": forwardID, "doc_id": forward.DocID})
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "ลบรายการส่งต่อเอกสารสำเร็จ",
+	})
+}
+
+// 8. DeleteDocument - ลบเอกสารออกจากระบบ
+func DeleteDocument(c *gin.Context) {
+	idParam := c.Param("id")
+	docID, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสเอกสารไม่ถูกต้อง"})
+		return
+	}
+
+	var doc models.Document
+	if err := config.DB.First(&doc, uint(docID)).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบเอกสารที่ระบุ"})
+		return
+	}
+
+	// ลบรายการส่งต่อที่เกี่ยวข้องก่อน
+	config.DB.Where("doc_id = ?", uint(docID)).Delete(&models.DocumentForward{})
+
+	if err := config.DB.Delete(&doc).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถลบเอกสารได้"})
+		return
+	}
+
+	ws.BroadcastEvent("DOCUMENT_DELETED", gin.H{"id": docID})
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "ลบเอกสารสำเร็จ",
+	})
+}
+

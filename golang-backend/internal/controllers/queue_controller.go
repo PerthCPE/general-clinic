@@ -265,6 +265,18 @@ func CreateQueue(c *gin.Context) {
 
 		if err := tx.Create(&newQueue).Error; err != nil {
 			tx.Rollback()
+			if strings.Contains(err.Error(), "idx_active_queue_per_patient") {
+				var duplicateQueue models.Queue
+				config.DB.Where("patient_id = ? AND service_date = ? AND status NOT IN (?, ?, ?)",
+					req.PatientID, serviceDate, "เสร็จสิ้น", "ยกเลิกคิว", "ยกเลิก",
+				).Order("id DESC").First(&duplicateQueue)
+				c.JSON(http.StatusConflict, gin.H{
+					"error":          fmt.Sprintf("คนไข้รายนี้มีคิว %s สถานะ %s อยู่แล้ว", duplicateQueue.QueueNumber, duplicateQueue.Status),
+					"code":           "DUPLICATE_ACTIVE_QUEUE",
+					"existing_queue": duplicateQueue,
+				})
+				return
+			}
 			lastErr = err
 			log.Printf("[COLLISION RETRY] Attempt %d/%d encountered collision for queue %s: %v. Retrying with next sequence...", attempt+1, maxRetries, queueNo, err)
 			time.Sleep(10 * time.Millisecond) // Short backoff on collision

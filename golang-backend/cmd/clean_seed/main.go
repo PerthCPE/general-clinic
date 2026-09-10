@@ -7,6 +7,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/services"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -19,13 +20,14 @@ func main() {
 
 	// 1. Delete dependent transactional records first to maintain referential integrity
 	tables := []string{
+		"appointment_tests",
+		"appointments",
 		"qr_payments",
 		"billings",
 		"billing_queues",
 		"billing_histories",
 		"medicine_queues",
 		"dispensings",
-		"prescription_items",
 		"examinations",
 		"diagnoses",
 		"patient_medicines",
@@ -45,7 +47,26 @@ func main() {
 		}
 	}
 
-	log.Println("All transactional test data cleaned! Now seeding fresh clean records...")
+	// Reset primary key sequences for transactional tables so IDs start cleanly from 1
+	seqs := []string{
+		"patients_id_seq",
+		"queues_id_seq",
+		"visit_records_id_seq",
+		"screenings_id_seq",
+		"medical_eligibilities_id_seq",
+		"diagnoses_id_seq",
+		"examinations_id_seq",
+		"patient_medicines_id_seq",
+		"billings_id_seq",
+		"medicine_queues_id_seq",
+		"appointments_id_seq",
+		"appointment_tests_id_seq",
+	}
+	for _, seq := range seqs {
+		db.Exec("ALTER SEQUENCE IF EXISTS " + seq + " RESTART WITH 1")
+	}
+
+	log.Println("All transactional test data cleaned and sequences reset! Now seeding fresh clean records...")
 
 	// 2. Seed All Required Users — รหัสผ่านเริ่มต้นของแต่ละคน = employee_id ของตัวเอง (ตรงกับ
 	// seedDatabase() ใน internal/config/db.go) ไม่ใช่ "password" ที่ใช้ร่วมกันทุกคนแบบเดิม
@@ -105,6 +126,28 @@ func main() {
 	db.Where("username = ?", "doctor1").First(&doc1)
 	db.Where("username = ?", "doctor2").First(&doc2)
 	db.Where("username = ?", "doctor3").First(&doc3)
+
+	// Ensure Doctor profiles
+	doctorProfiles := []models.Doctor{
+		{UserID: doc1.ID, FullName: doc1.FullName, LicenseNumber: "ว.11234", Specialty: "อายุรกรรมทั่วไป", Room: "ห้องตรวจ 1", Phone: doc1.Phone, IsActive: true},
+		{UserID: doc2.ID, FullName: doc2.FullName, LicenseNumber: "ว.22345", Specialty: "เวชศาสตร์ครอบครัว", Room: "ห้องตรวจ 2", Phone: doc2.Phone, IsActive: true},
+		{UserID: doc3.ID, FullName: doc3.FullName, LicenseNumber: "ว.33456", Specialty: "กุมารเวชกรรม", Room: "ห้องตรวจ 3", Phone: doc3.Phone, IsActive: true},
+	}
+	for _, dp := range doctorProfiles {
+		var existingDP models.Doctor
+		if err := db.Where("user_id = ?", dp.UserID).First(&existingDP).Error; err != nil {
+			db.Create(&dp)
+		} else {
+			db.Model(&existingDP).Updates(map[string]interface{}{
+				"full_name":      dp.FullName,
+				"license_number": dp.LicenseNumber,
+				"specialty":      dp.Specialty,
+				"room":           dp.Room,
+				"phone":          dp.Phone,
+				"is_active":      true,
+			})
+		}
+	}
 
 	parseDate := func(d string) time.Time {
 		t, _ := time.Parse("2006-01-02", d)
@@ -199,7 +242,8 @@ func main() {
 	log.Printf("Seeded %d eligibilities successfully.", len(patients))
 
 	// 5. Seed 15 Queues Today (Q0001 - Q000F in Hex) with mixed clinical statuses
-	today := time.Now().Truncate(24 * time.Hour)
+	nowBkk := time.Now().In(services.BangkokLocation())
+	today := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
 	queueDefs := []struct {
 		QueueNo string
 		Status  string
@@ -262,6 +306,8 @@ func main() {
 		db.Create(&visits[i])
 	}
 
+	boolPtr := func(b bool) *bool { return &b }
+
 	screeningsData := []struct {
 		Triage      int
 		Complaint   string
@@ -279,46 +325,66 @@ func main() {
 		SpO2        int
 		Pain        int
 		Sugar       int
+		FoodAllergy string
+		CurrentMed  string
+		Smoking     string
+		Alcohol     string
+		HasURI      *bool
+		HasTB       *bool
+		Precaution  string
+		Q2Depressed *bool
+		Q2Anhedonia *bool
+		ScrPositive *bool
 	}{
-		{1, "แน่นหน้าอกร้าวไปกรามซ้าย หายใจเหนื่อยหอบ เหงื่อแตก", "แพ้ยา Sulfa", "โรคหัวใจขาดเลือด, ความดันโลหิตสูง", "ให้ออกซิเจนแคนนูลา 3 LPM EKG 12 Lead ส่งห้องตรวจแพทย์ทันที", 62.0, 165.0, 22.77, 36.4, 178, 108, 115, 24, 92, 8, 140},
-		{2, "ปวดศีรษะไมเกรนรุนแรง ตาพร่ามัว คลื่นไส้", "แพ้ยา Penicillin", "ไมเกรน", "ส่งเข้าห้องตรวจ 1 ทันที เพื่อรับยาระงับอาการปวด", 54.0, 162.0, 20.57, 37.2, 142, 92, 98, 20, 98, 7, 110},
-		{2, "มีไข้สูง 39.2 องศา หนาวสั่น ไอมีเสมหะ ซึมลง", "ปฏิเสธการแพ้ยา", "ไม่มี", "เช็ดตัวลดไข้ทันที ส่งพบกุมารแพทย์ห้องตรวจ 3 ด่วน", 25.0, 125.0, 16.00, 39.2, 105, 65, 128, 26, 96, 4, 95},
-		{3, "ปวดศีรษะท้ายทอยช่วงบ่าย ทานยาแก้ปวดแล้วไม่ดีขึ้น", "ปฏิเสธการแพ้ยา", "ความดันโลหิตสูง", "ความดันค่อนข้างสูง ให้นั่งพัก 15 นาทีแล้ววัดซ้ำ", 72.5, 175.0, 23.67, 36.8, 138, 88, 78, 18, 98, 5, 120},
-		{3, "ตรวจระดับน้ำตาลในเลือดสะสม ปัสสาวะบ่อยตอนกลางคืน", "ปฏิเสธการแพ้ยา", "เบาหวานชนิดที่ 2", "แนะนำงดของหวานและคุมอาหารต่อเนื่อง", 65.0, 158.0, 26.04, 36.7, 135, 85, 76, 18, 98, 2, 180},
-		{3, "ปวดท้องบิดเป็นพักๆ ถ่ายเหลว 3 ครั้ง อ่อนเพลีย", "ปฏิเสธการแพ้ยา", "ไม่มี", "ให้ดื่มเกลือแร่ ORS รอพบแพทย์เพื่อตรวจประเมินภาวะขาดน้ำ", 58.0, 168.0, 20.55, 37.0, 115, 75, 82, 18, 99, 5, 100},
-		{4, "มาตรวจสุขภาพประจำปี รู้สึกอ่อนเพลียเล็กน้อย", "ปฏิเสธการแพ้ยา", "ความดันโลหิตสูง (คุมได้ดี)", "สัญญาณชีพปกติ แนะนำออกกำลังกายสม่ำเสมอ", 70.0, 175.0, 22.86, 36.6, 128, 84, 74, 18, 99, 0, 95},
-		{4, "รับยาความดันต่อเนื่องตามนัด สบายดี ไม่มีอาการผิดปกติ", "ปฏิเสธการแพ้ยา", "ความดันโลหิตสูง", "วัดความดันได้ปกติ ยาเดิมทานครบสม่ำเสมอ", 68.0, 170.0, 23.53, 36.5, 122, 80, 72, 16, 99, 0, 105},
-		{4, "ตรวจสุขภาพทั่วไป เพื่อขอใบรับรองแพทย์ทำใบขับขี่", "ปฏิเสธการแพ้ยา", "ไม่มี", "สุขภาพแข็งแรง สัญญาณชีพและผลตรวจร่างกายทั่วไปปกติ", 75.0, 178.0, 23.67, 36.6, 118, 76, 68, 16, 99, 0, 90},
-		{4, "ขอรับยาแก้แพ้อากาศต่อเนื่อง คัดจมูกช่วงเช้า", "ปฏิเสธการแพ้ยา", "ภูมิแพ้อากาศ", "อาการคงที่ ให้รับยาแก้แพ้ตัวเดิม", 60.0, 165.0, 22.04, 36.5, 120, 78, 70, 16, 99, 1, 92},
+		{1, "แน่นหน้าอกร้าวไปกรามซ้าย หายใจเหนื่อยหอบ เหงื่อแตก", "แพ้ยา Sulfa", "โรคหัวใจขาดเลือด, ความดันโลหิตสูง", "ให้ออกซิเจนแคนนูลา 3 LPM EKG 12 Lead ส่งห้องตรวจแพทย์ทันที", 62.0, 165.0, 22.77, 36.4, 178, 108, 115, 24, 92, 8, 140, "ไม่มี", "Aspirin 81mg, Enalapril 5mg", "สูบ 1 ซอง/วัน", "ดื่มสังสรรค์", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{2, "ปวดศีรษะไมเกรนรุนแรง ตาพร่ามัว คลื่นไส้", "แพ้ยา Penicillin", "ไมเกรน", "ส่งเข้าห้องตรวจ 1 ทันที เพื่อรับยาระงับอาการปวด", 54.0, 162.0, 20.57, 37.2, 142, 92, 98, 20, 98, 7, 110, "อาหารทะเล", "Paracetamol (ทานแล้วไม่ดีขึ้น)", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{2, "มีไข้สูง 39.2 องศา หนาวสั่น ไอมีเสมหะ ซึมลง", "ปฏิเสธการแพ้ยา", "ไม่มี", "เช็ดตัวลดไข้ทันที ส่งพบกุมารแพทย์ห้องตรวจ 3 ด่วน", 25.0, 125.0, 16.00, 39.2, 105, 65, 128, 26, 96, 4, 95, "ไม่มี", "ไม่มี", "ไม่สูบ", "ไม่ดื่ม", boolPtr(true), boolPtr(false), "Droplet", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{3, "ปวดศีรษะท้ายทอยช่วงบ่าย ทานยาแก้ปวดแล้วไม่ดีขึ้น", "ปฏิเสธการแพ้ยา", "ความดันโลหิตสูง", "ความดันค่อนข้างสูง ให้นั่งพัก 15 นาทีแล้ววัดซ้ำ", 72.5, 175.0, 23.67, 36.8, 138, 88, 78, 18, 98, 5, 120, "ไม่มี", "Amlodipine 5mg", "เคยสูบ เลิกแล้ว", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{3, "ตรวจระดับน้ำตาลในเลือดสะสม ปัสสาวะบ่อยตอนกลางคืน", "ปฏิเสธการแพ้ยา", "เบาหวานชนิดที่ 2", "แนะนำงดของหวานและคุมอาหารต่อเนื่อง", 65.0, 158.0, 26.04, 36.7, 135, 85, 76, 18, 98, 2, 180, "ไม่มี", "Metformin 500mg", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{3, "ปวดท้องบิดเป็นพักๆ ถ่ายเหลว 3 ครั้ง อ่อนเพลีย", "ปฏิเสธการแพ้ยา", "ไม่มี", "ให้ดื่มเกลือแร่ ORS รอพบแพทย์เพื่อตรวจประเมินภาวะขาดน้ำ", 58.0, 168.0, 20.55, 37.0, 115, 75, 82, 18, 99, 5, 100, "ไม่มี", "ORS ชงดื่มแล้ว 1 ซอง", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Contact", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{4, "มาตรวจสุขภาพประจำปี รู้สึกอ่อนเพลียเล็กน้อย", "ปฏิเสธการแพ้ยา", "ความดันโลหิตสูง (คุมได้ดี)", "สัญญาณชีพปกติ แนะนำออกกำลังกายสม่ำเสมอ", 70.0, 175.0, 22.86, 36.6, 128, 84, 74, 18, 99, 0, 95, "ไม่มี", "Losartan 50mg", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(true), boolPtr(false), boolPtr(true)},
+		{4, "รับยาความดันต่อเนื่องตามนัด สบายดี ไม่มีอาการผิดปกติ", "ปฏิเสธการแพ้ยา", "ความดันโลหิตสูง", "วัดความดันได้ปกติ ยาเดิมทานครบสม่ำเสมอ", 68.0, 170.0, 23.53, 36.5, 122, 80, 72, 16, 99, 0, 105, "ไม่มี", "Enalapril 10mg", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{4, "ตรวจสุขภาพทั่วไป เพื่อขอใบรับรองแพทย์ทำใบขับขี่", "ปฏิเสธการแพ้ยา", "ไม่มี", "สุขภาพแข็งแรง สัญญาณชีพและผลตรวจร่างกายทั่วไปปกติ", 75.0, 178.0, 23.67, 36.6, 118, 76, 68, 16, 99, 0, 90, "ไม่มี", "ไม่มี", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{4, "ขอรับยาแก้แพ้อากาศต่อเนื่อง คัดจมูกช่วงเช้า", "ปฏิเสธการแพ้ยา", "ภูมิแพ้อากาศ", "อาการคงที่ ให้รับยาแก้แพ้ตัวเดิม", 60.0, 165.0, 22.04, 36.5, 120, 78, 70, 16, 99, 1, 92, "ไม่มี", "Cetirizine 10mg", "ไม่สูบ", "ไม่ดื่ม", boolPtr(true), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
 	}
 
 	for i, sd := range screeningsData {
 		scr := models.Screening{
-			VisitID:          visits[i].ID,
-			ScreenedByUserID: nurse.ID,
-			AssignedDoctorID: visits[i].DoctorID,
-			TriageLevel:      sd.Triage,
-			ChiefComplaint:   sd.Complaint,
-			Allergies:        sd.Allergies,
-			MedicalHistory:   sd.History,
-			NurseNotes:       sd.Notes,
-			Weight:           sd.Weight,
-			Height:           sd.Height,
-			BMI:              sd.BMI,
-			Temperature:      sd.Temp,
-			SystolicBP:       sd.SysBP,
-			DiastolicBP:      sd.DiaBP,
-			HeartRate:        sd.HR,
-			RespiratoryRate:  sd.RR,
-			SpO2:             sd.SpO2,
-			PainScore:        sd.Pain,
-			BloodSugar:       sd.Sugar,
+			VisitID:            visits[i].ID,
+			ScreenedByUserID:   nurse.ID,
+			AssignedDoctorID:   visits[i].DoctorID,
+			TriageLevel:        sd.Triage,
+			ChiefComplaint:     sd.Complaint,
+			Allergies:          sd.Allergies,
+			MedicalHistory:     sd.History,
+			NurseNotes:         sd.Notes,
+			Weight:             sd.Weight,
+			Height:             sd.Height,
+			BMI:                sd.BMI,
+			Temperature:        sd.Temp,
+			SystolicBP:         sd.SysBP,
+			DiastolicBP:        sd.DiaBP,
+			HeartRate:          sd.HR,
+			RespiratoryRate:    sd.RR,
+			SpO2:               sd.SpO2,
+			PainScore:          sd.Pain,
+			BloodSugar:         sd.Sugar,
+			FoodAllergies:      sd.FoodAllergy,
+			CurrentMedications: sd.CurrentMed,
+			SmokingHistory:     sd.Smoking,
+			AlcoholHistory:     sd.Alcohol,
+			HasURI:             sd.HasURI,
+			HasTB:              sd.HasTB,
+			PrecautionType:     sd.Precaution,
+			Q2Depressed:        sd.Q2Depressed,
+			Q2Anhedonia:        sd.Q2Anhedonia,
+			ScreeningPositive:  sd.ScrPositive,
 		}
 		db.Create(&scr)
 	}
 	log.Printf("Seeded %d screenings successfully (Triage 1-4).", len(screeningsData))
 
 	fmt.Println("\n=======================================================")
-	fmt.Println("🎉 Database reset and clean seeding completed successfully!")
+	fmt.Println("[SUCCESS] Database reset and clean seeding completed successfully!")
 	fmt.Println("=======================================================")
 }
