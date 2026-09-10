@@ -13,6 +13,7 @@ type User struct {
 	FullName       string         `json:"fullname"`
 	Phone          string         `json:"phone"`
 	EmployeeID     string         `json:"employee_id"`
+	Department     string         `json:"department"`
 	Status         string         `gorm:"default:'active'" json:"status"`
 	RequiresPasswordChange bool   `gorm:"default:true" json:"requires_password_change"`
 

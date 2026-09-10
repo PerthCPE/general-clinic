@@ -83,15 +83,7 @@ function MainApp() {
   };
 
   if (!isAuthenticated) {
-    return (
-      <LoginPage
-        onLoginSuccess={() => {
-          if (currentUser) {
-            setActivePage(ROLE_DEFAULT_PAGES[currentUser.role]);
-          }
-        }}
-      />
-    );
+    return <LoginPage />;
   }
 
   const renderContent = () => {
