@@ -70,6 +70,7 @@ func (ctrl *AdminController) CreateAccount(c *gin.Context) {
 		FullName:               req.FullName,
 		EmployeeID:             req.EmployeeID,
 		Phone:                  req.Phone,
+		Department:             req.Department,
 		Status:                 "active",
 		RequiresPasswordChange: true,
 	}
