@@ -142,12 +142,12 @@ const TriageLevelBadge: React.FC<{ level?: string; language: string }> = ({ leve
   const tone = triageTone(level);
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap"
+      className="inline-grid w-[112px] grid-cols-[6px_1fr] items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap"
       style={{ backgroundColor: tone.bg, borderColor: tone.border, color: tone.text }}
       title={level}
     >
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tone.dot }} />
-      {label}
+      <span className="text-center">{label}</span>
     </span>
   );
 };
@@ -180,6 +180,7 @@ const TriageFlag: React.FC<{
   absentTh?: string;
   presentEn?: string;
   absentEn?: string;
+  highlightContainer?: boolean;
 }> = ({
   label,
   value,
@@ -188,19 +189,24 @@ const TriageFlag: React.FC<{
   absentTh = 'ไม่มีอาการ',
   presentEn = 'Present',
   absentEn = 'Absent',
+  highlightContainer = false,
 }) => {
   const isTh = language === 'th';
 
   return (
     <div className="space-y-1.5">
       <label className="text-[13px] font-bold text-slate-800 block">{label}</label>
-      <div className="w-full min-h-[44px] px-3.5 py-2.5 bg-[#f8fafc] border border-slate-200 rounded-xl flex items-center">
+      <div className={`w-full min-h-[44px] px-3.5 py-2.5 border rounded-xl flex items-center ${
+        highlightContainer && value === true
+          ? 'bg-rose-50/70 border-rose-200/80'
+          : 'bg-[#f8fafc] border-slate-200'
+      }`}>
         {value === true ? (
-          <span className="text-sm font-bold text-amber-800 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg">
+          <span className={`text-sm font-bold ${highlightContainer ? 'text-rose-900' : 'text-amber-800 bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg'}`}>
             {isTh ? presentTh : presentEn}
           </span>
         ) : value === false ? (
-          <span className="text-sm font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg">
+          <span className={`text-sm font-bold ${highlightContainer ? 'text-slate-900' : 'text-emerald-800 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg'}`}>
             {isTh ? absentTh : absentEn}
           </span>
         ) : (
@@ -224,7 +230,7 @@ const TriageFlag: React.FC<{
  */
 const PRECAUTION_OPTIONS: Record<
   string,
-  { th: string; en: string; noteTh: string; noteEn: string; box: string; chip: string }
+  { th: string; en: string; noteTh: string; noteEn: string; box: string; text: string }
 > = {
   Standard: {
     th: 'Standard',
@@ -232,7 +238,7 @@ const PRECAUTION_OPTIONS: Record<
     noteTh: 'ข้อปฏิบัติมาตรฐาน ล้างมือ ใส่ถุงมือเมื่อสัมผัสสารคัดหลั่ง',
     noteEn: 'Standard practice: hand hygiene, gloves for body fluids',
     box: 'bg-[#f8fafc] border-slate-200',
-    chip: 'text-slate-700 bg-slate-100 border-slate-300',
+    text: 'text-slate-900',
   },
   Contact: {
     th: 'Contact',
@@ -240,7 +246,7 @@ const PRECAUTION_OPTIONS: Record<
     noteTh: 'แพร่ทางการสัมผัส ต้องใส่ถุงมือและเสื้อกาวน์',
     noteEn: 'Contact spread: gloves and gown required',
     box: 'bg-amber-50/70 border-amber-200/80',
-    chip: 'text-amber-900 bg-amber-100 border-amber-300',
+    text: 'text-amber-900',
   },
   Droplet: {
     th: 'Droplet',
@@ -248,7 +254,7 @@ const PRECAUTION_OPTIONS: Record<
     noteTh: 'แพร่ทางละอองฝอย ต้องใส่หน้ากากอนามัย เว้นระยะ 1-2 เมตร',
     noteEn: 'Droplet spread: surgical mask, keep 1-2 m distance',
     box: 'bg-orange-50/70 border-orange-200/80',
-    chip: 'text-orange-900 bg-orange-100 border-orange-300',
+    text: 'text-orange-900',
   },
   Airborne: {
     th: 'Airborne',
@@ -256,7 +262,7 @@ const PRECAUTION_OPTIONS: Record<
     noteTh: 'แพร่ทางอากาศ ต้องใส่ N95 และแยกผู้ป่วยออกจากคิวรวมทันที',
     noteEn: 'Airborne spread: N95 required, isolate from waiting area',
     box: 'bg-rose-50/70 border-rose-200/80',
-    chip: 'text-rose-900 bg-rose-100 border-rose-300',
+    text: 'text-rose-900',
   },
 };
 
@@ -277,9 +283,7 @@ const PrecautionCard: React.FC<{ value?: string; language: string }> = ({ value,
       >
         {option ? (
           <>
-            <span
-              className={`self-start text-sm font-bold px-2.5 py-1 rounded-lg border ${option.chip}`}
-            >
+            <span className={`self-start text-sm font-bold ${option.text}`}>
               {isTh ? option.th : option.en}
             </span>
             <span className="text-[11px] text-slate-500 leading-snug">
@@ -2461,7 +2465,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           <button
             type="button"
             onClick={handleCancelVisit}
-            className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+            className="w-[180px] h-9 px-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-2xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
           >
             <XCircle className="w-3.5 h-3.5" />
             <span>{language === 'th' ? 'ยกเลิกการรับบริการ' : 'Cancel Visit'}</span>
@@ -2470,7 +2474,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           <button
             type="button"
             onClick={handleSaveDraft}
-            className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="w-[180px] h-9 px-3 bg-amber-400 hover:bg-amber-500 text-white rounded-xl text-xs font-semibold shadow-2xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
           >
             <Save className="w-3.5 h-3.5" />
             <span>{language === 'th' ? 'บันทึกฉบับร่าง' : 'Save Draft'}</span>
@@ -2479,7 +2483,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           <button
             type="button"
             onClick={() => handleCompleteVisit()}
-            className="px-4 py-1.5 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+            className="w-[180px] h-9 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-2xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
           >
             <CheckCircle className="w-3.5 h-3.5" />
             <span>{t('saveExam')}</span>
@@ -2857,12 +2861,14 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     label={language === 'th' ? 'อาการติดเชื้อทางเดินหายใจส่วนบน (URI)' : 'Upper Respiratory Infection (URI)'}
                     value={patient.hasURI}
                     language={language}
+                    highlightContainer
                   />
 
                   <TriageFlag
                     label={language === 'th' ? 'คัดกรองวัณโรค (TB)' : 'Tuberculosis Screening (TB)'}
                     value={patient.hasTB}
                     language={language}
+                    highlightContainer
                   />
 
                   <PrecautionCard value={patient.precautionType} language={language} />
@@ -2906,8 +2912,6 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
               {/* --- 3. ยาที่ใช้อยู่ และข้อควรระวังก่อนสั่งยา ----------------
                   ทุกช่องในกลุ่มนี้ตอบคำถามเดียวกันคือ "สั่งยาตัวนี้ให้ได้ไหม"
-                  ยาละลายลิ่มเลือดย้ายมาจากกลุ่มคัดกรองด้านบน เพราะมันคือ "ยา"
-                  ควรอยู่ข้างๆ ยาประจำและสมุนไพรที่เสริมฤทธิ์กันได้
                   การตั้งครรภ์/ให้นมบุตรก็อยู่กลุ่มนี้ด้วยเหตุผลเดียวกัน */}
               <div className="space-y-4 rounded-2xl border border-indigo-200/80 bg-white p-5 shadow-2xs">
                 <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
@@ -2919,16 +2923,6 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   <InfoCard
                     label={language === 'th' ? 'ยาที่รับประทานประจำ' : 'Current Medications'}
                     value={currentMedicationsText}
-                  />
-
-                  <TriageFlag
-                    label={language === 'th' ? 'ใช้ยาละลายลิ่มเลือด' : 'On Anticoagulant'}
-                    value={patient.onAnticoagulant}
-                    language={language}
-                    presentTh="ใช้อยู่"
-                    absentTh="ไม่ได้ใช้"
-                    presentEn="Yes"
-                    absentEn="No"
                   />
 
                   {/* สมุนไพร / อาหารเสริม แยกจากช่องยาข้างบนโดยตั้งใจ
@@ -3017,6 +3011,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     label={language === 'th' ? 'หดหู่ เศร้า ท้อแท้' : 'Depressed mood'}
                     value={patient.q2Depressed}
                     language={language}
+                    highlightContainer
                     presentTh="มีอาการ"
                     absentTh="ไม่มีอาการ"
                     presentEn="Yes"
@@ -3027,6 +3022,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     label={language === 'th' ? 'เบื่อหน่าย' : 'Anhedonia'}
                     value={patient.q2Anhedonia}
                     language={language}
+                    highlightContainer
                     presentTh="มีอาการ"
                     absentTh="ไม่มีอาการ"
                     presentEn="Yes"

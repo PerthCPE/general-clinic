@@ -245,14 +245,28 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   // ถ้าคนเดียวกันอยู่ทั้งสองชุด ยึดของคิวเพราะสถานะเป็นปัจจุบันกว่า
   const searchablePatients = useMemo(() => {
     if (!isDoctor) return [];
-    const merged = [...doctorPatients];
-    const seen = new Set(doctorPatients.map((p) => p.hn));
-    for (const p of recordPatients) {
-      if (!seen.has(p.hn)) {
-        seen.add(p.hn);
-        merged.push(p);
-      }
-    }
+
+    const merged: typeof doctorPatients = [];
+    const seen = new Set<string>();
+    const addPatient = (patient: (typeof doctorPatients)[number]) => {
+      const hn = (patient.hn || '').trim().toUpperCase();
+      const nationalId = (patient.nationalId || '').replace(/[-\s]/g, '');
+      const identity = hn
+        ? `hn:${hn}`
+        : nationalId
+          ? `national-id:${nationalId}`
+          : patient.patientId
+            ? `patient-id:${patient.patientId}`
+            : `id:${patient.id}`;
+
+      if (seen.has(identity)) return;
+      seen.add(identity);
+      merged.push(patient);
+    };
+
+    // ใส่คิวปัจจุบันก่อนเพื่อให้ข้อมูลสถานะล่าสุดมีสิทธิ์เหนือข้อมูลย้อนหลัง
+    doctorPatients.forEach(addPatient);
+    recordPatients.forEach(addPatient);
     return merged;
   }, [isDoctor, doctorPatients, recordPatients]);
 
