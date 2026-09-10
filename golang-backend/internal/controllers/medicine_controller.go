@@ -16,8 +16,8 @@ import (
 // DTO สำหรับการอัปเดตสต็อกยา
 type UpdateStockRequest struct {
 	MedicineCode string `json:"medicine_code" binding:"required"`
-	Action       string `json:"action" binding:"required"` // "add" หรือ "reduce"
-	Quantity     int    `json:"quantity" binding:"required,min=1"`
+	Action       string `json:"action" binding:"required"` // "add", "reduce", หรือ "set"
+	Quantity     int    `json:"quantity"`
 }
 
 // GET /api/pharmacy/medicines - ดึงรายการยาทั้งหมดในคลัง (⚡ RAM Cache 0.01 ms)
@@ -93,21 +93,48 @@ func UpdateMedicineStock(c *gin.Context) {
 	}
 
 	var medicine models.Medicine
-	if err := config.DB.Where("medicine_code = ?", req.MedicineCode).First(&medicine).Error; err != nil {
+	medCode := strings.TrimSpace(req.MedicineCode)
+	var err error
+
+	// ค้นหาอย่างยืดหยุ่น: ทั้ง ID ตัวเลข, medicine_code, MED-xxx, และ Name
+	if id, parseErr := strconv.Atoi(medCode); parseErr == nil {
+		err = config.DB.Where("id = ? OR LOWER(medicine_code) = LOWER(?) OR LOWER(medicine_code) = LOWER(?)", id, medCode, fmt.Sprintf("MED-%03d", id)).First(&medicine).Error
+	}
+	if err != nil || medicine.ID == 0 {
+		cleanCode := strings.TrimPrefix(strings.ToLower(medCode), "med-")
+		cleanCode = strings.TrimPrefix(cleanCode, "med")
+		err = config.DB.Where("LOWER(medicine_code) = LOWER(?) OR LOWER(medicine_code) = LOWER(?) OR LOWER(name) = LOWER(?) OR LOWER(generic_name) = LOWER(?)", medCode, "med-"+cleanCode, medCode, medCode).First(&medicine).Error
+	}
+
+	if err != nil || medicine.ID == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Medicine not found"})
 		return
 	}
 
 	if req.Action == "add" {
+		if req.Quantity < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Quantity must be positive"})
+			return
+		}
 		medicine.StockQuantity += req.Quantity
 	} else if req.Action == "reduce" {
+		if req.Quantity < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Quantity must be positive"})
+			return
+		}
 		if medicine.StockQuantity < req.Quantity {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Insufficient stock in inventory"})
 			return
 		}
 		medicine.StockQuantity -= req.Quantity
+	} else if req.Action == "set" {
+		if req.Quantity < 0 {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Quantity cannot be negative"})
+			return
+		}
+		medicine.StockQuantity = req.Quantity
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid action. Use 'add' or 'reduce'"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid action. Use 'add', 'reduce', or 'set'"})
 		return
 	}
 

@@ -812,7 +812,21 @@ export default function PatientHistoryPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedPatients.map((patient) => {
+                    {paginatedPatients.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary, #64748B)' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                              <circle cx="11" cy="11" r="8"></circle>
+                              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <span style={{ fontSize: '16px', fontWeight: '600' }}>ไม่มีประวัติผู้การรับยา</span>
+                            <span style={{ fontSize: '13.5px', opacity: 0.8 }}>ยังไม่มีข้อมูลประวัติการรับยาในระบบ</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                    paginatedPatients.map((patient) => {
                       const rights = patient.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
                       return (
                         <tr key={patient.id}>
@@ -913,7 +927,8 @@ export default function PatientHistoryPage() {
                           </td>
                         </tr>
                       );
-                    })}
+                    })
+                    )}
                   </tbody>
                 </table>
               </div>
