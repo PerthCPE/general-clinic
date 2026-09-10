@@ -7,7 +7,6 @@ import { Check, Plus, Minus, Loader2, RefreshCw } from 'lucide-react';
 import { PharmacyDetailSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
-import { API_BASE_URL } from '../../services/api';
 import { formatNationalId } from '../../utils/formatters';
 // เสียงแจ้งเตือน "ใบสั่งยาใหม่" เล่นจาก GlobalAudioListener ที่เดียว (ฟัง event MEDICINE_QUEUE_CREATED)
 // ไม่เล่นซ้ำที่หน้านี้อีก เพื่อไม่ให้เสียงซ้อนกันสองรอบ
@@ -235,12 +234,10 @@ export default function DetailPage({
 
       // ดึงทั้งคิวห้องยา ประวัติการเงิน และสต็อกยาจริงจากคลังยาแบบ Parallel เพื่อประสิทธิภาพสูงสุด
       const [pRes, bRes, stockData] = await Promise.all([
-        fetch(`${API_BASE_URL}/pharmacy/queues${qParam}`, { headers })
-          .then(r => r.ok ? r : fetch(`/api/pharmacy/queues${qParam}`, { headers }))
+        fetch(`/api/pharmacy/queues${qParam}`, { headers })
           .then(r => r.ok ? r : fetch(`/api/system/pharmacy/queues${qParam}`))
           .catch(() => null),
-        fetch(`${API_BASE_URL}/billing/history`, { headers })
-          .then(r => r.ok ? r : fetch('/api/billing/history', { headers }))
+        fetch('/api/billing/history', { headers })
           .then(r => r.ok ? r : fetch('/api/system/billing/history'))
           .catch(() => null),
         fetchWarehouseStock()
