@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Autocomplete, TextField, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { patientApi, vitalsApi, appointmentApi, type BackendPatient, type BackendDoctor } from '../../services/api';
+import { patientApi, appointmentApi, type BackendPatient } from '../../services/api';
 import { TREATMENT_DEPARTMENTS } from '../../config/roles';
 import './AppointmentForm.css';
 
@@ -10,12 +10,6 @@ interface PatientOption {
   label: string;
   id: number;
   hn: string;
-  name: string;
-}
-
-interface DoctorOption {
-  label: string;
-  id: number;
   name: string;
 }
 
@@ -28,11 +22,9 @@ export default function AppointmentForm() {
   const { currentUser } = useAuth();
 
   const [patientOptions, setPatientOptions] = useState<PatientOption[]>([]);
-  const [doctorOptions, setDoctorOptions] = useState<DoctorOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [selectedPatient, setSelectedPatient] = useState<PatientOption | null>(null);
-  const [selectedDoctor, setSelectedDoctor] = useState<DoctorOption | null>(null);
   const [date, setDate] = useState<string>('');
   const [time, setTime] = useState<string>('');
   const [department, setDepartment] = useState<string>('');
@@ -57,21 +49,6 @@ export default function AppointmentForm() {
         }));
         setPatientOptions(opts);
 
-        // Load doctors from DB — /api/doctors ไม่จำกัด role จึงใช้ได้ทั้ง doctor/nurse/registrar ฯลฯ
-        // (ต่างจาก /api/admin/users ที่จำกัดเฉพาะ admin และหน้านี้แพทย์เข้าถึงไม่ได้)
-        const dData: BackendDoctor[] = await vitalsApi.getDoctors();
-        const docOpts: DoctorOption[] = dData.map(d => ({
-          label: d.fullname || d.username,
-          id: d.id,
-          name: d.fullname || d.username,
-        }));
-        setDoctorOptions(docOpts);
-
-        // Auto-select current user if they are a doctor
-        if (currentUser?.role === 'doctor') {
-          const self = docOpts.find(d => String(d.id) === String(currentUser.id));
-          if (self) setSelectedDoctor(self);
-        }
       } catch (err) {
         console.error('Failed to load appointment form data', err);
       } finally {
@@ -87,9 +64,11 @@ export default function AppointmentForm() {
       return;
     }
 
-    const doctorId = selectedDoctor?.id;
-    if (!doctorId) {
-      alert('กรุณาเลือกแพทย์');
+    // หน้านี้เข้าได้เฉพาะ role doctor อยู่แล้ว (PAGE_PERMISSIONS['appointment-form'])
+    // จึงล็อกแพทย์ผู้นัดเป็นผู้ที่ล็อกอินอยู่เสมอ ไม่ต้องเลือกเอง
+    const doctorId = currentUser?.id ? Number(currentUser.id) : NaN;
+    if (!currentUser || Number.isNaN(doctorId)) {
+      alert('ไม่พบข้อมูลแพทย์ผู้ล็อกอิน กรุณาล็อกอินใหม่อีกครั้ง');
       return;
     }
 
@@ -110,7 +89,6 @@ export default function AppointmentForm() {
 
       // Clear form
       setSelectedPatient(null);
-      setSelectedDoctor(currentUser?.role === 'doctor' ? selectedDoctor : null);
       setDate('');
       setTime('');
       setDepartment('');
@@ -202,35 +180,14 @@ export default function AppointmentForm() {
               />
             </div>
 
-            {/* เลือกแพทย์ */}
+            {/* แพทย์ผู้นัด — ล็อกเป็นผู้ที่ล็อกอินอยู่เสมอ (หน้านี้เข้าได้เฉพาะ role doctor) */}
             <div className="input-group">
-              <label>แพทย์ผู้นัด <span className="required">*</span></label>
-              <Autocomplete<DoctorOption>
-                disablePortal
-                options={doctorOptions}
-                getOptionLabel={(option: DoctorOption) => option.label}
-                value={selectedDoctor}
-                disabled={currentUser?.role === 'doctor'}
-                onChange={(_event: unknown, newValue: DoctorOption | null) => {
-                  setSelectedDoctor(newValue);
-                }}
-                renderInput={(params) => (
-                  <TextField 
-                    {...params} 
-                    size="small" 
-                    placeholder="เลือกแพทย์..."
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: 'var(--input-bg)',
-                        borderRadius: '8px',
-                        '& fieldset': { borderColor: 'var(--input-border)' },
-                        '&:hover fieldset': { borderColor: '#94A3B8' },
-                        '&.Mui-focused fieldset': { borderColor: '#2563EB', borderWidth: '1px' },
-                      },
-                      '& .MuiInputBase-input': { color: 'var(--input-text)' }
-                    }}
-                  />
-                )}
+              <label>แพทย์ผู้นัด</label>
+              <input
+                type="text"
+                readOnly
+                value={currentUser?.fullName || ''}
+                className="read-only-input"
               />
             </div>
 
