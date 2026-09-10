@@ -26,10 +26,17 @@ interface SystemUser {
 const ROLE_DEPARTMENTS: Record<string, string[]> = {
   'แพทย์': TREATMENT_DEPARTMENTS,
   'พยาบาลและผู้ช่วยพยาบาล': ['จุดคัดกรองผู้ป่วย (Triage)', 'แผนกอุบัติเหตุและฉุกเฉิน (ER)', 'ห้องตรวจโรคทั่วไป (OPD)'],
+  // ผู้ช่วยพยาบาล (role: nurse_assistant) แยกจาก 'พยาบาลและผู้ช่วยพยาบาล' (role: nurse) ข้างบน —
+  // ใช้แผนกชุดเดียวกันเพราะทำงานในพื้นที่เดียวกันจริง แต่ต้องเป็นคนละ key เพื่อไม่ให้ role-mapping ชนกัน
+  'ผู้ช่วยพยาบาล': ['จุดคัดกรองผู้ป่วย (Triage)', 'แผนกอุบัติเหตุและฉุกเฉิน (ER)', 'ห้องตรวจโรคทั่วไป (OPD)'],
   'พนักงานเวชระเบียน': ['จุดคัดกรองผู้ป่วย (Triage)', 'ห้องตรวจโรคทั่วไป (OPD)'],
   'เภสัชกร': ['แผนกเภสัชกรรมห้องยา (Pharmacy)'],
   'พนักงานธุรการต้อนรับ': ['ห้องทะเบียนประวัติและคิว (Reception)'],
   'พนักงานธุรการการเงิน': ['ห้องชำระเงินและออกใบเสร็จ (Cashier)'],
+  // เจ้าหน้าที่ธุรการ (role: officer จริง — งาน DMS เอกสาร) แยกจาก 'พนักงานธุรการต้อนรับ'
+  // (role: registrar) ข้างบน — คนละ role กันจริง ใช้ชื่อแผนกตรงกับ DEMO_USERS.officer.department
+  // ใน config/roles.ts ('แผนกธุรการ') ไม่ใช่แผนก Reception ของ registrar ที่ officer ไม่ได้ทำงานด้วย
+  'เจ้าหน้าที่ธุรการ': ['แผนกธุรการ'],
   'นักเทคนิคการแพทย์': ['แผนกเจาะเลือดและห้องปฏิบัติการ (Lab)'],
   'ผู้ดูแลระบบ': ['ศูนย์คอมพิวเตอร์และระบบสารสนเทศ (Admin/IT)']
 };
@@ -39,20 +46,27 @@ const roleToEnglish: Record<string, string> = {
   'พยาบาลและผู้ช่วยพยาบาล': 'nurse', 'เภสัชกร': 'pharmacist',
   'พนักงานเวชระเบียน': 'registrar', 'พนักงานธุรการต้อนรับ': 'registrar',
   'พนักงานธุรการการเงิน': 'cashier', 'นักเทคนิคการแพทย์': 'lab_technician',
-  'ผู้ดูแลระบบ': 'admin'
+  'ผู้ดูแลระบบ': 'admin', 'เจ้าหน้าที่ธุรการ': 'officer'
 };
 
+// englishToRole ต้องเป็นค่าผกผัน (inverse) ของ roleToEnglish แบบตรงตัวสำหรับทุก role จริงที่ backend
+// ส่งมาได้ — ห้าม map role ที่ต่างกันไปเป็น Thai label เดียวกันโดยไม่มี roleToEnglish คู่กันแบบ 1:1
+// (เคย map 'officer'/'nurse_assistant' ไปชนป้ายของ role อื่นมาก่อน ทำให้กด "บันทึกการแก้ไข" แล้ว
+// role ถูกเปลี่ยนเงียบๆ ไปเป็น role อื่นที่ไม่ตรงกับที่ backend ส่งมาจริง — ดู CLAUDE.md/PLAN.md 3.1)
 const englishToRole: Record<string, string> = {
-  'doctor': 'แพทย์', 'nurse': 'พยาบาลและผู้ช่วยพยาบาล', 'nurse_assistant': 'พยาบาลและผู้ช่วยพยาบาล',
+  'doctor': 'แพทย์', 'nurse': 'พยาบาลและผู้ช่วยพยาบาล', 'nurse_assistant': 'ผู้ช่วยพยาบาล',
   'pharmacist': 'เภสัชกร', 'registrar': 'พนักงานเวชระเบียน', 'cashier': 'พนักงานธุรการการเงิน',
-  'lab_technician': 'นักเทคนิคการแพทย์', 'admin': 'ผู้ดูแลระบบ', 'officer': 'พนักงานเวชระเบียน'
+  'lab_technician': 'นักเทคนิคการแพทย์', 'admin': 'ผู้ดูแลระบบ', 'officer': 'เจ้าหน้าที่ธุรการ'
 };
 
 const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
   const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'];
   const randomColor = colors[u.id % colors.length];
-  
-  const thaiRole = englishToRole[u.role] || 'พนักงานเวชระเบียน';
+
+  // role ที่ englishToRole ไม่รู้จัก (ยังไม่เคยเกิดกับ role ปัจจุบันทั้งหมด แต่กันไว้กรณี backend
+  // เพิ่ม role ใหม่ในอนาคต) ต้องโชว์ค่าดิบตรงๆ ห้าม fallback ไปเป็น label ของ role อื่นแบบเงียบๆ
+  // เหมือนเดิม เพราะจะพา user ไปกด "บันทึกการแก้ไข" แล้วโดนเปลี่ยน role จริงโดยไม่ได้ตั้งใจ (ดูข้อ 3.1)
+  const thaiRole = englishToRole[u.role] || u.role;
   const defaultDept = ROLE_DEPARTMENTS[thaiRole] ? ROLE_DEPARTMENTS[thaiRole][0] : 'ทั่วไป';
   
   return {
@@ -255,14 +269,22 @@ const UserManagement: React.FC = () => {
       // แก้ไขบัญชีทั้งใบ (ชื่อ/อีเมล/เบอร์โทร/ตำแหน่ง/แผนก/สถานะ) ผ่าน endpoint เดียว
       try {
         const backendStatus = formData.status === 'กำลังใช้งาน' ? 'active' : (formData.status === 'ระงับใช้งาน' ? 'suspended' : 'pending');
-        await adminApi.updateAccount(formData.internalId, {
+        const payload: { fullname?: string; email?: string; phone?: string; role?: string; department?: string; status?: string } = {
           fullname: formData.name,
           email: formData.email,
           phone: formData.phone,
-          role: roleToEnglish[formData.role] || 'officer',
           department: formData.department,
           status: backendStatus,
-        });
+        };
+        // formData.role มาจาก <option> จริงใน dropdown เสมอ "ยกเว้น" กรณี role ดิบที่ englishToRole
+        // ไม่รู้จัก (เติมเป็น <option> พิเศษ disabled ไว้ — ดู JSX ด้านล่าง) กรณีนั้นห้ามส่ง field
+        // `role` เข้า payload เด็ดขาด เพราะ roleToEnglish[formData.role] จะหาไม่เจอและ mask ปัญหา
+        // ด้วยการ fallback เป็น 'officer' เงียบๆ เหมือนบั๊กเดิม — backend เว้นฟิลด์ที่ไม่ส่งไว้อยู่แล้ว
+        // จึงไม่ส่งเลยปลอดภัยกว่า
+        if (Object.prototype.hasOwnProperty.call(ROLE_DEPARTMENTS, formData.role)) {
+          payload.role = roleToEnglish[formData.role];
+        }
+        await adminApi.updateAccount(formData.internalId, payload);
         alert('อัปเดตข้อมูลสำเร็จ');
         fetchUsers();
       } catch (err: any) {
@@ -519,11 +541,18 @@ const UserManagement: React.FC = () => {
                 
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                   <label>ตำแหน่งงาน (เลือกเพื่อสร้างรหัสพนักงานอัตโนมัติ)</label>
-                  <select 
-                    value={formData.role} 
-                    onChange={handleRoleChange} 
+                  <select
+                    value={formData.role}
+                    onChange={handleRoleChange}
                     className="highlight-select"
+                    // role ดิบจาก backend ที่ englishToRole ไม่รู้จัก (ยังไม่เคยเกิดกับ role ปัจจุบัน
+                    // แต่กันไว้กรณีมี role ใหม่ในอนาคต) ต้อง disable ช่องนี้ — ถ้าปล่อยให้เลือกได้
+                    // <select> จะ auto-snap ไปที่ option แรกในลิสต์แบบเงียบๆ (สาเหตุเดิมของบั๊ก 3.1)
+                    disabled={!Object.prototype.hasOwnProperty.call(ROLE_DEPARTMENTS, formData.role)}
                   >
+                    {!Object.prototype.hasOwnProperty.call(ROLE_DEPARTMENTS, formData.role) && (
+                      <option value={formData.role}>{formData.role} (ตำแหน่งที่ระบบไม่รู้จัก — ติดต่อผู้ดูแลระบบก่อนแก้ไข)</option>
+                    )}
                     {Object.keys(ROLE_DEPARTMENTS).map(role => (
                       <option key={role} value={role}>{role}</option>
                     ))}
@@ -534,14 +563,21 @@ const UserManagement: React.FC = () => {
                   <label>รหัสประจำตัวพนักงาน (Auto)</label>
                   <input required type="text" disabled value={formData.id} className="input-disabled text-blue font-bold" />
                 </div>
-                
+
                 <div className="form-group">
                   <label>แผนกประจำ (เปลี่ยนตามตำแหน่งงาน)</label>
-                  <select 
-                    required 
-                    value={formData.department} 
+                  <select
+                    required
+                    value={formData.department}
                     onChange={e => setFormData({...formData, department: e.target.value})}
+                    disabled={!Object.prototype.hasOwnProperty.call(ROLE_DEPARTMENTS, formData.role)}
                   >
+                    {/* ถ้าแผนกปัจจุบันไม่อยู่ในลิสต์ของตำแหน่งนี้ (เช่น role ดิบที่ยังไม่รู้จัก) ให้
+                        โชว์ค่าดิบเป็น option เพิ่มไว้ก่อน กัน <select> auto-snap ไปเลือก option แรก
+                        แบบเงียบๆ เหมือนบั๊กเดิม (ดูคอมเมนต์ช่องตำแหน่งงานด้านบน) */}
+                    {formData.department && !(ROLE_DEPARTMENTS[formData.role] || []).includes(formData.department) && (
+                      <option value={formData.department}>{formData.department}</option>
+                    )}
                     {/* ดึงข้อมูลแผนกมาแสดงเฉพาะตำแหน่งที่เลือกเท่านั้น */}
                     {(ROLE_DEPARTMENTS[formData.role] || []).map(dept => (
                       <option key={dept} value={dept}>{dept}</option>
