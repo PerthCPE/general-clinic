@@ -1,18 +1,21 @@
+/* --bg-color / --text-color / --card-bg map ไปยังตัวแปรสีกลางของทีม (index.css:root)
+   เช่นเดียวกับ UserManagement.css — --input-bg / --hover-bg ไม่มี token กลางที่ตรงกัน
+   (เฉพาะหน้านี้) จึงยังคงประกาศแยกไว้ */
 .access-page-container {
+  --bg-color: var(--bg-canvas);
+  --text-color: var(--text-primary);
+  --card-bg: var(--bg-card);
+  --input-bg: var(--bg-canvas);
+  --hover-bg: #F1F5F9;
   padding: 24px;
-  background-color: var(--bg-color, #f3f4f6);
+  background-color: var(--bg-color);
   min-height: 100vh;
-  color: var(--text-color, #1f2937);
-  font-family: 'Prompt', sans-serif;
+  color: var(--text-color);
+  font-family: var(--font-primary);
 }
 
 body.dark-mode .access-page-container {
-  --bg-color: #111827;
-  --text-color: #f9fafb;
-  --card-bg: #1f2937;
-  --border-color: #374151;
-  --input-bg: #111827;
-  --hover-bg: #374151;
+  --hover-bg: #334155;
 }
 
 .access-page-container .access-layout {
@@ -156,12 +159,17 @@ body.dark-mode .access-page-container .security-level p { color: #9ca3af; }
 .access-page-container .status-dot.green { background-color: #10b981; box-shadow: 0 0 4px #10b981; }
 .access-page-container .status-dot.orange { background-color: #f59e0b; box-shadow: 0 0 4px #f59e0b; }
 
-.access-page-container .status-badge-lg { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+.access-page-container .status-badge-lg { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
 .access-page-container .badge-active { background-color: #d1fae5; color: #065f46; border: 1px solid #34d399; }
 .access-page-container .badge-pending { background-color: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
 
-body.dark-mode .access-page-container .badge-active { background-color: rgba(16,185,129,0.1); color: #34d399; }
-body.dark-mode .access-page-container .badge-pending { background-color: rgba(245,158,11,0.1); color: #fbbf24; }
+/* Glowing Status Badges ตามมาตรฐานทีม (TEAM_RULES.md ข้อ 2) */
+body.dark-mode .access-page-container .badge-active {
+  background: rgba(22, 163, 74, 0.3); color: #86EFAC; border: 1.5px solid #4ADE80;
+}
+body.dark-mode .access-page-container .badge-pending {
+  background: rgba(217, 119, 6, 0.3); color: #FBBF24; border: 1.5px solid #F59E0B;
+}
 
 /* === Warning Boxes (Low and High Level) === */
 .access-page-container .level-warning {
@@ -197,6 +205,7 @@ body.dark-mode .access-page-container .high-warning {
   display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
 }
 .access-page-container .audit-chip {
+  display: inline-flex; align-items: center; gap: 4px;
   padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;
   cursor: pointer; background: var(--bg-color, #f3f4f6); color: var(--text-color, #4b5563);
   border: 1px solid var(--border-color, #e5e7eb); transition: all 0.2s;
@@ -235,4 +244,89 @@ body.dark-mode .access-page-container .list-level-badge { background-color: rgba
 /* Disable state สำหรับปุ่ม Reset */
 .access-page-container .btn-cancel:disabled {
   opacity: 0.5; cursor: not-allowed;
+}
+
+/* === ช่องที่ยังบันทึกจริงไม่ได้ (อยู่ระหว่างพัฒนา) ===
+   handleSave ส่งแค่ perms.level ไปที่ backend เท่านั้น — checkbox เมนู/data-matrix
+   ทั้งกริดไม่เคยถูกบันทึกจริงเลย ปิดการโต้ตอบไว้กันผู้ใช้เข้าใจผิดว่ากดติ๊กแล้วมีผล */
+.access-page-container .checkbox-grid input:disabled,
+.access-page-container .perm-table input:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.access-page-container .checkbox-grid label:has(input:disabled) {
+  cursor: not-allowed;
+  color: var(--text-color, #4b5563);
+  opacity: 0.7;
+}
+.access-page-container .perm-card.wip-note {
+  border-color: #FDE68A;
+  background: #FFFBEB;
+}
+body.dark-mode .access-page-container .perm-card.wip-note {
+  background: rgba(217, 119, 6, 0.12);
+  border-color: rgba(217, 119, 6, 0.4);
+}
+.access-page-container .wip-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #B45309;
+  background: #FEF3C7;
+  border: 1px solid #FCD34D;
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin-left: 8px;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
+}
+body.dark-mode .access-page-container .wip-badge {
+  color: #FBBF24;
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+/* Loading / Error states */
+.access-page-container .ga-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FEE2E2;
+  color: #DC2626;
+  border-left: 4px solid #DC2626;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+body.dark-mode .access-page-container .ga-error-banner {
+  background: rgba(220, 38, 38, 0.15);
+  color: #FCA5A5;
+}
+
+.access-page-container .ga-loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  color: var(--text-color);
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+.access-page-container .ga-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2.5px solid var(--border-color, #e5e7eb);
+  border-top-color: #2563eb;
+  animation: ga-spin 0.8s linear infinite;
+}
+
+@keyframes ga-spin {
+  to { transform: rotate(360deg); }
 }

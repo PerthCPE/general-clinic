@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { Clock, CheckCircle2, ShieldAlert, AlertTriangle, Info, Wrench } from 'lucide-react';
 import { adminApi, type BackendUser } from '../../services/api';
 import './GrantAccess.css';
+
+// handleSave ส่งแค่ perms.level ไปที่ backend (bulkUpdateSystemAccess) เท่านั้น —
+// checkbox เมนู/data-matrix ทั้งกริดด้านล่างนี้ยังไม่เคยถูกบันทึกจริงเลย (ดู ก.5 ในรายงานสำรวจ)
+// ปิดการโต้ตอบไว้ก่อนพร้อม tooltip กันผู้ใช้เข้าใจผิดว่ากดติ๊กแล้วมีผลจริง
+const WIP_TOOLTIP = 'ฟีเจอร์นี้อยู่ระหว่างพัฒนา';
 
 interface SystemUser {
   internalId: number;
@@ -54,6 +60,7 @@ const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
 const GrantAccess: React.FC = () => {
   const [personnel, setPersonnel] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -61,9 +68,11 @@ const GrantAccess: React.FC = () => {
       const data = await adminApi.getAccounts();
       if (data) {
         setPersonnel(data.map(mapBackendToSystemUser));
+        setErrorMsg(null);
       }
     } catch (err) {
       console.error(err);
+      setErrorMsg('ไม่สามารถโหลดรายชื่อบุคลากรได้ กรุณาลองรีเฟรชหน้านี้ใหม่อีกครั้ง');
     } finally {
       setLoading(false);
     }
@@ -176,12 +185,12 @@ const GrantAccess: React.FC = () => {
 
   const handleSave = async () => {
     if (isLevelTooLow) {
-      if (!window.confirm(`⚠️ ระดับสิทธิ์ต่ำกว่ามาตรฐานของ "${activeUser.role}" คุณแน่ใจหรือไม่ว่าต้องการบันทึกสิทธิ์นี้?`)) return;
+      if (!window.confirm(`ระดับสิทธิ์ต่ำกว่ามาตรฐานของ "${activeUser.role}" คุณแน่ใจหรือไม่ว่าต้องการบันทึกสิทธิ์นี้?`)) return;
     }
     if (isLevelTooHigh) {
-      if (!window.confirm(`🚨 คำเตือนความปลอดภัย: คุณกำลังมอบสิทธิ์ที่สูงเกินความจำเป็นให้กับตำแหน่ง "${activeUser.role}" ยืนยันการดำเนินการหรือไม่?`)) return;
+      if (!window.confirm(`คำเตือนความปลอดภัย: คุณกำลังมอบสิทธิ์ที่สูงเกินความจำเป็นให้กับตำแหน่ง "${activeUser.role}" ยืนยันการดำเนินการหรือไม่?`)) return;
     }
-    
+
     try {
       // ใช้ bulkUpdate เพื่อ DELETE ค่าเก่าก่อน INSERT ใหม่ — ไม่ให้มีข้อมูลซ้ำ
       await adminApi.bulkUpdateSystemAccess({
@@ -191,7 +200,7 @@ const GrantAccess: React.FC = () => {
       if (activeUser.status === 'รอการยืนยัน') {
         await adminApi.updateAccountStatus(activeUser.internalId, 'active');
       }
-      alert(`✅ บันทึกสิทธิ์ของ "${activeUser.name}" สำเร็จ! (Level ${perms.level})`);
+      alert(`บันทึกสิทธิ์ของ "${activeUser.name}" สำเร็จ! (Level ${perms.level})`);
       fetchUsers();
     } catch (err: any) {
       alert("เกิดข้อผิดพลาด: " + err.message);
@@ -199,11 +208,11 @@ const GrantAccess: React.FC = () => {
   };
 
   const handleReset = async () => {
-    if (window.confirm(`⚠️ คุณต้องการเพิกถอนสิทธิ์ของ "${activeUser.name}" และเปลี่ยนสถานะกลับเป็น "รอการยืนยัน" ใช่หรือไม่?`)) {
+    if (window.confirm(`คุณต้องการเพิกถอนสิทธิ์ของ "${activeUser.name}" และเปลี่ยนสถานะกลับเป็น "รอการยืนยัน" ใช่หรือไม่?`)) {
       try {
         await adminApi.updateAccountStatus(activeUser.internalId, 'pending');
-        handleLevelChange(1); 
-        alert(`🔄 เพิกถอนสิทธิ์สำเร็จ สถานะกลับเป็น "รอการยืนยัน"`);
+        handleLevelChange(1);
+        alert(`เพิกถอนสิทธิ์สำเร็จ สถานะกลับเป็น "รอการยืนยัน"`);
         fetchUsers();
       } catch (err: any) {
         alert("Error: " + err.message);
@@ -219,32 +228,43 @@ const GrantAccess: React.FC = () => {
         <div className="access-sidebar">
           <h3>รายชื่อบุคลากร</h3>
           <p className="sidebar-sub">เลือกบุคลากรเพื่อจัดการกำหนดสิทธิ์การเข้าใช้บริการระบบ</p>
-          
+
+          {errorMsg && (
+            <div className="ga-error-banner">
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
           <div className="search-box">
             <input type="text" placeholder="ค้นหาชื่อ หรือ ตำแหน่ง..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
           </div>
 
-          {/* === แผงตรวจสอบความปลอดภัย (เพิ่ม 🟡 รอให้สิทธิ์ เข้ามาแล้ว) === */}
+          {/* === แผงตรวจสอบความปลอดภัย === */}
           <div className="audit-filters">
             <div className={`audit-chip ${auditFilter === 'all' ? 'active' : ''}`} onClick={() => setAuditFilter('all')}>
               ทั้งหมด ({auditStats.all})
             </div>
             <div className={`audit-chip pending ${auditFilter === 'pending' ? 'active' : ''}`} onClick={() => setAuditFilter('pending')} title="บัญชีใหม่ที่ยังไม่ได้กำหนดสิทธิ์">
-              🟡 รอให้สิทธิ์ ({auditStats.pending})
+              <Clock size={12} strokeWidth={2} /> รอให้สิทธิ์ ({auditStats.pending})
             </div>
             <div className={`audit-chip match ${auditFilter === 'match' ? 'active' : ''}`} onClick={() => setAuditFilter('match')} title="สิทธิ์ตรงตามตำแหน่งมาตรฐาน">
-              ✅ ตรงระดับ ({auditStats.match})
+              <CheckCircle2 size={12} strokeWidth={2} /> ตรงระดับ ({auditStats.match})
             </div>
             <div className={`audit-chip high ${auditFilter === 'high' ? 'active' : ''}`} onClick={() => setAuditFilter('high')} title="สิทธิ์สูงกว่ามาตรฐาน (เสี่ยง)">
-              🚨 สูงไป ({auditStats.high})
+              <ShieldAlert size={12} strokeWidth={2} /> สูงไป ({auditStats.high})
             </div>
             <div className={`audit-chip low ${auditFilter === 'low' ? 'active' : ''}`} onClick={() => setAuditFilter('low')} title="สิทธิ์ต่ำกว่ามาตรฐาน (แต่ใช้งานอยู่)">
-              ⚠️ ต่ำไป ({auditStats.low})
+              <AlertTriangle size={12} strokeWidth={2} /> ต่ำไป ({auditStats.low})
             </div>
           </div>
 
           <div className="personnel-list">
-            {filteredPersonnel.length === 0 ? (
+            {loading ? (
+              <div className="ga-loading-state">
+                <span className="ga-spinner" />
+                <span>กำลังโหลดรายชื่อบุคลากร...</span>
+              </div>
+            ) : filteredPersonnel.length === 0 ? (
               <div style={{textAlign: 'center', padding: '12px', fontSize: '12px', color: '#62748E'}}>ไม่พบบัญชีที่ตรงกับเงื่อนไข</div>
             ) : (
               filteredPersonnel.map(p => (
@@ -280,7 +300,9 @@ const GrantAccess: React.FC = () => {
                 <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
                   <h2>สิทธิ์เข้าถึงของ: {activeUser.name || 'กำลังโหลด...'}</h2>
                   <span className={`status-badge-lg ${activeUser.status === 'กำลังใช้งาน' ? 'badge-active' : 'badge-pending'}`}>
-                    {activeUser.status === 'กำลังใช้งาน' ? '🟢 กำลังใช้งาน' : '🟡 รอการยืนยันสิทธิ์'}
+                    {activeUser.status === 'กำลังใช้งาน'
+                      ? <><CheckCircle2 size={12} strokeWidth={2} /> กำลังใช้งาน</>
+                      : <><Clock size={12} strokeWidth={2} /> รอการยืนยันสิทธิ์</>}
                   </span>
                 </div>
                 <p>ID: {activeUser.id} | ตำแหน่ง: {activeUser.role} (แนะนำ Level {recommendedLvl})</p>
@@ -324,16 +346,19 @@ const GrantAccess: React.FC = () => {
               </div>
               
               {activeUser.status === 'รอการยืนยัน' ? (
-                 <div className="level-warning" style={{backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', color: '#15803D'}}>
-                   <strong>💡 บัญชีใหม่:</strong> กรุณาเลือกระดับ Level ที่เหมาะสม (ระบบแนะนำ Level {recommendedLvl}) แล้วกดบันทึกเพื่อเปิดใช้งาน
+                 <div className="level-warning" style={{display: 'flex', alignItems: 'flex-start', gap: '8px', backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', color: '#15803D'}}>
+                   <Info size={16} strokeWidth={2} style={{flexShrink: 0, marginTop: '2px'}} />
+                   <span><strong>บัญชีใหม่:</strong> กรุณาเลือกระดับ Level ที่เหมาะสม (ระบบแนะนำ Level {recommendedLvl}) แล้วกดบันทึกเพื่อเปิดใช้งาน</span>
                  </div>
               ) : isLevelTooLow ? (
-                <div className="level-warning low-warning">
-                  <strong>⚠️ สิทธิ์ต่ำเกินไป:</strong> ระดับสิทธิ์ Level {perms.level} อาจไม่เพียงพอต่อการทำงานของ <strong>"{activeUser.role}"</strong> (แนะนำ Level {recommendedLvl})
+                <div className="level-warning low-warning" style={{display: 'flex', alignItems: 'flex-start', gap: '8px'}}>
+                  <AlertTriangle size={16} strokeWidth={2} style={{flexShrink: 0, marginTop: '2px'}} />
+                  <span><strong>สิทธิ์ต่ำเกินไป:</strong> ระดับสิทธิ์ Level {perms.level} อาจไม่เพียงพอต่อการทำงานของ <strong>"{activeUser.role}"</strong> (แนะนำ Level {recommendedLvl})</span>
                 </div>
               ) : isLevelTooHigh ? (
-                <div className="level-warning high-warning">
-                  <strong>🚨 เสี่ยงความปลอดภัย:</strong> การให้สิทธิ์ Level {perms.level} กับ <strong>"{activeUser.role}"</strong> สูงเกินความจำเป็นและอาจขัดต่อนโยบาย (แนะนำ Level {recommendedLvl})
+                <div className="level-warning high-warning" style={{display: 'flex', alignItems: 'flex-start', gap: '8px'}}>
+                  <ShieldAlert size={16} strokeWidth={2} style={{flexShrink: 0, marginTop: '2px'}} />
+                  <span><strong>เสี่ยงความปลอดภัย:</strong> การให้สิทธิ์ Level {perms.level} กับ <strong>"{activeUser.role}"</strong> สูงเกินความจำเป็นและอาจขัดต่อนโยบาย (แนะนำ Level {recommendedLvl})</span>
                 </div>
               ) : (
                 <p>ระดับสิทธิ์นี้เหมาะสมกับตำแหน่งงานแล้ว (สามารถปรับแต่งรายข้อได้ที่ตารางด้านล่าง)</p>
@@ -341,14 +366,17 @@ const GrantAccess: React.FC = () => {
             </div>
 
             <div className="perm-card menu-access">
-              <h4>สิทธิ์การเข้าถึงเมนูระบบ</h4>
+              <h4>
+                สิทธิ์การเข้าถึงเมนูระบบ
+                <span className="wip-badge" title={WIP_TOOLTIP}><Wrench size={10} strokeWidth={2.5} /> อยู่ระหว่างพัฒนา</span>
+              </h4>
               <div className="checkbox-grid">
-                <label><input type="checkbox" checked={perms.menus.dashboard} onChange={() => toggleMenu('dashboard')} /> แดชบอร์ดสรุปผล</label>
-                <label><input type="checkbox" checked={perms.menus.appointment} onChange={() => toggleMenu('appointment')} /> จัดการคิวและนัดหมาย</label>
-                <label><input type="checkbox" checked={perms.menus.pharmacy} onChange={() => toggleMenu('pharmacy')} /> ระบบห้องยา (สั่งยา)</label>
-                <label><input type="checkbox" checked={perms.menus.stock} onChange={() => toggleMenu('stock')} /> สต็อกเวชภัณฑ์</label>
-                <label><input type="checkbox" checked={perms.menus.finance} onChange={() => toggleMenu('finance')} /> รายงานการเงิน / ชำระเงิน</label>
-                <label><input type="checkbox" checked={perms.menus.security} onChange={() => toggleMenu('security')} /> การตั้งค่าระบบจัดการสิทธิ์</label>
+                <label><input type="checkbox" checked={perms.menus.dashboard} onChange={() => toggleMenu('dashboard')} disabled title={WIP_TOOLTIP} /> แดชบอร์ดสรุปผล</label>
+                <label><input type="checkbox" checked={perms.menus.appointment} onChange={() => toggleMenu('appointment')} disabled title={WIP_TOOLTIP} /> จัดการคิวและนัดหมาย</label>
+                <label><input type="checkbox" checked={perms.menus.pharmacy} onChange={() => toggleMenu('pharmacy')} disabled title={WIP_TOOLTIP} /> ระบบห้องยา (สั่งยา)</label>
+                <label><input type="checkbox" checked={perms.menus.stock} onChange={() => toggleMenu('stock')} disabled title={WIP_TOOLTIP} /> สต็อกเวชภัณฑ์</label>
+                <label><input type="checkbox" checked={perms.menus.finance} onChange={() => toggleMenu('finance')} disabled title={WIP_TOOLTIP} /> รายงานการเงิน / ชำระเงิน</label>
+                <label><input type="checkbox" checked={perms.menus.security} onChange={() => toggleMenu('security')} disabled title={WIP_TOOLTIP} /> การตั้งค่าระบบจัดการสิทธิ์</label>
               </div>
             </div>
 
@@ -356,7 +384,10 @@ const GrantAccess: React.FC = () => {
 
           <div className="perm-card data-access">
             <div className="data-header">
-              <h4>สิทธิ์การจัดการฐานข้อมูลเชิงลึก</h4>
+              <h4>
+                สิทธิ์การจัดการฐานข้อมูลเชิงลึก
+                <span className="wip-badge" title={WIP_TOOLTIP}><Wrench size={10} strokeWidth={2.5} /> อยู่ระหว่างพัฒนา</span>
+              </h4>
               <span className="info-text">ข้อมูลอัปเดตอัตโนมัติตาม Level ที่เลือก</span>
             </div>
             <table className="perm-table">
@@ -375,30 +406,30 @@ const GrantAccess: React.FC = () => {
                     <strong>ประวัติสุขภาพผู้ป่วย (EMR)</strong>
                     <p>ข้อมูลโรคประจำตัว การแพ้ยา ผลตรวจ Lab</p>
                   </td>
-                  <td><input type="checkbox" checked={perms.data.emr.read} onChange={() => toggleData('emr', 'read')} /></td>
-                  <td><input type="checkbox" checked={perms.data.emr.write} onChange={() => toggleData('emr', 'write')} /></td>
-                  <td><input type="checkbox" checked={perms.data.emr.del} onChange={() => toggleData('emr', 'del')} /></td>
-                  <td><input type="checkbox" checked={perms.data.emr.export} onChange={() => toggleData('emr', 'export')} /></td>
+                  <td><input type="checkbox" checked={perms.data.emr.read} onChange={() => toggleData('emr', 'read')} disabled title={WIP_TOOLTIP} /></td>
+                  <td><input type="checkbox" checked={perms.data.emr.write} onChange={() => toggleData('emr', 'write')} disabled title={WIP_TOOLTIP} /></td>
+                  <td><input type="checkbox" checked={perms.data.emr.del} onChange={() => toggleData('emr', 'del')} disabled title={WIP_TOOLTIP} /></td>
+                  <td><input type="checkbox" checked={perms.data.emr.export} onChange={() => toggleData('emr', 'export')} disabled title={WIP_TOOLTIP} /></td>
                 </tr>
                 <tr>
                   <td>
                     <strong>ข้อมูลบุคลากรและค่าตอบแทน</strong>
                     <p>เงินเดือน ข้อมูลส่วนตัว และวันลาพักร้อน</p>
                   </td>
-                  <td><input type="checkbox" checked={perms.data.hr.read} onChange={() => toggleData('hr', 'read')} /></td>
-                  <td><input type="checkbox" checked={perms.data.hr.write} onChange={() => toggleData('hr', 'write')} /></td>
-                  <td><input type="checkbox" checked={perms.data.hr.del} onChange={() => toggleData('hr', 'del')} /></td>
-                  <td><input type="checkbox" checked={perms.data.hr.export} onChange={() => toggleData('hr', 'export')} /></td>
+                  <td><input type="checkbox" checked={perms.data.hr.read} onChange={() => toggleData('hr', 'read')} disabled title={WIP_TOOLTIP} /></td>
+                  <td><input type="checkbox" checked={perms.data.hr.write} onChange={() => toggleData('hr', 'write')} disabled title={WIP_TOOLTIP} /></td>
+                  <td><input type="checkbox" checked={perms.data.hr.del} onChange={() => toggleData('hr', 'del')} disabled title={WIP_TOOLTIP} /></td>
+                  <td><input type="checkbox" checked={perms.data.hr.export} onChange={() => toggleData('hr', 'export')} disabled title={WIP_TOOLTIP} /></td>
                 </tr>
                 <tr>
                   <td>
                     <strong>รายการสต็อกยาและเวชภัณฑ์</strong>
                     <p>การเบิกจ่าย ล็อตการผลิต และวันหมดอายุ</p>
                   </td>
-                  <td><input type="checkbox" checked={perms.data.inventory.read} onChange={() => toggleData('inventory', 'read')} /></td>
-                  <td><input type="checkbox" checked={perms.data.inventory.write} onChange={() => toggleData('inventory', 'write')} /></td>
-                  <td><input type="checkbox" checked={perms.data.inventory.del} onChange={() => toggleData('inventory', 'del')} /></td>
-                  <td><input type="checkbox" checked={perms.data.inventory.export} onChange={() => toggleData('inventory', 'export')} /></td>
+                  <td><input type="checkbox" checked={perms.data.inventory.read} onChange={() => toggleData('inventory', 'read')} disabled title={WIP_TOOLTIP} /></td>
+                  <td><input type="checkbox" checked={perms.data.inventory.write} onChange={() => toggleData('inventory', 'write')} disabled title={WIP_TOOLTIP} /></td>
+                  <td><input type="checkbox" checked={perms.data.inventory.del} onChange={() => toggleData('inventory', 'del')} disabled title={WIP_TOOLTIP} /></td>
+                  <td><input type="checkbox" checked={perms.data.inventory.export} onChange={() => toggleData('inventory', 'export')} disabled title={WIP_TOOLTIP} /></td>
                 </tr>
               </tbody>
             </table>
