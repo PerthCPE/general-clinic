@@ -55,10 +55,16 @@ func getCachedMedicines() []models.Medicine {
 			TotalQty   int
 		}
 		var results []Result
-		todayStr := time.Now().Format("2006-01-02")
+		// "จ่ายวันนี้" = ผลรวม quantity ของ dispensings ที่เกิดขึ้นในวันนี้ตามเวลาไทย (UTC+7)
+		// created_at เก็บเป็น UTC ถ้าใช้ DATE(created_at) ตรง ๆ จะเพี้ยนช่วงเที่ยงคืน-ตี 7
+		// จึงคำนวณช่วงเวลา "วันนี้" ของไทยแล้วแปลงกลับเป็น UTC ก่อน query
+		ict := time.FixedZone("ICT", 7*3600)
+		nowICT := time.Now().In(ict)
+		startICT := time.Date(nowICT.Year(), nowICT.Month(), nowICT.Day(), 0, 0, 0, 0, ict)
+		endICT := startICT.Add(24 * time.Hour)
 		config.DB.Model(&models.Dispensing{}).
 			Select("medicine_id, SUM(quantity) as total_qty").
-			Where("DATE(created_at) = ?", todayStr).
+			Where("created_at >= ? AND created_at < ?", startICT.UTC(), endICT.UTC()).
 			Group("medicine_id").
 			Scan(&results)
 
@@ -407,6 +413,51 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 
 	var medList []gin.H
 
+	// ── ตรวจสอบสต็อกให้ครบทุกรายการก่อนจ่าย ──
+	// ถ้ามียาตัวใด "ไม่พอ" แม้แต่ตัวเดียว → ปฏิเสธทั้งใบสั่ง (ไม่จ่ายบางส่วน)
+	// เภสัชกรต้องเติมยาเข้าคลัง หรือลบยารายการนั้นออกจากใบสั่งก่อน
+	if len(req.Medications) > 0 {
+		var insufficient []gin.H
+		for _, mObj := range req.Medications {
+			name, _ := mObj["name"].(string)
+			needQty := 1
+			if qVal, ok := mObj["quantity"]; ok {
+				if qNum, ok := qVal.(float64); ok && qNum > 0 {
+					needQty = int(qNum)
+				}
+			}
+			medCode, _ := mObj["medId"].(string)
+			if medCode == "" {
+				medCode, _ = mObj["medicine_code"].(string)
+			}
+			m := FindMedicineByNameOrCode(medCode, name)
+			if m.ID == 0 {
+				continue
+			}
+			var cur models.Medicine
+			if config.DB.Select("id, name, medicine_code, stock_quantity").First(&cur, m.ID).Error != nil {
+				continue
+			}
+			if cur.StockQuantity < needQty {
+				insufficient = append(insufficient, gin.H{
+					"name":          cur.Name,
+					"medicine_code": cur.MedicineCode,
+					"requested":     needQty,
+					"available":     cur.StockQuantity,
+				})
+			}
+		}
+		if len(insufficient) > 0 {
+			tx.Rollback()
+			c.JSON(http.StatusConflict, gin.H{
+				"status":       "error",
+				"error":        "ยาในคลังไม่เพียงพอ ไม่สามารถจ่ายยาได้",
+				"insufficient": insufficient,
+			})
+			return
+		}
+	}
+
 	// 🚨 บันทึกลงตารางยาด้วยเสมอเมื่อส่งไปการเงิน (ระบบจัดการยา)
 	// เพื่อให้เวลาเลื่อนลำดับคิวอัตโนมัติแล้วกด Submit ข้อมูลจะถูกบันทึกลงตารางประวัติยาผู้ป่วย (dispensings) 100%
 	if len(req.Medications) > 0 {
@@ -461,20 +512,19 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 					}
 				}
 
-				// ตัดสต็อกยา
-				dispensedQty := qty
+				// ตัดสต็อกยาแบบ atomic (ผ่านการตรวจ pre-check มาแล้ว)
 				res := tx.Model(&models.Medicine{}).Where("id = ? AND stock_quantity >= ?", med.ID, qty).Update("stock_quantity", gorm.Expr("stock_quantity - ?", qty))
-				if res.RowsAffected == 0 {
-					var stockMed models.Medicine
-					tx.First(&stockMed, med.ID)
-					dispensedQty = stockMed.StockQuantity
-					if dispensedQty > qty {
-						dispensedQty = qty
-					}
-					tx.Model(&models.Medicine{}).Where("id = ?", med.ID).Update("stock_quantity", gorm.Expr("GREATEST(stock_quantity - ?, 0)", qty))
+				if res.Error != nil || res.RowsAffected == 0 {
+					// เกิด race: สต็อกถูกตัดไปโดยคำสั่งอื่นระหว่างนี้ → ยกเลิกทั้งใบ
+					tx.Rollback()
+					c.JSON(http.StatusConflict, gin.H{
+						"status":       "error",
+						"error":        "ยาในคลังไม่เพียงพอ (สต็อกเปลี่ยนระหว่างทำรายการ) กรุณาลองใหม่",
+						"insufficient": []gin.H{{"name": med.Name, "medicine_code": med.MedicineCode, "requested": qty}},
+					})
+					return
 				}
-				qty = dispensedQty
-				
+
 				price := med.UnitPrice
 				if price <= 0 {
 					price = 10.0
@@ -502,18 +552,16 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 		for _, d := range dispensings {
 			var med models.Medicine
 			if err := tx.Where("id = ?", d.MedicineID).First(&med).Error; err == nil {
-				dispensedQty := d.Quantity
 				res := tx.Model(&models.Medicine{}).Where("id = ? AND stock_quantity >= ?", med.ID, d.Quantity).Update("stock_quantity", gorm.Expr("stock_quantity - ?", d.Quantity))
-				if res.RowsAffected == 0 {
-					var stockMed models.Medicine
-					tx.First(&stockMed, med.ID)
-					dispensedQty = stockMed.StockQuantity
-					if dispensedQty > d.Quantity {
-						dispensedQty = d.Quantity
-					}
-					tx.Model(&models.Medicine{}).Where("id = ?", med.ID).Update("stock_quantity", gorm.Expr("GREATEST(stock_quantity - ?, 0)", d.Quantity))
+				if res.Error != nil || res.RowsAffected == 0 {
+					tx.Rollback()
+					c.JSON(http.StatusConflict, gin.H{
+						"status":       "error",
+						"error":        "ยาในคลังไม่เพียงพอ ไม่สามารถจ่ายยาได้",
+						"insufficient": []gin.H{{"name": med.Name, "medicine_code": med.MedicineCode, "requested": d.Quantity, "available": med.StockQuantity}},
+					})
+					return
 				}
-				d.Quantity = dispensedQty
 				price := med.UnitPrice
 				if price <= 0 {
 					price = 10.0
