@@ -180,6 +180,31 @@ export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'doctor-records': ['doctor'],
 };
 
+// สร้างจาก PAGE_PERMISSIONS อัตโนมัติ (reverse index: role -> รายชื่อหน้าที่เข้าถึงได้)
+// ไม่ต้อง maintain แยกอีกชุด — ใช้ใน GrantAccess.tsx เพื่อแสดงสิทธิ์จริงตาม role แบบอ่านอย่างเดียว
+// สะท้อนสิ่งที่ hasAccess()/PAGE_PERMISSIONS บังคับใช้จริงในแอปโดยตรง จึงไม่มีทางเพี้ยนไปจากของจริง
+export const ROLE_PAGE_ACCESS: Record<UserRole, string[]> = (() => {
+  const result: Record<UserRole, string[]> = {
+    registrar: [], nurse: [], nurse_assistant: [], pharmacist: [],
+    cashier: [], doctor: [], admin: [], officer: [],
+  };
+  for (const [pageId, roles] of Object.entries(PAGE_PERMISSIONS)) {
+    roles.forEach((role) => {
+      result[role].push(pageId);
+    });
+  }
+  return result;
+})();
+
+// ชื่อหน้าที่อ่านง่ายสำหรับแสดงผล — ดึงจาก title ที่ประกาศไว้แล้วใน ROLE_MENUS ทุก role มารวมกัน
+// (pageId ไหนไม่มีอยู่ใน ROLE_MENUS เลย เช่น 'doctor-dashboard' ที่ไม่มีลิงก์ sidebar จะ fallback เป็น pageId ตรงๆ)
+export const PAGE_TITLES: Record<string, string> = Object.values(ROLE_MENUS)
+  .flat()
+  .reduce((acc, item) => {
+    acc[item.id] = item.title;
+    return acc;
+  }, {} as Record<string, string>);
+
 // ตารางกำหนดสิทธิ์ระดับ API Endpoints (Backend Middleware Alignment & Parity)
 // หมายเหตุ: พยาบาลและผู้ช่วยพยาบาลได้รับสิทธิ์ API-only ในการค้นหา/ดูข้อมูลผู้ป่วย (GET /api/registrar/*)
 // เพื่อใช้อ้างอิงประวัติก่อนคัดกรอง แต่การลงทะเบียนและแก้ไขข้อมูล (POST/PUT) สงวนไว้ให้เจ้าหน้าที่เวชระเบียน (registrar) เท่านั้น

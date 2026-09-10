@@ -1,11 +1,10 @@
 /* --bg-color / --text-color / --card-bg map ไปยังตัวแปรสีกลางของทีม (index.css:root)
-   เช่นเดียวกับ UserManagement.css — --input-bg / --hover-bg ไม่มี token กลางที่ตรงกัน
-   (เฉพาะหน้านี้) จึงยังคงประกาศแยกไว้ */
+   เช่นเดียวกับ UserManagement.css — --hover-bg ไม่มี token กลางที่ตรงกัน (เฉพาะหน้านี้)
+   จึงยังคงประกาศแยกไว้ */
 .access-page-container {
   --bg-color: var(--bg-canvas);
   --text-color: var(--text-primary);
   --card-bg: var(--bg-card);
-  --input-bg: var(--bg-canvas);
   --hover-bg: #F1F5F9;
   padding: 24px;
   background-color: var(--bg-color);
@@ -24,9 +23,9 @@ body.dark-mode .access-page-container {
   align-items: flex-start;
 }
 
-/* Sidebar */
+/* Sidebar: รายชื่อตำแหน่งงาน */
 .access-page-container .access-sidebar {
-  width: 320px;
+  width: 300px;
   background-color: var(--card-bg, white);
   border-radius: 12px;
   padding: 20px;
@@ -38,14 +37,6 @@ body.dark-mode .access-page-container {
 }
 .access-page-container .access-sidebar h3 { margin: 0 0 4px; font-size: 18px; }
 .access-page-container .sidebar-sub { font-size: 12px; color: #6b7280; margin-bottom: 16px; }
-
-.access-page-container .search-box input {
-  width: 100%; padding: 10px; border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 6px; margin-bottom: 16px;
-  background-color: var(--input-bg, white);
-  color: inherit; outline: none; transition: border-color 0.2s;
-}
-.access-page-container .search-box input:focus { border-color: #3b82f6; }
 
 .access-page-container .personnel-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 .access-page-container .personnel-item {
@@ -59,13 +50,8 @@ body.dark-mode .access-page-container {
 }
 body.dark-mode .access-page-container .personnel-item.active { background-color: rgba(37,99,235,0.1); box-shadow: inset 4px 0 0 #3b82f6; }
 
-.access-page-container .personnel-item .info .name { font-weight: 500; font-size: 14px; }
+.access-page-container .personnel-item .info .name { font-weight: 500; font-size: 14px; display: flex; align-items: center; }
 .access-page-container .personnel-item .info .role { font-size: 12px; color: #6b7280; }
-
-.access-page-container .btn-add-personnel {
-  width: 100%; padding: 10px; background-color: #2563eb; color: white;
-  border: none; border-radius: 6px; font-weight: 500; cursor: pointer;
-}
 
 /* Main Content */
 .access-page-container .access-content {
@@ -78,86 +64,56 @@ body.dark-mode .access-page-container .personnel-item.active { background-color:
   border-radius: 12px; border: 1px solid var(--border-color, #e5e7eb);
 }
 .access-page-container .user-title { display: flex; align-items: center; gap: 16px; }
+.access-page-container .avatar,
 .access-page-container .avatar-large {
-  width: 56px; height: 56px; border-radius: 50%; display: flex;
-  align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold;
+  border-radius: 50%; display: flex;
+  align-items: center; justify-content: center; color: white; font-weight: bold;
+  flex-shrink: 0;
+}
+.access-page-container .avatar { width: 40px; height: 40px; font-size: 16px; }
+.access-page-container .avatar-large {
+  width: 56px; height: 56px; font-size: 24px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
 }
 .access-page-container .user-title h2 { margin: 0 0 4px; font-size: 20px; }
 .access-page-container .user-title p { margin: 0; color: #6b7280; font-size: 14px; }
 
-.access-page-container .header-actions { display: flex; gap: 12px; }
-.access-page-container .btn-cancel { padding: 8px 16px; border: 1px solid var(--border-color, #e5e7eb); background: transparent; border-radius: 6px; cursor: pointer; color: inherit; transition: background-color 0.2s;}
-.access-page-container .btn-cancel:hover { background-color: #f3f4f6; }
-body.dark-mode .access-page-container .btn-cancel:hover { background-color: #374151; }
-.access-page-container .btn-save { padding: 8px 16px; background-color: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: background-color 0.2s;}
-.access-page-container .btn-save:hover { background-color: #1d4ed8; }
-
-.access-page-container .permissions-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-
 .access-page-container .perm-card {
   background-color: var(--card-bg, white); padding: 20px;
   border-radius: 12px; border: 1px solid var(--border-color, #e5e7eb);
 }
-.access-page-container .perm-card h4 { margin: 0 0 16px; font-size: 16px; color: #374151; }
+.access-page-container .perm-card h4 { margin: 0 0 8px; font-size: 16px; color: #374151; }
 body.dark-mode .access-page-container .perm-card h4 { color: #e5e7eb; }
 
-/* Menu Access Checkboxes */
-.access-page-container .checkbox-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.access-page-container .checkbox-grid label { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; user-select: none; }
-.access-page-container .checkbox-grid input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
-
-/* === Security Level Interactive UI === */
-.access-page-container .security-level { 
-  background: linear-gradient(135deg, #eff6ff, #dbeafe); border-color: #bfdbfe; 
-  display: flex; flex-direction: column; justify-content: center;
+.access-page-container .data-header { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.access-page-container .info-text {
+  display: flex; align-items: flex-start; gap: 6px;
+  font-size: 12px; color: #6b7280; line-height: 1.5;
 }
-body.dark-mode .access-page-container .security-level { background: linear-gradient(135deg, #1e3a8a, #172554); border-color: #1e40af; }
-.access-page-container .sec-header { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; color: #1d4ed8; letter-spacing: 1px; margin-bottom: 12px; }
-body.dark-mode .access-page-container .sec-header { color: #93c5fd; }
-.access-page-container .info-badge { font-size: 10px; background: rgba(37,99,235,0.1); padding: 2px 6px; border-radius: 10px; color: #2563eb; font-weight: normal; letter-spacing: normal;}
-body.dark-mode .access-page-container .info-badge { background: rgba(147,197,253,0.1); color: #93c5fd; }
+body.dark-mode .access-page-container .info-text { color: #9ca3af; }
+.access-page-container .info-text svg { flex-shrink: 0; margin-top: 1px; }
 
-/* Level Buttons Row */
-.access-page-container .level-selector { display: flex; gap: 8px; margin-bottom: 16px; justify-content: center;}
-.access-page-container .level-btn {
-  width: 36px; height: 36px; border-radius: 50%; border: 2px solid #93c5fd;
-  background: white; color: #3b82f6; font-weight: bold; font-size: 16px;
-  cursor: pointer; transition: all 0.2s;
+/* กริดแสดงรายชื่อเมนู/โมดูลที่ตำแหน่งนี้เข้าถึงได้ — อ่านอย่างเดียว */
+.access-page-container .page-access-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
 }
-body.dark-mode .access-page-container .level-btn { background: #1e3a8a; border-color: #3b82f6; color: #bfdbfe; }
-.access-page-container .level-btn:hover { transform: scale(1.1); }
-.access-page-container .level-btn.active {
-  background: #2563eb; color: white; border-color: #2563eb; transform: scale(1.1);
-  box-shadow: 0 4px 10px rgba(37,99,235,0.4);
+.access-page-container .page-access-chip {
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--hover-bg, #f9fafb);
+  border: 1px solid var(--border-color, #e5e7eb);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-color);
 }
-
-.access-page-container .level-badge { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
-.access-page-container .lvl-text { font-size: 16px; font-weight: bold; color: #1e40af; }
-.access-page-container .lvl-num { font-size: 32px; font-weight: 900; color: #2563eb; line-height: 1; }
-.access-page-container .lvl-desc { font-size: 12px; color: #2563eb; text-transform: uppercase; font-weight: bold; }
-body.dark-mode .access-page-container .lvl-text, body.dark-mode .access-page-container .lvl-desc { color: #60a5fa; } body.dark-mode .access-page-container .lvl-num { color: #3b82f6; }
-
-.access-page-container .security-level p { font-size: 12px; color: #4b5563; margin-bottom: 0; line-height: 1.5; }
-body.dark-mode .access-page-container .security-level p { color: #9ca3af; }
-
-/* Data Table */
-.access-page-container .data-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.access-page-container .info-text { font-size: 12px; color: #6b7280; }
-
-.access-page-container .perm-table { width: 100%; border-collapse: collapse; }
-.access-page-container .perm-table th { padding: 12px; background-color: var(--hover-bg, #f9fafb); font-size: 12px; color: #6b7280; text-align: center; border-bottom: 1px solid var(--border-color, #e5e7eb); }
-.access-page-container .perm-table th:first-child { text-align: left; }
-.access-page-container .perm-table td { padding: 16px 12px; border-bottom: 1px solid var(--border-color, #e5e7eb); text-align: center; vertical-align: middle;}
-.access-page-container .perm-table td:first-child { text-align: left; }
-.access-page-container .perm-table td strong { display: block; font-size: 14px; margin-bottom: 4px; color: var(--text-color, #1f2937); }
-.access-page-container .perm-table td p { margin: 0; font-size: 12px; color: #6b7280; }
-.access-page-container .perm-table input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
 
 /* === Status Badges & Dots === */
 .access-page-container .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 8px; }
 .access-page-container .status-dot.green { background-color: #10b981; box-shadow: 0 0 4px #10b981; }
 .access-page-container .status-dot.orange { background-color: #f59e0b; box-shadow: 0 0 4px #f59e0b; }
+.access-page-container .status-dot.red { background-color: #ef4444; box-shadow: 0 0 4px #ef4444; }
 
 .access-page-container .status-badge-lg { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
 .access-page-container .badge-active { background-color: #d1fae5; color: #065f46; border: 1px solid #34d399; }
@@ -169,123 +125,6 @@ body.dark-mode .access-page-container .badge-active {
 }
 body.dark-mode .access-page-container .badge-pending {
   background: rgba(217, 119, 6, 0.3); color: #FBBF24; border: 1.5px solid #F59E0B;
-}
-
-/* === Warning Boxes (Low and High Level) === */
-.access-page-container .level-warning {
-  padding: 12px; border-radius: 8px; font-size: 12px; line-height: 1.5;
-  margin-top: 8px; 
-}
-
-/* เตือนสีเหลือง (Level ต่ำไป) */
-.access-page-container .low-warning {
-  background-color: #fffbeb; border: 1px solid #fcd34d; color: #b45309;
-}
-body.dark-mode .access-page-container .low-warning {
-  background-color: rgba(245,158,11,0.1); border-color: #d97706; color: #fcd34d;
-}
-
-/* เตือนสีแดง (Level สูงไป - กระพริบ) */
-.access-page-container .high-warning {
-  background-color: #fef2f2; border: 1px solid #fca5a5; color: #991b1b;
-  animation: pulse-danger 2s infinite;
-}
-body.dark-mode .access-page-container .high-warning {
-  background-color: rgba(239,68,68,0.1); border-color: #ef4444; color: #fca5a5;
-}
-
-@keyframes pulse-danger {
-  0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-  70% { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
-  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
-}
-
-/* === Security Audit Filters === */
-.access-page-container .audit-filters {
-  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;
-}
-.access-page-container .audit-chip {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;
-  cursor: pointer; background: var(--bg-color, #f3f4f6); color: var(--text-color, #4b5563);
-  border: 1px solid var(--border-color, #e5e7eb); transition: all 0.2s;
-  user-select: none;
-}
-.access-page-container .audit-chip:hover { filter: brightness(0.95); }
-
-/* สไตล์ตอนปุ่มกรองถูกเลือก (Active) */
-.access-page-container .audit-chip.active { background: #2563eb; color: white; border-color: #2563eb; }
-.access-page-container .audit-chip.pending.active { background: #f59e0b; border-color: #f59e0b; color: white; }
-.access-page-container .audit-chip.match.active { background: #10b981; border-color: #10b981; }
-.access-page-container .audit-chip.high.active { background: #ef4444; border-color: #ef4444; animation: pulse-border-red 2s infinite;}
-.access-page-container .audit-chip.low.active { background: #f97316; border-color: #f97316; }
-
-body.dark-mode .access-page-container .audit-chip { background: #374151; color: #d1d5db; border-color: #4b5563; }
-body.dark-mode .access-page-container .audit-chip.active { background: #3b82f6; color: white; }
-body.dark-mode .access-page-container .audit-chip.pending.active { background: #f59e0b; }
-body.dark-mode .access-page-container .audit-chip.match.active { background: #10b981; }
-body.dark-mode .access-page-container .audit-chip.high.active { background: #ef4444; }
-body.dark-mode .access-page-container .audit-chip.low.active { background: #f97316; }
-
-@keyframes pulse-border-red {
-  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-  70% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-}
-
-/* ป้ายบอก Level */
-.access-page-container .list-level-badge {
-  display: inline-block; margin-left: 6px; padding: 1px 6px;
-  background-color: #e0e7ff; color: #4338ca; border-radius: 8px;
-  font-size: 10px; font-weight: bold; letter-spacing: 0.5px;
-}
-body.dark-mode .access-page-container .list-level-badge { background-color: rgba(67, 56, 202, 0.3); color: #818cf8; }
-
-/* Disable state สำหรับปุ่ม Reset */
-.access-page-container .btn-cancel:disabled {
-  opacity: 0.5; cursor: not-allowed;
-}
-
-/* === ช่องที่ยังบันทึกจริงไม่ได้ (อยู่ระหว่างพัฒนา) ===
-   handleSave ส่งแค่ perms.level ไปที่ backend เท่านั้น — checkbox เมนู/data-matrix
-   ทั้งกริดไม่เคยถูกบันทึกจริงเลย ปิดการโต้ตอบไว้กันผู้ใช้เข้าใจผิดว่ากดติ๊กแล้วมีผล */
-.access-page-container .checkbox-grid input:disabled,
-.access-page-container .perm-table input:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-.access-page-container .checkbox-grid label:has(input:disabled) {
-  cursor: not-allowed;
-  color: var(--text-color, #4b5563);
-  opacity: 0.7;
-}
-.access-page-container .perm-card.wip-note {
-  border-color: #FDE68A;
-  background: #FFFBEB;
-}
-body.dark-mode .access-page-container .perm-card.wip-note {
-  background: rgba(217, 119, 6, 0.12);
-  border-color: rgba(217, 119, 6, 0.4);
-}
-.access-page-container .wip-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  color: #B45309;
-  background: #FEF3C7;
-  border: 1px solid #FCD34D;
-  border-radius: 10px;
-  padding: 1px 8px;
-  margin-left: 8px;
-  letter-spacing: 0.3px;
-  vertical-align: middle;
-}
-body.dark-mode .access-page-container .wip-badge {
-  color: #FBBF24;
-  background: rgba(245, 158, 11, 0.15);
-  border-color: rgba(245, 158, 11, 0.4);
 }
 
 /* Loading / Error states */
@@ -312,7 +151,7 @@ body.dark-mode .access-page-container .ga-error-banner {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  padding: 48px 24px;
+  padding: 24px;
   color: var(--text-color);
   opacity: 0.6;
   font-size: 14px;

@@ -1,59 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, CheckCircle2, ShieldAlert, AlertTriangle, Info, Wrench } from 'lucide-react';
+import { Info } from 'lucide-react';
 import { adminApi, type BackendUser } from '../../services/api';
+import { DEMO_USERS, ROLE_PAGE_ACCESS, PAGE_TITLES } from '../../config/roles';
+import type { UserRole } from '../../types/auth';
 import './GrantAccess.css';
 
-// handleSave ส่งแค่ perms.level ไปที่ backend (bulkUpdateSystemAccess) เท่านั้น —
-// checkbox เมนู/data-matrix ทั้งกริดด้านล่างนี้ยังไม่เคยถูกบันทึกจริงเลย (ดู ก.5 ในรายงานสำรวจ)
-// ปิดการโต้ตอบไว้ก่อนพร้อม tooltip กันผู้ใช้เข้าใจผิดว่ากดติ๊กแล้วมีผลจริง
-const WIP_TOOLTIP = 'ฟีเจอร์นี้อยู่ระหว่างพัฒนา';
+// สิทธิ์จริงในระบบนี้เป็น role-based ล้วนๆ — บังคับใช้ผ่าน PAGE_PERMISSIONS (frontend routing)
+// และ RoleRequired middleware (backend) โดยอ้างอิง role ของ JWT เท่านั้น ไม่เคยมีจุดไหนอ่านค่า
+// system_accesses.access_level มาใช้ตัดสินใจเปิด/ปิดสิทธิ์เลยสักที่ (grep ยืนยันแล้ว)
+//
+// หน้านี้เคยเป็น grid ให้ติ๊กสิทธิ์ระดับ user รายคน 18 ช่อง ซึ่งไม่เคยถูกบันทึกจริง (ก.5 ในรายงาน
+// สำรวจก่อนหน้า) เปลี่ยนมาเป็นหน้าแสดงสิทธิ์ระดับ "ตำแหน่งงาน" (role) แบบอ่านอย่างเดียวแทน โดยดึง
+// ข้อมูลตรงจาก PAGE_PERMISSIONS ที่มีอยู่แล้ว (single source of truth เดียวกับที่แอปใช้จริง)
+// จึงไม่มีทางเพี้ยนไปจากสิทธิ์จริง และไม่ต้องสร้าง backend ใหม่
 
 interface SystemUser {
   internalId: number;
   id: string;
   name: string;
   role: string;
+  status: 'รอการยืนยัน' | 'กำลังใช้งาน' | 'ระงับใช้งาน' | string;
   avatar: string;
-  status: 'รอการยืนยัน' | 'กำลังใช้งาน';
-  currentLevel: number; 
 }
 
-interface UserPermissions {
-  level: number;
-  menus: { dashboard: boolean; appointment: boolean; pharmacy: boolean; stock: boolean; finance: boolean; security: boolean; };
-  data: {
-    emr: { read: boolean; write: boolean; del: boolean; export: boolean };
-    hr: { read: boolean; write: boolean; del: boolean; export: boolean };
-    inventory: { read: boolean; write: boolean; del: boolean; export: boolean };
-  };
-}
-
-const englishToRole: Record<string, string> = {
-  'doctor': 'แพทย์', 'nurse': 'พยาบาลและผู้ช่วยพยาบาล', 'nurse_assistant': 'พยาบาลและผู้ช่วยพยาบาล',
-  'pharmacist': 'เภสัชกร', 'registrar': 'พนักงานเวชระเบียน', 'cashier': 'พนักงานธุรการการเงิน',
-  'lab_technician': 'นักเทคนิคการแพทย์', 'admin': 'ผู้ดูแลระบบ', 'officer': 'พนักงานเวชระเบียน'
-};
+const ROLE_ORDER: UserRole[] = ['doctor', 'nurse', 'nurse_assistant', 'pharmacist', 'cashier', 'registrar', 'officer', 'admin'];
 
 const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
   const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'];
-  const randomColor = colors[u.id % colors.length];
-  
-  let level = 1;
-  // SAFE CHECK HERE
-  if (u.system_accesses && u.system_accesses.length > 0 && u.system_accesses[0]) {
-    level = Number(u.system_accesses[0].access_level) || 1;
-  }
-  
-  const thaiRole = englishToRole[u.role] || u.role;
-
   return {
     internalId: u.id,
     id: u.employee_id || `EMP-${u.id}`,
     name: u.fullname || u.full_name || u.username || '',
-    role: thaiRole,
-    avatar: randomColor,
-    status: (u.status === 'active' || u.status === 'suspended') ? 'กำลังใช้งาน' : 'รอการยืนยัน',
-    currentLevel: level
+    role: u.role,
+    status: u.status === 'active' ? 'กำลังใช้งาน' : (u.status === 'suspended' ? 'ระงับใช้งาน' : 'รอการยืนยัน'),
+    avatar: colors[u.id % colors.length],
   };
 };
 
@@ -61,6 +41,7 @@ const GrantAccess: React.FC = () => {
   const [personnel, setPersonnel] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<UserRole>('doctor');
 
   const fetchUsers = async () => {
     try {
@@ -82,152 +63,18 @@ const GrantAccess: React.FC = () => {
     fetchUsers();
   }, []);
 
-  const [activeUserId, setActiveUserId] = useState<string>(''); 
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  // === ปรับปรุง State ตัวกรองให้มี 'pending' (รอให้สิทธิ์) แบบแยกชัดเจน ===
-  const [auditFilter, setAuditFilter] = useState<'all' | 'pending' | 'match' | 'high' | 'low'>('all');
-
-  const [perms, setPerms] = useState<UserPermissions>({
-    level: 1,
-    menus: { dashboard: true, appointment: false, pharmacy: false, stock: false, finance: false, security: false },
-    data: { emr: { read: false, write: false, del: false, export: false }, hr: { read: false, write: false, del: false, export: false }, inventory: { read: false, write: false, del: false, export: false } }
-  });
-
-  const getRecommendedLevel = (role: string) => {
-    if (role.includes('ระบบ')) return 5;
-    if (role.includes('แพทย์')) return 4;
-    if (role.includes('พยาบาล') || role.includes('เภสัช')) return 3;
-    if (role.includes('เงิน') || role.includes('ระเบียน') || role.includes('เทคนิค')) return 2;
-    return 1;
-  };
-
-  // === คำนวณสถิติแยกตาม 5 หมวด ===
-  const auditStats = {
-    all: personnel.length,
-    pending: personnel.filter(p => p.status === 'รอการยืนยัน').length,
-    match: personnel.filter(p => p.currentLevel === getRecommendedLevel(p.role) && p.status === 'กำลังใช้งาน').length,
-    high: personnel.filter(p => p.currentLevel > getRecommendedLevel(p.role) && p.status === 'กำลังใช้งาน').length,
-    low: personnel.filter(p => p.currentLevel < getRecommendedLevel(p.role) && p.status === 'กำลังใช้งาน').length,
-  };
-
-  // === กรองข้อมูลตามที่เลือก ===
-  const filteredPersonnel = personnel.filter(p => {
-    const matchesSearch = p.name.includes(searchTerm) || p.role.includes(searchTerm);
-    if (!matchesSearch) return false;
-
-    const recLvl = getRecommendedLevel(p.role);
-    if (auditFilter === 'pending') return p.status === 'รอการยืนยัน';
-    if (auditFilter === 'match') return p.currentLevel === recLvl && p.status === 'กำลังใช้งาน';
-    if (auditFilter === 'high') return p.currentLevel > recLvl && p.status === 'กำลังใช้งาน';
-    if (auditFilter === 'low') return p.currentLevel < recLvl && p.status === 'กำลังใช้งาน';
-    return true; 
-  });
-
-  // Set default active user when data loads
-  useEffect(() => {
-    if (personnel.length > 0 && !activeUserId) {
-      setActiveUserId(personnel[0].id);
-    }
-  }, [personnel, activeUserId]);
-
-  const activeUser = personnel.find(p => p.id === activeUserId) || personnel[0] || {} as SystemUser;
-  const recommendedLvl = activeUser.role ? getRecommendedLevel(activeUser.role) : 1;
-  
-  const isLevelTooLow = perms.level < recommendedLvl;
-  const isLevelTooHigh = perms.level > recommendedLvl;
-
-  const handleLevelChange = (level: number) => {
-    let newPerms: UserPermissions = { ...perms, level };
-
-    switch (level) {
-      case 5:
-        newPerms.menus = { dashboard: true, appointment: true, pharmacy: true, stock: true, finance: true, security: true };
-        newPerms.data = { emr: { read: true, write: true, del: true, export: true }, hr: { read: true, write: true, del: true, export: true }, inventory: { read: true, write: true, del: true, export: true } };
-        break;
-      case 4:
-        newPerms.menus = { dashboard: true, appointment: true, pharmacy: true, stock: false, finance: false, security: false };
-        newPerms.data = { emr: { read: true, write: true, del: false, export: true }, hr: { read: true, write: false, del: false, export: false }, inventory: { read: true, write: false, del: false, export: false } };
-        break;
-      case 3:
-        newPerms.menus = { dashboard: true, appointment: true, pharmacy: true, stock: true, finance: false, security: false };
-        newPerms.data = { emr: { read: true, write: true, del: false, export: false }, hr: { read: false, write: false, del: false, export: false }, inventory: { read: true, write: true, del: false, export: false } };
-        break;
-      case 2:
-        newPerms.menus = { dashboard: true, appointment: true, pharmacy: false, stock: false, finance: true, security: false };
-        newPerms.data = { emr: { read: true, write: false, del: false, export: false }, hr: { read: false, write: false, del: false, export: false }, inventory: { read: false, write: false, del: false, export: false } };
-        break;
-      case 1:
-        newPerms.menus = { dashboard: true, appointment: false, pharmacy: false, stock: false, finance: false, security: false };
-        newPerms.data = { emr: { read: false, write: false, del: false, export: false }, hr: { read: false, write: false, del: false, export: false }, inventory: { read: false, write: false, del: false, export: false } };
-        break;
-    }
-    setPerms(newPerms);
-  };
-
-  useEffect(() => {
-    if (activeUser && activeUser.status) {
-      if (activeUser.status === 'รอการยืนยัน') {
-        handleLevelChange(1);
-      } else {
-        handleLevelChange(activeUser.currentLevel);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeUserId]);
-
-  const toggleMenu = (menuKey: keyof UserPermissions['menus']) => {
-    setPerms(prev => ({ ...prev, menus: { ...prev.menus, [menuKey]: !prev.menus[menuKey] } }));
-  };
-  const toggleData = (category: keyof UserPermissions['data'], action: keyof UserPermissions['data']['emr']) => {
-    setPerms(prev => ({ ...prev, data: { ...prev.data, [category]: { ...prev.data[category], [action]: !prev.data[category][action] } } }));
-  };
-
-  const handleSave = async () => {
-    if (isLevelTooLow) {
-      if (!window.confirm(`ระดับสิทธิ์ต่ำกว่ามาตรฐานของ "${activeUser.role}" คุณแน่ใจหรือไม่ว่าต้องการบันทึกสิทธิ์นี้?`)) return;
-    }
-    if (isLevelTooHigh) {
-      if (!window.confirm(`คำเตือนความปลอดภัย: คุณกำลังมอบสิทธิ์ที่สูงเกินความจำเป็นให้กับตำแหน่ง "${activeUser.role}" ยืนยันการดำเนินการหรือไม่?`)) return;
-    }
-
-    try {
-      // ใช้ bulkUpdate เพื่อ DELETE ค่าเก่าก่อน INSERT ใหม่ — ไม่ให้มีข้อมูลซ้ำ
-      await adminApi.bulkUpdateSystemAccess({
-        user_id: activeUser.internalId,
-        accesses: [{ module_name: 'All', access_level: perms.level }]
-      });
-      if (activeUser.status === 'รอการยืนยัน') {
-        await adminApi.updateAccountStatus(activeUser.internalId, 'active');
-      }
-      alert(`บันทึกสิทธิ์ของ "${activeUser.name}" สำเร็จ! (Level ${perms.level})`);
-      fetchUsers();
-    } catch (err: any) {
-      alert("เกิดข้อผิดพลาด: " + err.message);
-    }
-  };
-
-  const handleReset = async () => {
-    if (window.confirm(`คุณต้องการเพิกถอนสิทธิ์ของ "${activeUser.name}" และเปลี่ยนสถานะกลับเป็น "รอการยืนยัน" ใช่หรือไม่?`)) {
-      try {
-        await adminApi.updateAccountStatus(activeUser.internalId, 'pending');
-        handleLevelChange(1);
-        alert(`เพิกถอนสิทธิ์สำเร็จ สถานะกลับเป็น "รอการยืนยัน"`);
-        fetchUsers();
-      } catch (err: any) {
-        alert("Error: " + err.message);
-      }
-    }
-  };
+  const usersInRole = personnel.filter((p) => p.role === selectedRole);
+  const pagesForRole = ROLE_PAGE_ACCESS[selectedRole] || [];
+  const roleInfo = DEMO_USERS[selectedRole];
 
   return (
     <div className="access-page-container">
       <div className="access-layout">
-        
-        {/* === Left Sidebar === */}
+
+        {/* === Left Sidebar: รายชื่อตำแหน่งงาน === */}
         <div className="access-sidebar">
-          <h3>รายชื่อบุคลากร</h3>
-          <p className="sidebar-sub">เลือกบุคลากรเพื่อจัดการกำหนดสิทธิ์การเข้าใช้บริการระบบ</p>
+          <h3>ตำแหน่งงานในระบบ</h3>
+          <p className="sidebar-sub">เลือกตำแหน่งเพื่อดูว่าเข้าถึงเมนู/โมดูลอะไรได้บ้าง</p>
 
           {errorMsg && (
             <div className="ga-error-banner">
@@ -235,57 +82,26 @@ const GrantAccess: React.FC = () => {
             </div>
           )}
 
-          <div className="search-box">
-            <input type="text" placeholder="ค้นหาชื่อ หรือ ตำแหน่ง..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-          </div>
-
-          {/* === แผงตรวจสอบความปลอดภัย === */}
-          <div className="audit-filters">
-            <div className={`audit-chip ${auditFilter === 'all' ? 'active' : ''}`} onClick={() => setAuditFilter('all')}>
-              ทั้งหมด ({auditStats.all})
-            </div>
-            <div className={`audit-chip pending ${auditFilter === 'pending' ? 'active' : ''}`} onClick={() => setAuditFilter('pending')} title="บัญชีใหม่ที่ยังไม่ได้กำหนดสิทธิ์">
-              <Clock size={12} strokeWidth={2} /> รอให้สิทธิ์ ({auditStats.pending})
-            </div>
-            <div className={`audit-chip match ${auditFilter === 'match' ? 'active' : ''}`} onClick={() => setAuditFilter('match')} title="สิทธิ์ตรงตามตำแหน่งมาตรฐาน">
-              <CheckCircle2 size={12} strokeWidth={2} /> ตรงระดับ ({auditStats.match})
-            </div>
-            <div className={`audit-chip high ${auditFilter === 'high' ? 'active' : ''}`} onClick={() => setAuditFilter('high')} title="สิทธิ์สูงกว่ามาตรฐาน (เสี่ยง)">
-              <ShieldAlert size={12} strokeWidth={2} /> สูงไป ({auditStats.high})
-            </div>
-            <div className={`audit-chip low ${auditFilter === 'low' ? 'active' : ''}`} onClick={() => setAuditFilter('low')} title="สิทธิ์ต่ำกว่ามาตรฐาน (แต่ใช้งานอยู่)">
-              <AlertTriangle size={12} strokeWidth={2} /> ต่ำไป ({auditStats.low})
-            </div>
-          </div>
-
           <div className="personnel-list">
-            {loading ? (
-              <div className="ga-loading-state">
-                <span className="ga-spinner" />
-                <span>กำลังโหลดรายชื่อบุคลากร...</span>
-              </div>
-            ) : filteredPersonnel.length === 0 ? (
-              <div style={{textAlign: 'center', padding: '12px', fontSize: '12px', color: '#62748E'}}>ไม่พบบัญชีที่ตรงกับเงื่อนไข</div>
-            ) : (
-              filteredPersonnel.map(p => (
-                <div key={p.id} onClick={() => setActiveUserId(p.id)} className={`personnel-item ${p.id === activeUserId ? 'active' : ''}`}>
-                  <div className="avatar" style={{ backgroundColor: p.avatar }}>
-                    {p.name.split(' ')[1]?.charAt(0) || p.name.charAt(0)}
+            {ROLE_ORDER.map((role) => {
+              const info = DEMO_USERS[role];
+              const count = personnel.filter((p) => p.role === role).length;
+              return (
+                <div
+                  key={role}
+                  onClick={() => setSelectedRole(role)}
+                  className={`personnel-item ${role === selectedRole ? 'active' : ''}`}
+                >
+                  <div className="avatar" style={{ backgroundColor: info?.avatarColor || '#94A3B8' }}>
+                    {info?.avatarText || role.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="info">
-                    <div className="name">
-                      {p.name} 
-                      {p.status === 'กำลังใช้งาน' ? <span className="status-dot green" title="กำลังใช้งาน"></span> : <span className="status-dot orange" title="รอการยืนยันสิทธิ์"></span>}
-                    </div>
-                    {/* ถ้ายังรอการยืนยัน จะไม่โชว์ Level ให้สับสน */}
-                    <div className="role">
-                      {p.role} 
-                      {p.status === 'กำลังใช้งาน' && <span className="list-level-badge">LVL {p.currentLevel}</span>}
-                    </div>
+                    <div className="name">{info?.roleTitleTh || role}</div>
+                    <div className="role">{loading ? 'กำลังโหลด...' : `${count} บัญชี`}</div>
                   </div>
                 </div>
-              ))
-            )}
+              );
+            })}
           </div>
         </div>
 
@@ -293,148 +109,74 @@ const GrantAccess: React.FC = () => {
         <div className="access-content">
           <div className="content-header">
             <div className="user-title">
-              <div className="avatar-large" style={{ backgroundColor: activeUser.avatar || '#ccc' }}>
-                {activeUser.name ? (activeUser.name.split(' ')[1]?.charAt(0) || activeUser.name.charAt(0)) : '?'}
+              <div className="avatar-large" style={{ backgroundColor: roleInfo?.avatarColor || '#94A3B8' }}>
+                {roleInfo?.avatarText || selectedRole.slice(0, 2).toUpperCase()}
               </div>
               <div>
-                <div style={{display: 'flex', alignItems: 'center', gap: '12px'}}>
-                  <h2>สิทธิ์เข้าถึงของ: {activeUser.name || 'กำลังโหลด...'}</h2>
-                  <span className={`status-badge-lg ${activeUser.status === 'กำลังใช้งาน' ? 'badge-active' : 'badge-pending'}`}>
-                    {activeUser.status === 'กำลังใช้งาน'
-                      ? <><CheckCircle2 size={12} strokeWidth={2} /> กำลังใช้งาน</>
-                      : <><Clock size={12} strokeWidth={2} /> รอการยืนยันสิทธิ์</>}
-                  </span>
-                </div>
-                <p>ID: {activeUser.id} | ตำแหน่ง: {activeUser.role} (แนะนำ Level {recommendedLvl})</p>
+                <h2>สิทธิ์การเข้าถึงของตำแหน่ง: {roleInfo?.roleTitleTh || selectedRole}</h2>
+                <p>{roleInfo?.roleTitleEn} &bull; {pagesForRole.length} เมนูที่เข้าถึงได้ &bull; {usersInRole.length} บัญชีที่ใช้ตำแหน่งนี้</p>
               </div>
-            </div>
-            <div className="header-actions">
-              <button className="btn-cancel" onClick={handleReset} title="ล้างค่าและกลับไปรอการยืนยัน" disabled={activeUser.status === 'รอการยืนยัน'}>เพิกถอนสิทธิ์ (Reset)</button>
-              <button className="btn-save" onClick={handleSave}>บันทึกการเปลี่ยนแปลง</button>
             </div>
           </div>
 
-          <div className="permissions-grid">
-            
-            <div className="perm-card security-level">
-              <div className="sec-header">
-                SECURITY LEVEL 
-                <span className="info-badge">เลือกระดับเพื่อกำหนดสิทธิ์อัตโนมัติ</span>
-              </div>
-              
-              <div className="level-selector">
-                {[1, 2, 3, 4, 5].map(lvl => (
-                  <button 
-                    key={lvl} 
-                    className={`level-btn ${perms.level === lvl ? 'active' : ''}`}
-                    onClick={() => handleLevelChange(lvl)}
-                  >
-                    {lvl}
-                  </button>
+          <div className="perm-card">
+            <div className="data-header">
+              <h4>เมนู/โมดูลที่เข้าถึงได้</h4>
+              <span className="info-text">
+                <Info size={13} strokeWidth={2} />
+                อ่านอย่างเดียว — ดึงตรงจาก PAGE_PERMISSIONS ในโค้ด ซึ่งเป็นจุดเดียวที่ระบบใช้จริงในการ
+                เปิด/ปิดสิทธิ์เข้าหน้าต่างๆ (ทั้งฝั่งเมนูและฝั่งกันเส้นทาง) จึงตรงกับสิทธิ์จริงเสมอ ไม่มีทางเพี้ยน
+              </span>
+            </div>
+            {pagesForRole.length === 0 ? (
+              <p style={{ color: 'var(--text-color)', opacity: 0.6, fontSize: 13 }}>ตำแหน่งนี้ยังไม่มีเมนูที่กำหนดสิทธิ์ไว้</p>
+            ) : (
+              <div className="page-access-grid">
+                {pagesForRole.map((pageId) => (
+                  <div key={pageId} className="page-access-chip">
+                    {PAGE_TITLES[pageId] || pageId}
+                  </div>
                 ))}
               </div>
-
-              <div className="level-badge">
-                <span className="lvl-text">Current Level</span>
-                <span className="lvl-num">{perms.level}</span>
-                <span className="lvl-desc">
-                  {perms.level === 5 ? 'Admin (Full Access)' :
-                   perms.level === 4 ? 'Doctor (High Privileges)' :
-                   perms.level === 3 ? 'Nurse/Pharm (Medium Privileges)' :
-                   perms.level === 2 ? 'Staff (Basic Privileges)' : 'Restricted (View Only)'}
-                </span>
-              </div>
-              
-              {activeUser.status === 'รอการยืนยัน' ? (
-                 <div className="level-warning" style={{display: 'flex', alignItems: 'flex-start', gap: '8px', backgroundColor: '#ECFDF5', borderColor: '#A7F3D0', color: '#15803D'}}>
-                   <Info size={16} strokeWidth={2} style={{flexShrink: 0, marginTop: '2px'}} />
-                   <span><strong>บัญชีใหม่:</strong> กรุณาเลือกระดับ Level ที่เหมาะสม (ระบบแนะนำ Level {recommendedLvl}) แล้วกดบันทึกเพื่อเปิดใช้งาน</span>
-                 </div>
-              ) : isLevelTooLow ? (
-                <div className="level-warning low-warning" style={{display: 'flex', alignItems: 'flex-start', gap: '8px'}}>
-                  <AlertTriangle size={16} strokeWidth={2} style={{flexShrink: 0, marginTop: '2px'}} />
-                  <span><strong>สิทธิ์ต่ำเกินไป:</strong> ระดับสิทธิ์ Level {perms.level} อาจไม่เพียงพอต่อการทำงานของ <strong>"{activeUser.role}"</strong> (แนะนำ Level {recommendedLvl})</span>
-                </div>
-              ) : isLevelTooHigh ? (
-                <div className="level-warning high-warning" style={{display: 'flex', alignItems: 'flex-start', gap: '8px'}}>
-                  <ShieldAlert size={16} strokeWidth={2} style={{flexShrink: 0, marginTop: '2px'}} />
-                  <span><strong>เสี่ยงความปลอดภัย:</strong> การให้สิทธิ์ Level {perms.level} กับ <strong>"{activeUser.role}"</strong> สูงเกินความจำเป็นและอาจขัดต่อนโยบาย (แนะนำ Level {recommendedLvl})</span>
-                </div>
-              ) : (
-                <p>ระดับสิทธิ์นี้เหมาะสมกับตำแหน่งงานแล้ว (สามารถปรับแต่งรายข้อได้ที่ตารางด้านล่าง)</p>
-              )}
-            </div>
-
-            <div className="perm-card menu-access">
-              <h4>
-                สิทธิ์การเข้าถึงเมนูระบบ
-                <span className="wip-badge" title={WIP_TOOLTIP}><Wrench size={10} strokeWidth={2.5} /> อยู่ระหว่างพัฒนา</span>
-              </h4>
-              <div className="checkbox-grid">
-                <label><input type="checkbox" checked={perms.menus.dashboard} onChange={() => toggleMenu('dashboard')} disabled title={WIP_TOOLTIP} /> แดชบอร์ดสรุปผล</label>
-                <label><input type="checkbox" checked={perms.menus.appointment} onChange={() => toggleMenu('appointment')} disabled title={WIP_TOOLTIP} /> จัดการคิวและนัดหมาย</label>
-                <label><input type="checkbox" checked={perms.menus.pharmacy} onChange={() => toggleMenu('pharmacy')} disabled title={WIP_TOOLTIP} /> ระบบห้องยา (สั่งยา)</label>
-                <label><input type="checkbox" checked={perms.menus.stock} onChange={() => toggleMenu('stock')} disabled title={WIP_TOOLTIP} /> สต็อกเวชภัณฑ์</label>
-                <label><input type="checkbox" checked={perms.menus.finance} onChange={() => toggleMenu('finance')} disabled title={WIP_TOOLTIP} /> รายงานการเงิน / ชำระเงิน</label>
-                <label><input type="checkbox" checked={perms.menus.security} onChange={() => toggleMenu('security')} disabled title={WIP_TOOLTIP} /> การตั้งค่าระบบจัดการสิทธิ์</label>
-              </div>
-            </div>
-
+            )}
           </div>
 
-          <div className="perm-card data-access">
+          <div className="perm-card">
             <div className="data-header">
-              <h4>
-                สิทธิ์การจัดการฐานข้อมูลเชิงลึก
-                <span className="wip-badge" title={WIP_TOOLTIP}><Wrench size={10} strokeWidth={2.5} /> อยู่ระหว่างพัฒนา</span>
-              </h4>
-              <span className="info-text">ข้อมูลอัปเดตอัตโนมัติตาม Level ที่เลือก</span>
+              <h4>บัญชีที่ใช้ตำแหน่งนี้ ({usersInRole.length})</h4>
             </div>
-            <table className="perm-table">
-              <thead>
-                <tr>
-                  <th>หมวดหมู่ข้อมูล</th>
-                  <th>ดูข้อมูล<br/>(Read)</th>
-                  <th>แก้ไข<br/>(Write)</th>
-                  <th>ลบ<br/>(Delete)</th>
-                  <th>ส่งออก<br/>(Export)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>
-                    <strong>ประวัติสุขภาพผู้ป่วย (EMR)</strong>
-                    <p>ข้อมูลโรคประจำตัว การแพ้ยา ผลตรวจ Lab</p>
-                  </td>
-                  <td><input type="checkbox" checked={perms.data.emr.read} onChange={() => toggleData('emr', 'read')} disabled title={WIP_TOOLTIP} /></td>
-                  <td><input type="checkbox" checked={perms.data.emr.write} onChange={() => toggleData('emr', 'write')} disabled title={WIP_TOOLTIP} /></td>
-                  <td><input type="checkbox" checked={perms.data.emr.del} onChange={() => toggleData('emr', 'del')} disabled title={WIP_TOOLTIP} /></td>
-                  <td><input type="checkbox" checked={perms.data.emr.export} onChange={() => toggleData('emr', 'export')} disabled title={WIP_TOOLTIP} /></td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>ข้อมูลบุคลากรและค่าตอบแทน</strong>
-                    <p>เงินเดือน ข้อมูลส่วนตัว และวันลาพักร้อน</p>
-                  </td>
-                  <td><input type="checkbox" checked={perms.data.hr.read} onChange={() => toggleData('hr', 'read')} disabled title={WIP_TOOLTIP} /></td>
-                  <td><input type="checkbox" checked={perms.data.hr.write} onChange={() => toggleData('hr', 'write')} disabled title={WIP_TOOLTIP} /></td>
-                  <td><input type="checkbox" checked={perms.data.hr.del} onChange={() => toggleData('hr', 'del')} disabled title={WIP_TOOLTIP} /></td>
-                  <td><input type="checkbox" checked={perms.data.hr.export} onChange={() => toggleData('hr', 'export')} disabled title={WIP_TOOLTIP} /></td>
-                </tr>
-                <tr>
-                  <td>
-                    <strong>รายการสต็อกยาและเวชภัณฑ์</strong>
-                    <p>การเบิกจ่าย ล็อตการผลิต และวันหมดอายุ</p>
-                  </td>
-                  <td><input type="checkbox" checked={perms.data.inventory.read} onChange={() => toggleData('inventory', 'read')} disabled title={WIP_TOOLTIP} /></td>
-                  <td><input type="checkbox" checked={perms.data.inventory.write} onChange={() => toggleData('inventory', 'write')} disabled title={WIP_TOOLTIP} /></td>
-                  <td><input type="checkbox" checked={perms.data.inventory.del} onChange={() => toggleData('inventory', 'del')} disabled title={WIP_TOOLTIP} /></td>
-                  <td><input type="checkbox" checked={perms.data.inventory.export} onChange={() => toggleData('inventory', 'export')} disabled title={WIP_TOOLTIP} /></td>
-                </tr>
-              </tbody>
-            </table>
+            {loading ? (
+              <div className="ga-loading-state">
+                <span className="ga-spinner" />
+                <span>กำลังโหลดรายชื่อบุคลากร...</span>
+              </div>
+            ) : usersInRole.length === 0 ? (
+              <p style={{ color: 'var(--text-color)', opacity: 0.6, fontSize: 13 }}>ยังไม่มีบัญชีที่ใช้ตำแหน่งนี้</p>
+            ) : (
+              <div className="personnel-list" style={{ marginBottom: 0 }}>
+                {usersInRole.map((u) => (
+                  <div key={u.internalId} className="personnel-item" style={{ cursor: 'default' }}>
+                    <div className="avatar" style={{ backgroundColor: u.avatar }}>
+                      {u.name.split(' ')[1]?.charAt(0) || u.name.charAt(0)}
+                    </div>
+                    <div className="info">
+                      <div className="name">
+                        {u.name}
+                        {u.status === 'กำลังใช้งาน' ? (
+                          <span className="status-dot green" title="กำลังใช้งาน" />
+                        ) : u.status === 'ระงับใช้งาน' ? (
+                          <span className="status-dot red" title="ระงับใช้งาน" />
+                        ) : (
+                          <span className="status-dot orange" title="รอการยืนยันสิทธิ์" />
+                        )}
+                      </div>
+                      <div className="role">{u.id}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-
         </div>
       </div>
     </div>
