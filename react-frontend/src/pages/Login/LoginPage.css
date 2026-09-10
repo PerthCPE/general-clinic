@@ -1,4 +1,6 @@
-/* ===== Login Page ===== */
+/* ===== Login Page =====
+   ใช้ตัวแปรสี/ฟอนต์ตามมาตรฐานทีม (frontend.md หมวด 2-3) ผ่าน CSS custom properties
+   ที่ประกาศไว้ที่ index.css:root — --bg-canvas / --bg-card / --border-color / --text-* */
 .login-container {
   min-height: 100vh;
   display: flex;
@@ -13,11 +15,11 @@
 .login-box {
   max-width: 440px; /* narrowed down to make it look professional */
   width: 100%;
-  background: #FFFFFF;
+  background: var(--bg-card);
   border-radius: 20px;
   padding: 40px 36px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--border-color);
   transition: background-color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
 }
 
@@ -50,7 +52,7 @@
   font-family: var(--font-heading);
   font-size: 16px;
   font-weight: 500;
-  color: #475569;
+  color: var(--text-secondary);
   margin: 0;
 }
 
@@ -82,7 +84,7 @@
   font-family: var(--font-primary);
   font-size: 14px;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-secondary);
 }
 
 .password-input-wrapper {
@@ -95,12 +97,14 @@
   width: 100%;
   height: 48px;
   padding: 0 14px;
-  border: 1.5px solid #CBD5E1;
+  border: 1.5px solid var(--border-color);
   border-radius: 10px;
   font-family: var(--font-primary);
   font-size: 15px;
-  color: #1E293B;
-  background: #FFFFFF;
+  color: var(--text-primary);
+  /* ใช้ bg-canvas (ไม่ใช่ bg-card) ให้ช่องกรอกดู "จมลง" กว่าพื้นการ์ด สร้างมิติความลึกแบบ
+     Elevated Dark Slate ตามกฎข้อ 2 ของ TEAM_RULES.md */
+  background: var(--bg-canvas);
   outline: none;
   box-sizing: border-box;
   transition: all 0.2s ease;
@@ -111,7 +115,7 @@
 }
 
 .login-form-input:focus {
-  border-color: #2563EB;
+  border-color: var(--border-focus);
   box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
 }
 
@@ -192,35 +196,17 @@
   to { transform: rotate(360deg); }
 }
 
-/* ===== Dark Mode ===== */
+/* ===== Dark Mode =====
+   .login-box / .login-tagline / .login-form-label / .login-form-input ไม่ต้อง override ซ้ำ
+   ที่นี่แล้ว — ใช้ var(--bg-card) / var(--border-color) / var(--text-*) ที่ประกาศไว้แล้วด้านบน
+   ซึ่งสลับค่าตาม body.dark-mode อัตโนมัติจาก index.css:root */
 body.dark-mode .login-container {
-  background: linear-gradient(135deg, #0B0F19 0%, #121212 100%);
-}
-
-body.dark-mode .login-box {
-  background: #1E1E1E;
-  border-color: #2D2D2D;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-}
-
-body.dark-mode .login-tagline {
-  color: #CBD5E1;
-}
-
-body.dark-mode .login-form-label, 
-body.dark-mode .login-input-group label {
-  color: #E2E8F0;
-}
-
-body.dark-mode .login-form-input {
-  background: #272727;
-  border-color: #3A3A3A;
-  color: #E2E8F0;
+  background: linear-gradient(135deg, #0B0F19 0%, #0F172A 100%);
 }
 
 body.dark-mode .login-form-input:disabled {
-  background: #1A1A1A;
-  color: #64748B;
+  background: #1A2233;
+  color: var(--text-muted);
 }
 
 body.dark-mode .password-toggle-btn {
@@ -278,100 +264,8 @@ body.dark-mode .test-login-btn:hover {
   color: #F8FAFC;
 }
 
-
-/* Dark Mode Overrides */
-body.dark-mode .um-container,
-body.dark-mode .ga-container,
-body.dark-mode .appt-dash-container,
-body.dark-mode .appt-form-container,
-body.dark-mode .login-container {
-  background-color: #0f172a !important;
-  color: #f8fafc !important;
-}
-
-body.dark-mode .um-table-card,
-body.dark-mode .ga-content,
-body.dark-mode .ga-sidebar,
-body.dark-mode .appt-summary-cards .summary-card,
-body.dark-mode .table-card,
-body.dark-mode .appt-form-card,
-body.dark-mode .login-box,
-body.dark-mode .user-info-card,
-body.dark-mode .um-modal {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
-  color: #f1f5f9 !important;
-}
-
-body.dark-mode .dash-title,
-body.dark-mode .um-title,
-body.dark-mode .form-title,
-body.dark-mode .login-header h2,
-body.dark-mode h1, body.dark-mode h2, body.dark-mode h3 {
-  color: #f8fafc !important;
-}
-
-body.dark-mode .dash-subtitle,
-body.dark-mode .um-subtitle,
-body.dark-mode .form-subtitle,
-body.dark-mode .login-tagline,
-body.dark-mode p {
-  color: #94a3b8 !important;
-}
-
-body.dark-mode table th,
-body.dark-mode .dash-table th,
-body.dark-mode .um-table th,
-body.dark-mode .matrix-table th {
-  background-color: #334155 !important;
-  color: #f1f5f9 !important;
-  border-bottom: 1px solid #475569 !important;
-}
-
-body.dark-mode table td,
-body.dark-mode .dash-table td,
-body.dark-mode .um-table td,
-body.dark-mode .matrix-table td {
-  border-bottom: 1px solid #334155 !important;
-  color: #e2e8f0 !important;
-}
-
-body.dark-mode .matrix-table tr.bg-gray-100 td {
-  background-color: #0f172a !important;
-  color: #e2e8f0 !important;
-}
-
-body.dark-mode input,
-body.dark-mode select,
-body.dark-mode textarea,
-body.dark-mode .form-input,
-body.dark-mode .login-form-input,
-body.dark-mode .ga-search input,
-body.dark-mode .um-search input {
-  background-color: #0f172a !important;
-  border-color: #475569 !important;
-  color: #f8fafc !important;
-}
-
-body.dark-mode .ga-user-item {
-  border-color: #334155 !important;
-}
-body.dark-mode .ga-user-item:hover,
-body.dark-mode .ga-user-item.active {
-  background-color: #334155 !important;
-}
-
-body.dark-mode .qf-btn {
-  background-color: #1e293b !important;
-  border-color: #334155 !important;
-  color: #cbd5e1 !important;
-}
-body.dark-mode .qf-btn.active {
-  background-color: #3b82f6 !important;
-  color: #fff !important;
-}
-
-body.dark-mode .status-badge {
-  background-color: #334155 !important;
+/* หัวข้อ "เปลี่ยนรหัสผ่านครั้งแรก" (change-password-box) */
+body.dark-mode .login-header h2 {
+  color: var(--text-primary);
 }
 

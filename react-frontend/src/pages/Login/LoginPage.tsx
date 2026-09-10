@@ -80,7 +80,7 @@ const LoginPage: React.FC = () => {
       <div className="login-container">
         <div className="login-box change-password-box">
           <div className="login-header">
-            <h2 style={{marginTop: 0, color: '#1E293B', fontFamily: 'Prompt'}}>เปลี่ยนรหัสผ่านครั้งแรก</h2>
+            <h2 style={{marginTop: 0, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)'}}>เปลี่ยนรหัสผ่านครั้งแรก</h2>
             <p className="login-tagline">เนื่องจากคุณเข้าใช้งานระบบเป็นครั้งแรก กรุณาตั้งรหัสผ่านใหม่เพื่อความปลอดภัยของข้อมูล</p>
           </div>
           <form className="login-form" onSubmit={handleChangePassword}>
