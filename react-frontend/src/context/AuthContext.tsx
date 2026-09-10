@@ -3,7 +3,7 @@ import type { User, UserRole } from '../types/auth';
 import { DEMO_USERS, ROLE_DEFAULT_PAGES, PAGE_PERMISSIONS } from '../config/roles';
 
 // โค้ดส่วนของเพื่อน (ระบบเชื่อม Backend)
-import { authApi } from '../services/api';
+import { authApi, ApiRequestError } from '../services/api';
 
 // โค้ดส่วนของคุณ (ระบบคิวและนัดหมาย)
 export interface PatientQueueItem {
@@ -23,7 +23,7 @@ export interface PatientQueueItem {
 interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
-  login: (roleOrUsername: string, password?: string) => Promise<{ success: boolean; requiresPasswordChange?: boolean }>;
+  login: (roleOrUsername: string, password?: string) => Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }>;
   switchRole: (role: UserRole) => Promise<void>;
   logout: () => void;
   hasAccess: (pageId: string) => boolean;
@@ -149,7 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [currentUser]);
 
   // ของเพื่อน: ระบบล็อกอิน
-  const login = async (roleOrUsername: string, password?: string): Promise<{ success: boolean; requiresPasswordChange?: boolean }> => {
+  const login = async (roleOrUsername: string, password?: string): Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }> => {
     try {
       let usernameToSend = roleOrUsername;
       if (roleOrUsername === 'registrar') usernameToSend = 'registrar1';
@@ -188,7 +188,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: true, requiresPasswordChange: res.requires_password_change };
       }
     } catch (err) {
-      console.warn('Backend login error, checking fallback:', err);
+      // สำคัญ: ต้องแยกให้ออกว่า backend "ปฏิเสธ login จริง" (มี HTTP response กลับมา เช่น 401
+      // รหัสผ่านผิด หรือ 403 บัญชีถูกระงับ) กับ backend "ติดต่อไม่ได้เลย" (เน็ตหลุด/server ล่ม)
+      // เดิมโค้ดนี้ catch แล้ว fallback ไป local demo login (ด้านล่าง) ทุกกรณีแบบไม่แยก — พอ
+      // backend ปฏิเสธ login ที่ถูกต้องแล้ว (เช่น บัญชีถูกระงับ) โค้ดกลับไป match DEMO_USERS ด้วย
+      // username เดิม แล้ว setCurrentUser() ให้ "สำเร็จ" แบบปลอมๆ ทั้งที่ไม่เคยได้ token จริง
+      // จาก backend เลย พอหน้าถัดไปเรียก API ใดๆ ก็เจอ "ไม่มี token" แล้ว reload กลับไปหน้า login
+      // ทันที (ถูกต้องแล้วตามเงื่อนไข 401) — แต่ผลลัพธ์ที่ผู้ใช้เห็นคือ login ดูเหมือนสำเร็จแวบเดียว
+      // แล้วจอกระพริบรีโหลดวนซ้ำทุกครั้งที่ลอง เพราะ fake login ใหม่ทุกรอบไม่เคยมี token จริงสักที
+      //
+      // ฉะนั้นถ้า backend ตอบกลับมาจริง (ApiRequestError มี status) ให้เชื่อคำตอบนั้นตรงๆ
+      // ไม่ fallback ไป local demo เด็ดขาด — คืน failure พร้อม error message จริงจาก backend
+      // (เช่น "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ") ให้ผู้ใช้เห็นเฉยๆ ไม่มี reload
+      if (err instanceof ApiRequestError) {
+        console.warn('Backend rejected login (not falling back to local demo):', err.message);
+        return { success: false, error: err.message };
+      }
+      // เคสนี้เหลือแค่ backend ติดต่อไม่ได้จริงๆ (network error) — fallback ไป local demo ต่อได้
+      console.warn('Backend unreachable, checking local fallback:', err);
     }
 
     let matchedUser: User | undefined;
@@ -243,18 +260,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       officer: { username: 'officer1', password: 'OFF001' },
     };
     const cred = credentials[role];
+    if (!cred) return;
 
     try {
-      if (cred) {
-        await authApi.login(cred.username, cred.password);
+      const res = await authApi.login(cred.username, cred.password);
+      // ตั้ง currentUser เฉพาะตอนที่ backend login สำเร็จจริง (ได้ token จริงกลับมา) เท่านั้น
+      // เดิมโค้ดนี้ตั้ง currentUser แบบ fake เสมอไม่ว่า login จะสำเร็จหรือไม่ (catch แล้วเงียบ)
+      // ถ้า backend ปฏิเสธ (เช่นบัญชีถูกระงับ) จะได้ currentUser ที่ไม่มี token จริงรองรับ —
+      // พอเรียก API ถัดไปจะชน "ไม่มี token" แล้ว reload กลับไปหน้า login ทันที (บั๊กเดียวกับที่
+      // เจอใน login() ด้านบน — ดูคอมเมนต์ตรงนั้นสำหรับรายละเอียดเต็ม)
+      if (res && res.user) {
+        setCurrentUser(DEMO_USERS[role]);
       }
-    } catch {
-      // ignore
-    }
-
-    const targetUser = DEMO_USERS[role];
-    if (targetUser) {
-      setCurrentUser(targetUser);
+    } catch (err) {
+      console.warn('switchRole: login failed, not switching role:', err);
     }
   };
 

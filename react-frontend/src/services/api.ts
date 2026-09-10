@@ -41,6 +41,21 @@ export const tokenStorage = {
   },
 };
 
+// ใช้แยกให้ชัดว่า error นี้คือ "backend ตอบกลับมาจริง (มี HTTP status)" ต่างจาก network error
+// ทั่วไป (fetch เอง reject ก่อนได้ response เช่น เน็ตหลุด/backend ล่ม) — สำคัญมากตอน caller
+// ต้องตัดสินใจว่าจะ fallback ไป local demo หรือไม่ (ดู AuthContext.login สำหรับตัวอย่างบั๊กจริง
+// ที่เคยเกิดจากไม่แยกสองเคสนี้: backend reject login ถูกต้องแล้ว (403 บัญชีถูกระงับ) แต่โค้ด
+// เดิม catch แล้ว fallback ไป local demo login แบบ fake สำเร็จ ทั้งที่ไม่มี token จริง — พอ
+// component ถัดไปเรียก API ก็ชน "ไม่มี token" แล้ว reload วนซ้ำ ดูเหมือน infinite loop ตอน 403)
+export class ApiRequestError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+  }
+}
+
 // เดิมจุดนี้เคยมี ensureToken() ที่ "เดา" username ตาม role ที่แคชไว้แล้วยิง login เงียบๆ
 // ด้วย password: 'password' ทุกครั้งที่ไม่มี token หรือเจอ 401 — ใช้ได้เฉพาะตอนทุกบัญชี seed
 // ใช้รหัสผ่านร่วมกันเป็น "password" เท่านั้น พอเปลี่ยนไปใช้ employee_id เป็นรหัสผ่านเริ่มต้น
@@ -68,7 +83,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     // ไม่มี token เลย (ยังไม่เคย login หรือ session หมดไปแล้ว) และนี่ไม่ใช่การเรียก login เอง
     // ส่งกลับไปหน้า login ทันที ไม่เดา credential มาลองยิงเงียบๆ แบบเดิม
     forceReLogin();
-    throw new Error('ไม่พบ session กำลังพากลับไปหน้าเข้าสู่ระบบ');
+    throw new ApiRequestError('ไม่พบ session กำลังพากลับไปหน้าเข้าสู่ระบบ', 401);
   }
 
   const headers: Record<string, string> = {
@@ -90,14 +105,14 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     // Token หมดอายุ/ไม่ถูกต้อง — เคลียร์แล้วส่งกลับไปหน้า login ทันที (ไม่เดา credential
     // มาลองใหม่เงียบๆ อีกต่อไป — ดูคอมเมนต์ข้างบน forceReLogin)
     forceReLogin();
-    throw new Error('เซสชันหมดอายุ กำลังพากลับไปหน้าเข้าสู่ระบบ');
+    throw new ApiRequestError('เซสชันหมดอายุ กำลังพากลับไปหน้าเข้าสู่ระบบ', 401);
   }
 
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
     const errorMsg = data?.error || data?.message || `Request failed with status ${response.status}`;
-    throw new Error(errorMsg);
+    throw new ApiRequestError(errorMsg, response.status);
   }
 
   return data as T;
