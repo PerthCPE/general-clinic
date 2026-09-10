@@ -393,13 +393,27 @@ func seedDatabase() {
 			// ไม่แตะ Password ตรงนี้โดยเจตนา — ถ้าเจ้าของบัญชีเคยเปลี่ยนรหัสผ่านจริงไปแล้ว
 			// (ผ่าน RequiresPasswordChange flow ครั้งแรก) ห้าม restart แล้วรีเซ็ตทับรหัสผ่านจริง
 			// กลับไปเป็นค่าเริ่มต้นอีก
-			DB.Model(&existing).Updates(map[string]interface{}{
+			updates := map[string]interface{}{
 				"full_name":   users[i].FullName,
 				"role":        users[i].Role,
 				"phone":       users[i].Phone,
 				"email":       users[i].Email,
 				"employee_id": users[i].EmployeeID,
-			})
+			}
+
+			// migration ครั้งเดียว: ตอนเปลี่ยนมาใช้ employee_id เป็นรหัสผ่านเริ่มต้น (feature นี้)
+			// ไม่เคยมี script รีเซ็ตรหัสผ่านบัญชี seed เดิมที่ถูกสร้างไว้ก่อนหน้า (ยุคที่ทุกบัญชี
+			// ใช้รหัสผ่านร่วมกันเป็น "password") ผลคือบัญชี seed ทั้ง 10 บัญชียัง hash เป็น
+			// "password" ค้างอยู่จริง ไม่ใช่ employee_id ตามที่ Login()/เอกสารคาดไว้ — ทำให้
+			// normal login ล้มเหลวทุกบัญชีพร้อมกัน (พบระหว่างสำรวจบั๊กนี้) จุดนี้ backfill ให้
+			// เฉพาะบัญชีที่ยัง "password" (ของเก่าที่ยังไม่เคยถูกเปลี่ยน) เท่านั้น — บัญชีที่เจ้าของ
+			// เคยเปลี่ยนรหัสผ่านจริงไปแล้วจะไม่ match "password" อีกต่อไป จึงไม่ถูกแตะ ปลอดภัยเหมือนเดิม
+			if bcrypt.CompareHashAndPassword([]byte(existing.Password), []byte("password")) == nil {
+				updates["password"] = users[i].Password
+				log.Printf("Migrated legacy default password -> employee_id for seed account %q", users[i].Username)
+			}
+
+			DB.Model(&existing).Updates(updates)
 		}
 	}
 	log.Println("Users & Doctors verified, updated and seeded successfully.")
