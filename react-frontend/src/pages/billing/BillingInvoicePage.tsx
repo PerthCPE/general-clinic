@@ -627,11 +627,6 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
     window.print();
   };
 
-  const handleSendDigitalReceipt = () => {
-    setReceiptSent('ส่งใบเสร็จดิจิทัลไปยัง SMS/Email ของผู้ป่วยเรียบร้อยแล้ว');
-    setTimeout(() => setReceiptSent(null), 3000);
-  };
-
   if (loading) {
     return <BillingInvoiceSkeleton />;
   }
@@ -1277,18 +1272,6 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                           <rect x="6" y="14" width="12" height="8"></rect>
                         </svg>
                         ดาวน์โหลด / พิมพ์ใบเสร็จ (PDF)
-                      </button>
-                      <button 
-                        type="button"
-                        className="receipt-btn digital-btn" 
-                        onClick={handleSendDigitalReceipt}
-                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                      >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                          <polyline points="22,6 12,13 2,6"></polyline>
-                        </svg>
-                        ส่งใบเสร็จดิจิทัล (SMS/Email)
                       </button>
                       {onNavigateToDashboard && (
                         <button 
