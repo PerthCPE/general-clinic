@@ -180,14 +180,14 @@ const LoginPage: React.FC = () => {
       <div className="test-login-box">
         <h4 style={{margin: '0 0 10px 0', fontSize: '13px', color: '#64748B'}}>Quick Test Login</h4>
         <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center'}}>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('doctor1'); setPassword('password');}}>Doctor</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('nurse1'); setPassword('password');}}>Nurse</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('assistant1'); setPassword('password');}}>Nurse Assistant</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('registrar1'); setPassword('password');}}>Reception / Admin</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('pharmacist1'); setPassword('password');}}>Pharmacist</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('cashier1'); setPassword('password');}}>Cashier</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('officer1'); setPassword('password');}}>Officer</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('admin1'); setPassword('password');}}>IT-admin</button>
+          <button type="button" className="test-login-btn" onClick={() => {setUsername('DOC001'); setPassword('DOC001');}}>Doctor</button>
+          <button type="button" className="test-login-btn" onClick={() => {setUsername('NUR001'); setPassword('NUR001');}}>Nurse</button>
+          <button type="button" className="test-login-btn" onClick={() => {setUsername('NUR002'); setPassword('NUR002');}}>Nurse Assistant</button>
+          <button type="button" className="test-login-btn" onClick={() => {setUsername('REC001'); setPassword('REC001');}}>Reception / Admin</button>
+          <button type="button" className="test-login-btn" onClick={() => {setUsername('PHA001'); setPassword('PHA001');}}>Pharmacist</button>
+          <button type="button" className="test-login-btn" onClick={() => {setUsername('CAS001'); setPassword('CAS001');}}>Cashier</button>
+          <button type="button" className="test-login-btn" onClick={() => {setUsername('OFF001'); setPassword('OFF001');}}>Officer</button>
+          <button type="button" className="test-login-btn" onClick={() => {setUsername('ADM001'); setPassword('ADM001');}}>IT-admin</button>
         </div>
       </div>
     </div>
