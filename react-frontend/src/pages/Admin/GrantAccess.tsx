@@ -183,10 +183,10 @@ const GrantAccess: React.FC = () => {
     }
     
     try {
-      await adminApi.createSystemAccess({
+      // ใช้ bulkUpdate เพื่อ DELETE ค่าเก่าก่อน INSERT ใหม่ — ไม่ให้มีข้อมูลซ้ำ
+      await adminApi.bulkUpdateSystemAccess({
         user_id: activeUser.internalId,
-        access_level: perms.level,
-        module_name: 'All'
+        accesses: [{ module_name: 'All', access_level: perms.level }]
       });
       if (activeUser.status === 'รอการยืนยัน') {
         await adminApi.updateAccountStatus(activeUser.internalId, 'active');
@@ -194,7 +194,7 @@ const GrantAccess: React.FC = () => {
       alert(`✅ บันทึกสิทธิ์ของ "${activeUser.name}" สำเร็จ! (Level ${perms.level})`);
       fetchUsers();
     } catch (err: any) {
-      alert("Error: " + err.message);
+      alert("เกิดข้อผิดพลาด: " + err.message);
     }
   };
 

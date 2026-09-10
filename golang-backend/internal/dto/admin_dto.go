@@ -2,12 +2,13 @@ package dto
 
 // DTO สำหรับการสร้าง Account ใหม่ (User)
 type CreateAccountRequest struct {
-	Username   string `json:"username" binding:"required"`
-	Password   string `json:"password" binding:"required"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
 	Role       string `json:"role" binding:"required"`
-	FullName   string `json:"fullname" binding:"required"`
-	EmployeeID string `json:"employee_id" binding:"required"`
+	FullName   string `json:"fullname"`
+	EmployeeID string `json:"employee_id"`
 	Phone      string `json:"phone"`
+	Department string `json:"department"`
 }
 
 type UpdateAccountStatusRequest struct {

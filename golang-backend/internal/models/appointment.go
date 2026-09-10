@@ -7,7 +7,7 @@ type Appointment struct {
 	ID              uint      `gorm:"primaryKey" json:"id"` // appointmentID
 	DoctorID        uint      `gorm:"not null" json:"doctor_id"`
 	PatientID       uint      `gorm:"not null" json:"patient_id"`
-	RegisterID      uint      `gorm:"not null" json:"register_id"` // ผูกกับ User ที่เป็น Registrar
+	RegisterID      *uint     `json:"register_id"` // User ที่รับนัด Registrar (optional)
 	AppointmentDate string    `gorm:"type:date;not null" json:"appointment_date"`
 	AppointmentTime string    `gorm:"type:time;not null" json:"appointment_time"`
 	Status          string    `gorm:"default:'scheduled'" json:"status"`

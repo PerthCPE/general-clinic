@@ -1,12 +1,9 @@
 package routes
 
 import (
-	"net/http"
-
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/controllers"
 	"clinic-backend/internal/middleware"
-	"clinic-backend/internal/models"
 	"clinic-backend/internal/ws"
 
 	"github.com/gin-gonic/gin"
@@ -20,11 +17,12 @@ func SetUpRoutes(r *gin.Engine) {
 	// WebSocket Endpoint สำหรับ Real-time Sync
 	r.GET("/ws", ws.ServeWS)
 
-	// ส่งข้อมูลเพื่อ login และเช็ค role
-	r.POST("/login", controllers.Login)
-
 	// create group for inherit
-	api := r.Group("api")
+	api := r.Group("/api")
+
+	// ส่งข้อมูลเพื่อ login และเช็ค role
+	api.POST("/login", controllers.Login)
+
 	// check jwt bearer token และแจก role
 	api.Use(middleware.AuthRequired())
 
@@ -166,20 +164,29 @@ func SetUpRoutes(r *gin.Engine) {
 	}
 
 	// ===== 5. Admin Module =====
+	adminCtrl := controllers.NewAdminController(config.DB)
 	adminRoutes := api.Group("/admin")
 	adminRoutes.Use(middleware.RoleRequired("admin"))
 	{
-		adminRoutes.GET("/users", func(c *gin.Context) {
-			var users []models.User
-			if err := config.DB.Find(&users).Error; err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
-				return
-			}
-			c.JSON(http.StatusOK, gin.H{"users": users})
-		})
+		adminRoutes.GET("/users", adminCtrl.GetAccounts)
+		adminRoutes.POST("/users", adminCtrl.CreateAccount)
+		adminRoutes.PUT("/users/:id/status", adminCtrl.UpdateAccountStatus)
+		adminRoutes.POST("/system-access", adminCtrl.CreateSystemAccess)
+		adminRoutes.POST("/system-access/bulk", adminCtrl.BulkUpdateSystemAccess)
 	}
 
-	// ===== 5. System Utilities (Reset Database for Testing) =====
+	// ===== 6. Appointments Module =====
+	apptCtrl := controllers.NewAppointmentController(config.DB)
+	apptRoutes := api.Group("/appointments")
+	apptRoutes.Use(middleware.RoleRequired("doctor", "admin", "nurse"))
+	{
+		apptRoutes.GET("", apptCtrl.GetAppointments)
+		apptRoutes.POST("", apptCtrl.CreateAppointment)
+		apptRoutes.PUT("/:id/status", apptCtrl.UpdateAppointmentStatus)
+		apptRoutes.PUT("/:id/schedule", apptCtrl.UpdateAppointmentSchedule)
+	}
+
+	// ===== 7. System Utilities (Reset Database for Testing) =====
 	// Expose without auth so tests don't fail with 401 Unauthorized
 	systemRoutes := r.Group("/api/system")
 	{

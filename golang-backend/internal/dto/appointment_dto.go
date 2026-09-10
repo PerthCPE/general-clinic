@@ -4,7 +4,7 @@ package dto
 type CreateAppointmentRequest struct {
 	DoctorID        uint   `json:"doctor_id" binding:"required"`
 	PatientID       uint   `json:"patient_id" binding:"required"`
-	RegisterID      uint   `json:"register_id" binding:"required"` // พนักงานรับนัด
+	RegisterID      uint   `json:"register_id"` // พนักงานรับนัด
 	AppointmentDate string `json:"appointment_date" binding:"required"`
 	AppointmentTime string `json:"appointment_time" binding:"required"`
 	ClinicalNote    string `json:"clinical_note"`

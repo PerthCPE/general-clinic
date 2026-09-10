@@ -40,11 +40,13 @@ func (ctrl *AppointmentController) CreateAppointment(c *gin.Context) {
 	appointment := models.Appointment{
 		DoctorID:        req.DoctorID,
 		PatientID:       req.PatientID,
-		RegisterID:      req.RegisterID,
 		AppointmentDate: req.AppointmentDate,
 		AppointmentTime: req.AppointmentTime,
 		ClinicalNote:    req.ClinicalNote,
-		Status:          "scheduled", // ค่าเริ่มต้น
+		Status:          "scheduled",
+	}
+	if req.RegisterID != 0 {
+		appointment.RegisterID = &req.RegisterID
 	}
 
 	if err := ctrl.DB.Create(&appointment).Error; err != nil {

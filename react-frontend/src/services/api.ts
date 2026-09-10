@@ -25,7 +25,7 @@
 //      grep -c "dmsApi\|pharmacyApi\|billingApi\|doctorApi" src/services/api.ts
 //   4. ถ้าขนาดไฟล์ "เล็กลง" หลังแก้ ให้สงสัยไว้ก่อนว่าลบของคนอื่นไปแล้ว
 // ==============================================================================
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const TOKEN_KEY = 'clinic_auth_token';
 
@@ -61,7 +61,7 @@ async function ensureToken(): Promise<string | null> {
           // ignore
         }
       }
-      const res = await fetch(`${API_BASE_URL}/login`, {
+      const res = await fetch(`${API_BASE_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password: 'password' }),
@@ -81,7 +81,7 @@ async function ensureToken(): Promise<string | null> {
 // Generic HTTP Request Handler
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   let token = tokenStorage.get();
-  if (!token && endpoint !== '/login') {
+  if (!token && endpoint !== '/api/login') {
     token = await ensureToken();
   }
 
@@ -101,7 +101,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   // If 401 Unauthorized, try refreshing token once
-  if (response.status === 401 && endpoint !== '/login') {
+  if (response.status === 401 && endpoint !== '/api/login') {
     tokenStorage.remove();
     token = await ensureToken();
     if (token) {
@@ -137,7 +137,7 @@ export const authApi = {
         role: string;
         phone: string;
       };
-    }>('/login', {
+    }>('/api/login', {
       method: 'POST',
       body: JSON.stringify({ username, password: password || 'password' }),
     });
@@ -1065,14 +1065,14 @@ export const examinationApi = {
     ),
 };
 export const adminApi = {
-    getAccounts: () => request<BackendUser[]>('/api/admin/accounts'),
+    getAccounts: () => request<BackendUser[]>('/api/admin/users'),
     createAccount: (payload: { username: string; password?: string; role: string; fullname: string; employee_id: string; phone: string; }) =>
-      request<BackendUser>('/api/admin/accounts', {
+      request<BackendUser>('/api/admin/users', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
     updateAccountStatus: (id: number | string, status: string) =>
-      request<{ message: string }>('/api/admin/accounts/' + id + '/status', {
+      request<{ message: string }>('/api/admin/users/' + id + '/status', {
         method: 'PUT',
         body: JSON.stringify({ status }),
       }),

@@ -72,11 +72,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const latest = DEMO_USERS[parsed.role as UserRole];
           return {
             ...parsed,
-            fullName: latest.fullName,
-            roleTitleTh: latest.roleTitleTh,
-            roleTitleEn: latest.roleTitleEn,
-            avatarText: latest.avatarText,
-            avatarColor: latest.avatarColor,
+            // คงชื่อจริงที่ login มา (fullName) ไว้ — ไม่ override ด้วย DEMO_USERS
+            roleTitleTh: parsed.roleTitleTh || latest.roleTitleTh,
+            roleTitleEn: parsed.roleTitleEn || latest.roleTitleEn,
+            avatarColor: parsed.avatarColor || latest.avatarColor,
           };
         }
         return parsed;
@@ -94,27 +93,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (currentUser) {
-      // ตรวจสอบว่าชื่อหรือตำแหน่งใน DEMO_USERS เปลี่ยนไปหรือไม่ ถ้าเปลี่ยน ให้อัปเดตทันที
-      if (currentUser.role && DEMO_USERS[currentUser.role]) {
-        const latest = DEMO_USERS[currentUser.role];
-        if (
-          currentUser.fullName !== latest.fullName ||
-          currentUser.roleTitleTh !== latest.roleTitleTh ||
-          currentUser.roleTitleEn !== latest.roleTitleEn ||
-          currentUser.avatarText !== latest.avatarText ||
-          currentUser.avatarColor !== latest.avatarColor
-        ) {
-          setCurrentUser(prev => prev ? ({
-            ...prev,
-            fullName: latest.fullName,
-            roleTitleTh: latest.roleTitleTh,
-            roleTitleEn: latest.roleTitleEn,
-            avatarText: latest.avatarText,
-            avatarColor: latest.avatarColor,
-          }) : null);
-          return;
-        }
-      }
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
     } else {
       localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -186,38 +164,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userRole = res.user.role as UserRole;
         const fallback = DEMO_USERS[userRole] || DEMO_USERS['registrar'];
 
-        let fullName = res.user.fullname || fallback.fullName;
-        let department = fallback.department;
-        let avatarText = fallback.avatarText;
-        let roleTitleTh = fallback.roleTitleTh;
-
-        if (userRole === 'doctor') {
-          if (res.user.username === 'doctor2' || res.user.fullname?.includes('วิชัย')) {
-            fullName = 'นพ.วิชัย ชาญการแพทย์';
-            department = 'แผนกอายุรกรรมทั่วไป';
-            avatarText = 'WC';
-            roleTitleTh = 'แพทย์ผู้ตรวจ (อายุรกรรม)';
-          } else if (res.user.username === 'doctor3' || res.user.fullname?.includes('เกศรา')) {
-            fullName = 'พญ.เกศรา รักษาดี';
-            department = 'แผนกกุมารเวชกรรม';
-            avatarText = 'KR';
-            roleTitleTh = 'แพทย์ผู้ตรวจ (กุมารเวชกรรม)';
-          } else {
-            fullName = 'พญ.สุดา สุขสมบูรณ์';
-            department = 'แผนกสูตินรีเวช';
-            avatarText = 'SS';
-            roleTitleTh = 'แพทย์ผู้ตรวจ (สูตินรีเวช)';
-          }
-        }
+        // ใช้ชื่อจริงจาก API เสมอ — ไม่ hardcode ชื่อตาม username/role
+        const fullName = res.user.fullname || res.user.username;
+        // สร้าง avatar text จากชื่อจริง (2 ตัวอักษรแรก)
+        const nameParts = fullName.replace(/^(นพ\.|พญ\.|นพ|พญ)\./i, '').trim();
+        const avatarText = nameParts.substring(0, 2) || fallback.avatarText;
 
         const loggedInUser: User = {
           id: String(res.user.id),
           username: res.user.username,
           fullName,
           role: userRole,
-          roleTitleTh,
+          roleTitleTh: fallback.roleTitleTh,
           roleTitleEn: fallback.roleTitleEn,
-          department,
+          department: fallback.department,
           avatarText,
           avatarColor: fallback.avatarColor,
         };
