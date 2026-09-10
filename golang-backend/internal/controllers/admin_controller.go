@@ -26,7 +26,11 @@ func NewAdminController(db *gorm.DB) *AdminController {
 
 func (ctrl *AdminController) GetAccounts(c *gin.Context) {
 	var users []models.User
-	if err := ctrl.DB.Preload("SystemAccesses").Find(&users).Error; err != nil {
+	// Order("id asc") ให้ผลลัพธ์มาตามลำดับคงที่เสมอ — เดิมไม่มี ORDER BY เลย ทำให้ Postgres
+	// คืนแถวตามลำดับที่ไม่รับประกัน (โดยเฉพาะหลัง UPDATE แถวใดแถวหนึ่ง ตำแหน่งจริงในผลลัพธ์อาจ
+	// เปลี่ยนได้) ฝั่ง UserManagement.tsx ตัดแสดงแค่ itemsPerPage แถวแรกโดยไม่มีปุ่มไปหน้าถัดไป
+	// ผู้ใช้ที่เพิ่งถูก UPDATE (เช่น รีเซ็ตรหัสผ่าน) จึงเสี่ยงเด้งหลุดออกจากรายการที่มองเห็นได้
+	if err := ctrl.DB.Preload("SystemAccesses").Order("id asc").Find(&users).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch accounts"})
 		return
 	}
