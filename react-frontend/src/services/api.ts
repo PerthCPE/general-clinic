@@ -25,7 +25,7 @@
 //      grep -c "dmsApi\|pharmacyApi\|billingApi\|doctorApi" src/services/api.ts
 //   4. ถ้าขนาดไฟล์ "เล็กลง" หลังแก้ ให้สงสัยไว้ก่อนว่าลบของคนอื่นไปแล้ว
 // ==============================================================================
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const TOKEN_KEY = 'clinic_auth_token';
 
@@ -41,50 +41,55 @@ export const tokenStorage = {
   },
 };
 
-// Helper to ensure valid token from server
-async function ensureToken(): Promise<string | null> {
-  let token = tokenStorage.get();
-  if (!token) {
-    try {
-      const savedUserStr = localStorage.getItem('clinic_auth_user');
-      let username = 'cashier1';
-      if (savedUserStr) {
-        try {
-          const savedUser = JSON.parse(savedUserStr);
-          if (savedUser.role === 'nurse') username = 'nurse1';
-          else if (savedUser.role === 'nurse_assistant') username = 'assistant1';
-          else if (savedUser.role === 'doctor') username = 'doctor1';
-          else if (savedUser.role === 'pharmacist') username = 'pharmacist1';
-          else if (savedUser.role === 'cashier') username = 'cashier1';
-          else if (savedUser.role === 'officer') username = 'officer1';
-          else if (savedUser.role === 'registrar') username = 'registrar1';
-          else if (savedUser.username) username = savedUser.username;
-        } catch {
-          // ignore
-        }
-      }
-      const res = await fetch(`${API_BASE_URL}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password: 'password' }),
-      });
-      const data = await res.json().catch(() => null);
-      if (data && data.token) {
-        token = data.token;
-        tokenStorage.set(data.token);
-      }
-    } catch {
-      // ignore
-    }
+// ใช้แยกให้ชัดว่า error นี้คือ "backend ตอบกลับมาจริง (มี HTTP status)" ต่างจาก network error
+// ทั่วไป (fetch เอง reject ก่อนได้ response เช่น เน็ตหลุด/backend ล่ม) — สำคัญมากตอน caller
+// ต้องตัดสินใจว่าจะ fallback ไป local demo หรือไม่ (ดู AuthContext.login สำหรับตัวอย่างบั๊กจริง
+// ที่เคยเกิดจากไม่แยกสองเคสนี้: backend reject login ถูกต้องแล้ว (403 บัญชีถูกระงับ) แต่โค้ด
+// เดิม catch แล้ว fallback ไป local demo login แบบ fake สำเร็จ ทั้งที่ไม่มี token จริง — พอ
+// component ถัดไปเรียก API ก็ชน "ไม่มี token" แล้ว reload วนซ้ำ ดูเหมือน infinite loop ตอน 403)
+export class ApiRequestError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiRequestError';
+    this.status = status;
+
   }
-  return token;
 }
+
+// เดิมจุดนี้เคยมี ensureToken() ที่ "เดา" username ตาม role ที่แคชไว้แล้วยิง login เงียบๆ
+// ด้วย password: 'password' ทุกครั้งที่ไม่มี token หรือเจอ 401 — ใช้ได้เฉพาะตอนทุกบัญชี seed
+// ใช้รหัสผ่านร่วมกันเป็น "password" เท่านั้น พอเปลี่ยนไปใช้ employee_id เป็นรหัสผ่านเริ่มต้น
+// (คนละค่ากันทุกบัญชี) การเดาแบบนี้ผิดเสมอ แล้ว error 401 จริงจะถูกกลบด้วย error อื่นที่งงกว่าเดิม
+// (เช่น "ไม่สามารถโหลดรายชื่อบุคลากรได้" ทั้งที่จริงคือ token หมดอายุ) แก้เป็นเคลียร์ session แล้ว
+// ส่งกลับไปหน้า login ตรงๆ แทน ไม่เดา credential อีกต่อไป
+let isRedirectingToLogin = false;
+function forceReLogin() {
+  if (isRedirectingToLogin) return;
+  isRedirectingToLogin = true;
+  tokenStorage.remove();
+  // เคลียร์ user ที่แคชไว้ด้วย ไม่งั้น AuthContext จะโหลด currentUser จาก localStorage
+  // กลับมาอีกหลัง reload ทั้งที่ token หายไปแล้ว ทำให้ดูเหมือน login ค้างอยู่แต่เรียก API ไม่ได้เลย
+  localStorage.removeItem('clinic_auth_user');
+  if (typeof window !== 'undefined') {
+    window.location.reload();
+  }
+}
+
+// endpoint ที่เรียกได้โดยไม่ต้องมี token อยู่แล้ว (login ปกติ + ทางลัด dev quick-login) —
+// ทั้งคู่มีจุดประสงค์เพื่อ "ขอ token ใหม่" ตั้งแต่แรก จึงต้องไม่โดน request() บล็อกด้วยเงื่อนไข
+// "ไม่มี token" หรือ forceReLogin ก่อนที่จะมีโอกาสยิง request ออกไปจริงด้วยซ้ำ
+const PUBLIC_ENDPOINTS = ['/api/login', '/api/dev/quick-login'];
 
 // Generic HTTP Request Handler
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  let token = tokenStorage.get();
-  if (!token && endpoint !== '/login') {
-    token = await ensureToken();
+  const token = tokenStorage.get();
+
+  if (!token && !PUBLIC_ENDPOINTS.includes(endpoint)) {
+    // ไม่มี token เลย (ยังไม่เคย login หรือ session หมดไปแล้ว) และนี่ไม่ใช่การเรียก login เอง
+    // ส่งกลับไปหน้า login ทันที ไม่เดา credential มาลองยิงเงียบๆ แบบเดิม
+    forceReLogin();
+    throw new ApiRequestError('ไม่พบ session กำลังพากลับไปหน้าเข้าสู่ระบบ', 401);
   }
 
   const headers: Record<string, string> = {
@@ -97,29 +102,23 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
-  let response = await fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers,
   });
 
-  // If 401 Unauthorized, try refreshing token once
-  if (response.status === 401 && endpoint !== '/login') {
-    tokenStorage.remove();
-    token = await ensureToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      response = await fetch(url, {
-        ...options,
-        headers,
-      });
-    }
+  if (response.status === 401 && !PUBLIC_ENDPOINTS.includes(endpoint)) {
+    // Token หมดอายุ/ไม่ถูกต้อง — เคลียร์แล้วส่งกลับไปหน้า login ทันที (ไม่เดา credential
+    // มาลองใหม่เงียบๆ อีกต่อไป — ดูคอมเมนต์ข้างบน forceReLogin)
+    forceReLogin();
+    throw new ApiRequestError('เซสชันหมดอายุ กำลังพากลับไปหน้าเข้าสู่ระบบ', 401);
   }
 
   const data = await response.json().catch(() => null);
 
   if (!response.ok) {
     const errorMsg = data?.error || data?.message || `Request failed with status ${response.status}`;
-    throw new Error(errorMsg);
+    throw new ApiRequestError(errorMsg, response.status);
   }
 
   return data as T;
@@ -131,6 +130,7 @@ export const authApi = {
     const res = await request<{
       token: string;
       role: string;
+      requires_password_change?: boolean;
       user: {
         id: number;
         username: string;
@@ -138,9 +138,12 @@ export const authApi = {
         role: string;
         phone: string;
       };
-    }>('/login', {
+    }>('/api/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password: password || 'password' }),
+      // ไม่มี default password ที่ใช้ได้กับทุกบัญชีอีกต่อไป (แต่ละบัญชีมี employee_id ของตัวเอง
+      // เป็นรหัสผ่านเริ่มต้น) — ถ้าไม่ส่ง password มาก็ปล่อยว่าง ให้ backend ตอบ 401 ตามจริง
+      // แทนที่จะเดาด้วย 'password' แล้วอาจบังเอิญ login ผิดคน/พังเงียบๆ
+      body: JSON.stringify({ username, password: password ?? '' }),
     });
 
     if (res.token) {
@@ -148,6 +151,38 @@ export const authApi = {
     }
     return res;
   },
+  // ทางลัด dev/test เท่านั้น สำหรับปุ่ม "Quick Test Login" — ไม่ส่ง password เลย backend จะหา
+  // บัญชี seed ของ role นั้นเอง และ reset status กลับเป็น active ให้ก่อน login เสมอ ต่างจาก
+  // login() ปกติด้านบนตรงที่ backend ปิด endpoint นี้ไว้เองถ้าไม่ใช่ dev mode (ตอบ 403 หรือแม้แต่
+  // ไม่มี route นี้เลย ดู golang-backend/internal/routes/routes.go) — โค้ด login แบบกรอกเองปกติ
+  // ไม่ถูกแตะเลย ยังเช็ค password และ status ตามจริงทุกประการเหมือนเดิม
+  quickLogin: async (role: string) => {
+    const res = await request<{
+      token: string;
+      role: string;
+      requires_password_change?: boolean;
+      user: {
+        id: number;
+        username: string;
+        fullname: string;
+        role: string;
+        phone: string;
+      };
+    }>('/api/dev/quick-login', {
+      method: 'POST',
+      body: JSON.stringify({ role }),
+    });
+
+    if (res.token) {
+      tokenStorage.set(res.token);
+    }
+    return res;
+  },
+  changePassword: (payload: { old_password: string; new_password: string }) =>
+    request('/api/auth/change-password', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
   logout: () => {
     tokenStorage.remove();
   },
@@ -161,6 +196,15 @@ export interface BackendPatient {
   fullname: string;
   gender: string;
   birthdate: string;
+  house_no?: string;
+  village_no?: string;
+  village_name?: string;
+  alley?: string;
+  road?: string;
+  sub_district?: string;
+  district?: string;
+  province?: string;
+  postal_code?: string;
   address: string;
   phone_number: string;
   emergency_contact: string;
@@ -179,14 +223,33 @@ export const patientApi = {
     fullname: string;
     gender: string;
     birthdate: string;
-    address: string;
+    house_no?: string;
+    village_no?: string;
+    village_name?: string;
+    alley?: string;
+    road?: string;
+    sub_district?: string;
+    district?: string;
+    province?: string;
+    postal_code?: string;
+    address?: string;
     phone_number: string;
     emergency_contact: string;
     scheme_type?: string;
+    issue_queue?: boolean;
     allergies?: string;
     chronic_diseases?: string;
   }) =>
-    request<{ message: string; patient: BackendPatient }>('/api/registrar/patients', {
+    request<{
+      message: string;
+      patient: BackendPatient;
+      hn?: string;
+      patient_id?: number;
+      queue_number?: string;
+      queue_id?: number;
+      queue_issued: boolean;
+      queue?: BackendQueue;
+    }>('/api/registrar/patients', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
@@ -216,8 +279,52 @@ export interface BackendQueue {
   };
 }
 
+export interface QueueStats {
+  total: number;
+  active: number;
+  waitingScreening: number;
+  waitingDoctor: number;
+  inExamination: number;
+  waitingTreatment: number;
+  waitingBilling: number;
+  waitingPharmacy: number;
+  completed: number;
+  cancelled: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  stats?: QueueStats;
+}
+
 export const queueApi = {
-  getList: () => request<BackendQueue[]>('/api/queue/list'),
+  getList: (
+    params?: {
+      page?: number;
+      limit?: number;
+      status?: string;
+      search?: string;
+      category?: string;
+    },
+    options?: { signal?: AbortSignal }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      if (params.page !== undefined) searchParams.set('page', String(params.page));
+      if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+      if (params.status) searchParams.set('status', params.status);
+      if (params.search) searchParams.set('search', params.search);
+      if (params.category) searchParams.set('category', params.category);
+    }
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<BackendQueue[] | PaginatedResponse<BackendQueue>>(`/api/queue/list${query}`, {
+      signal: options?.signal,
+    });
+  },
   create: (patientId: number, department?: string, note?: string) =>
     request<{ message: string; queue: BackendQueue }>('/api/queue/create', {
       method: 'POST',
@@ -252,6 +359,9 @@ export const eligibilityApi = {
       national_id: string;
       scheme_type: string;
       coverage_details: string;
+      hospital_name?: string;
+      expire_date?: string;
+      status?: string;
       verified_at: string;
     }>(`/api/registrar/eligibility/check/${nationalId.replace(/[-\s]/g, '')}`),
   save: (payload: {
@@ -275,7 +385,7 @@ export interface BackendScreening {
   visit_id: number;
   screened_by_user_id: number;
   assigned_doctor_id?: number;
-  triage_level: string;
+  triage_level: number | string;
   chief_complaint: string;
   allergies: string;
   medical_history: string;
@@ -295,6 +405,18 @@ export interface BackendScreening {
   current_medications?: string;
   smoking_history?: string;
   alcohol_history?: string;
+  herbal_medicines?: string;
+  dietary_supplements?: string;
+  has_uri?: boolean | null;
+  has_tb?: boolean | null;
+  on_anticoagulant?: boolean | null;
+  precaution_type?: string;
+  is_pregnant?: boolean | null;
+  is_breastfeeding?: boolean | null;
+  last_menstrual_period?: string;
+  q2_depressed?: boolean | null;
+  q2_anhedonia?: boolean | null;
+  screening_positive?: boolean | null;
   created_at: string;
   updated_at: string;
   visit_record?: {
@@ -302,6 +424,9 @@ export interface BackendScreening {
     patient_id: number;
     doctor_id: number;
     visit_date: string;
+    queue_id?: number;
+    queue_number?: string;
+    department?: string;
     patient?: BackendPatient;
   };
   screened_by?: {
@@ -350,19 +475,54 @@ export const vitalsApi = {
     allergies?: string;
     medical_history?: string;
     nurse_notes?: string;
+    herbal_medicines?: string;
+    dietary_supplements?: string;
+    has_uri?: boolean | null;
+    has_tb?: boolean | null;
+    on_anticoagulant?: boolean | null;
+    precaution_type?: string;
+    is_pregnant?: boolean | null;
+    is_breastfeeding?: boolean | null;
+    last_menstrual_period?: string;
+    q2_depressed?: boolean | null;
+    q2_anhedonia?: boolean | null;
     assigned_doctor_id?: number;
-    triage_level?: string;
+    triage_level?: number | string;
   }) =>
     request<{
       message: string;
       screening_id: number;
+      visit_id?: number;
+      queue_number?: string;
       bmi: number;
-      triage_level: string;
+      triage_level: number | string;
     }>('/api/nurse/vitals', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
-  getAllHistory: () => request<BackendScreening[]>('/api/nurse/vitals/history'),
+  getAllHistory: (
+    params?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      triage?: string;
+      date_preset?: string;
+    },
+    options?: { signal?: AbortSignal }
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params) {
+      if (params.page !== undefined) searchParams.set('page', String(params.page));
+      if (params.limit !== undefined) searchParams.set('limit', String(params.limit));
+      if (params.search) searchParams.set('search', params.search);
+      if (params.triage) searchParams.set('triage', params.triage);
+      if (params.date_preset) searchParams.set('date_preset', params.date_preset);
+    }
+    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
+    return request<BackendScreening[] | PaginatedResponse<BackendScreening>>(`/api/nurse/vitals/history${query}`, {
+      signal: options?.signal,
+    });
+  },
   getPatientHistory: (patientId: number | string) =>
     request<{ patient_id: string; history: BackendScreening[] }>(`/api/nurse/vitals/history/${patientId}`),
 };
@@ -392,10 +552,17 @@ export interface StorageStats {
 export interface BackendUser {
   id: number;
   username: string;
-  fullname?: string;
+  fullname: string;
   full_name?: string;
   role: string;
   phone?: string;
+  email?: string;
+  employee_id?: string;
+  department?: string;
+  status?: string;
+  system_accesses?: Array<{ access_level?: number | string; [key: string]: any }>;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface BackendDocument {
@@ -505,6 +672,7 @@ export interface BackendDoctorScreening {
   medical_history: string;
   nurse_notes: string;
   triage_level: string;
+  triage_level_num?: number;
   triage_code: string;
   triage_priority: string;
   bp: string;
@@ -949,3 +1117,70 @@ export const examinationApi = {
       `/api/doctor/patients/${patientId}/visits`
     ),
 };
+export const adminApi = {
+    getAccounts: () => request<BackendUser[]>('/api/admin/users'),
+    createAccount: (payload: { username: string; password?: string; role: string; fullname: string; employee_id: string; phone: string; department?: string; }) =>
+      request<BackendUser>('/api/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    updateAccountStatus: (id: number | string, status: string) =>
+      request<{ message: string }>('/api/admin/users/' + id + '/status', {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      }),
+    updateAccount: (id: number | string, payload: { fullname?: string; email?: string; phone?: string; role?: string; department?: string; status?: string; }) =>
+      request<{ message: string; user: BackendUser }>('/api/admin/users/' + id, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
+    resetPassword: (id: number | string) =>
+      request<{ message: string; temporary_password: string; requires_password_change: boolean }>('/api/admin/users/' + id + '/reset-password', {
+        method: 'PUT',
+      }),
+    createSystemAccess: (payload: { user_id: number; access_level: number; module_name: string; }) =>
+      request<any>('/api/admin/system-access', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    bulkUpdateSystemAccess: (payload: { user_id: number; accesses: { module_name: string; access_level: number }[]; }) =>
+      request<{ message: string }>('/api/admin/system-access/bulk', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+  };
+
+export interface BackendAppointment {
+  id: number;
+  doctor_id: number;
+  patient_id: number;
+  register_id: number;
+  appointment_date: string;
+  appointment_time: string;
+  status: string;
+  department: string;
+  clinical_note: string;
+  doctor?: BackendUser;
+  patient?: BackendPatient;
+  register?: BackendUser;
+}
+
+export const appointmentApi = {
+  getList: () => request<BackendAppointment[]>('/api/appointments'),
+  create: (payload: { doctor_id: number; patient_id: number; register_id: number; appointment_date: string; appointment_time: string; department: string; clinical_note: string; }) =>
+    request<BackendAppointment>('/api/appointments', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateStatus: (id: number | string, payload: { status: string; clinical_note?: string; }) =>
+    request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/status', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  updateSchedule: (id: number | string, payload: { appointment_date?: string; appointment_time?: string; }) =>
+    request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/schedule', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+};
+

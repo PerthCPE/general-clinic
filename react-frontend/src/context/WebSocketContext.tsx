@@ -52,24 +52,36 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       };
 
-      ws.onmessage = (event) => {
-        try {
-          const parsed: WebSocketEvent = JSON.parse(event.data);
-          setLastEvent(parsed);
+      const dispatchEvent = (parsed: WebSocketEvent) => {
+        setLastEvent(parsed);
+        const callbacks = subscribersRef.current.get(parsed.type);
+        if (callbacks) {
+          callbacks.forEach((cb) => {
+            try {
+              cb(parsed.data);
+            } catch (e) {
+              console.error(`Error in WebSocket subscriber for ${parsed.type}:`, e);
+            }
+          });
+        }
+      };
 
-          // Notify subscribers
-          const callbacks = subscribersRef.current.get(parsed.type);
-          if (callbacks) {
-            callbacks.forEach((cb) => {
-              try {
-                cb(parsed.data);
-              } catch (e) {
-                console.error(`Error in WebSocket subscriber for ${parsed.type}:`, e);
-              }
-            });
+      ws.onmessage = (event) => {
+        // ฝั่ง Go (writePump) รวมหลาย event เป็นเฟรมเดียวคั่นด้วย '\n' เวลา broadcast ถี่ ๆ
+        // (เช่น ตอนจ่ายยาจะยิง DISPENSE_RECORDED + BILLING_CREATED + QUEUE_UPDATED ติดกัน)
+        // ถ้า JSON.parse ทั้งก้อนจะ throw แล้ว event หายทั้งเฟรม — ต้องแยกทีละบรรทัดก่อน parse
+        const raw = typeof event.data === 'string' ? event.data : '';
+        if (!raw) return;
+
+        const lines = raw.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed[0] !== '{') continue; // ข้าม ping/pong หรือบรรทัดว่าง
+          try {
+            dispatchEvent(JSON.parse(trimmed) as WebSocketEvent);
+          } catch (e) {
+            console.warn('[ws] failed to parse event line:', trimmed, e);
           }
-        } catch {
-          // non-json or ping/pong message
         }
       };
 

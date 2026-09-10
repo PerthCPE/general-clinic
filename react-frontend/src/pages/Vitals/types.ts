@@ -1,10 +1,10 @@
-// Types matching Go Backend Models: Screening, VisitRecord, Patient, Doctor, Queue
+export type TriageLevelNum = 1 | 2 | 3 | 4;
 
-export type TriageLevelKey = 'ปกติ (Normal)' | 'กึ่งฉุกเฉิน (Semi-Urgent)' | 'ฉุกเฉินเร่งด่วน (Urgent)' | 'ฉุกเฉินวิกฤต (Resuscitation)';
+export type TriageLevelKey = 'ฉุกเฉินวิกฤต (Resuscitation)' | 'ฉุกเฉินเร่งด่วน (Urgent)' | 'กึ่งฉุกเฉิน (Semi-Urgent)' | 'ปกติ (Normal)';
 
 export interface TriageLevelInfo {
   key: TriageLevelKey;
-  levelNum: number;
+  levelNum: TriageLevelNum;
   labelTh: string;
   labelEn: string;
   badgeClass: string;
@@ -80,6 +80,19 @@ export interface ScreeningRecord {
   currentMedications?: string;
   smokingHistory?: string;
   alcoholHistory?: string;
+  nurseNotes?: string;
+  herbalMedicines?: string;
+  dietarySupplements?: string;
+  hasURI?: boolean | null;
+  hasTB?: boolean | null;
+  onAnticoagulant?: boolean | null;
+  precautionType?: string;
+  isPregnant?: boolean | null;
+  isBreastfeeding?: boolean | null;
+  lastMenstrualPeriod?: string;
+  q2Depressed?: boolean | null;
+  q2Anhedonia?: boolean | null;
+  screeningPositive?: boolean | null;
   assignedDoctorId: number;
   assignedDoctorName: string;
   assignedRoom: string;

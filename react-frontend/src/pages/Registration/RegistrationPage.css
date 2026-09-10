@@ -247,13 +247,20 @@
 }
 
 .reg-card-body.expanded {
-  max-height: 1600px;
+  max-height: none;
+  overflow: visible;
   padding: 24px 24px 28px;
 }
 
 /* Custom smooth transitions specifically for Recent Patients card */
 .reg-card-body.reg-recent-body {
   transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1), padding 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.reg-card-body.reg-recent-body.expanded {
+  max-height: none;
+  overflow: visible;
+  padding: 0 0 16px 0;
 }
 
 .reg-recent-toggle {
@@ -1394,6 +1401,13 @@
   font-weight: 600;
 }
 
+.reg-modal-row .modal-val.font-mono {
+  font-family: var(--font-heading);
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  font-weight: 600;
+}
+
 .reg-modal-footer {
   padding: 14px 24px;
   border-top: 1px solid #F1F5F9;
@@ -1928,6 +1942,251 @@ body.dark-mode .reg-btn-draft-dismiss:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
 }
 
+/* ===== Structured Address Section Styles (Sprint 3) ===== */
+body.dark-mode .address-dropdown-menu {
+  background-color: #212836 !important;
+  border-color: #333F53 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+}
 
+body.dark-mode .address-dropdown-menu input {
+  background-color: #1C2230 !important;
+  border-color: #333F53 !important;
+  color: #F1F5F9 !important;
+}
 
+body.dark-mode .address-dropdown-item {
+  color: #E2E8F0 !important;
+}
+
+body.dark-mode .address-dropdown-item:hover {
+  background-color: #2A3447 !important;
+}
+
+body.dark-mode .address-preview-box {
+  background-color: #1C2230 !important;
+  border-color: #333F53 !important;
+}
+
+body.dark-mode .reg-legacy-address-banner {
+  background: rgba(245, 158, 11, 0.15) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+  color: #FBBF24 !important;
+}
+
+/* ===== Sprint 3.2 Auto-Queue Checkbox & Success Modal ===== */
+.reg-issue-queue-checkbox-wrap {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-top: 20px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.reg-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.reg-custom-checkbox {
+  width: 19px;
+  height: 19px;
+  cursor: pointer;
+  accent-color: #2563EB;
+  margin: 0;
+}
+
+.reg-checkbox-text {
+  font-family: var(--font-primary);
+  font-weight: 600;
+  font-size: 15px;
+  color: #1E293B;
+}
+
+.reg-checkbox-hint {
+  font-family: var(--font-primary);
+  font-size: 13px;
+  color: #64748B;
+  margin: 4px 0 0 29px;
+}
+
+.reg-success-queue-box {
+  margin-top: 14px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(37, 99, 235, 0.02));
+  border: 1.5px dashed #2563EB;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.reg-success-queue-lbl {
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563EB;
+}
+
+.reg-success-queue-val {
+  font-family: var(--font-heading);
+  font-size: 26px;
+  font-weight: 800;
+  color: #1D4ED8;
+  letter-spacing: 1px;
+}
+
+.reg-success-queue-dept {
+  font-family: var(--font-primary);
+  font-size: 12.5px;
+  color: #64748B;
+}
+
+/* Dark Mode Overrides for Sprint 3.2 */
+body.dark-mode .reg-issue-queue-checkbox-wrap {
+  background: #1C2230;
+  border-color: #333F53;
+}
+
+body.dark-mode .reg-checkbox-text {
+  color: #F1F5F9;
+}
+
+body.dark-mode .reg-checkbox-hint {
+  color: #94A3B8;
+}
+
+body.dark-mode .reg-success-queue-box {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: #60A5FA;
+}
+
+body.dark-mode .reg-success-queue-lbl {
+  color: #93C5FD;
+}
+
+body.dark-mode .reg-success-queue-val {
+  color: #60A5FA;
+}
+
+body.dark-mode .reg-success-queue-dept {
+  color: #94A3B8;
+}
+
+/* ===== Table Controls Bar (Sprint UI-3) ===== */
+.reg-table-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  border-bottom: 1px solid #F1F5F9;
+  background: #FFFFFF;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.reg-table-info-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reg-table-desc {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748B;
+}
+
+.reg-items-per-page-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reg-items-per-page-label {
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748B;
+}
+
+.reg-items-per-page-select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: #1E293B;
+  font-family: var(--font-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.reg-items-per-page-select:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.reg-fetch-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 10px;
+  color: #DC2626;
+  font-family: var(--font-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.reg-retry-btn {
+  padding: 6px 14px;
+  background: #DC2626;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.reg-retry-btn:hover {
+  background: #B91C1C;
+}
+
+/* Dark Mode Overrides for Table Controls Bar */
+body.dark-mode .reg-table-controls-bar {
+  background: #212836;
+  border-color: #333F53;
+}
+
+body.dark-mode .reg-table-desc,
+body.dark-mode .reg-items-per-page-label {
+  color: #94A3B8;
+}
+
+body.dark-mode .reg-items-per-page-select {
+  background-color: #1C2230;
+  border-color: #333F53;
+  color: #F1F5F9;
+}
+
+body.dark-mode .reg-items-per-page-select:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
 

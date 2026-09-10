@@ -23,10 +23,39 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     server: {
+      // ต้องเป็น 'localhost' ห้ามเป็น '127.0.0.1' — localStorage แยก origin กันตาม hostname
+      // เป๊ะๆ (แม้ IP จะชี้ไปที่เดียวกัน) ถ้าใครเปิดหน้าเว็บผ่าน localhost:5173 บ้าง
+      // 127.0.0.1:5173 บ้าง จะได้ token/session คนละชุดกันเงียบๆ ทำให้ดูเหมือน login ไม่ติด
+      // หรือ auth state หลุดโดยไม่มี error ชัดเจน
+      host: 'localhost',
       proxy: {
         '/api': {
           target: apiTarget,
           changeOrigin: true,
+        },
+      },
+    },
+    build: {
+      chunkSizeWarningLimit: 1000,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('@mui') || id.includes('@emotion')) {
+                return 'vendor-mui'
+              }
+              if (id.includes('react') || id.includes('react-dom')) {
+                return 'vendor-react'
+              }
+              if (id.includes('lucide-react') || id.includes('react-hot-toast')) {
+                return 'vendor-ui'
+              }
+              if (id.includes('@supabase')) {
+                return 'vendor-supabase'
+              }
+              return 'vendor'
+            }
+          },
         },
       },
     },

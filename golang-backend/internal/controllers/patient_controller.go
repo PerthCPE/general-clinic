@@ -8,6 +8,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/services"
 	"clinic-backend/internal/ws"
 	"github.com/gin-gonic/gin"
 )
@@ -19,12 +20,131 @@ type RegisterPatientReq struct {
 	FullName         string `json:"fullname" binding:"required"`
 	Gender           string `json:"gender"`
 	BirthDate        string `json:"birthdate" binding:"required"`
-	Address          string `json:"address"`
 	PhoneNumber      string `json:"phone_number" binding:"required"`
 	EmergencyContact string `json:"emergency_contact"`
 	SchemeType       string `json:"scheme_type"`
 	Allergies        string `json:"allergies"`
 	ChronicDiseases  string `json:"chronic_diseases"`
+
+	// Structured Address Fields (Sprint 3)
+	HouseNo          string `json:"house_no"`
+	VillageNo        string `json:"village_no"`
+	VillageName      string `json:"village_name"`
+	Alley            string `json:"alley"`
+	Road             string `json:"road"`
+	SubDistrict      string `json:"sub_district"`
+	District         string `json:"district"`
+	Province         string `json:"province"`
+	PostalCode       string `json:"postal_code"`
+
+	// Auto Queue Issuance Flag (Sprint 3.2 - default: false)
+	IssueQueue       bool   `json:"issue_queue"`
+
+	// Legacy Address fallback
+	Address          string `json:"address"`
+}
+
+// ComposeAddress ประกอบฟิลด์ย่อยของที่อยู่เข้าเป็นสตริงเดียวกันตามมาตรฐาน
+func ComposeAddress(houseNo, villageNo, villageName, alley, road, subDistrict, district, province, postalCode, fallback string) string {
+	return composeAddress(houseNo, villageNo, villageName, alley, road, subDistrict, district, province, postalCode, fallback)
+}
+
+// composeAddress ประกอบฟิลด์ย่อยของที่อยู่เข้าเป็นสตริงเดียวกันตามมาตรฐาน
+func composeAddress(houseNo, villageNo, villageName, alley, road, subDistrict, district, province, postalCode, fallback string) string {
+	var parts []string
+	if h := strings.TrimSpace(houseNo); h != "" {
+		parts = append(parts, h)
+	}
+	if vNo := strings.TrimSpace(villageNo); vNo != "" {
+		if strings.HasPrefix(vNo, "หมู่") {
+			parts = append(parts, vNo)
+		} else {
+			parts = append(parts, "หมู่ "+vNo)
+		}
+	}
+	if vName := strings.TrimSpace(villageName); vName != "" {
+		parts = append(parts, vName)
+	}
+	if a := strings.TrimSpace(alley); a != "" {
+		if strings.HasPrefix(a, "ซ.") || strings.HasPrefix(a, "ซอย") || strings.HasPrefix(a, "ตรอก") {
+			parts = append(parts, a)
+		} else {
+			parts = append(parts, "ซ."+a)
+		}
+	}
+	if r := strings.TrimSpace(road); r != "" {
+		if strings.HasPrefix(r, "ถ.") || strings.HasPrefix(r, "ถนน") {
+			parts = append(parts, r)
+		} else {
+			parts = append(parts, "ถ."+r)
+		}
+	}
+
+	pTrim := strings.TrimSpace(province)
+	isBkk := pTrim == "กรุงเทพมหานคร" || pTrim == "กทม." || strings.Contains(pTrim, "กรุงเทพ")
+
+	if sd := strings.TrimSpace(subDistrict); sd != "" {
+		if isBkk {
+			if strings.HasPrefix(sd, "แขวง") {
+				parts = append(parts, sd)
+			} else {
+				cleanSd := strings.TrimPrefix(strings.TrimPrefix(sd, "ตำบล"), "ต.")
+				parts = append(parts, "แขวง"+strings.TrimSpace(cleanSd))
+			}
+		} else {
+			if strings.HasPrefix(sd, "ต.") || strings.HasPrefix(sd, "ตำบล") {
+				parts = append(parts, sd)
+			} else {
+				parts = append(parts, "ต."+sd)
+			}
+		}
+	}
+
+	if d := strings.TrimSpace(district); d != "" {
+		if isBkk {
+			if strings.HasPrefix(d, "เขต") {
+				parts = append(parts, d)
+			} else {
+				cleanD := strings.TrimPrefix(strings.TrimPrefix(d, "อำเภอ"), "อ.")
+				parts = append(parts, "เขต"+strings.TrimSpace(cleanD))
+			}
+		} else {
+			if strings.HasPrefix(d, "อ.") || strings.HasPrefix(d, "อำเภอ") {
+				parts = append(parts, d)
+			} else {
+				parts = append(parts, "อ."+d)
+			}
+		}
+	}
+
+	if pTrim != "" {
+		if isBkk {
+			parts = append(parts, "กรุงเทพมหานคร")
+		} else if strings.HasPrefix(pTrim, "จ.") || strings.HasPrefix(pTrim, "จังหวัด") {
+			parts = append(parts, pTrim)
+		} else {
+			parts = append(parts, "จ."+pTrim)
+		}
+	}
+
+	if pc := strings.TrimSpace(postalCode); pc != "" {
+		parts = append(parts, pc)
+	}
+
+	composed := strings.Join(parts, " ")
+	if strings.TrimSpace(composed) != "" {
+		return composed
+	}
+	return strings.TrimSpace(fallback)
+}
+
+func isOnlyDigits(s string) bool {
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
 }
 
 // GetPatients - ดึงรายชื่อคนไข้ทั้งหมด
@@ -47,23 +167,34 @@ func RegisterPatient(c *gin.Context) {
 		return
 	}
 
-	// birth date format check with Buddhist Era (พ.ศ.) auto-conversion
-	var parsedBirthDate time.Time
-	cleanBD := strings.TrimSpace(req.BirthDate)
-	if parsed, err := time.Parse("2006-01-02", cleanBD); err == nil {
-		parsedBirthDate = parsed
-	} else if parsed, err := time.Parse("02/01/2006", cleanBD); err == nil {
-		parsedBirthDate = parsed
-	} else if parsed, err := time.Parse("2006/01/02", cleanBD); err == nil {
-		parsedBirthDate = parsed
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "รูปแบบวันเกิดไม่ถูกต้อง กรุณาใช้ DD/MM/YYYY หรือ YYYY-MM-DD"})
+	// Address Validation (Sprint 3: บังคับจังหวัดและอำเภอ)
+	cleanProvince := strings.TrimSpace(req.Province)
+	cleanDistrict := strings.TrimSpace(req.District)
+	cleanPostal := strings.TrimSpace(req.PostalCode)
+
+	if cleanProvince == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุจังหวัด"})
+		return
+	}
+	if cleanDistrict == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณาระบุอำเภอ/เขต"})
+		return
+	}
+	if cleanPostal != "" && (len(cleanPostal) != 5 || !isOnlyDigits(cleanPostal)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก"})
 		return
 	}
 
-	// หากปีเกิดเป็น พ.ศ. (>= 2400) ให้แปลงเป็น ค.ศ. (ลบ 543 ปี)
-	if parsedBirthDate.Year() >= 2400 {
-		parsedBirthDate = parsedBirthDate.AddDate(-543, 0, 0)
+	// birth date format check with Buddhist Era (พ.ศ.) auto-conversion
+	cleanBD := strings.TrimSpace(req.BirthDate)
+	parsedBirthDate, err := services.ParseFlexibleDate(cleanBD)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รูปแบบวันเกิดไม่ถูกต้อง กรุณาใช้ DD/MM/YYYY หรือ YYYY-MM-DD"})
+		return
+	}
+	if parsedBirthDate.After(time.Now()) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "วันเกิดต้องไม่อยู่ในอนาคต"})
+		return
 	}
 
 	// query checking in DB
@@ -74,7 +205,7 @@ func RegisterPatient(c *gin.Context) {
 		return
 	}
 
-	// Auto generate HN if empty (strictly HN + 4-digit decimal format: HN0001, HN0002, etc.)
+	// Auto generate HN if empty (strictly HN + 4-digit hexadecimal format: HN0001 through HNFFFF)
 	hn := req.HN
 	if strings.TrimSpace(hn) == "" {
 		var allPatients []models.Patient
@@ -83,15 +214,25 @@ func RegisterPatient(c *gin.Context) {
 		for _, p := range allPatients {
 			clean := strings.TrimPrefix(strings.TrimPrefix(strings.ToUpper(p.HN), "HN-"), "HN")
 			var num int
-			if _, err := fmt.Sscanf(clean, "%d", &num); err == nil && num > maxNum {
+			if _, err := fmt.Sscanf(clean, "%X", &num); err == nil && num > maxNum {
 				maxNum = num
 			}
-			if int(p.ID) > maxNum {
-				maxNum = int(p.ID)
-			}
 		}
-		hn = fmt.Sprintf("HN%04d", maxNum+1)
+		hn = fmt.Sprintf("HN%04X", maxNum+1)
 	}
+
+	composedAddr := composeAddress(
+		req.HouseNo,
+		req.VillageNo,
+		req.VillageName,
+		req.Alley,
+		req.Road,
+		req.SubDistrict,
+		cleanDistrict,
+		cleanProvince,
+		cleanPostal,
+		req.Address,
+	)
 
 	// define new patient
 	newPatient := models.Patient{
@@ -100,7 +241,16 @@ func RegisterPatient(c *gin.Context) {
 		FullName:         req.FullName,
 		Gender:           req.Gender,
 		BirthDate:        parsedBirthDate,
-		Address:          req.Address,
+		HouseNo:          strings.TrimSpace(req.HouseNo),
+		VillageNo:        strings.TrimSpace(req.VillageNo),
+		VillageName:      strings.TrimSpace(req.VillageName),
+		Alley:            strings.TrimSpace(req.Alley),
+		Road:             strings.TrimSpace(req.Road),
+		SubDistrict:      strings.TrimSpace(req.SubDistrict),
+		District:         cleanDistrict,
+		Province:         cleanProvince,
+		PostalCode:       cleanPostal,
+		Address:          composedAddr,
 		PhoneNumber:      req.PhoneNumber,
 		EmergencyContact: req.EmergencyContact,
 		SchemeType:       req.SchemeType,
@@ -108,8 +258,21 @@ func RegisterPatient(c *gin.Context) {
 		ChronicDiseases:  req.ChronicDiseases,
 	}
 
+	// Atomic Transaction (P1c): Enforce all-or-nothing for Patient + Initial Eligibility + Queue
+	tx := config.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถเริ่ม Transaction ได้"})
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
 	// add new patient to DB
-	if err := config.DB.Create(&newPatient).Error; err != nil {
+	if err := tx.Create(&newPatient).Error; err != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถบันทึกข้อมูลคนไข้ได้"})
 		return
 	}
@@ -132,50 +295,99 @@ func RegisterPatient(c *gin.Context) {
 		coverage = "ชำระค่ารักษาพยาบาลด้วยตนเอง"
 	}
 
+	defaultExp := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
 	initialEligibility := models.MedicalEligibility{
 		PatientID:       &newPatient.ID,
 		SchemeType:      schemeType,
 		CoverageDetails: coverage,
 		HospitalName:    "โรงพยาบาลคลินิกเวชกรรมชุมชน",
 		Status:          "ใช้งานได้",
-		ExpireDate:      "31/12/2026",
+		ExpireDate:      &defaultExp,
 		VerifiedAt:      time.Now(),
 	}
-	config.DB.Create(&initialEligibility)
+	if err := tx.Create(&initialEligibility).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถสร้างข้อมูลสิทธิ์การรักษาได้"})
+		return
+	}
 
-	// สร้างคิวรอคัดกรองให้อัตโนมัติ เพื่อส่งต่อเข้าสู่ระบบคัดกรองทันที
-	var qCount int64
-	config.DB.Model(&models.Queue{}).Count(&qCount)
-	queueNo := fmt.Sprintf("Q%04d", qCount+1)
-
-	var creatorID uint = 2
-	if val, exists := c.Get("userID"); exists {
-		if idFloat, ok := val.(float64); ok {
-			creatorID = uint(idFloat)
-		} else if idUint, ok := val.(uint); ok {
-			creatorID = idUint
+	// Sprint 3.2: ตรวจสอบ issue_queue flag (Default = false: ไม่ออกคิว)
+	if req.IssueQueue {
+		// สร้างคิวรอคัดกรองให้อัตโนมัติ เพื่อส่งต่อเข้าสู่ระบบคัดกรองทันที (Atomic Daily Sequential Queue)
+		nowBkk := time.Now().In(services.BangkokLocation())
+		serviceDate := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
+		queueNo, qErr := services.NextQueueNumber(tx, nowBkk)
+		if qErr != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("ไม่สามารถออกบัตรคิวได้: %v", qErr)})
+			return
 		}
+
+		var creatorID uint = 2
+		if val, exists := c.Get("userID"); exists {
+			if idFloat, ok := val.(float64); ok {
+				creatorID = uint(idFloat)
+			} else if idUint, ok := val.(uint); ok {
+				creatorID = idUint
+			}
+		}
+
+		newQueue := models.Queue{
+			PatientID:       newPatient.ID,
+			CreatedByUserID: creatorID,
+			QueueNumber:     queueNo,
+			ServiceDate:     serviceDate,
+			Status:          "รอคัดกรอง",
+			Department:      "จุดคัดกรอง",
+			Note:            "ส่งเข้าคิวจากการลงทะเบียน",
+			CreatedAt:       nowBkk,
+			UpdatedAt:       nowBkk,
+		}
+		if err := tx.Create(&newQueue).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถสร้างคิวได้"})
+			return
+		}
+
+		if err := tx.Commit().Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถบันทึกข้อมูลได้"})
+			return
+		}
+
+		// ส่ง WebSocket Broadcast แจ้งเตือนทุกเครื่องว่ามีผู้ป่วยใหม่และมีการสร้างคิว
+		ws.BroadcastEvent("PATIENT_REGISTERED", newPatient)
+		ws.BroadcastEvent("QUEUE_CREATED", newQueue)
+
+		// คืน Response พร้อมข้อมูลคิวและ flag queue_issued: true
+		c.JSON(http.StatusCreated, gin.H{
+			"message":      "ลงทะเบียนคนไข้ใหม่และส่งเข้าคิวคัดกรองสำเร็จ",
+			"patient":      newPatient,
+			"hn":           newPatient.HN,
+			"patient_id":   newPatient.ID,
+			"queue_number": newQueue.QueueNumber,
+			"queue_id":     newQueue.ID,
+			"queue_issued": true,
+			"queue":        newQueue,
+		})
+		return
 	}
 
-	newQueue := models.Queue{
-		PatientID:       newPatient.ID,
-		CreatedByUserID: creatorID,
-		QueueNumber:     queueNo,
-		Status:          "รอคัดกรอง",
-		Department:      "จุดคัดกรอง",
-		Note:            "ส่งเข้าคิวจากการลงทะเบียน",
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถบันทึกข้อมูลได้"})
+		return
 	}
-	config.DB.Create(&newQueue)
-	ws.BroadcastEvent("QUEUE_CREATED", newQueue)
 
-	// ส่ง WebSocket Broadcast แจ้งเตือนทุกเครื่องว่ามีผู้ป่วยใหม่ลงทะเบียน
+	// กรณี issue_queue == false (หรือไม่ได้ส่งมา): ออกแค่ HN และไม่ออกคิว
 	ws.BroadcastEvent("PATIENT_REGISTERED", newPatient)
 
-	// send json object to frontend
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "ลงทะเบียนคนไข้ใหม่และส่งเข้าคิวคัดกรองสำเร็จ",
-		"patient": newPatient,
-		"queue":   newQueue,
+		"message":      "ลงทะเบียนคนไข้ใหม่สำเร็จ (ยังไม่ออกบัตรคิว)",
+		"patient":      newPatient,
+		"hn":           newPatient.HN,
+		"patient_id":   newPatient.ID,
+		"queue_issued": false,
 	})
 }
 
@@ -226,4 +438,136 @@ func SearchPatient(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, patients)
+}
+
+// UpdatePatientReq struct
+type UpdatePatientReq struct {
+	FullName         string `json:"fullname"`
+	Gender           string `json:"gender"`
+	BirthDate        string `json:"birthdate"`
+	PhoneNumber      string `json:"phone_number"`
+	EmergencyContact string `json:"emergency_contact"`
+	SchemeType       string `json:"scheme_type"`
+	Allergies        string `json:"allergies"`
+	ChronicDiseases  string `json:"chronic_diseases"`
+
+	// Structured Address Fields (Sprint 3)
+	HouseNo     string `json:"house_no"`
+	VillageNo   string `json:"village_no"`
+	VillageName string `json:"village_name"`
+	Alley       string `json:"alley"`
+	Road        string `json:"road"`
+	SubDistrict string `json:"sub_district"`
+	District    string `json:"district"`
+	Province    string `json:"province"`
+	PostalCode  string `json:"postal_code"`
+
+	// Legacy Address fallback
+	Address string `json:"address"`
+}
+
+// UpdatePatient - แก้ไขข้อมูลคนไข้ พร้อม Re-compose Address ใหม่ทุกครั้ง
+func UpdatePatient(c *gin.Context) {
+	id := c.Param("id")
+	var patient models.Patient
+	if err := config.DB.Where("id = ? OR hn = ?", id, id).First(&patient).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "ไม่พบข้อมูลผู้ป่วย"})
+		return
+	}
+
+	var req UpdatePatientReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ข้อมูลที่ส่งมาไม่ถูกต้อง"})
+		return
+	}
+
+	if req.FullName != "" {
+		patient.FullName = req.FullName
+	}
+	if req.Gender != "" {
+		patient.Gender = req.Gender
+	}
+	if strings.TrimSpace(req.BirthDate) != "" {
+		parsedBirthDate, err := services.ParseFlexibleDate(req.BirthDate)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "รูปแบบวันเกิดไม่ถูกต้อง กรุณาใช้ DD/MM/YYYY หรือ YYYY-MM-DD"})
+			return
+		}
+		if parsedBirthDate.After(time.Now()) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "วันเกิดต้องไม่อยู่ในอนาคต"})
+			return
+		}
+		patient.BirthDate = parsedBirthDate
+	}
+	if req.PhoneNumber != "" {
+		patient.PhoneNumber = req.PhoneNumber
+	}
+	if req.EmergencyContact != "" {
+		patient.EmergencyContact = req.EmergencyContact
+	}
+	if req.SchemeType != "" {
+		patient.SchemeType = req.SchemeType
+	}
+	if req.Allergies != "" {
+		patient.Allergies = req.Allergies
+	}
+	if req.ChronicDiseases != "" {
+		patient.ChronicDiseases = req.ChronicDiseases
+	}
+
+	// Update structured address fields
+	if req.HouseNo != "" {
+		patient.HouseNo = strings.TrimSpace(req.HouseNo)
+	}
+	if req.VillageNo != "" {
+		patient.VillageNo = strings.TrimSpace(req.VillageNo)
+	}
+	if req.VillageName != "" {
+		patient.VillageName = strings.TrimSpace(req.VillageName)
+	}
+	if req.Alley != "" {
+		patient.Alley = strings.TrimSpace(req.Alley)
+	}
+	if req.Road != "" {
+		patient.Road = strings.TrimSpace(req.Road)
+	}
+	if req.SubDistrict != "" {
+		patient.SubDistrict = strings.TrimSpace(req.SubDistrict)
+	}
+	if req.District != "" {
+		patient.District = strings.TrimSpace(req.District)
+	}
+	if req.Province != "" {
+		patient.Province = strings.TrimSpace(req.Province)
+	}
+	if req.PostalCode != "" {
+		patient.PostalCode = strings.TrimSpace(req.PostalCode)
+	}
+
+	// Re-compose Address every time patient is updated
+	composedAddr := composeAddress(
+		patient.HouseNo,
+		patient.VillageNo,
+		patient.VillageName,
+		patient.Alley,
+		patient.Road,
+		patient.SubDistrict,
+		patient.District,
+		patient.Province,
+		patient.PostalCode,
+		req.Address,
+	)
+	patient.Address = composedAddr
+
+	if err := config.DB.Save(&patient).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "ไม่สามารถบันทึกการแก้ไขข้อมูลผู้ป่วยได้"})
+		return
+	}
+
+	ws.BroadcastEvent("PATIENT_UPDATED", patient)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "แก้ไขข้อมูลผู้ป่วยสำเร็จ",
+		"patient": patient,
+	})
 }

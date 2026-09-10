@@ -19,6 +19,7 @@ export interface PatientConfig {
   phone?: string;
   occupation?: string;
   treatmentRights: string;
+  registeredRights?: string;
   patientType: 'ผู้ป่วยนอก (OPD)' | 'ผู้ป่วยใน (IPD)';
   allergies: string[];
   chronicDiseases: string;
@@ -43,6 +44,90 @@ export interface PatientConfig {
   }[];
   createdAt?: string;
 }
+
+export const normalizeScheme = (r?: string): string => {
+  if (!r) return '30baht';
+  const s = r.toLowerCase();
+  if (s.includes('30') || s.includes('บัตรทอง') || s.includes('สปสช')) return '30baht';
+  if (s.includes('ประกันสังคม') || s.includes('social')) return 'sso';
+  if (s.includes('ข้าราชการ') || s.includes('กรมบัญชีกลาง') || s.includes('gov')) return 'gov';
+  if (s.includes('ประกันสุขภาพ') || s.includes('เอกชน') || s.includes('insurance')) return 'private';
+  if (s.includes('จ่ายตรง') || s.includes('เงินสด') || s.includes('ชำระ') || s.includes('cash') || s.includes('self')) return 'cash';
+  return '30baht';
+};
+
+export const SCHEME_LABELS: Record<string, string> = {
+  '30baht': 'สิทธิ 30 บาท (บัตรทอง / สปสช.)',
+  'sso': 'สิทธิประกันสังคม (Social Security)',
+  'gov': 'สิทธิข้าราชการ / จ่ายตรงกรมบัญชีกลาง',
+  'private': 'ประกันสุขภาพเอกชน (Private Insurance)',
+  'cash': 'จ่ายตรง / เงินสด (Self Pay / Cash)',
+};
+
+export interface BenefitCalculationResult {
+  grossTotal: number;
+  discountAmount: number;
+  netTotal: number;
+  discountDescription: string;
+  schemeLabel: string;
+}
+
+export const calculateBenefitAmounts = (
+  rawTotal: number,
+  scheme: string
+): BenefitCalculationResult => {
+  const key = normalizeScheme(scheme);
+  let discount = 0;
+  let net = rawTotal;
+  let desc = '';
+
+  switch (key) {
+    case '30baht':
+      if (rawTotal <= 30) {
+        discount = 0;
+        net = rawTotal;
+        desc = 'สิทธิ 30 บาท (สปสช.): ผู้ป่วยร่วมจ่ายตามจริง (ไม่เกิน 30 บาท)';
+      } else {
+        discount = rawTotal - 30;
+        net = 30;
+        desc = `สิทธิ 30 บาท (สปสช.): ผู้ป่วยร่วมจ่าย 30 บาท (หักส่วนลดสิทธิ ฿${discount.toLocaleString()})`;
+      }
+      break;
+
+    case 'sso':
+      discount = rawTotal;
+      net = 0;
+      desc = `สิทธิประกันสังคม: คลินิกคู่สัญญาครอบคลุม 100% (หักส่วนลดสิทธิ ฿${discount.toLocaleString()} จ่าย ฿0)`;
+      break;
+
+    case 'gov':
+      discount = rawTotal;
+      net = 0;
+      desc = `สิทธิข้าราชการ: เบิกจ่ายตรงกรมบัญชีกลาง 100% (หักส่วนลดสิทธิ ฿${discount.toLocaleString()} จ่าย ฿0)`;
+      break;
+
+    case 'private':
+      discount = Math.round(rawTotal * 0.8);
+      net = rawTotal - discount;
+      desc = `ประกันสุขภาพเอกชน: ประกันคุ้มครอง 80% ผู้ป่วยร่วมจ่าย 20% (หักส่วนลดสิทธิ ฿${discount.toLocaleString()} จ่าย ฿${net.toLocaleString()})`;
+      break;
+
+    case 'cash':
+    default:
+      discount = 0;
+      net = rawTotal;
+      desc = 'จ่ายตรง / เงินสด: ชำระเองเต็มจำนวน (ไม่มีส่วนลดสิทธิ)';
+      break;
+  }
+
+  return {
+    grossTotal: rawTotal,
+    discountAmount: discount,
+    netTotal: net,
+    discountDescription: desc,
+    schemeLabel: SCHEME_LABELS[key] || 'จ่ายตรง / เงินสด (Self Pay / Cash)',
+  };
+};
 
 export const CLINIC_CONFIG = {
   appName: 'General Clinic',

@@ -7,6 +7,8 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/services"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
@@ -14,23 +16,25 @@ func main() {
 	config.ConnectDB()
 
 	db := config.DB
-	log.Println("Starting database cleanup for B6706265 modules...")
+	log.Println("Starting database cleanup & seed for General Clinic (Docker / Local Dev)...")
 
-	// 1. Delete dependent records first to maintain referential integrity
+	// 1. Delete dependent transactional records first to maintain referential integrity
 	tables := []string{
+		"appointment_tests",
+		"appointments",
 		"qr_payments",
 		"billings",
 		"billing_queues",
 		"billing_histories",
 		"medicine_queues",
 		"dispensings",
-		"prescription_items",
 		"examinations",
 		"diagnoses",
 		"patient_medicines",
 		"patient_histories",
 		"screenings",
 		"queues",
+		"queue_counters",
 		"visit_records",
 		"medical_eligibilities",
 		"patients",
@@ -43,16 +47,79 @@ func main() {
 		}
 	}
 
-	log.Println("All test data cleaned successfully! Now seeding fresh clean records...")
+	// Reset primary key sequences for transactional tables so IDs start cleanly from 1
+	seqs := []string{
+		"patients_id_seq",
+		"queues_id_seq",
+		"visit_records_id_seq",
+		"screenings_id_seq",
+		"medical_eligibilities_id_seq",
+		"diagnoses_id_seq",
+		"examinations_id_seq",
+		"patient_medicines_id_seq",
+		"billings_id_seq",
+		"medicine_queues_id_seq",
+		"appointments_id_seq",
+		"appointment_tests_id_seq",
+	}
+	for _, seq := range seqs {
+		db.Exec("ALTER SEQUENCE IF EXISTS " + seq + " RESTART WITH 1")
+	}
 
-	// Fetch users for relations
-	var registrar models.User
-	var nurse models.User
-	var assistant models.User
-	var doc1 models.User
-	var doc2 models.User
-	var doc3 models.User
+	log.Println("All transactional test data cleaned and sequences reset! Now seeding fresh clean records...")
 
+	// 2. Seed All Required Users — รหัสผ่านเริ่มต้นของแต่ละคน = employee_id ของตัวเอง (ตรงกับ
+	// seedDatabase() ใน internal/config/db.go) ไม่ใช่ "password" ที่ใช้ร่วมกันทุกคนแบบเดิม
+	// ต้อง hash แยกรายคนเพราะรหัสผ่านไม่เหมือนกันแล้ว
+	type seedDef struct {
+		Username, FullName, Role, Phone, EmployeeID string
+	}
+	seedDefs := []seedDef{
+		{"officer1", "คุณสมจิต ดีใจ", "officer", "081-555-0001", "OFF001"},
+		{"registrar1", "คุณสุภาพร เวชระเบียน", "registrar", "081-111-0001", "REC001"},
+		{"nurse1", "พว. กานดา คัดกรอง", "nurse", "081-111-0002", "NUR001"},
+		{"assistant1", "นายสมคิด ช่วยเหลือดี", "nurse_assistant", "081-111-0003", "NUR002"},
+		{"pharmacist1", "ดร.บุญ สั่งยา", "pharmacist", "081-333-0001", "PHA001"},
+		{"cashier1", "นส.รวย การเงิน", "cashier", "081-444-0001", "CAS001"},
+		{"doctor1", "พญ.สุดา สุขสมบูรณ์", "doctor", "081-222-0001", "DOC001"},
+		{"doctor2", "นพ.วิชัย ชาญการแพทย์", "doctor", "081-222-0002", "DOC002"},
+		{"doctor3", "พญ.เกศรา รักษาดี", "doctor", "081-222-0003", "DOC003"},
+		{"admin1", "ผู้ดูแลระบบ คลินิก", "admin", "081-999-0001", "ADM001"},
+	}
+
+	seedUsers := make([]models.User, len(seedDefs))
+	for i, sd := range seedDefs {
+		hashPassword, _ := bcrypt.GenerateFromPassword([]byte(sd.EmployeeID), 10)
+		seedUsers[i] = models.User{
+			Username:   sd.Username,
+			Password:   string(hashPassword),
+			Role:       sd.Role,
+			FullName:   sd.FullName,
+			Phone:      sd.Phone,
+			EmployeeID: sd.EmployeeID,
+		}
+	}
+
+	for i := range seedUsers {
+		var existing models.User
+		if err := db.Where("username = ?", seedUsers[i].Username).First(&existing).Error; err != nil {
+			db.Create(&seedUsers[i])
+			log.Printf("Created user: %s (%s)", seedUsers[i].Username, seedUsers[i].Role)
+		} else {
+			db.Model(&existing).Updates(map[string]interface{}{
+				"full_name":   seedUsers[i].FullName,
+				"role":        seedUsers[i].Role,
+				"phone":       seedUsers[i].Phone,
+				"employee_id": seedUsers[i].EmployeeID,
+				"password":    seedUsers[i].Password,
+			})
+			seedUsers[i] = existing
+			log.Printf("Updated user: %s (%s)", seedUsers[i].Username, seedUsers[i].Role)
+		}
+	}
+
+	// Fetch users for FK relations
+	var registrar, nurse, assistant, doc1, doc2, doc3 models.User
 	db.Where("username = ?", "registrar1").First(&registrar)
 	db.Where("username = ?", "nurse1").First(&nurse)
 	db.Where("username = ?", "assistant1").First(&assistant)
@@ -60,25 +127,26 @@ func main() {
 	db.Where("username = ?", "doctor2").First(&doc2)
 	db.Where("username = ?", "doctor3").First(&doc3)
 
-	if doc1.ID == 0 {
-		var anyDoc models.User
-		db.Where("role = ?", "doctor").First(&anyDoc)
-		doc1 = anyDoc
+	// Ensure Doctor profiles
+	doctorProfiles := []models.Doctor{
+		{UserID: doc1.ID, FullName: doc1.FullName, LicenseNumber: "ว.11234", Specialty: "อายุรกรรมทั่วไป", Room: "ห้องตรวจ 1", Phone: doc1.Phone, IsActive: true},
+		{UserID: doc2.ID, FullName: doc2.FullName, LicenseNumber: "ว.22345", Specialty: "เวชศาสตร์ครอบครัว", Room: "ห้องตรวจ 2", Phone: doc2.Phone, IsActive: true},
+		{UserID: doc3.ID, FullName: doc3.FullName, LicenseNumber: "ว.33456", Specialty: "กุมารเวชกรรม", Room: "ห้องตรวจ 3", Phone: doc3.Phone, IsActive: true},
 	}
-	if doc2.ID == 0 {
-		doc2 = doc1
-	}
-	if doc3.ID == 0 {
-		doc3 = doc1
-	}
-	if nurse.ID == 0 {
-		db.Where("role = ?", "nurse").First(&nurse)
-	}
-	if assistant.ID == 0 {
-		assistant = nurse
-	}
-	if registrar.ID == 0 {
-		db.Where("role = ?", "registrar").First(&registrar)
+	for _, dp := range doctorProfiles {
+		var existingDP models.Doctor
+		if err := db.Where("user_id = ?", dp.UserID).First(&existingDP).Error; err != nil {
+			db.Create(&dp)
+		} else {
+			db.Model(&existingDP).Updates(map[string]interface{}{
+				"full_name":      dp.FullName,
+				"license_number": dp.LicenseNumber,
+				"specialty":      dp.Specialty,
+				"room":           dp.Room,
+				"phone":          dp.Phone,
+				"is_active":      true,
+			})
+		}
 	}
 
 	parseDate := func(d string) time.Time {
@@ -86,337 +154,237 @@ func main() {
 		return t
 	}
 
-	// 2. Seed Standard 8 Patients (HN0001 - HN0008)
+	// 3. Seed 20 Patients (HN0001 - HN0014 in 4-digit Hex)
 	patients := []models.Patient{
-		{
-			HN:               "HN0001",
-			NationalID:       "1234567890123",
-			FullName:         "นายสมชาย ใจดี",
-			Gender:           "ชาย",
-			BirthDate:        parseDate("1990-05-15"),
-			Address:          "123/45 ถนนพหลโยธิน แขวงลาดยาว เขตจตุจักร กรุงเทพฯ",
-			PhoneNumber:      "081-234-5678",
-			EmergencyContact: "นางสมศรี (ภรรยา) 089-999-1111",
-			SchemeType:       "บัตรทอง (สปสช.)",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			ChronicDiseases:  "ความดันโลหิตสูง (คุมได้ดี)",
-		},
-		{
-			HN:               "HN0002",
-			NationalID:       "3100598765432",
-			FullName:         "นางสาววิภาดา มณีรัตน์",
-			Gender:           "หญิง",
-			BirthDate:        parseDate("1995-11-22"),
-			Address:          "88/12 ซอยสุขุมวิท 55 แขวงคลองตันเหนือ เขตวัฒนา กรุงเทพฯ",
-			PhoneNumber:      "089-876-5432",
-			EmergencyContact: "นายประสิทธิ์ (บิดา) 081-444-2222",
-			SchemeType:       "ประกันสังคม (ม.33)",
-			Allergies:        "แพ้ยา Penicillin",
-			ChronicDiseases:  "ไมเกรน",
-		},
-		{
-			HN:               "HN0003",
-			NationalID:       "1101455443219",
-			FullName:         "นายอาทิตย์ มีสุข",
-			Gender:           "ชาย",
-			BirthDate:        parseDate("1982-03-10"),
-			Address:          "45/6 ถนนงามวงศ์วาน ตำบลบางเขน อำเภอเมือง นนทบุรี",
-			PhoneNumber:      "086-555-4321",
-			EmergencyContact: "นางวรรณา (มารดา) 082-333-8888",
-			SchemeType:       "สิทธิ์ข้าราชการ",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			ChronicDiseases:  "ความดันโลหิตสูง",
-		},
-		{
-			HN:               "HN0004",
-			NationalID:       "5102011223345",
-			FullName:         "นางสมศรี รักษาดี",
-			Gender:           "หญิง",
-			BirthDate:        parseDate("1975-08-05"),
-			Address:          "99/8 ซอยลาดพร้าว 71 แขวงสะพานสอง เขตวังทองหลาง กรุงเทพฯ",
-			PhoneNumber:      "084-111-2233",
-			EmergencyContact: "นายธนา (บุตรชาย) 087-654-3210",
-			SchemeType:       "บัตรทอง (สปสช.)",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			ChronicDiseases:  "เบาหวานชนิดที่ 2",
-		},
-		{
-			HN:               "HN0005",
-			NationalID:       "1103377889901",
-			FullName:         "นายธนกฤต กิตติพงษ์",
-			Gender:           "ชาย",
-			BirthDate:        parseDate("1998-09-14"),
-			Address:          "15/9 ถนนเพชรเกษม แขวงบางแคเหนือ เขตบางแค กรุงเทพฯ",
-			PhoneNumber:      "083-999-8877",
-			EmergencyContact: "นางกาญจนา (พี่สาว) 081-333-4455",
-			SchemeType:       "ประกันสุขภาพเอกชน",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			ChronicDiseases:  "ไม่มี",
-		},
-		{
-			HN:               "HN0006",
-			NationalID:       "1104488990123",
-			FullName:         "เด็กหญิงกัญญา มีทรัพย์",
-			Gender:           "หญิง",
-			BirthDate:        parseDate("2018-04-12"),
-			Address:          "24/1 ถนนพระราม 2 ซอย 50 แขวงแสมดำ เขตบางขุนเทียน กรุงเทพฯ",
-			PhoneNumber:      "082-123-4567",
-			EmergencyContact: "นายเกรียงไกร (บิดา) 082-123-4567",
-			SchemeType:       "บัตรทอง (สปสช.)",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			ChronicDiseases:  "ไม่มี",
-		},
-		{
-			HN:               "HN0007",
-			NationalID:       "3102233445567",
-			FullName:         "นายประเสริฐ ยืนยง",
-			Gender:           "ชาย",
-			BirthDate:        parseDate("1958-01-20"),
-			Address:          "67/3 ถนนสุขาภิบาล 5 แขวงท่าแร้ง เขตบางเขน กรุงเทพฯ",
-			PhoneNumber:      "085-678-9012",
-			EmergencyContact: "นางรัตนา (ภรรยา) 089-123-4567",
-			SchemeType:       "สิทธิ์ข้าราชการ",
-			Allergies:        "แพ้ยา Sulfa",
-			ChronicDiseases:  "โรคหัวใจขาดเลือด, ความดันโลหิตสูง",
-		},
-		{
-			HN:               "HN0008",
-			NationalID:       "2105566778890",
-			FullName:         "นางสาวมณีรัตน์ วงศ์สว่าง",
-			Gender:           "หญิง",
-			BirthDate:        parseDate("2002-07-30"),
-			Address:          "302/11 ถนนรัชดาภิเษก แขวงจันทร์เกษม เขตจตุจักร กรุงเทพฯ",
-			PhoneNumber:      "088-765-4321",
-			EmergencyContact: "นายสมบัติ (บิดา) 086-789-0123",
-			SchemeType:       "ชำระเงินเอง",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			ChronicDiseases:  "ไม่มี",
-		},
+		{HN: "HN0001", NationalID: "1234567890123", FullName: "นายสมชาย ใจดี", Gender: "ชาย", BirthDate: parseDate("1990-05-15"), Address: "123/45 ถนนพหลโยธิน แขวงลาดยาว เขตจตุจักร กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "จตุจักร", SubDistrict: "ลาดยาว", PostalCode: "10900", PhoneNumber: "081-234-5678", EmergencyContact: "นางสมศรี (ภรรยา) 089-999-1111", SchemeType: "บัตรทอง (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ความดันโลหิตสูง (คุมได้ดี)"},
+		{HN: "HN0002", NationalID: "3100598765432", FullName: "นางสาววิภาดา มณีรัตน์", Gender: "หญิง", BirthDate: parseDate("1995-11-22"), Address: "88/12 ซอยสุขุมวิท 55 แขวงคลองตันเหนือ เขตวัฒนา กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "วัฒนา", SubDistrict: "คลองตันเหนือ", PostalCode: "10110", PhoneNumber: "089-876-5432", EmergencyContact: "นายประสิทธิ์ (บิดา) 081-444-2222", SchemeType: "ประกันสังคม (ม.33)", Allergies: "แพ้ยา Penicillin", ChronicDiseases: "ไมเกรน"},
+		{HN: "HN0003", NationalID: "1101455443219", FullName: "นายอาทิตย์ มีสุข", Gender: "ชาย", BirthDate: parseDate("1982-03-10"), Address: "45/6 ถนนงามวงศ์วาน ตำบลบางเขน อำเภอเมือง นนทบุรี", Province: "นนทบุรี", District: "เมืองนนทบุรี", SubDistrict: "บางเขน", PostalCode: "11000", PhoneNumber: "086-555-4321", EmergencyContact: "นางวรรณา (มารดา) 082-333-8888", SchemeType: "สิทธิ์ข้าราชการ", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ความดันโลหิตสูง"},
+		{HN: "HN0004", NationalID: "5102011223345", FullName: "นางสมศรี รักษาดี", Gender: "หญิง", BirthDate: parseDate("1975-08-05"), Address: "99/8 ซอยลาดพร้าว 71 แขวงสะพานสอง เขตวังทองหลาง กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "วังทองหลาง", SubDistrict: "สะพานสอง", PostalCode: "10310", PhoneNumber: "084-111-2233", EmergencyContact: "นายธนา (บุตรชาย) 087-654-3210", SchemeType: "บัตรทอง (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "เบาหวานชนิดที่ 2"},
+		{HN: "HN0005", NationalID: "1103377889901", FullName: "นายธนกฤต กิตติพงษ์", Gender: "ชาย", BirthDate: parseDate("1998-09-14"), Address: "15/9 ถนนเพชรเกษม แขวงบางแคเหนือ เขตบางแค กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "บางแค", SubDistrict: "บางแคเหนือ", PostalCode: "10160", PhoneNumber: "083-999-8877", EmergencyContact: "นางกาญจนา (พี่สาว) 081-333-4455", SchemeType: "ประกันสุขภาพเอกชน", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ไม่มี"},
+		{HN: "HN0006", NationalID: "1104488990123", FullName: "เด็กหญิงกัญญา มีทรัพย์", Gender: "หญิง", BirthDate: parseDate("2018-04-12"), Address: "24/1 ถนนพระราม 2 ซอย 50 แขวงแสมดำ เขตบางขุนเทียน กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "บางขุนเทียน", SubDistrict: "แสมดำ", PostalCode: "10150", PhoneNumber: "082-123-4567", EmergencyContact: "นายเกรียงไกร (บิดา) 082-123-4567", SchemeType: "บัตรทอง (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ไม่มี"},
+		{HN: "HN0007", NationalID: "3102233445567", FullName: "นายประเสริฐ ยืนยง", Gender: "ชาย", BirthDate: parseDate("1958-01-20"), Address: "67/3 ถนนสุขาภิบาล 5 แขวงท่าแร้ง เขตบางเขน กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "บางเขน", SubDistrict: "ท่าแร้ง", PostalCode: "10220", PhoneNumber: "085-678-9012", EmergencyContact: "นางรัตนา (ภรรยา) 089-123-4567", SchemeType: "สิทธิ์ข้าราชการ", Allergies: "แพ้ยา Sulfa", ChronicDiseases: "โรคหัวใจขาดเลือด, ความดันโลหิตสูง"},
+		{HN: "HN0008", NationalID: "2105566778890", FullName: "นางสาวมณีรัตน์ วงศ์สว่าง", Gender: "หญิง", BirthDate: parseDate("2002-07-30"), Address: "302/11 ถนนรัชดาภิเษก แขวงจันทร์เกษม เขตจตุจักร กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "จตุจักร", SubDistrict: "จันทรเกษม", PostalCode: "10900", PhoneNumber: "088-765-4321", EmergencyContact: "นายสมบัติ (บิดา) 086-789-0123", SchemeType: "ชำระเงินเอง", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ไม่มี"},
+		{HN: "HN0009", NationalID: "1100223344556", FullName: "นายสุรชัย ชนะภัย", Gender: "ชาย", BirthDate: parseDate("1985-04-18"), Address: "54/2 หมู่ 3 ตำบลบางกร่าง อำเภอเมือง นนทบุรี", Province: "นนทบุรี", District: "เมืองนนทบุรี", SubDistrict: "บางกร่าง", PostalCode: "11000", PhoneNumber: "081-555-6789", EmergencyContact: "นางอรนุช (ภรรยา) 081-555-6780", SchemeType: "ประกันสังคม (ม.33)", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ไขมันในเลือดสูง"},
+		{HN: "HN000A", NationalID: "3100334455667", FullName: "นางนภา เลิศเกียรติ", Gender: "หญิง", BirthDate: parseDate("1979-12-05"), Address: "12/8 ซอยลาดพร้าว 101 แขวงคลองจั่น เขตบางกะปิ กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "บางกะปิ", SubDistrict: "คลองจั่น", PostalCode: "10240", PhoneNumber: "089-111-2244", EmergencyContact: "นายเกียรติ (สามี) 089-111-2245", SchemeType: "บัตรทอง (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ภูมิแพ้อากาศ"},
+		{HN: "HN000B", NationalID: "1100445566778", FullName: "นายพงศธร รัตนพงษ์", Gender: "ชาย", BirthDate: parseDate("1993-08-25"), Address: "77/4 ถนนพุทธมณฑลสาย 2 แขวงบางไผ่ เขตบางแค กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "บางแค", SubDistrict: "บางไผ่", PostalCode: "10160", PhoneNumber: "086-222-3355", EmergencyContact: "นางพรรณี (มารดา) 086-222-3356", SchemeType: "ประกันสุขภาพเอกชน", Allergies: "แพ้ยา Aspirin", ChronicDiseases: "ไม่มี"},
+		{HN: "HN000C", NationalID: "3100556677889", FullName: "นางสาวอรทัย บุณยเกียรติ", Gender: "หญิง", BirthDate: parseDate("2000-02-14"), Address: "9/99 ซอยอารีย์ แขวงสามเสนใน เขตพญาไท กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "พญาไท", SubDistrict: "สามเสนใน", PostalCode: "10400", PhoneNumber: "084-333-4466", EmergencyContact: "นายสมเกียรติ (บิดา) 084-333-4467", SchemeType: "สิทธิ์ข้าราชการ", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ไม่มี"},
+		{HN: "HN000D", NationalID: "1100667788990", FullName: "นายธนาธิป สุวรรณโชติ", Gender: "ชาย", BirthDate: parseDate("1968-10-30"), Address: "101/5 ถนนแจ้งวัฒนะ ตำบลคลองเกลือ อำเภอปากเกร็ด นนทบุรี", Province: "นนทบุรี", District: "ปากเกร็ด", SubDistrict: "คลองเกลือ", PostalCode: "11120", PhoneNumber: "083-444-5577", EmergencyContact: "นางวันดี (ภรรยา) 083-444-5578", SchemeType: "บัตรทอง (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "เกาต์, ความดันโลหิตสูง"},
+		{HN: "HN000E", NationalID: "3100778899001", FullName: "นางรุ่งนภา พัฒนกิจ", Gender: "หญิง", BirthDate: parseDate("1988-06-19"), Address: "33/1 ซอยสุขุมวิท 101/1 แขวงบางจาก เขตพระโขนง กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "พระโขนง", SubDistrict: "บางจาก", PostalCode: "10260", PhoneNumber: "082-555-6688", EmergencyContact: "นายพัฒนะ (สามี) 082-555-6689", SchemeType: "ประกันสังคม (ม.33)", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ไทรอยด์"},
+		{HN: "HN000F", NationalID: "1100889900112", FullName: "เด็กชายธีรภัทร เมธากุล", Gender: "ชาย", BirthDate: parseDate("2020-09-08"), Address: "8/12 ถนนประชาชื่น ตำบลท่าทราย อำเภอเมือง นนทบุรี", Province: "นนทบุรี", District: "เมืองนนทบุรี", SubDistrict: "ท่าทราย", PostalCode: "11000", PhoneNumber: "081-666-7799", EmergencyContact: "นางกุลธิดา (มารดา) 081-666-7799", SchemeType: "บัตรทอง (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ไม่มี"},
+		{HN: "HN0010", NationalID: "1100990011223", FullName: "นายวรพจน์ ธนสารสมบัติ", Gender: "ชาย", BirthDate: parseDate("1972-01-11"), Address: "25/3 ถนนพระราม 9 แขวงห้วยขวาง เขตห้วยขวาง กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "ห้วยขวาง", SubDistrict: "ห้วยขวาง", PostalCode: "10310", PhoneNumber: "087-777-8800", EmergencyContact: "นางจิตรา (ภรรยา) 087-777-8801", SchemeType: "สิทธิ์ข้าราชการ", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ไขมันในเลือดสูง"},
+		{HN: "HN0011", NationalID: "3100112233445", FullName: "นางสาวสิริกร ภัทรเดชา", Gender: "หญิง", BirthDate: parseDate("1997-03-28"), Address: "44/5 ซอยเอกมัย 12 แขวงคลองตันเหนือ เขตวัฒนา กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "วัฒนา", SubDistrict: "คลองตันเหนือ", PostalCode: "10110", PhoneNumber: "088-888-9911", EmergencyContact: "นางเดชา (มารดา) 088-888-9912", SchemeType: "ชำระเงินเอง", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ไม่มี"},
+		{HN: "HN0012", NationalID: "1100123456789", FullName: "นายชาญวิทย์ วงศ์ประสิทธิ์", Gender: "ชาย", BirthDate: parseDate("1980-11-03"), Address: "90/2 ถนนเพชรบุรีตัดใหม่ แขวงบางกะปิ เขตห้วยขวาง กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "ห้วยขวาง", SubDistrict: "บางกะปิ", PostalCode: "10310", PhoneNumber: "089-999-0022", EmergencyContact: "นางวิไล (ภรรยา) 089-999-0023", SchemeType: "ประกันสังคม (ม.33)", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "โรคกระเพาะ"},
+		{HN: "HN0013", NationalID: "3100234567890", FullName: "นางพิมพ์ใจ มั่นคง", Gender: "หญิง", BirthDate: parseDate("1965-07-16"), Address: "15/7 ซอยพหลโยธิน 34 แขวงเสนานิคม เขตจตุจักร กรุงเทพฯ", Province: "กรุงเทพมหานคร", District: "จตุจักร", SubDistrict: "เสนานิคม", PostalCode: "10900", PhoneNumber: "086-000-1133", EmergencyContact: "นายมั่นคง (สามี) 086-000-1134", SchemeType: "บัตรทอง (สปสช.)", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "โรคข้อเข่าเสื่อม"},
+		{HN: "HN0014", NationalID: "1100345678901", FullName: "นายจตุรงค์ โชคดี", Gender: "ชาย", BirthDate: parseDate("1991-12-24"), Address: "88/9 ถนนรังสิต-นครนายก ตำบลประชาธิปัตย์ อำเภอธัญบุรี ปทุมธานี", Province: "ปทุมธานี", District: "ธัญบุรี", SubDistrict: "ประชาธิปัตย์", PostalCode: "12130", PhoneNumber: "085-111-2244", EmergencyContact: "นางดวงใจ (พี่สาว) 085-111-2245", SchemeType: "ชำระเงินเอง", Allergies: "ปฏิเสธการแพ้ยา", ChronicDiseases: "ไม่มี"},
 	}
 
 	for i := range patients {
-		if err := db.Create(&patients[i]).Error; err != nil {
-			log.Printf("Error seeding patient %s: %v", patients[i].FullName, err)
-		} else {
-			log.Printf("Seeded patient %s (ID: %d, HN: %s)", patients[i].FullName, patients[i].ID, patients[i].HN)
+		db.Create(&patients[i])
+	}
+	log.Printf("Seeded %d patients successfully (HN0001 - HN0014).", len(patients))
+
+	// 4. Seed Medical Eligibilities
+	d2026 := time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	d2027 := time.Date(2027, 5, 15, 0, 0, 0, 0, time.UTC)
+	dLife := time.Date(2099, 12, 31, 0, 0, 0, 0, time.UTC)
+
+	for i, p := range patients {
+		pID := p.ID
+		regID := registrar.ID
+		var scheme, cov, hosp, stat string
+		var exp *time.Time
+
+		switch i % 5 {
+		case 0:
+			scheme = "บัตรทอง (สปสช.)"
+			cov = "ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชีและบริการพิเศษ"
+			hosp = "โรงพยาบาลคลินิกเวชกรรมชุมชน"
+			stat = "ใช้งานได้"
+			exp = &d2026
+		case 1:
+			scheme = "ประกันสังคม (ม.33)"
+			cov = "ผู้ประกันตนมาตรา 33 ครอบคลุมการรักษาตามเกณฑ์ สปส."
+			hosp = "โรงพยาบาลประกันสังคมสาขา 1"
+			stat = "ใช้งานได้"
+			exp = &d2026
+		case 2:
+			scheme = "สิทธิ์ข้าราชการ"
+			cov = "จ่ายตรงกรมบัญชีกลาง เบิกค่ายาและค่ารักษาได้ตามสิทธิ์"
+			hosp = "โรงพยาบาลรัฐบาลหลัก"
+			stat = "ใช้งานได้"
+			exp = &dLife
+		case 3:
+			scheme = "ประกันสุขภาพเอกชน"
+			cov = "AIA Care Max คุ้มครองผู้ป่วยนอก 2,000 บ./ครั้ง"
+			hosp = "โรงพยาบาลคู่สัญญาเอกชน"
+			stat = "ใช้งานได้"
+			exp = &d2027
+		default:
+			scheme = "ชำระเงินเอง"
+			cov = "ชำระเงินเต็มจำนวนตามอัตราค่าบริการของคลินิก"
+			hosp = "คลินิกเวชกรรมทั่วไป"
+			stat = "ใช้งานได้"
+			exp = nil
 		}
-	}
-	log.Printf("Seeded %d patients successfully.", len(patients))
 
-	// 3. Seed Medical Eligibilities
-	pID := func(idx int) *uint {
-		id := patients[idx].ID
-		return &id
+		elig := models.MedicalEligibility{
+			PatientID:       &pID,
+			UserID:          &regID,
+			SchemeType:      scheme,
+			CoverageDetails: cov,
+			HospitalName:    hosp,
+			Status:          stat,
+			ExpireDate:      exp,
+			VerifiedAt:      time.Now(),
+		}
+		db.Create(&elig)
 	}
-	regID := &registrar.ID
+	log.Printf("Seeded %d eligibilities successfully.", len(patients))
 
-	eligibilities := []models.MedicalEligibility{
-		{PatientID: pID(0), UserID: regID, SchemeType: "บัตรทอง (สปสช.)", CoverageDetails: "ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชีและบริการพิเศษ", HospitalName: "โรงพยาบาลคลินิกเวชกรรมชุมชน", Status: "ใช้งานได้", ExpireDate: "31/12/2026", VerifiedAt: time.Now()},
-		{PatientID: pID(1), UserID: regID, SchemeType: "ประกันสังคม (ม.33)", CoverageDetails: "ผู้ประกันตนมาตรา 33 ครอบคลุมการรักษาตามเกณฑ์ สปส.", HospitalName: "โรงพยาบาลประกันสังคมสาขา 1", Status: "ใช้งานได้", ExpireDate: "31/12/2026", VerifiedAt: time.Now()},
-		{PatientID: pID(2), UserID: regID, SchemeType: "สิทธิ์ข้าราชการ", CoverageDetails: "จ่ายตรงกรมบัญชีกลาง เบิกค่ายาและค่ารักษาได้ตามสิทธิ์", HospitalName: "โรงพยาบาลรัฐบาลหลัก", Status: "ใช้งานได้", ExpireDate: "ตลอดอายุราชการ", VerifiedAt: time.Now()},
-		{PatientID: pID(3), UserID: regID, SchemeType: "บัตรทอง (สปสช.)", CoverageDetails: "ครอบคลุมการรักษาโรคทั่วไปและโรคเรื้อรัง", HospitalName: "โรงพยาบาลศูนย์สุขภาพปฐมภูมิ", Status: "ใช้งานได้", ExpireDate: "31/12/2026", VerifiedAt: time.Now()},
-		{PatientID: pID(4), UserID: regID, SchemeType: "ประกันสุขภาพเอกชน", CoverageDetails: "AIA Care Max คุ้มครองผู้ป่วยนอก 2,000 บ./ครั้ง", HospitalName: "โรงพยาบาลคู่สัญญาเอกชน", Status: "ใช้งานได้", ExpireDate: "15/05/2027", VerifiedAt: time.Now()},
-		{PatientID: pID(5), UserID: regID, SchemeType: "บัตรทอง (สปสช.)", CoverageDetails: "สิทธิ์คุ้มครองเด็กเล็กและทันตกรรมพื้นฐาน", HospitalName: "โรงพยาบาลส่งเสริมสุขภาพประจำตำบล", Status: "ใช้งานได้", ExpireDate: "31/12/2026", VerifiedAt: time.Now()},
-		{PatientID: pID(6), UserID: regID, SchemeType: "สิทธิ์ข้าราชการ", CoverageDetails: "สิทธิ์ข้าราชการบำนาญ จ่ายตรงเบิกได้เต็มจำนวน", HospitalName: "โรงพยาบาลรัฐบาลหลัก", Status: "ใช้งานได้", ExpireDate: "ตลอดชีพ", VerifiedAt: time.Now()},
-		{PatientID: pID(7), UserID: regID, SchemeType: "ชำระเงินเอง", CoverageDetails: "ชำระเงินเต็มจำนวนตามอัตราค่าบริการของคลินิก", HospitalName: "คลินิกเวชกรรมทั่วไป", Status: "ใช้งานได้", ExpireDate: "-", VerifiedAt: time.Now()},
+	// 5. Seed 15 Queues Today (Q0001 - Q000F in Hex) with mixed clinical statuses
+	nowBkk := time.Now().In(services.BangkokLocation())
+	today := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
+	queueDefs := []struct {
+		QueueNo string
+		Status  string
+		Dept    string
+		Note    string
+	}{
+		{"Q0001", "รอคัดกรอง", "จุดคัดกรอง", "รอวัดความดันโลหิตและสัญญาณชีพ"},
+		{"Q0002", "รอคัดกรอง", "จุดคัดกรอง", "ผู้ป่วย Walk-in มีอาการไข้หวัด"},
+		{"Q0003", "รอคัดกรอง", "จุดคัดกรอง", "นัดติดตามอาการโรคความดันโลหิตสูง"},
+		{"Q0004", "รอพบแพทย์", "ห้องตรวจ 1 (พญ.สุดา)", "คัดกรองแล้ว: เร่งด่วน (Urgent) (BP: 142/92, HR: 98)"},
+		{"Q0005", "รอพบแพทย์", "ห้องตรวจ 2 (นพ.วิชัย)", "คัดกรองแล้ว: สัญญาณชีพปกติ รอเรียกเข้าห้องตรวจ"},
+		{"Q0006", "รอพบแพทย์", "ห้องตรวจ 3 (พญ.เกศรา)", "คัดกรองแล้ว: กุมารแพทย์ รอคิวห้อง 3"},
+		{"Q0007", "กำลังตรวจ", "ห้องตรวจ 1 (พญ.สุดา)", "แพทย์กำลังซักประวัติและตรวจร่างกาย"},
+		{"Q0008", "กำลังตรวจ", "ห้องตรวจ 2 (นพ.วิชัย)", "แพทย์กำลังวินิจฉัยและสั่งยา"},
+		{"Q0009", "รอทำหัตถการ", "ห้องหัตถการ (ทำแผล/ฉีดยา)", "ส่งทำแผล / ฉีดยา / พ่นยา"},
+		{"Q000A", "รอทำหัตถการ", "ห้องหัตถการ (ทำแผล/ฉีดยา)", "ฉีดยาฆ่าเชื้อและสังเกตอาการ 15 นาที"},
+		{"Q000B", "รอชำระเงิน", "ห้องการเงิน (แคชเชียร์)", "ตรวจเสร็จสิ้น รอชำระค่ารักษาพยาบาล"},
+		{"Q000C", "รอชำระเงิน", "ห้องการเงิน (แคชเชียร์)", "รอคำนวณสิทธิการรักษาและออกใบเสร็จ"},
+		{"Q000D", "รอรับยา", "ห้องจ่ายยาและเภสัชกรรม", "ชำระเงินแล้ว รอจัดยาและรับคำแนะนำ"},
+		{"Q000E", "เสร็จสิ้น", "ห้องจ่ายยาและเภสัชกรรม", "รับยาและเสร็จสิ้นขั้นตอนการรักษา"},
+		{"Q000F", "ยกเลิกคิว", "จุดคัดกรอง", "ผู้ป่วยขอยกเลิกคิวเนื่องจากมีธุระด่วน"},
 	}
-	for i := range eligibilities {
-		db.Create(&eligibilities[i])
-	}
-	log.Printf("Seeded %d eligibilities successfully.", len(eligibilities))
 
-	// 4. Seed Clean Standard Queues (Q0001 - Q0008)
-	queues := []models.Queue{
-		{PatientID: patients[0].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0001", Status: "รอคัดกรอง", Department: "จุดคัดกรอง", Note: "รอวัดความดันโลหิตและสัญญาณชีพ"},
-		{PatientID: patients[1].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0002", Status: "รอพบแพทย์", Department: "ห้องตรวจ 1 (พญ.สุดา)", Note: "คัดกรองแล้ว: เร่งด่วน (Urgent) (BP: 142/92, HR: 98)"},
-		{PatientID: patients[2].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0003", Status: "รอพบแพทย์", Department: "ห้องตรวจ 2 (นพ.วิชัย)", Note: "ผู้ป่วย Walk-in มีอาการปวดศีรษะ"},
-		{PatientID: patients[3].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0004", Status: "กำลังตรวจ", Department: "ห้องตรวจ 3 (พญ.เกศรา)", Note: "เข้าห้องตรวจกุมารแพทย์แล้ว"},
-		{PatientID: patients[4].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0005", Status: "รอทำหัตถการ", Department: "ห้องหัตถการ (ทำแผล/ฉีดยา)", Note: "ส่งทำแผล / ฉีดยา / พ่นยา"},
-		{PatientID: patients[5].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0006", Status: "รอชำระเงิน", Department: "ห้องการเงิน (แคชเชียร์)", Note: "ตรวจเสร็จสิ้น รอชำระค่ารักษาพยาบาล"},
-		{PatientID: patients[6].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0007", Status: "รอรับยา", Department: "ห้องจ่ายยาและเภสัชกรรม", Note: "ชำระเงินแล้ว รอจัดยาและรับคำแนะนำ"},
-		{PatientID: patients[7].ID, CreatedByUserID: registrar.ID, QueueNumber: "Q0008", Status: "เสร็จสิ้น", Department: "ห้องจ่ายยาและเภสัชกรรม", Note: "รับยาและเสร็จสิ้นขั้นตอนการรักษา"},
+	for i, qd := range queueDefs {
+		q := models.Queue{
+			PatientID:       patients[i].ID,
+			CreatedByUserID: registrar.ID,
+			QueueNumber:     qd.QueueNo,
+			Status:          qd.Status,
+			Department:      qd.Dept,
+			Note:            qd.Note,
+			ServiceDate:     today,
+		}
+		db.Create(&q)
 	}
-	for i := range queues {
-		db.Create(&queues[i])
-	}
-	log.Printf("Seeded %d queues successfully.", len(queues))
+	log.Printf("Seeded %d queues successfully (Q0001 - Q000F).", len(queueDefs))
 
-	// 5. Seed Visits & Screenings
-	visits := []models.VisitRecord{
-		{PatientID: patients[0].ID, DoctorID: doc1.ID, VisitDate: time.Now().AddDate(0, -1, 0)},
-		{PatientID: patients[0].ID, DoctorID: doc2.ID, VisitDate: time.Now().AddDate(0, -2, 0)},
-		{PatientID: patients[1].ID, DoctorID: doc1.ID, VisitDate: time.Now().Add(-2 * time.Hour)},
-		{PatientID: patients[2].ID, DoctorID: doc2.ID, VisitDate: time.Now().Add(-1 * time.Hour)},
-		{PatientID: patients[3].ID, DoctorID: doc2.ID, VisitDate: time.Now().Add(-30 * time.Minute)},
-		{PatientID: patients[4].ID, DoctorID: doc3.ID, VisitDate: time.Now().Add(-15 * time.Minute)},
-		{PatientID: patients[5].ID, DoctorID: doc3.ID, VisitDate: time.Now().Add(-3 * time.Hour)},
-		{PatientID: patients[6].ID, DoctorID: doc2.ID, VisitDate: time.Now().AddDate(0, -1, -5)},
+	// Seed Queue Counter for Q000F (decimal 15)
+	counter := models.QueueCounter{
+		ServiceDate: today,
+		LastNumber:  15,
 	}
-	for i := range visits {
+	db.Save(&counter)
+
+	// 6. Seed Visits & 10 Screenings (Triage Levels 1-4 canonical integers)
+	visits := make([]models.VisitRecord, 10)
+	for i := 0; i < 10; i++ {
+		doc := doc1
+		if i%3 == 1 {
+			doc = doc2
+		} else if i%3 == 2 {
+			doc = doc3
+		}
+		visits[i] = models.VisitRecord{
+			PatientID:   patients[i].ID,
+			DoctorID:    doc.ID,
+			VisitDate:   time.Now().Add(-time.Duration(i*30) * time.Minute),
+			QueueNumber: queueDefs[i].QueueNo,
+		}
 		db.Create(&visits[i])
 	}
 
-	screenings := []models.Screening{
-		{
-			VisitID:          visits[0].ID,
-			ScreenedByUserID: nurse.ID,
-			AssignedDoctorID: doc1.ID,
-			TriageLevel:      "ไม่ฉุกเฉิน (Non-Urgent)",
-			ChiefComplaint:   "มาตรวจสุขภาพประจำปี รู้สึกอ่อนเพลียเล็กน้อย",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			MedicalHistory:   "ความดันโลหิตสูง (คุมได้ดี)",
-			NurseNotes:       "สัญญาณชีพปกติ แนะนำออกกำลังกายสม่ำเสมอ",
-			Weight:           70.0,
-			Height:           175.0,
-			BMI:              22.86,
-			Temperature:      36.6,
-			SystolicBP:       128,
-			DiastolicBP:      84,
-			HeartRate:        74,
-			RespiratoryRate:  18,
-			SpO2:             99,
-		},
-		{
-			VisitID:          visits[1].ID,
-			ScreenedByUserID: nurse.ID,
-			AssignedDoctorID: doc2.ID,
-			TriageLevel:      "กึ่งฉุกเฉิน (Semi-Urgent)",
-			ChiefComplaint:   "ปวดศีรษะท้ายทอยช่วงบ่าย ทานยาแก้ปวดแล้วไม่ดีขึ้น",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			MedicalHistory:   "ความดันโลหิตสูง",
-			NurseNotes:       "ความดันค่อนข้างสูง ให้นั่งพัก 15 นาทีแล้ววัดซ้ำได้ 134/86",
-			Weight:           72.5,
-			Height:           175.0,
-			BMI:              23.67,
-			Temperature:      36.8,
-			SystolicBP:       138,
-			DiastolicBP:      88,
-			HeartRate:        78,
-			RespiratoryRate:  18,
-			SpO2:             98,
-		},
-		{
-			VisitID:          visits[2].ID,
-			ScreenedByUserID: nurse.ID,
-			AssignedDoctorID: doc1.ID,
-			TriageLevel:      "ฉุกเฉินเร่งด่วน (Urgent)",
-			ChiefComplaint:   "ปวดศีรษะไมเกรนรุนแรง ตาพร่ามัว คลื่นไส้",
-			Allergies:        "แพ้ยา Penicillin",
-			MedicalHistory:   "ไมเกรน",
-			NurseNotes:       "ส่งเข้าห้องตรวจ 1 ทันที เพื่อรับยาระงับอาการปวด",
-			Weight:           54.0,
-			Height:           162.0,
-			BMI:              20.57,
-			Temperature:      37.2,
-			SystolicBP:       142,
-			DiastolicBP:      92,
-			HeartRate:        98,
-			RespiratoryRate:  20,
-			SpO2:             98,
-		},
-		{
-			VisitID:          visits[3].ID,
-			ScreenedByUserID: assistant.ID,
-			AssignedDoctorID: doc2.ID,
-			TriageLevel:      "ไม่ฉุกเฉิน (Non-Urgent)",
-			ChiefComplaint:   "รับยาความดันต่อเนื่องตามนัด สบายดี ไม่มีอาการผิดปกติ",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			MedicalHistory:   "ความดันโลหิตสูง",
-			NurseNotes:       "วัดความดันได้ปกติ ยาเดิมทานครบสม่ำเสมอ",
-			Weight:           68.0,
-			Height:           170.0,
-			BMI:              23.53,
-			Temperature:      36.5,
-			SystolicBP:       122,
-			DiastolicBP:      80,
-			HeartRate:        72,
-			RespiratoryRate:  16,
-			SpO2:             99,
-		},
-		{
-			VisitID:          visits[4].ID,
-			ScreenedByUserID: nurse.ID,
-			AssignedDoctorID: doc2.ID,
-			TriageLevel:      "กึ่งฉุกเฉิน (Semi-Urgent)",
-			ChiefComplaint:   "ตรวจระดับน้ำตาลในเลือดสะสม ปัสสาวะบ่อยตอนกลางคืน",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			MedicalHistory:   "เบาหวานชนิดที่ 2",
-			NurseNotes:       "แนะนำงดของหวานและคุมอาหารต่อเนื่อง",
-			Weight:           65.0,
-			Height:           158.0,
-			BMI:              26.04,
-			Temperature:      36.7,
-			SystolicBP:       135,
-			DiastolicBP:      85,
-			HeartRate:        76,
-			RespiratoryRate:  18,
-			SpO2:             98,
-		},
-		{
-			VisitID:          visits[5].ID,
-			ScreenedByUserID: assistant.ID,
-			AssignedDoctorID: doc3.ID,
-			TriageLevel:      "ไม่ฉุกเฉิน (Non-Urgent)",
-			ChiefComplaint:   "ตรวจสุขภาพทั่วไป เพื่อขอใบรับรองแพทย์ทำใบขับขี่",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			MedicalHistory:   "ไม่มี",
-			NurseNotes:       "สุขภาพแข็งแรง สัญญาณชีพและผลตรวจร่างกายทั่วไปปกติ",
-			Weight:           75.0,
-			Height:           178.0,
-			BMI:              23.67,
-			Temperature:      36.6,
-			SystolicBP:       118,
-			DiastolicBP:      76,
-			HeartRate:        68,
-			RespiratoryRate:  16,
-			SpO2:             99,
-		},
-		{
-			VisitID:          visits[6].ID,
-			ScreenedByUserID: nurse.ID,
-			AssignedDoctorID: doc3.ID,
-			TriageLevel:      "ฉุกเฉิน (Emergency)",
-			ChiefComplaint:   "มีไข้สูง 39.2 องศา หนาวสั่น ไอมีเสมหะ ซึมลง",
-			Allergies:        "ปฏิเสธการแพ้ยา",
-			MedicalHistory:   "ไม่มี",
-			NurseNotes:       "เช็ดตัวลดไข้ทันที ส่งพบกุมารแพทย์ห้องตรวจ 3 ด่วน",
-			Weight:           25.0,
-			Height:           125.0,
-			BMI:              16.00,
-			Temperature:      39.2,
-			SystolicBP:       105,
-			DiastolicBP:      65,
-			HeartRate:        128,
-			RespiratoryRate:  26,
-			SpO2:             96,
-		},
-		{
-			VisitID:          visits[7].ID,
-			ScreenedByUserID: nurse.ID,
-			AssignedDoctorID: doc2.ID,
-			TriageLevel:      "ฉุกเฉินวิกฤต (Resuscitation)",
-			ChiefComplaint:   "แน่นหน้าอกร้าวไปกรามซ้าย หายใจเหนื่อยหอบ เหงื่อแตก",
-			Allergies:        "แพ้ยา Sulfa",
-			MedicalHistory:   "โรคหัวใจขาดเลือด, ความดันโลหิตสูง",
-			NurseNotes:       "ให้ออกซิเจนแคนนูลา 3 LPM EKG 12 Lead ส่งห้องตรวจแพทย์ทันที",
-			Weight:           62.0,
-			Height:           165.0,
-			BMI:              22.77,
-			Temperature:      36.4,
-			SystolicBP:       178,
-			DiastolicBP:      108,
-			HeartRate:        115,
-			RespiratoryRate:  24,
-			SpO2:             92,
-		},
+	boolPtr := func(b bool) *bool { return &b }
+
+	screeningsData := []struct {
+		Triage      int
+		Complaint   string
+		Allergies   string
+		History     string
+		Notes       string
+		Weight      float64
+		Height      float64
+		BMI         float64
+		Temp        float64
+		SysBP       int
+		DiaBP       int
+		HR          int
+		RR          int
+		SpO2        int
+		Pain        int
+		Sugar       int
+		FoodAllergy string
+		CurrentMed  string
+		Smoking     string
+		Alcohol     string
+		HasURI      *bool
+		HasTB       *bool
+		Precaution  string
+		Q2Depressed *bool
+		Q2Anhedonia *bool
+		ScrPositive *bool
+	}{
+		{1, "แน่นหน้าอกร้าวไปกรามซ้าย หายใจเหนื่อยหอบ เหงื่อแตก", "แพ้ยา Sulfa", "โรคหัวใจขาดเลือด, ความดันโลหิตสูง", "ให้ออกซิเจนแคนนูลา 3 LPM EKG 12 Lead ส่งห้องตรวจแพทย์ทันที", 62.0, 165.0, 22.77, 36.4, 178, 108, 115, 24, 92, 8, 140, "ไม่มี", "Aspirin 81mg, Enalapril 5mg", "สูบ 1 ซอง/วัน", "ดื่มสังสรรค์", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{2, "ปวดศีรษะไมเกรนรุนแรง ตาพร่ามัว คลื่นไส้", "แพ้ยา Penicillin", "ไมเกรน", "ส่งเข้าห้องตรวจ 1 ทันที เพื่อรับยาระงับอาการปวด", 54.0, 162.0, 20.57, 37.2, 142, 92, 98, 20, 98, 7, 110, "อาหารทะเล", "Paracetamol (ทานแล้วไม่ดีขึ้น)", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{2, "มีไข้สูง 39.2 องศา หนาวสั่น ไอมีเสมหะ ซึมลง", "ปฏิเสธการแพ้ยา", "ไม่มี", "เช็ดตัวลดไข้ทันที ส่งพบกุมารแพทย์ห้องตรวจ 3 ด่วน", 25.0, 125.0, 16.00, 39.2, 105, 65, 128, 26, 96, 4, 95, "ไม่มี", "ไม่มี", "ไม่สูบ", "ไม่ดื่ม", boolPtr(true), boolPtr(false), "Droplet", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{3, "ปวดศีรษะท้ายทอยช่วงบ่าย ทานยาแก้ปวดแล้วไม่ดีขึ้น", "ปฏิเสธการแพ้ยา", "ความดันโลหิตสูง", "ความดันค่อนข้างสูง ให้นั่งพัก 15 นาทีแล้ววัดซ้ำ", 72.5, 175.0, 23.67, 36.8, 138, 88, 78, 18, 98, 5, 120, "ไม่มี", "Amlodipine 5mg", "เคยสูบ เลิกแล้ว", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{3, "ตรวจระดับน้ำตาลในเลือดสะสม ปัสสาวะบ่อยตอนกลางคืน", "ปฏิเสธการแพ้ยา", "เบาหวานชนิดที่ 2", "แนะนำงดของหวานและคุมอาหารต่อเนื่อง", 65.0, 158.0, 26.04, 36.7, 135, 85, 76, 18, 98, 2, 180, "ไม่มี", "Metformin 500mg", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{3, "ปวดท้องบิดเป็นพักๆ ถ่ายเหลว 3 ครั้ง อ่อนเพลีย", "ปฏิเสธการแพ้ยา", "ไม่มี", "ให้ดื่มเกลือแร่ ORS รอพบแพทย์เพื่อตรวจประเมินภาวะขาดน้ำ", 58.0, 168.0, 20.55, 37.0, 115, 75, 82, 18, 99, 5, 100, "ไม่มี", "ORS ชงดื่มแล้ว 1 ซอง", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Contact", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{4, "มาตรวจสุขภาพประจำปี รู้สึกอ่อนเพลียเล็กน้อย", "ปฏิเสธการแพ้ยา", "ความดันโลหิตสูง (คุมได้ดี)", "สัญญาณชีพปกติ แนะนำออกกำลังกายสม่ำเสมอ", 70.0, 175.0, 22.86, 36.6, 128, 84, 74, 18, 99, 0, 95, "ไม่มี", "Losartan 50mg", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(true), boolPtr(false), boolPtr(true)},
+		{4, "รับยาความดันต่อเนื่องตามนัด สบายดี ไม่มีอาการผิดปกติ", "ปฏิเสธการแพ้ยา", "ความดันโลหิตสูง", "วัดความดันได้ปกติ ยาเดิมทานครบสม่ำเสมอ", 68.0, 170.0, 23.53, 36.5, 122, 80, 72, 16, 99, 0, 105, "ไม่มี", "Enalapril 10mg", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{4, "ตรวจสุขภาพทั่วไป เพื่อขอใบรับรองแพทย์ทำใบขับขี่", "ปฏิเสธการแพ้ยา", "ไม่มี", "สุขภาพแข็งแรง สัญญาณชีพและผลตรวจร่างกายทั่วไปปกติ", 75.0, 178.0, 23.67, 36.6, 118, 76, 68, 16, 99, 0, 90, "ไม่มี", "ไม่มี", "ไม่สูบ", "ไม่ดื่ม", boolPtr(false), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
+		{4, "ขอรับยาแก้แพ้อากาศต่อเนื่อง คัดจมูกช่วงเช้า", "ปฏิเสธการแพ้ยา", "ภูมิแพ้อากาศ", "อาการคงที่ ให้รับยาแก้แพ้ตัวเดิม", 60.0, 165.0, 22.04, 36.5, 120, 78, 70, 16, 99, 1, 92, "ไม่มี", "Cetirizine 10mg", "ไม่สูบ", "ไม่ดื่ม", boolPtr(true), boolPtr(false), "Standard", boolPtr(false), boolPtr(false), boolPtr(false)},
 	}
 
-	for i := range screenings {
-		db.Create(&screenings[i])
+	for i, sd := range screeningsData {
+		scr := models.Screening{
+			VisitID:            visits[i].ID,
+			ScreenedByUserID:   nurse.ID,
+			AssignedDoctorID:   visits[i].DoctorID,
+			TriageLevel:        sd.Triage,
+			ChiefComplaint:     sd.Complaint,
+			Allergies:          sd.Allergies,
+			MedicalHistory:     sd.History,
+			NurseNotes:         sd.Notes,
+			Weight:             sd.Weight,
+			Height:             sd.Height,
+			BMI:                sd.BMI,
+			Temperature:        sd.Temp,
+			SystolicBP:         sd.SysBP,
+			DiastolicBP:        sd.DiaBP,
+			HeartRate:          sd.HR,
+			RespiratoryRate:    sd.RR,
+			SpO2:               sd.SpO2,
+			PainScore:          sd.Pain,
+			BloodSugar:         sd.Sugar,
+			FoodAllergies:      sd.FoodAllergy,
+			CurrentMedications: sd.CurrentMed,
+			SmokingHistory:     sd.Smoking,
+			AlcoholHistory:     sd.Alcohol,
+			HasURI:             sd.HasURI,
+			HasTB:              sd.HasTB,
+			PrecautionType:     sd.Precaution,
+			Q2Depressed:        sd.Q2Depressed,
+			Q2Anhedonia:        sd.Q2Anhedonia,
+			ScreeningPositive:  sd.ScrPositive,
+		}
+		db.Create(&scr)
 	}
-	log.Printf("Seeded %d screenings successfully.", len(screenings))
+	log.Printf("Seeded %d screenings successfully (Triage 1-4).", len(screeningsData))
 
 	fmt.Println("\n=======================================================")
-	fmt.Println("🎉 Database reset and clean seeding completed successfully!")
+	fmt.Println("[SUCCESS] Database reset and clean seeding completed successfully!")
 	fmt.Println("=======================================================")
 }

@@ -7,12 +7,14 @@ import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Co
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 import { playBillingNotification } from '../../utils/audioQueue';
 import html2pdf from 'html2pdf.js';
+import { formatNationalId } from '../../utils/formatters';
 
 interface PaymentRecord {
   id: string;
   hn: string;
   vn?: string;
   patientName: string;
+  nationalID?: string;
   date: string;
   time: string;
   amount: string;
@@ -25,6 +27,7 @@ interface PaymentRecord {
 interface DetailedPatientRecord {
   id: string;
   patientName: string;
+  nationalId?: string;
   hn: string;
   vn: string;
   date: string;
@@ -354,7 +357,9 @@ export default function BillingDashboardPage() {
                           record.id.toLowerCase().includes(query) || 
                           record.hn.toLowerCase().includes(query) || 
                           (record.vn || '').toLowerCase().includes(query) ||
-                          record.patientName.toLowerCase().includes(query);
+                          record.patientName.toLowerCase().includes(query) ||
+                          (record.rawHistory?.national_id || '').toLowerCase().includes(query) ||
+                          (record.nationalID || '').toLowerCase().includes(query);
       const matchStatus = statusFilter === 'all' || record.status === statusFilter;
       const matchMethod = methodFilter === 'all' || 
                           (methodFilter === 'qr' && record.method === 'QR Code') ||
@@ -403,6 +408,7 @@ export default function BillingDashboardPage() {
     const detail: DetailedPatientRecord = {
       id: record.id,
       patientName: raw?.patient_name || record.patientName,
+      nationalId: raw?.national_id || record.nationalID || record.rawHistory?.national_id || '',
       hn: raw?.hn || record.hn,
       vn: raw?.vn || record.vn || '-',
       date: record.date,
@@ -607,7 +613,7 @@ export default function BillingDashboardPage() {
             </div>
             <input
               type="text"
-              placeholder="ค้นหาด้วยรหัสใบเสร็จ, HN, หรือชื่อผู้ป่วย..."
+              placeholder="ค้นหาด้วยรหัสใบเสร็จ, HN, บัตรประชาชน หรือชื่อผู้ป่วย..."
               value={patientId}
               onChange={(e) => setPatientId(e.target.value)}
               className="search-input"
@@ -753,7 +759,7 @@ export default function BillingDashboardPage() {
                       </span>
                     </td>
                     <td style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
-                      <span className={`status-badge ${record.status === 'completed' ? 'status-completed' : 'status-pending'}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '4px 8px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '999px' }}>
+                      <span className={`status-badge ${record.status === 'completed' ? 'status-completed' : 'status-pending'}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '98px', height: '26px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '999px', boxSizing: 'border-box' }}>
                         {record.status === 'completed' ? (
                           <>
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -763,7 +769,7 @@ export default function BillingDashboardPage() {
                       </span>
                     </td>
                     <td style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
-                      <span className={`method-badge ${record.method === 'QR Code' ? 'badge-qr' : 'badge-cash'}`} style={{ display: 'inline-block', padding: '4px 8px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '6px' }}>
+                      <span className={`method-badge ${record.method === 'QR Code' ? 'badge-qr' : 'badge-cash'}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '78px', height: '26px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '6px', boxSizing: 'border-box' }}>
                         {record.method}
                       </span>
                     </td>
@@ -1328,6 +1334,11 @@ export default function BillingDashboardPage() {
                   <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>เลขประจำตัว (HN): </span>
                     <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1E40AF' }}>{selectedDetail.hn}</span>
+                    {selectedDetail.nationalId && (
+                      <span style={{ color: '#64748B', marginLeft: '10px' }}>
+                        (เลขบัตร: {formatNationalId(selectedDetail.nationalId)})
+                      </span>
+                    )}
                   </div>
                   <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>เลขรับบริการ (VN): </span>

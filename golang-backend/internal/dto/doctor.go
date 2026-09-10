@@ -37,10 +37,12 @@ type ScreeningBrief struct {
 	NurseNotes     string `json:"nurse_notes"`
 
 	// ระดับความเร่งด่วน ส่งไปสามรูปแบบ
-	// triage_level = ข้อความไทยที่พยาบาลบันทึกไว้ (แสดงผลตรงๆ ได้)
-	// triage_code  = รูปแบบที่ ExaminationView ใช้ เช่น "Level 2: Emergency"
+	// triage_level = ข้อความไทยที่พยาบาลบันทึกไว้ (แสดงผลตรงๆ ได้ เช่น "ฉุกเฉินวิกฤต", "ฉุกเฉินเร่งด่วน", "กึ่งฉุกเฉิน", "ปกติ", "ไม่ระบุ")
+	// triage_level_num = ตัวเลขระดับความรุนแรง 1-4
+	// triage_code  = รูปแบบที่ ExaminationView และตารางคิวใช้ เช่น "Level 2: Emergency"
 	// triage_priority = High / Medium / Low ตรงกับ triage.priority ใน types.ts
 	TriageLevel    string `json:"triage_level"`
+	TriageLevelNum int    `json:"triage_level_num"`
 	TriageCode     string `json:"triage_code"`
 	TriagePriority string `json:"triage_priority"`
 
@@ -91,8 +93,9 @@ type ScreeningBrief struct {
 	// แบบคัดกรองภาวะซึมเศร้า 2Q (ช่วง 2 สัปดาห์ที่ผ่านมา)
 	// nil = ยังไม่ได้ถาม / false = ไม่มี / true = มี
 	// ตอบใช่ข้อใดข้อหนึ่ง = ผลบวก ต้องประเมินต่อด้วย 9Q
-	Q2Depressed *bool `json:"q2_depressed"`
-	Q2Anhedonia *bool `json:"q2_anhedonia"`
+	Q2Depressed        *bool  `json:"q2_depressed"`
+	Q2Anhedonia        *bool  `json:"q2_anhedonia"`
+	ScreeningPositive  *bool  `json:"screening_positive"`
 
 	FoodAllergies      string `json:"food_allergies"`
 	CurrentMedications string `json:"current_medications"` // ยาที่ผู้ป่วยใช้อยู่ ใช้เช็คยาตีกัน

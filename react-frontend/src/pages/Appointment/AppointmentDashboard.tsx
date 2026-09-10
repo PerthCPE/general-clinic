@@ -1,6 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Stethoscope, Users, Baby, CheckCircle2, ChevronRight, BarChart2, Pin } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { appointmentApi, type BackendAppointment } from '../../services/api';
+import { TREATMENT_DEPARTMENTS } from '../../config/roles';
 import './AppointmentDashboard.css';
+
+// ไอคอน + สีต่อแผนก ใช้คู่กับ TREATMENT_DEPARTMENTS (single source of truth ใน config/roles.ts)
+// ถ้ามีการเพิ่ม/ลดแผนกใน TREATMENT_DEPARTMENTS ให้เพิ่ม/ลดรายการนี้ตามด้วย
+const DEPARTMENT_META: Record<string, { icon: typeof Stethoscope; color: string }> = {
+  'อายุรกรรมทั่วไป': { icon: Stethoscope, color: '#2563EB' },
+  'เวชศาสตร์ครอบครัว': { icon: Users, color: '#9333EA' },
+  'กุมารเวชกรรม': { icon: Baby, color: '#16A34A' },
+};
+const UNASSIGNED_DEPT_LABEL = 'ไม่ระบุแผนก';
 
 const timeSlots = [
   '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
@@ -16,17 +28,89 @@ const getTodayDateString = () => {
 };
 
 export default function AppointmentDashboard() {
-  const { currentUser, patientQueue, updateAppointment } = useAuth();
+  const { currentUser } = useAuth();
   
+  const [appointments, setAppointments] = useState<BackendAppointment[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
-  
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 8; // เพิ่มจำนวนการแสดงผลต่อหน้าจาก 4 เป็น 8 รายการ
+  const itemsPerPage = 8;
 
   const isDoctor = currentUser?.role === 'doctor';
-  const isRegistrar = currentUser?.role === 'registrar';
+  // สิทธิ์แก้ไข (วันที่/เวลา/สถานะ): nurse_assistant ได้เต็ม (แทนที่ registrar เดิมที่ถูกตัดออก
+  // ทั้งหมดตามนโยบายใหม่) + admin คงไว้เหมือนเดิม — nurse ไม่อยู่ในนี้โดยตั้งใจ เพราะได้สิทธิ์
+  // แบบดูอย่างเดียวเท่านั้น (ตกไปใช้ branch แสดงข้อความ/badge ธรรมดาแทน input/select ที่แก้ได้)
+  const canEdit = currentUser?.role === 'nurse_assistant' || currentUser?.role === 'admin';
 
-  // กรองข้อมูลเฉพาะวันที่เลือก และทำการ "เรียงลำดับตามเวลา (time)" จากเช้าไปเย็น
+  const fetchAppointments = async () => {
+    try {
+      const data = await appointmentApi.getList();
+      if (data) {
+        setAppointments(data);
+        setErrorMsg(null);
+      }
+    } catch (err) {
+      console.error("Failed to fetch appointments", err);
+      setErrorMsg('ไม่สามารถโหลดข้อมูลการนัดหมายได้ กรุณาลองรีเฟรชหน้านี้ใหม่อีกครั้ง');
+    } finally {
+      // ใช้เกต isLoading เฉพาะตอนโหลดครั้งแรก การรีเฟรชพื้นหลัง (WS / หลังแก้ไข)
+      // ไม่ต้องเด้งกลับไปเป็นหน้า loading เต็มจออีก
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAppointments();
+
+    const wsUrl = `ws://localhost:8080/ws`;
+    const ws = new WebSocket(wsUrl);
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type === 'APPOINTMENT_CREATED' || payload.type === 'APPOINTMENT_UPDATED') {
+          fetchAppointments();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    return () => { ws.close(); };
+  }, []);
+
+  const mapBackendToRow = (a: BackendAppointment) => {
+    const pName = a.patient?.fullname || 'Unknown';
+    const initialText = pName.length >= 2 ? pName.substring(0, 2) : 'คน';
+    const timeStr = a.appointment_time ? a.appointment_time.substring(0, 5) : '-';
+    // ใช้คอลัมน์ department ตรงๆ (เทียบค่ากับ TREATMENT_DEPARTMENTS ได้จริง) แทนการแกะจาก
+    // clinical_note แบบเดิม — นัดหมายเก่าก่อนมีคอลัมน์นี้จะไม่มีค่า จึงจัดเป็น "ไม่ระบุแผนก"
+    let deptName = a.department || UNASSIGNED_DEPT_LABEL;
+    let deptColor = 'primary';
+    
+    let statusColor = 'default';
+    if (a.status === 'เข้ารับการรักษาแล้ว') statusColor = 'success';
+    else if (a.status === 'ยืนยันที่จะมาวันนี้') statusColor = 'info';
+    else if (a.status === 'ยกเลิกนัด') statusColor = 'error';
+    else if (a.status === 'ติดต่อไม่ได้') statusColor = 'warning';
+    else if (a.status === 'รอยืนยัน') statusColor = 'info';
+
+    return {
+      id: a.id,
+      name: pName,
+      initial: initialText,
+      dept: deptName,
+      date: a.appointment_date ? a.appointment_date.substring(0, 10) : '-',
+      time: timeStr,
+      phone: a.patient?.phone_number || '-',
+      status: a.status || '-',
+      statusColor,
+      deptColor
+    };
+  };
+
+  const patientQueue = appointments.map(mapBackendToRow);
+
   const filteredQueue = patientQueue
     .filter(p => p.date === selectedDate)
     .sort((a, b) => a.time.localeCompare(b.time));
@@ -39,11 +123,12 @@ export default function AppointmentDashboard() {
   const confirmedCount = filteredQueue.filter(p => p.status === 'ยืนยันที่จะมาวันนี้').length;
   const unreachableCount = filteredQueue.filter(p => p.status === 'ติดต่อไม่ได้').length;
 
-  // จำนวนผู้ป่วยแยกตามแผนก
-  const generalCount = filteredQueue.filter(p => p.dept === 'โรคทั่วไป').length;
-  const medicineCount = filteredQueue.filter(p => p.dept === 'อายุรกรรม').length;
-  const psychCount = filteredQueue.filter(p => p.dept === 'จิตวิทยา').length;
-  const physicalCount = filteredQueue.filter(p => p.dept === 'กายภาพบำบัด').length;
+  // นับจำนวนผู้ป่วยต่อแผนกจริงจาก TREATMENT_DEPARTMENTS (single source of truth)
+  // แทนการเทียบ string 4 ชื่อที่ฝังไว้ตรงๆ ซึ่งไม่เคยตรงกับค่าที่ฟอร์มนัดหมายส่งมาเลย
+  const departmentCounts = TREATMENT_DEPARTMENTS.map((dept) => ({
+    dept,
+    count: filteredQueue.filter(p => p.dept === dept).length,
+  }));
 
   const progressPercent = netActiveAppointments > 0 ? ((arrivedCount / netActiveAppointments) * 100).toFixed(1) : '0';
 
@@ -51,24 +136,33 @@ export default function AppointmentDashboard() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentTableData = filteredQueue.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleStatusChange = (id: number, newStatus: string) => {
-    let newColor = 'default';
-    if (newStatus === 'เข้ารับการรักษาแล้ว') newColor = 'success';
-    else if (newStatus === 'ยืนยันที่จะมาวันนี้') newColor = 'info';
-    else if (newStatus === 'ยกเลิกนัด') newColor = 'error';
-    else if (newStatus === 'ติดต่อไม่ได้') newColor = 'warning';
-    else if (newStatus === 'รอยืนยัน') newColor = 'info';
-
-    updateAppointment(id, { status: newStatus, statusColor: newColor });
+  const handleStatusChange = async (id: number, newStatus: string) => {
+    try {
+      await appointmentApi.updateStatus(id, { status: newStatus });
+      fetchAppointments();
+    } catch (err) {
+      console.error(err);
+      alert('ไม่สามารถอัปเดตสถานะได้');
+    }
   };
 
-  const handleTimeChange = (id: number, newTime: string) => {
-    updateAppointment(id, { time: newTime });
+  const handleTimeChange = async (id: number, newTime: string) => {
+    try {
+      await appointmentApi.updateSchedule(id, { appointment_time: newTime });
+      fetchAppointments();
+    } catch (err) {
+      console.error(err);
+      alert('ไม่สามารถอัปเดตเวลาได้');
+    }
   };
 
-  const handleDateSelected = (id: number, newDate: string) => {
-    if (newDate) {
-      updateAppointment(id, { date: newDate });
+  const handleDateSelected = async (id: number, newDate: string) => {
+    try {
+      await appointmentApi.updateSchedule(id, { appointment_date: newDate });
+      fetchAppointments();
+    } catch (err) {
+      console.error(err);
+      alert('ไม่สามารถอัปเดตวันที่ได้');
     }
   };
 
@@ -77,14 +171,27 @@ export default function AppointmentDashboard() {
       
       <div className="appt-title-row">
         <h1 className="appt-title">แดชบอร์ดสรุปภาพรวมนัดหมาย</h1>
-        <input 
-          type="date" 
-          value={selectedDate} 
+        <input
+          type="date"
+          value={selectedDate}
           onChange={(e) => { setSelectedDate(e.target.value); setCurrentPage(1); }}
           className="appt-date-select"
         />
       </div>
 
+      {errorMsg && (
+        <div className="appt-error-banner">
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="appt-card appt-loading-state">
+          <span className="appt-spinner" />
+          <span>กำลังโหลดข้อมูลนัดหมาย...</span>
+        </div>
+      ) : (
+      <>
       {/* 1. ส่วนการ์ดใหญ่หลัก (ยอดรวม & ความคืบหน้า) */}
       <div className="appt-metrics-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginBottom: '16px' }}>
         
@@ -108,34 +215,28 @@ export default function AppointmentDashboard() {
       </div>
 
       {/* 2. สถิติจำนวนผู้ป่วยแยกตามแผนก */}
-      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary, #94A3B8)', marginBottom: '8px', paddingLeft: '4px' }}>
-        📊 สถิติผู้ป่วยแยกตามแผนกการรักษา
+      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary, #94A3B8)', marginBottom: '8px', paddingLeft: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <BarChart2 size={18} strokeWidth={2.5} /> สถิติผู้ป่วยแยกตามแผนกการรักษา
       </div>
-      <div className="appt-metrics-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '16px' }}>
-        <div className="appt-card metric-card" style={{ padding: '16px', borderLeft: '4px solid #2563EB' }}>
-          <span className="metric-label" style={{ fontSize: '0.85rem' }}>🏥 โรคทั่วไป</span>
-          <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#2563EB', marginTop: '4px' }}>{generalCount} คน</div>
-        </div>
-
-        <div className="appt-card metric-card" style={{ padding: '16px', borderLeft: '4px solid #D97706' }}>
-          <span className="metric-label" style={{ fontSize: '0.85rem' }}>🩺 อายุรกรรม</span>
-          <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#D97706', marginTop: '4px' }}>{medicineCount} คน</div>
-        </div>
-
-        <div className="appt-card metric-card" style={{ padding: '16px', borderLeft: '4px solid #9333EA' }}>
-          <span className="metric-label" style={{ fontSize: '0.85rem' }}>🧠 จิตวิทยา</span>
-          <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#9333EA', marginTop: '4px' }}>{psychCount} คน</div>
-        </div>
-
-        <div className="appt-card metric-card" style={{ padding: '16px', borderLeft: '4px solid #16A34A' }}>
-          <span className="metric-label" style={{ fontSize: '0.85rem' }}>🌿 กายภาพบำบัด</span>
-          <div className="metric-value-large" style={{ fontSize: '1.6rem', color: '#16A34A', marginTop: '4px' }}>{physicalCount} คน</div>
-        </div>
+      <div className="appt-metrics-grid" style={{ gridTemplateColumns: `repeat(${departmentCounts.length}, 1fr)`, marginBottom: '16px' }}>
+        {departmentCounts.map(({ dept, count }) => {
+          const meta = DEPARTMENT_META[dept];
+          const Icon = meta?.icon ?? Stethoscope;
+          const color = meta?.color ?? '#64748B';
+          return (
+            <div key={dept} className="appt-card metric-card" style={{ padding: '16px', borderLeft: `4px solid ${color}` }}>
+              <span className="metric-label" style={{ fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icon size={16} strokeWidth={2.5} /> {dept}
+              </span>
+              <div className="metric-value-large" style={{ fontSize: '1.6rem', color, marginTop: '4px' }}>{count} คน</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* 3. สถิติตามสถานะการนัดหมาย */}
-      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary, #94A3B8)', marginBottom: '8px', paddingLeft: '4px' }}>
-        📌 สถานะการมาใช้บริการ
+      <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-secondary, #94A3B8)', marginBottom: '8px', paddingLeft: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <Pin size={18} strokeWidth={2.5} /> สถานะการมาใช้บริการ
       </div>
       <div className="appt-metrics-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: '28px' }}>
         <div className="appt-card metric-card" style={{ padding: '14px 18px' }}>
@@ -199,7 +300,7 @@ export default function AppointmentDashboard() {
                       <span className={`dept-badge badge-${row.deptColor}`}>{row.dept}</span>
                     </td>
                     <td>
-                      {isRegistrar ? (
+                      {canEdit ? (
                         <input 
                           type="date"
                           value={row.date}
@@ -212,7 +313,7 @@ export default function AppointmentDashboard() {
                       )}
                     </td>
                     <td>
-                      {isRegistrar ? (
+                      {canEdit ? (
                         <select
                           value={row.time}
                           onChange={(e) => handleTimeChange(row.id, e.target.value)}
@@ -230,7 +331,7 @@ export default function AppointmentDashboard() {
                     </td>
                     <td><span className="phone-text">{row.phone}</span></td>
                     <td>
-                      {isRegistrar ? (
+                      {canEdit ? (
                         <select 
                           value={row.status}
                           onChange={(e) => handleStatusChange(row.id, e.target.value)}
@@ -288,6 +389,8 @@ export default function AppointmentDashboard() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

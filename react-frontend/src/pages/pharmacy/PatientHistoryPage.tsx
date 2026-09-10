@@ -5,6 +5,8 @@ import CopyableText from '../../components/Common/CopyableText';
 import { PharmacyHistorySkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
+import { formatNationalId } from '../../utils/formatters';
+import { Search, ChevronDown } from 'lucide-react';
 
 interface Patient {
   id: string;
@@ -570,6 +572,22 @@ export default function PatientHistoryPage() {
 
     const matchSearch = q === '' || matchHn || matchName || (queryDigits !== '' && matchNationalId) || matchVn || matchQueue;
 
+    let matchTime = true;
+    if (timeRange === 'today') {
+      const today = new Date().toDateString();
+      const pDateStr = patient.updatedAt || patient.createdAt || patient.visitTime;
+      matchTime = Boolean(pDateStr && new Date(pDateStr).toDateString() === today);
+    } else if (timeRange === 'month') {
+      const now = new Date();
+      const pDateStr = patient.updatedAt || patient.createdAt || patient.visitTime;
+      if (pDateStr) {
+        const pDate = new Date(pDateStr);
+        matchTime = pDate.getMonth() === now.getMonth() && pDate.getFullYear() === now.getFullYear();
+      } else {
+        matchTime = false;
+      }
+    }
+
     let matchRisk = true;
     if (riskFilter === 'hypertension') {
       matchRisk = (patient.diseases || []).some(d => d.includes('ความดัน'));
@@ -577,9 +595,15 @@ export default function PatientHistoryPage() {
       const hasAllergyDisease = (patient?.diseases || []).some(d => d?.includes('แพ้ยา') || d?.includes('ภูมิแพ้'));
       const hasAllergiesText = Boolean(patient?.allergies && typeof patient.allergies === 'string' && !patient.allergies.includes('ปฏิเสธ'));
       matchRisk = hasAllergyDisease || hasAllergiesText;
+    } else if (riskFilter === 'fever') {
+      const feverInVitals = typeof patient?.vitals?.temp === 'number' && patient.vitals.temp > 37.5;
+      const feverInDiseases = (patient?.diseases || []).some(d => d?.includes('ไข้'));
+      const feverInAdvice = (patient?.doctorAdvice || '').includes('ไข้');
+      const feverInAllergies = (patient?.allergies || '').includes('ไข้');
+      matchRisk = feverInVitals || feverInDiseases || feverInAdvice || feverInAllergies;
     }
 
-    return matchSearch && matchRisk;
+    return matchSearch && matchRisk && matchTime;
   }).sort((a, b) => {
     const aDate = new Date(a.updatedAt || a.createdAt || 0).getTime();
     const bDate = new Date(b.updatedAt || b.createdAt || 0).getTime();
@@ -622,88 +646,122 @@ export default function PatientHistoryPage() {
           </div>
         </div>
 
-        <div className="search-card card" style={{ padding: '20px 24px', marginBottom: '24px', borderRadius: '12px', background: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div className="search-inputs" style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
-            <div className="input-group" style={{ flex: 1 }}>
-              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '600', fontSize: '13.5px', color: '#475569' }}>ค้นหาผู้ป่วย (รหัส HN หรือ ชื่อผู้ป่วย)</label>
-              <div className="input-with-icon">
+        <div className="search-card card" style={{ padding: '20px 24px', marginBottom: '24px', borderRadius: '14px', background: '#FFFFFF', border: '1px solid #E2E8F0', boxShadow: '0 1px 3px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* ช่องค้นหาผู้ป่วย: กว้างยาวเต็มจากซ้ายไปขวา */}
+          <div className="search-inputs" style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="input-group" style={{ width: '100%' }}>
+              <label style={{ display: 'block', marginBottom: '6px', fontWeight: '700', fontSize: '13.5px', color: '#475569' }}>
+                ค้นหาผู้ป่วย (รหัส HN หรือ ชื่อผู้ป่วย)
+              </label>
+              <div className="input-with-icon" style={{ position: 'relative', width: '100%' }}>
+                <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', pointerEvents: 'none' }} />
                 <input
                   type="text"
                   placeholder="เช่น HN0001, Somchai หรือ 0001"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  style={{ width: '100%', padding: '9px 14px', border: '1px solid #CBD5E1', borderRadius: '8px', fontSize: '14px' }}
+                  style={{
+                    width: '100%',
+                    padding: '10px 16px 10px 42px',
+                    border: '1.5px solid #CBD5E1',
+                    borderRadius: '10px',
+                    fontSize: '14px',
+                    backgroundColor: '#F8FAFC',
+                    color: '#0F172A',
+                    boxSizing: 'border-box',
+                    outline: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: '#E2E8F0',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '20px',
+                      height: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#475569',
+                      cursor: 'pointer',
+                      fontSize: '11px',
+                      fontWeight: 'bold',
+                      padding: 0
+                    }}
+                    title="ล้างคำค้นหา"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Filter Pills matching Image 3 (Urgency Filter Removed) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '12px', borderTop: '1px solid #F1F5F9' }}>
-            {/* Row 1: ช่วงเวลา */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span className="filter-row-label" style={{ fontSize: '13.5px', fontWeight: '700', minWidth: '80px' }}>ช่วงเวลา:</span>
-              {(['all', 'today', 'month'] as const).map((key) => {
-                const labels = { all: 'ทั้งหมด', today: 'วันนี้', month: 'เดือนนี้' };
-                const active = timeRange === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setTimeRange(key)}
-                    className={`filter-pill-btn ${active ? 'active' : ''}`}
-                    style={{
-                      padding: '6px 16px', borderRadius: '8px',
-                      fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
-                    }}
-                  >
-                    {labels[key]}
-                  </button>
-                );
-              })}
+          {/* แถบด้านล่างตัวค้นหา: 3 คอลัมน์ (การจัดเรียง, ช่วงเวลา, ความเสี่ยงทางคลินิก) */}
+          <div className="patient-filters-grid">
+            {/* Column 1: การจัดเรียง */}
+            <div className="filter-col-item">
+              <span className="filter-row-label">
+                การจัดเรียง:
+              </span>
+              <div className="select-wrapper">
+                <select
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+                  className="sort-select"
+                >
+                  <option value="desc">ล่าสุด (ใหม่ไปเก่า)</option>
+                  <option value="asc">เก่าสุด (เก่าไปใหม่)</option>
+                </select>
+                <ChevronDown size={16} className="select-chevron-icon" />
+              </div>
             </div>
 
-            {/* Row 2: ความเสี่ยงทางคลินิก */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span className="filter-row-label" style={{ fontSize: '13.5px', fontWeight: '700', minWidth: '120px' }}>ความเสี่ยงทางคลินิก:</span>
-              {(['all', 'hypertension', 'fever', 'allergies'] as const).map((key) => {
-                const labels = { all: 'ทั้งหมด', hypertension: 'ความดันสูง', fever: 'มีไข้ (> 37.5°C)', allergies: 'มีประวัติแพ้ยา' };
-                const active = riskFilter === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setRiskFilter(key)}
-                    className={`filter-pill-btn ${active ? 'active' : ''}`}
-                    style={{
-                      padding: '6px 16px', borderRadius: '8px',
-                      fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
-                    }}
-                  >
-                    {labels[key]}
-                  </button>
-                );
-              })}
+            {/* Column 2: ช่วงเวลา */}
+            <div className="filter-col-item">
+              <span className="filter-row-label">
+                ช่วงเวลา:
+              </span>
+              <div className="select-wrapper">
+                <select
+                  value={timeRange}
+                  onChange={(e) => setTimeRange(e.target.value as 'all' | 'today' | 'month')}
+                  className="sort-select"
+                >
+                  <option value="all">ทั้งหมด</option>
+                  <option value="today">วันนี้</option>
+                  <option value="month">เดือนนี้</option>
+                </select>
+                <ChevronDown size={16} className="select-chevron-icon" />
+              </div>
             </div>
 
-            {/* Row 3: การจัดเรียง */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span className="filter-row-label" style={{ fontSize: '13.5px', fontWeight: '700', minWidth: '120px' }}>การจัดเรียง:</span>
-              {(['desc', 'asc'] as const).map((key) => {
-                const labels = { desc: 'ล่าสุด (ใหม่ไปเก่า)', asc: 'เก่าสุด (เก่าไปใหม่)' };
-                const active = sortOrder === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => setSortOrder(key)}
-                    className={`filter-pill-btn ${active ? 'active' : ''}`}
-                    style={{
-                      padding: '6px 16px', borderRadius: '8px',
-                      fontWeight: active ? '700' : '500', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s'
-                    }}
-                  >
-                    {labels[key]}
-                  </button>
-                );
-              })}
+            {/* Column 3: ความเสี่ยงทางคลินิก */}
+            <div className="filter-col-item">
+              <span className="filter-row-label">
+                ความเสี่ยงทางคลินิก:
+              </span>
+              <div className="select-wrapper">
+                <select
+                  value={riskFilter}
+                  onChange={(e) => setRiskFilter(e.target.value as 'all' | 'hypertension' | 'fever' | 'allergies')}
+                  className="sort-select"
+                >
+                  <option value="all">ทั้งหมด</option>
+                  <option value="hypertension">ความดันสูง</option>
+                  <option value="fever">มีไข้ (&gt; 37.5°C)</option>
+                  <option value="allergies">มีประวัติแพ้ยา</option>
+                </select>
+                <ChevronDown size={16} className="select-chevron-icon" />
+              </div>
             </div>
           </div>
         </div>
@@ -742,19 +800,33 @@ export default function PatientHistoryPage() {
                   <table className="patient-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                     <thead>
                     <tr>
-                      <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>ID (HN)</th>
-                      <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>เลข VN</th>
-                      <th style={{ textAlign: 'left', width: '18%', padding: '12px 14px' }}>ชื่อผู้ป่วย</th>
-                      <th style={{ textAlign: 'center', width: '7%', padding: '12px 4px' }}>อายุ</th>
-                      <th style={{ textAlign: 'center', width: '7%', padding: '12px 4px' }}>กรุ๊ปเลือด</th>
+                      <th style={{ textAlign: 'center', width: '9%', padding: '12px 6px' }}>ID (HN)</th>
+                      <th style={{ textAlign: 'center', width: '9%', padding: '12px 6px' }}>เลข VN</th>
+                      <th style={{ textAlign: 'left', width: '17%', padding: '12px 12px' }}>ชื่อผู้ป่วย</th>
+                      <th style={{ textAlign: 'center', width: '6%', padding: '12px 4px' }}>อายุ</th>
+                      <th style={{ textAlign: 'center', width: '6%', padding: '12px 4px' }}>กรุ๊ปเลือด</th>
                       <th style={{ textAlign: 'center', width: '16%', padding: '12px 6px' }}>สิทธิการรักษา</th>
-                      <th style={{ textAlign: 'center', width: '12%', padding: '12px 6px' }}>จำนวนเข้ารักษา</th>
-                      <th style={{ textAlign: 'center', width: '14%', padding: '12px 6px' }}>โรคประจำตัว</th>
-                      <th style={{ textAlign: 'center', width: '16%', padding: '12px 16px 12px 6px' }}>การจัดการ</th>
+                      <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>จำนวนเข้ารักษา</th>
+                      <th style={{ textAlign: 'center', width: '13%', padding: '12px 4px' }}>โรคประจำตัว</th>
+                      <th style={{ textAlign: 'center', width: '13%', padding: '12px 8px 12px 4px' }}>การจัดการ</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedPatients.map((patient) => {
+                    {paginatedPatients.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary, #64748B)' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                              <circle cx="11" cy="11" r="8"></circle>
+                              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <span style={{ fontSize: '16px', fontWeight: '600' }}>ไม่มีประวัติผู้การรับยา</span>
+                            <span style={{ fontSize: '13.5px', opacity: 0.8 }}>ยังไม่มีข้อมูลประวัติการรับยาในระบบ</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                    paginatedPatients.map((patient) => {
                       const rights = patient.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
                       return (
                         <tr key={patient.id}>
@@ -769,37 +841,37 @@ export default function PatientHistoryPage() {
                           <td 
                             className="patient-name-cell clickable-patient-history"
                             onClick={() => handleSelectPatient(patient)}
-                            style={{ textAlign: 'left', padding: '12px 14px 12px 20px' }}
+                            style={{ textAlign: 'left', padding: '12px 16px', cursor: 'pointer' }}
                           >
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '3px' }}>
-                              <span className="history-name-link" style={{ fontWeight: '700', color: '#0F172A', display: 'inline-flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                  <circle cx="12" cy="7" r="4"/>
-                                </svg>
-                                {patient.name}
-                              </span>
-                              <span className="history-hint-tag" style={{ fontSize: '11px', color: '#2563EB', background: '#EFF6FF', padding: '1px 6px', borderRadius: '4px', border: '1px solid #DBEAFE', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '500' }}>
-                                (คลิกดูประวัติ)
-                              </span>
-                            </div>
+                            <span 
+                              className="history-name-link" 
+                              style={{ 
+                                fontWeight: '700', 
+                                color: '#2563EB', 
+                                fontSize: '14px', 
+                                whiteSpace: 'nowrap', 
+                                cursor: 'pointer' 
+                              }}
+                            >
+                              {patient.name}
+                            </span>
                           </td>
                           <td style={{ textAlign: 'center' }}>{patient.age} ปี</td>
                           <td style={{ textAlign: 'center' }}><span className="blood-badge">{patient.bloodType}</span></td>
-                          <td style={{ textAlign: 'center' }}>
+                          <td style={{ textAlign: 'center', padding: '8px 4px' }}>
                             <span style={{ 
                               background: rights.includes('30') ? '#FEF9C3' : rights.includes('ประกันสังคม') ? '#E0F2FE' : '#F3E8FF',
                               color: rights.includes('30') ? '#92400E' : rights.includes('ประกันสังคม') ? '#075985' : '#6D28D9',
                               border: `1px solid ${rights.includes('30') ? '#FDE68A' : rights.includes('ประกันสังคม') ? '#BAE6FD' : '#DDD6FE'}`,
-                              padding: '6px 14px', borderRadius: '9999px', fontSize: '13px', fontWeight: '700',
-                              whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center',
-                              width: '175px', textAlign: 'center', boxSizing: 'border-box'
+                              borderRadius: '9999px', fontSize: '12px', fontWeight: '700',
+                              whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                              width: '142px', minWidth: '142px', maxWidth: '142px', height: '28px', boxSizing: 'border-box'
                             }}>
                               {rights}
                             </span>
                           </td>
-                          <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
-                            <span className="visit-count-badge" style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '6px 14px', borderRadius: '20px', fontSize: '12.5px', fontWeight: '700', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE' }}>
+                          <td style={{ textAlign: 'center', padding: '8px 4px' }}>
+                            <span className="visit-count-badge" style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '110px', height: '26px', borderRadius: '16px', fontSize: '12px', fontWeight: '700', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', boxSizing: 'border-box' }}>
                               เข้ารักษา {patient.visitCount || 1} ครั้ง
                             </span>
                           </td>
@@ -855,7 +927,8 @@ export default function PatientHistoryPage() {
                           </td>
                         </tr>
                       );
-                    })}
+                    })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -957,7 +1030,7 @@ export default function PatientHistoryPage() {
                   <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>{selectedPatientModal.name}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>เลขบัตรประชาชน / HN:</span>
+                  <span style={{ color: '#64748B', fontSize: '13.5px' }}>เลขประจำตัว (HN):</span>
                   <span
                     onClick={(e) => handleCopyHn(selectedPatientModal.hn, e)}
                     title={copiedHn === selectedPatientModal.hn.replace(/[-]/g, '') ? 'คัดลอกแล้ว!' : 'คลิกเพื่อคัดลอก HN'}
@@ -1004,6 +1077,16 @@ export default function PatientHistoryPage() {
                     )}
                   </span>
                 </div>
+                {selectedPatientModal.nationalId && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ color: '#64748B', fontSize: '13.5px' }}>เลขบัตรประชาชน:</span>
+                    <CopyableText 
+                      value={selectedPatientModal.nationalId.replace(/-/g, '')} 
+                      displayValue={formatNationalId(selectedPatientModal.nationalId)} 
+                      color="#0F172A" 
+                    />
+                  </div>
+                )}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748B', fontSize: '13.5px' }}>เวลารับคิว:</span>
                   <span style={{ color: '#0F172A', fontWeight: '700', fontSize: '13.5px' }}>{selectedPatientModal.visitTime || '08:45 น.'}</span>

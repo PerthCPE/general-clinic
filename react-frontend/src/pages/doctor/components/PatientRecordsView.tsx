@@ -7,12 +7,10 @@ import {
   ChevronRight,
   Calendar,
   Clock,
-  FileText,
   Printer,
   ChevronDown,
   ChevronUp,
   AlertTriangle,
-  Activity,
   HeartPulse,
   History,
   User,
@@ -123,13 +121,13 @@ const NotAsked: React.FC = () => {
 const HistoryField: React.FC<{ label: string; value?: string }> = ({ label, value }) => {
   const text = (value || '').trim();
   return (
-    <div>
-      <span className="block text-[11px] font-bold text-slate-700 mb-1">{label}</span>
-      <div
-        className={`p-2.5 bg-slate-50 border border-slate-200 rounded-xl leading-relaxed whitespace-pre-line min-h-[38px] ${
-          text ? 'text-slate-800 font-medium' : 'text-slate-400'
-        }`}
-      >
+    <div className={`rounded-xl border px-3 py-2.5 min-h-[62px] ${
+      text ? 'border-slate-200 bg-slate-50/70' : 'border-slate-100 bg-slate-50/40'
+    }`}>
+      <span className="block text-[11px] font-semibold text-slate-500 mb-1">{label}</span>
+      <div className={`leading-relaxed whitespace-pre-line ${
+        text ? 'text-slate-900 font-medium' : 'text-slate-400'
+      }`}>
         {text || '-'}
       </div>
     </div>
@@ -278,9 +276,38 @@ const HistoryPrescriptionRow: React.FC<{
 };
 
 const HistorySection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div className="space-y-2">
-    <h5 className="text-sm font-bold text-slate-900">{title}</h5>
-    {children}
+  <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
+    <div className="border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+      <h5 className="text-sm font-bold text-slate-900">{title}</h5>
+    </div>
+    <div className="p-4">{children}</div>
+  </section>
+);
+
+const ProfileSection: React.FC<{
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ title, icon, children }) => (
+  <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
+    <div className="flex items-center gap-2.5 border-b border-slate-100 bg-slate-50/70 px-4 py-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+        {icon}
+      </span>
+      <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+    </div>
+    <div className="p-4">{children}</div>
+  </section>
+);
+
+const ProfileField: React.FC<{
+  label: string;
+  value: React.ReactNode;
+  className?: string;
+}> = ({ label, value, className = '' }) => (
+  <div className={`min-h-[64px] rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 ${className}`}>
+    <span className="mb-1 block text-[11px] font-semibold text-slate-500">{label}</span>
+    <div className="font-semibold leading-relaxed text-slate-900">{value}</div>
   </div>
 );
 
@@ -316,6 +343,43 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
   const [showPrintModal, setShowPrintModal] = useState(false);
 
   const { language, t } = useLanguage();
+
+  React.useEffect(() => {
+    const handleTabArrowNavigation = (event: KeyboardEvent) => {
+      if (
+        !selectedPatient ||
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
+      ) return;
+
+      const target = event.target;
+      if (target instanceof HTMLElement && (
+        target.isContentEditable ||
+        target.closest('input, textarea, select, [role="textbox"], [role="combobox"], [role="listbox"], [role="slider"], [role="dialog"], dialog')
+      )) return;
+
+      const nextTab = event.key === 'ArrowRight' ? 'profile' : 'history';
+      if (nextTab === activeTab) return;
+
+      event.preventDefault();
+      setActiveTab(nextTab);
+
+      requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLButtonElement>(`[data-record-tab="${nextTab}"]`)
+          ?.focus({ preventScroll: true });
+      });
+    };
+
+    window.addEventListener('keydown', handleTabArrowNavigation);
+    return () => window.removeEventListener('keydown', handleTabArrowNavigation);
+  }, [activeTab, selectedPatient]);
 
   // ผู้ป่วยที่ปิดการตรวจไปแล้ว (รวมที่ส่งต่อห้องยา) — มาจาก /patient-records
   // จึงเห็นย้อนหลังได้ทุกวัน ไม่ใช่เฉพาะคิวของวันนี้
@@ -555,7 +619,9 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
             {filteredPatients.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredPatients.map((patient) => {
-                  const pastCount = (patient.pastVisits?.length || 0) + (patient.chiefComplaint || patient.diagnosis ? 1 : 0);
+                  // visitCount มาจาก COUNT(*) ของ visit_records และเป็นจำนวนครั้งจริง
+                  // ส่วน pastVisits จะโหลดเมื่อเปิดดูคนไข้ จึงใช้เป็นตัวเลขบนการ์ดไม่ได้
+                  const pastCount = patient.visitCount ?? (patient.pastVisits?.length || 0);
                   const vnCode = displayVN(patient.vn);
 
                   return (
@@ -589,9 +655,8 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                         </div>
 
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs space-y-1 font-mono text-slate-600">
-                          <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-3">
                             <CopyableText label="VN" value={vnCode} />
-                            <span>•</span>
                             <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={formatNationalId(patient.nationalId)} copyValue={rawNationalId(patient.nationalId)} />
                           </div>
                           <div className="px-1.5 py-0.5"><strong className="text-slate-800">{language === 'th' ? 'เพศ/อายุ:' : 'Gender/Age:'}</strong> {patient.gender}, {patient.age} {language === 'th' ? 'ปี' : 'yrs'}</div>
@@ -640,7 +705,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
               และการมีช่องค้นหาสองที่ที่ผูกกับ state ตัวเดียวกัน (search)
               ทำให้พิมพ์ค้างไว้ในหน้านี้แล้วกดย้อนกลับ จะเจอรายชื่อถูกกรองอยู่
               โดยไม่มีอะไรบอกว่าทำไม */}
-          <div className="bg-white p-3.5 px-5 rounded-2xl border border-slate-200/90 shadow-2xs">
+          <div className="sticky top-[74px] z-40 bg-white p-3.5 px-5 rounded-2xl border border-slate-200/90 shadow-2xs">
             <button
               onClick={() => handleSelectPatient(null)}
               className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 px-3.5 py-2 rounded-xl transition-all border border-slate-200 hover:border-blue-200 cursor-pointer w-fit"
@@ -662,13 +727,10 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                     <h2 className="text-xl font-bold text-slate-900">{selectedPatient.name}</h2>
                     <StatusBadge status={selectedPatient.status} />
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-500 font-mono mt-1.5 flex-wrap">
+                  <div className="flex items-center gap-3 text-xs text-slate-500 font-mono mt-1.5 flex-wrap">
                     <CopyableText label="HN" value={selectedPatient.hn} />
-                    <span>•</span>
                     <CopyableText label="VN" value={displayVN(selectedPatient.vn)} />
-                    <span>•</span>
                     <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={formatNationalId(selectedPatient.nationalId)} copyValue={rawNationalId(selectedPatient.nationalId)} />
-                    <span>•</span>
                     <span>{selectedPatient.gender}, {selectedPatient.age} {language === 'th' ? 'ปี' : 'yrs'}</span>
                   </div>
                 </div>
@@ -715,11 +777,20 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
 
           {/* Navigation Tabs (History vs Profile) */}
           <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 px-6 pt-2.5 bg-slate-50/50 gap-3 overflow-x-auto">
-              <div className="flex items-center gap-2">
+            <div className="border-b border-slate-200 px-6 pt-2.5 bg-slate-50/50 overflow-x-auto">
+              <div
+                role="tablist"
+                aria-label={language === 'th' ? 'ข้อมูลเวชระเบียนผู้ป่วย' : 'Patient medical records'}
+                className="grid grid-cols-2 w-full"
+              >
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'history'}
+                  tabIndex={activeTab === 'history' ? 0 : -1}
+                  data-record-tab="history"
                   onClick={() => setActiveTab('history')}
-                  className={`px-5 py-3 text-xs font-extrabold rounded-t-2xl transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+                  className={`w-full min-w-0 px-4 py-3 text-xs font-extrabold rounded-t-2xl transition-all border-b-2 flex items-center justify-center gap-2 cursor-pointer focus:outline-hidden ${
                     activeTab === 'history'
                       ? 'bg-white text-blue-700 border-blue-600 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 border-transparent'
@@ -733,8 +804,13 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                 </button>
 
                 <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeTab === 'profile'}
+                  tabIndex={activeTab === 'profile' ? 0 : -1}
+                  data-record-tab="profile"
                   onClick={() => setActiveTab('profile')}
-                  className={`px-5 py-3 text-xs font-extrabold rounded-t-2xl transition-all border-b-2 flex items-center gap-2 cursor-pointer ${
+                  className={`w-full min-w-0 px-4 py-3 text-xs font-extrabold rounded-t-2xl transition-all border-b-2 flex items-center justify-center gap-2 cursor-pointer focus:outline-hidden ${
                     activeTab === 'profile'
                       ? 'bg-white text-blue-700 border-blue-600 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 border-transparent'
@@ -743,18 +819,6 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                   <User className="w-4 h-4 text-blue-600" />
                   <span>{language === 'th' ? 'ข้อมูลสุขภาพและประวัติส่วนตัว' : 'Health Profile & Medical Background'}</span>
                 </button>
-              </div>
-
-              {/* Right Side Composition Details */}
-              <div className="hidden md:flex items-center gap-2.5 pb-2 text-xs font-medium text-slate-600 shrink-0">
-                <span className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-slate-700 font-mono text-xs shadow-2xs flex items-center gap-2">
-                  <FileText className="w-3.5 h-3.5 text-blue-600" />
-                  <span>HN: <strong className="text-slate-900">{selectedPatient.hn}</strong></span>
-                </span>
-                <span className="px-3 py-1.5 bg-blue-50/90 border border-blue-200/80 rounded-xl text-blue-900 text-xs font-bold flex items-center gap-2 shadow-2xs">
-                  <Activity className="w-3.5 h-3.5 text-blue-600" />
-                  <span>{language === 'th' ? `ประวัติย้อนหลังทั้งหมด ${currentHistory.length} รายการ` : `Total ${currentHistory.length} Records`}</span>
-                </span>
               </div>
             </div>
 
@@ -813,24 +877,34 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                               {/* Visit Header Bar */}
                               <div
                                 onClick={() => setExpandedVisitId(isExpanded ? 'none' : visit.id)}
-                                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-100/50 transition-colors rounded-t-2xl"
+                                className={`p-4 flex items-start justify-between gap-4 cursor-pointer select-none transition-colors ${
+                                  isExpanded ? 'bg-white rounded-t-2xl' : 'hover:bg-slate-50 rounded-2xl'
+                                }`}
                               >
-                                <div className="space-y-1">
+                                <div className="min-w-0 space-y-2">
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200/80 font-mono">
-                                      {visit.visitDate} {visit.visitTime ? `• ${visit.visitTime}` : ''}
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-900 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/80 font-mono">
+                                      <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                                      {visit.visitDate}
                                     </span>
+                                    {visit.visitTime && (
+                                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 px-1 font-mono">
+                                        <Clock className="w-3.5 h-3.5 text-slate-400" />
+                                        {visit.visitTime}
+                                      </span>
+                                    )}
+                                    <CopyableText label="VN" value={visit.vn} />
                                     {isCurrentSession && (
                                       <span className="text-[10px] font-extrabold text-blue-800 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md uppercase">
                                         {language === 'th' ? 'การรับบริการวันนี้' : 'Today Visit'}
                                       </span>
                                     )}
-                                    <CopyableText label="VN" value={visit.vn} />
-                                    <VisitProgressBadge visit={visit} language={language} />
                                   </div>
 
-                                  <h4 className="text-sm font-bold text-blue-900 mt-1">
-                                    {translateClinicalText(visit.diagnosis, language)}
+                                  <h4 className="text-sm font-bold text-slate-900 leading-relaxed">
+                                    {visit.diagnosis
+                                      ? translateClinicalText(visit.diagnosis, language)
+                                      : (language === 'th' ? 'ยังไม่มีข้อมูลการวินิจฉัย' : 'No diagnosis recorded')}
                                     {visit.icdCode && (
                                       <span className="ml-2 font-mono text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/80">
                                         {visit.icdCode}
@@ -838,20 +912,25 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                                     )}
                                   </h4>
 
-                                  <div className="text-xs text-slate-600 font-medium">
-                                    <span>{visit.doctorName || <NoData />}</span>
+                                  <div className="text-xs text-slate-500 font-medium">
+                                    <span className="text-slate-400">{language === 'th' ? 'แพทย์ผู้ตรวจ: ' : 'Doctor: '}</span>
+                                    <span className="text-slate-700">{visit.doctorName || <NoData />}</span>
                                     {visit.department && <span className="text-slate-400"> ({visit.department})</span>}
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-3 shrink-0">
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <VisitProgressBadge visit={visit} language={language} />
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setExpandedVisitId(isExpanded ? 'none' : visit.id);
                                     }}
-                                    className="p-1.5 rounded-lg hover:bg-slate-200/70 text-slate-500 transition-colors cursor-pointer"
+                                    className="w-8 h-8 inline-flex items-center justify-center rounded-full border border-slate-200 bg-white hover:border-blue-300 hover:text-blue-600 text-slate-500 transition-colors cursor-pointer"
+                                    aria-label={isExpanded
+                                      ? (language === 'th' ? 'ย่อรายละเอียด' : 'Collapse details')
+                                      : (language === 'th' ? 'ดูรายละเอียด' : 'Expand details')}
                                   >
                                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                                   </button>
@@ -860,42 +939,36 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
 
                               {/* Expanded Visit Details Body */}
                               {isExpanded && (
-                                <div className="px-4 pb-5 pt-2 border-t border-slate-100 space-y-4 text-xs">
+                                <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50/50 space-y-4 text-xs">
                                 {/* Chief Complaint */}
-                                <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200 space-y-1">
-                                  <span className="font-bold text-slate-700 block text-[11px] uppercase tracking-wide">
-                                    {language === 'th' ? 'อาการสำคัญ (CHIEF COMPLAINT)' : 'CHIEF COMPLAINT'}
-                                  </span>
-                                  <p className="text-slate-800 font-medium leading-relaxed">
-                                    {translateClinicalText(visit.chiefComplaint, language)}
-                                  </p>
-                                </div>
+                                <HistorySection title={language === 'th' ? 'อาการสำคัญ' : 'Chief Complaint'}>
+                                  <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-4 py-3 text-sm font-medium leading-relaxed text-slate-900">
+                                    {translateClinicalText(visit.chiefComplaint, language) || '-'}
+                                  </div>
+                                </HistorySection>
 
                                 {/* Vitals Snapshot */}
                                 {visit.vitals && (
-                                  <div className="space-y-1.5">
-                                    <span className="font-bold text-slate-700 block text-[11px] uppercase tracking-wide">
-                                      {language === 'th' ? 'สัญญาณชีพประจำครั้งนี้ (VITALS RECORDED)' : 'VITALS RECORDED'}
-                                    </span>
+                                  <HistorySection title={language === 'th' ? 'สัญญาณชีพประจำครั้งนี้' : 'Vitals Recorded'}>
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                      <div className="p-2.5 bg-white rounded-xl border border-slate-200">
-                                        <span className="text-[10px] text-slate-400 block">{t('bloodPressure')}</span>
-                                        <span className="font-mono font-bold text-slate-800 text-xs">{visit.vitals.bp || '-'}</span>
+                                      <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200">
+                                        <span className="text-[10px] font-semibold text-slate-500 block mb-1">{t('bloodPressure')}</span>
+                                        <span className="font-mono font-bold text-slate-900 text-sm">{visit.vitals.bp || '-'}</span>
                                       </div>
-                                      <div className="p-2.5 bg-white rounded-xl border border-slate-200">
-                                        <span className="text-[10px] text-slate-400 block">{t('pulseRate')}</span>
-                                        <span className="font-mono font-bold text-slate-800 text-xs">{visit.vitals.pulse ? `${fmtVital(visit.vitals.pulse)} bpm` : '-'}</span>
+                                      <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200">
+                                        <span className="text-[10px] font-semibold text-slate-500 block mb-1">{t('pulseRate')}</span>
+                                        <span className="font-mono font-bold text-slate-900 text-sm">{visit.vitals.pulse ? `${fmtVital(visit.vitals.pulse)} bpm` : '-'}</span>
                                       </div>
-                                      <div className="p-2.5 bg-white rounded-xl border border-slate-200">
-                                        <span className="text-[10px] text-slate-400 block">{t('temperature')}</span>
-                                        <span className="font-mono font-bold text-slate-800 text-xs">{visit.vitals.temp ? `${fmtVital(visit.vitals.temp, 1)} °C` : '-'}</span>
+                                      <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200">
+                                        <span className="text-[10px] font-semibold text-slate-500 block mb-1">{t('temperature')}</span>
+                                        <span className="font-mono font-bold text-slate-900 text-sm">{visit.vitals.temp ? `${fmtVital(visit.vitals.temp, 1)} °C` : '-'}</span>
                                       </div>
-                                      <div className="p-2.5 bg-white rounded-xl border border-slate-200">
-                                        <span className="text-[10px] text-slate-400 block">{t('weight')}</span>
-                                        <span className="font-mono font-bold text-slate-800 text-xs">{visit.vitals.weight ? `${fmtVital(visit.vitals.weight, 1)} kg` : '-'}</span>
+                                      <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200">
+                                        <span className="text-[10px] font-semibold text-slate-500 block mb-1">{t('weight')}</span>
+                                        <span className="font-mono font-bold text-slate-900 text-sm">{visit.vitals.weight ? `${fmtVital(visit.vitals.weight, 1)} kg` : '-'}</span>
                                       </div>
                                     </div>
-                                  </div>
+                                  </HistorySection>
                                 )}
 
                                 {/* หมายเหตุ: กล่องเขียว "รายการยาที่สั่งจ่าย" ที่เคยอยู่ตรงนี้ถูกย้ายลงไป
@@ -1028,234 +1101,192 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
 
               {/* TAB 2: PERSONAL HEALTH PROFILE */}
               {activeTab === 'profile' && (
-                <div className="space-y-6 text-xs">
-                  {/* Full Structured Patient Profile Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Block 1: Demographics */}
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3 shadow-xs">
-                      <div className="flex items-center gap-2 border-b border-slate-200 pb-2.5 text-sm font-bold text-slate-900">
-                        <div className="p-1.5 rounded-lg bg-blue-100/80 text-blue-700">
-                          <User className="w-4 h-4" />
-                        </div>
-                        <span>{language === 'th' ? 'ข้อมูลพื้นฐาน' : 'Demographics'}</span>
+                <div className="space-y-5 text-xs">
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <ProfileSection
+                      title={language === 'th' ? 'ข้อมูลส่วนตัว' : 'Personal Information'}
+                      icon={<User className="w-4 h-4" />}
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <ProfileField
+                          className="col-span-2"
+                          label={language === 'th' ? 'ชื่อ - นามสกุล' : 'Full Name'}
+                          value={selectedPatient.name}
+                        />
+                        <ProfileField
+                          label={language === 'th' ? 'อายุ' : 'Age'}
+                          value={`${selectedPatient.age} ${language === 'th' ? 'ปี' : 'yrs'}`}
+                        />
+                        <ProfileField
+                          label={language === 'th' ? 'เพศ' : 'Gender'}
+                          value={selectedPatient.gender === 'Male'
+                            ? (language === 'th' ? 'ชาย' : 'Male')
+                            : selectedPatient.gender === 'Female'
+                            ? (language === 'th' ? 'หญิง' : 'Female')
+                            : selectedPatient.gender}
+                        />
+                        <ProfileField
+                          label={language === 'th' ? 'วันเกิด' : 'Date of Birth'}
+                          value={selectedPatient.dob || <NoData />}
+                        />
+                        <ProfileField
+                          label={language === 'th' ? 'หมู่โลหิต' : 'Blood Group'}
+                          value={selectedPatient.bloodGroup || <NoData />}
+                        />
+                        <ProfileField
+                          className="col-span-2"
+                          label={language === 'th' ? 'เลขบัตรประชาชน' : 'National ID'}
+                          value={<CopyableText value={formatNationalId(selectedPatient.nationalId)} copyValue={rawNationalId(selectedPatient.nationalId)} />}
+                        />
                       </div>
-                      <div className="space-y-2 text-xs">
-                        <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                          <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'ชื่อ - นามสกุล :' : 'Full Name :'}</span>
-                          <span className="font-bold text-slate-900 text-xs">{selectedPatient.name}</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                            <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'อายุ :' : 'Age :'}</span>
-                            <span className="font-bold text-slate-900 text-xs">{selectedPatient.age} {language === 'th' ? 'ปี' : 'yrs'}</span>
-                          </div>
-                          <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                            <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เพศ :' : 'Gender :'}</span>
-                            <span className="font-bold text-slate-900 text-xs">
-                              {selectedPatient.gender === 'Male'
-                                ? (language === 'th' ? 'ชาย' : 'Male')
-                                : selectedPatient.gender === 'Female'
-                                ? (language === 'th' ? 'หญิง' : 'Female')
-                                : selectedPatient.gender}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                            <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'หมู่โลหิต :' : 'Blood Group :'}</span>
-                            <span className="font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 inline-block text-[11px]">
-                              {selectedPatient.bloodGroup || <NoData />}
-                            </span>
-                          </div>
-                          <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                            <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'วันเกิด :' : 'Date of Birth :'}</span>
-                            <span className="font-semibold text-slate-800 text-xs">{selectedPatient.dob || <NoData />}</span>
-                          </div>
-                        </div>
-                        <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                          <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เลขบัตรประชาชน :' : 'National ID :'}</span>
-                          <CopyableText value={formatNationalId(selectedPatient.nationalId)} copyValue={rawNationalId(selectedPatient.nationalId)} />
-                        </div>
-                      </div>
-                    </div>
+                    </ProfileSection>
 
-                    {/* Block 2: Address & Phone */}
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3 shadow-xs">
-                      <div className="flex items-center gap-2 border-b border-slate-200 pb-2.5 text-sm font-bold text-slate-900">
-                        <div className="p-1.5 rounded-lg bg-emerald-100/80 text-emerald-700">
-                          <Phone className="w-4 h-4" />
-                        </div>
-                        <span>{language === 'th' ? 'การติดต่อ & ที่อยู่' : 'Contact & Address'}</span>
+                    <ProfileSection
+                      title={language === 'th' ? 'การติดต่อและการรับบริการ' : 'Contact & Visit Information'}
+                      icon={<Phone className="w-4 h-4" />}
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <ProfileField
+                          label={language === 'th' ? 'เบอร์โทรศัพท์' : 'Phone Number'}
+                          value={selectedPatient.phone || <NoData />}
+                        />
+                        <ProfileField
+                          label={language === 'th' ? 'อาชีพ' : 'Occupation'}
+                          value={selectedPatient.occupation || <NoData />}
+                        />
+                        <ProfileField
+                          className="col-span-2"
+                          label={language === 'th' ? 'ที่อยู่ผู้ป่วย' : 'Patient Address'}
+                          value={selectedPatient.address || <NoData />}
+                        />
+                        <ProfileField
+                          className="col-span-2"
+                          label={language === 'th' ? 'สิทธิการรักษา' : 'Insurance Scheme'}
+                          value={selectedPatient.insuranceType || <NoData />}
+                        />
+                        <ProfileField
+                          label={language === 'th' ? 'วันที่รับบริการ' : 'Visit Date'}
+                          value={selectedPatient.visitDate || <NoData />}
+                        />
+                        <ProfileField
+                          label={language === 'th' ? 'เวลา' : 'Visit Time'}
+                          value={selectedPatient.visitTime || <NoData />}
+                        />
                       </div>
-                      <div className="space-y-2 text-xs">
-                        <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                          <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เบอร์โทรศัพท์ :' : 'Patient Phone :'}</span>
-                          <span className="font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60 inline-block text-xs">
-                            {selectedPatient.phone || <NoData />}
+                    </ProfileSection>
+                  </div>
+
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                    <ProfileSection
+                      title={language === 'th' ? 'ข้อมูลการแพ้' : 'Allergy Information'}
+                      icon={<AlertTriangle className="w-4 h-4" />}
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-3.5">
+                          <span className="mb-2 block text-[11px] font-bold text-rose-900">
+                            {language === 'th' ? 'ประวัติการแพ้ยา' : 'Drug Allergies'}
                           </span>
-                        </div>
-                        <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                          <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'อาชีพ :' : 'Occupation :'}</span>
-                          <span className="font-bold text-slate-900 text-xs">{selectedPatient.occupation || <NoData />}</span>
-                        </div>
-                        <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                          <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'ที่อยู่ผู้ป่วย :' : 'Patient Address :'}</span>
-                          <p className="font-semibold text-slate-800 text-xs leading-relaxed">
-                            {selectedPatient.address || <NoData />}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Block 3: Insurance & Visit Info */}
-                    <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3 shadow-xs">
-                      <div className="flex items-center gap-2 border-b border-slate-200 pb-2.5 text-sm font-bold text-slate-900">
-                        <div className="p-1.5 rounded-lg bg-amber-100/80 text-amber-700">
-                          <Shield className="w-4 h-4" />
-                        </div>
-                        <span>{language === 'th' ? 'สิทธิการรักษา & รับบริการ' : 'Insurance Scheme & Visit'}</span>
-                      </div>
-                      <div className="space-y-2 text-xs">
-                        <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                          <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'สิทธิการรักษา :' : 'Insurance Scheme :'}</span>
-                          <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 inline-block text-xs">
-                            {selectedPatient.insuranceType || <NoData />}
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                            <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'วันที่รับบริการ :' : 'Visit Date :'}</span>
-                            <span className="font-bold text-slate-900 text-xs">{selectedPatient.visitDate || <NoData />}</span>
-                          </div>
-                          <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                            <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เวลา :' : 'Visit Time :'}</span>
-                            <span className="font-bold text-slate-900 text-xs">{selectedPatient.visitTime || <NoData />}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Chronic Diseases */}
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                    <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs font-extrabold text-slate-800">
-                      <div className="p-1.5 rounded-lg bg-rose-100/80 text-rose-700">
-                        <HeartPulse className="w-4 h-4" />
-                      </div>
-                      <span>{language === 'th' ? 'โรคประจำตัวและภาวะเรื้อรัง' : 'Chronic Diseases & Conditions'}</span>
-                    </div>
-                    {selectedPatient.chronicDiseases && selectedPatient.chronicDiseases.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {selectedPatient.chronicDiseases.map((d, i) => (
-                          <span key={i} className="px-3 py-1 bg-blue-100 text-blue-900 font-bold rounded-lg border border-blue-200 text-xs">
-                            • {d}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-slate-500 font-medium">{language === 'th' ? 'ไม่มีโรคประจำตัว' : 'No chronic diseases recorded.'}</span>
-                    )}
-                  </div>
-
-                  {/* Allergies Section */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-rose-50/60 rounded-2xl border border-rose-200 space-y-2">
-                      <span className="font-bold text-rose-900 text-xs block border-b border-rose-200/80 pb-1.5 flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-rose-100/80 text-rose-700">
-                          <AlertTriangle className="w-4 h-4" />
-                        </div>
-                        <span>{language === 'th' ? 'ประวัติการแพ้ยา (Drug Allergies)' : 'Drug Allergies'}</span>
-                      </span>
-                      {selectedPatient.drugAllergies && selectedPatient.drugAllergies.length > 0 ? (
-                        <div className="space-y-1">
-                          {selectedPatient.drugAllergies.map((drug, i) => (
-                            <span key={i} className="inline-block px-2.5 py-1 bg-rose-100 text-rose-900 font-bold rounded-lg border border-rose-200 text-xs mr-1.5 mb-1">
-                              ⚠️ {drug}
+                          {selectedPatient.drugAllergies && selectedPatient.drugAllergies.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedPatient.drugAllergies.map((drug, i) => (
+                                <span key={i} className="rounded-lg border border-rose-200 bg-white px-2.5 py-1 font-bold text-rose-900">
+                                  {drug}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="font-semibold text-emerald-700">
+                              {language === 'th' ? 'ปฏิเสธประวัติแพ้ยา (NKDA)' : 'No Known Drug Allergies (NKDA)'}
                             </span>
-                          ))}
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-emerald-800 font-semibold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 inline-block">
-                          ✓ {language === 'th' ? 'ปฏิเสธประวัติแพ้ยา (NKDA)' : 'No Known Drug Allergies (NKDA)'}
-                        </span>
-                      )}
-                    </div>
 
-                    <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200 space-y-2">
-                      <span className="font-bold text-amber-900 text-xs block border-b border-amber-200/80 pb-1.5 flex items-center gap-2">
-                        <div className="p-1.5 rounded-lg bg-amber-100/80 text-amber-700">
-                          <AlertTriangle className="w-4 h-4" />
-                        </div>
-                        <span>{language === 'th' ? 'ประวัติการแพ้อาหาร (Food Allergies)' : 'Food Allergies'}</span>
-                      </span>
-                      {selectedPatient.foodAllergies && selectedPatient.foodAllergies.length > 0 ? (
-                        <div className="space-y-1">
-                          {selectedPatient.foodAllergies.map((food, i) => (
-                            <span key={i} className="inline-block px-2.5 py-1 bg-amber-100 text-amber-900 font-bold rounded-lg border border-amber-200 text-xs mr-1.5 mb-1">
-                              ⚠️ {food}
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5">
+                          <span className="mb-2 block text-[11px] font-bold text-amber-900">
+                            {language === 'th' ? 'ประวัติการแพ้อาหาร' : 'Food Allergies'}
+                          </span>
+                          {selectedPatient.foodAllergies && selectedPatient.foodAllergies.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedPatient.foodAllergies.map((food, i) => (
+                                <span key={i} className="rounded-lg border border-amber-200 bg-white px-2.5 py-1 font-bold text-amber-900">
+                                  {food}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="font-medium text-slate-600">
+                              {language === 'th' ? 'ไม่มีประวัติแพ้อาหาร' : 'No food allergies recorded.'}
                             </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-600 font-medium">
-                          ✓ {language === 'th' ? 'ไม่มีประวัติแพ้อาหาร' : 'No food allergies recorded.'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Personal Lifestyle & Surgery */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                      <span className="font-bold text-slate-800 text-xs block border-b border-slate-200 pb-1.5">
-                        {language === 'th' ? 'ประวัติพฤติกรรมสุขภาพ' : 'Social & Behavioral History'}
-                      </span>
-                      <div className="space-y-1.5 text-slate-700">
-                        <div>
-                          <strong className="text-slate-900">{language === 'th' ? 'การสูบบุหรี่:' : 'Smoking:'}</strong>{' '}
-                          {selectedPatient.smokingHistory?.status || <NotAsked />}
-                        </div>
-                        <div>
-                          <strong className="text-slate-900">{language === 'th' ? 'การดื่มแอลกอฮอล์:' : 'Alcohol:'}</strong>{' '}
-                          {selectedPatient.alcoholHistory?.status || <NotAsked />}
+                          )}
                         </div>
                       </div>
-                    </div>
+                    </ProfileSection>
 
-                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                      <span className="font-bold text-slate-800 text-xs block border-b border-slate-200 pb-1.5">
-                        {language === 'th' ? 'ประวัติการผ่าตัดและประวัติครอบครัว' : 'Surgical & Family History'}
-                      </span>
-                      <div className="space-y-1.5 text-slate-700">
-                        <div>
-                          <strong className="text-slate-900">{language === 'th' ? 'การผ่าตัดเดิม:' : 'Past Surgery:'}</strong>{' '}
-                          {selectedPatient.pastSurgery || <NotAsked />}
+                    <ProfileSection
+                      title={language === 'th' ? 'โรคประจำตัวและยาที่ใช้ประจำ' : 'Chronic Conditions & Current Medications'}
+                      icon={<HeartPulse className="w-4 h-4" />}
+                    >
+                      <div className="space-y-3">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
+                          <span className="mb-2 block text-[11px] font-semibold text-slate-500">
+                            {language === 'th' ? 'โรคประจำตัวและภาวะเรื้อรัง' : 'Chronic Diseases & Conditions'}
+                          </span>
+                          {selectedPatient.chronicDiseases && selectedPatient.chronicDiseases.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              {selectedPatient.chronicDiseases.map((d, i) => (
+                                <span key={i} className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 font-bold text-blue-900">
+                                  {d}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="font-medium text-slate-500">{language === 'th' ? 'ไม่มีโรคประจำตัว' : 'No chronic diseases recorded.'}</span>
+                          )}
                         </div>
-                        <div>
-                          <strong className="text-slate-900">{language === 'th' ? 'ประวัติครอบครัว:' : 'Family History:'}</strong>{' '}
-                          {selectedPatient.familyHistory || <NotAsked />}
+
+                        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
+                          <span className="mb-2 block text-[11px] font-semibold text-slate-500">
+                            {language === 'th' ? 'ยาที่รับประทานประจำในปัจจุบัน' : 'Current Long-term Medications'}
+                          </span>
+                          {selectedPatient.currentMedications && selectedPatient.currentMedications.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {selectedPatient.currentMedications.map((med, i) => (
+                                <div key={i} className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-800">
+                                  {med}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="font-medium text-slate-500">{language === 'th' ? 'ไม่มีรายการยาประจำ' : 'No long-term medications listed.'}</span>
+                          )}
                         </div>
                       </div>
-                    </div>
+                    </ProfileSection>
                   </div>
 
-                  {/* Current Regular Medications */}
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-                    <span className="font-bold text-slate-800 text-xs block border-b border-slate-200 pb-1.5">
-                      {language === 'th' ? 'ยาที่รับประทานประจำในปัจจุบัน (Current Long-term Medications)' : 'Current Long-term Medications'}
-                    </span>
-                    {selectedPatient.currentMedications && selectedPatient.currentMedications.length > 0 ? (
-                      <div className="space-y-1">
-                        {selectedPatient.currentMedications.map((med, i) => (
-                          <div key={i} className="p-2 bg-white rounded-lg border border-slate-200 font-medium text-slate-800">
-                            • {med}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-slate-500 font-medium">{language === 'th' ? 'ไม่มีรายการยาประจำ' : 'No long-term medications listed.'}</span>
-                    )}
-                  </div>
+                  <ProfileSection
+                    title={language === 'th' ? 'ประวัติสุขภาพเพิ่มเติม' : 'Additional Health History'}
+                    icon={<Shield className="w-4 h-4" />}
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                      <ProfileField
+                        label={language === 'th' ? 'การสูบบุหรี่' : 'Smoking'}
+                        value={selectedPatient.smokingHistory?.status || <NotAsked />}
+                      />
+                      <ProfileField
+                        label={language === 'th' ? 'การดื่มแอลกอฮอล์' : 'Alcohol'}
+                        value={selectedPatient.alcoholHistory?.status || <NotAsked />}
+                      />
+                      <ProfileField
+                        label={language === 'th' ? 'ประวัติการผ่าตัด' : 'Past Surgery'}
+                        value={selectedPatient.pastSurgery || <NotAsked />}
+                      />
+                      <ProfileField
+                        label={language === 'th' ? 'ประวัติครอบครัว' : 'Family History'}
+                        value={selectedPatient.familyHistory || <NotAsked />}
+                      />
+                    </div>
+                  </ProfileSection>
                 </div>
               )}
             </div>

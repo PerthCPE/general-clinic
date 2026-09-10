@@ -1,31 +1,58 @@
-﻿node_modules/
+# Dependencies
+node_modules/
 **/node_modules/
+package-lock.json
+
+# Environment variables & secrets
+.env
+.env.*
+*.env
+*.env.*
+**/.env
+**/.env.*
 golang-backend/.env
+golang-backend/.env.*
+react-frontend/.env
+react-frontend/.env.*
+
+# Build artifacts & Binaries
+dist/
+react-frontend/dist/
 golang-backend/golang-backend
 golang-backend/*.exe
+*.exe
+*.exe~
+*.log
+backups/
+golang-backend/backups/
 
-react-frontend/node_modules/
-react-frontend/dist/
-react-frontend/.env
-react-frontend/.env.local
 
+# OS specific
 .DS_Store
 Thumbs.db
-aboutmypart.md
 
-# MCP Server, AI Assistant Tooling, Brain & Local State
+# Local Workspace & AI tooling
+go.work
+go.work.sum
+skills-lock.json
+old_api.ts
 mcp-server/
 mcp-qa-server/
 .agents/
 .gemini/
-
 brain/
-*.exe
-*.exe~
-*.tmp
-*.log
-package-lock.json
 
+# Local & Internal Documentation / Configs
+aboutmypart.md
 GEMINI.md
-
+HANDOVER_PROMPT.md
+MIGRATION_NOTES.md
+frontend.md
+project_spec.md
+package.json
 frontend/
+TEAM_RULES.md
+
+docker-compose.yml
+vercel.json
+**/vercel.json

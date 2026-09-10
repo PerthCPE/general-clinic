@@ -7,7 +7,7 @@ type Screening struct {
 	VisitID            uint    `gorm:"not null" json:"visit_id"`
 	ScreenedByUserID   uint    `json:"screened_by_user_id"` // พยาบาลผู้ทำการคัดกรอง
 	AssignedDoctorID   uint    `json:"assigned_doctor_id"`  // แพทย์ประจำห้องตรวจที่ส่งต่อ
-	TriageLevel        string  `json:"triage_level"`        // ปกติ (Normal), เร่งด่วน (Urgent), ฉุกเฉิน (Emergency), วิกฤต (Resuscitation)
+	TriageLevel        int     `gorm:"not null;default:4;check:triage_level BETWEEN 1 AND 4" json:"triage_level"` // 1=Resuscitation, 2=Urgent, 3=Semi-Urgent, 4=Normal
 	ChiefComplaint     string  `json:"chief_complaint"`
 	Allergies          string  `json:"allergies"`
 	MedicalHistory     string  `json:"medical_history"`
@@ -113,8 +113,9 @@ type Screening struct {
 	// ใช้ *bool 3 สถานะ nil = ยังไม่ได้ถาม
 	// ตรงนี้สำคัญกว่าข้ออื่นด้วยซ้ำ เพราะ "ไม่ได้ถาม" กับ "ถามแล้วตอบไม่มี"
 	// ต่างกันที่ว่าผู้ป่วยเคยมีโอกาสบอกหรือยัง
-	Q2Depressed *bool `json:"q2_depressed"`
-	Q2Anhedonia *bool `json:"q2_anhedonia"`
+	Q2Depressed       *bool `json:"q2_depressed"`
+	Q2Anhedonia       *bool `json:"q2_anhedonia"`
+	ScreeningPositive *bool `json:"screening_positive"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -123,3 +124,52 @@ type Screening struct {
 	ScreenedBy     User        `gorm:"foreignKey:ScreenedByUserID" json:"screened_by"` // ดึงข้อมูลพยาบาลผู้คัดกรอง
 	AssignedDoctor User        `gorm:"foreignKey:AssignedDoctorID" json:"assigned_doctor"`
 }
+
+// TriageLabelTH returns the canonical Thai label for triage level 1-4 (default "ไม่ระบุ")
+func TriageLabelTH(level int) string {
+	switch level {
+	case 1:
+		return "ฉุกเฉินวิกฤต"
+	case 2:
+		return "ฉุกเฉินเร่งด่วน"
+	case 3:
+		return "กึ่งฉุกเฉิน"
+	case 4:
+		return "ปกติ"
+	default:
+		return "ไม่ระบุ"
+	}
+}
+
+// TriageLabelEN returns the canonical English label for triage level 1-4 (default "Unknown")
+func TriageLabelEN(level int) string {
+	switch level {
+	case 1:
+		return "Resuscitation"
+	case 2:
+		return "Emergency-Urgent"
+	case 3:
+		return "Semi-Urgent"
+	case 4:
+		return "Non-Urgent"
+	default:
+		return "Unknown"
+	}
+}
+
+// TriageInfoFromLevel returns doctor UI triage code, priority, Thai label, and English label
+func TriageInfoFromLevel(level int) (code string, priority string, labelTH string, labelEN string) {
+	switch level {
+	case 1:
+		return "Level 1: Resuscitation", "High", "ฉุกเฉินวิกฤต", "Resuscitation"
+	case 2:
+		return "Level 2: Emergency", "High", "ฉุกเฉินเร่งด่วน", "Emergency-Urgent"
+	case 3:
+		return "Level 3: Urgent", "Medium", "กึ่งฉุกเฉิน", "Semi-Urgent"
+	case 4:
+		return "Level 4: Less Urgent", "Low", "ปกติ", "Non-Urgent"
+	default:
+		return "", "", "ไม่ระบุ", "Unknown"
+	}
+}
+

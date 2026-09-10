@@ -1,7 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useWebSocket } from '../../context/WebSocketContext';
+import { useToast } from '../../components/Toast/ToastProvider';
 import type {
   QueuePatientItem,
+  TriageLevelNum,
   TriageLevelKey,
   BMICategoryKey,
   BMICategoryInfo,
@@ -12,8 +15,8 @@ import { BMIWidget } from './components/BMIWidget';
 import { TriageWidget } from './components/TriageWidget';
 import { VitalsFormCard } from './components/VitalsFormCard';
 import { queueApi, vitalsApi, type BackendQueue } from '../../services/api';
-import { useWebSocket } from '../../context/WebSocketContext';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
+import { validateVitalsInput } from '../../utils/clinicalValidation';
 import './VitalsPage.css';
 
 export { formatHN, formatQueueNo };
@@ -41,7 +44,19 @@ interface VitalsDraftPayload {
   currentMedications: string;
   smokingHistory: string;
   alcoholHistory: string;
-  selectedTriage: TriageLevelKey;
+  nurseNotes?: string;
+  herbalMedicines?: string;
+  dietarySupplements?: string;
+  hasURI?: boolean | null;
+  hasTB?: boolean | null;
+  onAnticoagulant?: boolean | null;
+  precautionType?: string;
+  isPregnant?: boolean | null;
+  isBreastfeeding?: boolean | null;
+  lastMenstrualPeriod?: string;
+  q2Depressed?: boolean | null;
+  q2Anhedonia?: boolean | null;
+  selectedTriage: TriageLevelNum;
   assignedDoctorId: number;
   savedAt: string;
 }
@@ -58,7 +73,7 @@ const getInitialDraft = (): VitalsDraftPayload | null => {
   return null;
 };
 
-// Initial Fallback Doctors
+// Initial Fallback Doctors (Matches seed users doctor1-3)
 const DEFAULT_DOCTORS: DoctorOption[] = [
   { doctorId: 4, fullName: 'พญ.สุดา สุขสมบูรณ์', specialty: 'เวชปฏิบัติทั่วไป', roomName: 'ห้องตรวจ 1 (พญ.สุดา)' },
   { doctorId: 5, fullName: 'นพ.วิชัย ชาญการแพทย์', specialty: 'อายุรกรรมทั่วไป', roomName: 'ห้องตรวจ 2 (นพ.วิชัย)' },
@@ -78,8 +93,19 @@ const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
     }
   }
 
-  const birthYear = q.patient?.birthdate ? new Date(q.patient.birthdate).getFullYear() : 1990;
-  const age = new Date().getFullYear() - birthYear;
+  let age = 0;
+  if (q.patient?.birthdate) {
+    try {
+      const d = new Date(q.patient.birthdate);
+      if (!isNaN(d.getTime())) {
+        const bYear = d.getFullYear() >= 2400 ? d.getFullYear() - 543 : d.getFullYear();
+        const calcAge = new Date().getFullYear() - bYear;
+        age = calcAge >= 0 ? calcAge : 0;
+      }
+    } catch {
+      // ignore
+    }
+  }
   const queueFormatted = formatQueueNo(q.queue_number || q.id);
   const hnFormatted = q.patient?.hn ? formatHN(q.patient.hn) : formatHN(q.patient_id || q.id || 1);
 
@@ -92,7 +118,7 @@ const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
     fullName: q.patient?.fullname || `ผู้ป่วยคิว ${queueFormatted}`,
     nationalId: formatNationalId(q.patient?.national_id),
     gender: (q.patient?.gender as 'ชาย' | 'หญิง' | 'อื่นๆ') || 'ชาย',
-    age: age > 0 ? age : 35,
+    age: age,
     phone: formatPhone(q.patient?.phone_number),
     schemeType: q.patient?.scheme_type || 'บัตรทอง (สปสช.)',
     allergies: q.patient?.allergies || 'ปฏิเสธการแพ้ยา',
@@ -104,6 +130,7 @@ const mapBackendQueueToPatientItem = (q: BackendQueue): QueuePatientItem => {
 
 export const VitalsPage: React.FC = () => {
   const { currentUser } = useAuth();
+  const { showToast } = useToast();
   const initialDraft = useMemo(() => getInitialDraft(), []);
 
   // Queue & Patient State (Auto-restored from draft if available)
@@ -111,20 +138,26 @@ export const VitalsPage: React.FC = () => {
   const [selectedPatientId, setSelectedPatientId] = useState<string>(() => initialDraft?.selectedPatientId || '');
   const [doctorList, setDoctorList] = useState<DoctorOption[]>(DEFAULT_DOCTORS);
 
-  // ดึงรายการคิวจาก Backend DB
+  // ดึงรายการคิวจริงจาก Backend DB (Zero Mock)
   const fetchQueues = useCallback(async () => {
     try {
-      const data = await queueApi.getList();
-      if (Array.isArray(data)) {
-        const mapped = data.map(mapBackendQueueToPatientItem);
+      const res = await queueApi.getList();
+      const rawList = Array.isArray(res) ? res : (res && typeof res === 'object' && 'data' in res ? (res as any).data : []);
+      if (Array.isArray(rawList)) {
+        const mapped = rawList.map(mapBackendQueueToPatientItem);
         setQueueList(mapped);
         return mapped;
+      } else {
+        setQueueList([]);
+        return [];
       }
     } catch (err) {
-      console.warn('Could not load queues in vitals:', err);
+      console.error('Could not load queues in vitals from backend:', err);
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดรายการคิวได้' });
+      setQueueList([]);
+      return [];
     }
-    return [];
-  }, []);
+  }, [showToast]);
 
   // ดึงรายชื่อแพทย์ประจำห้องตรวจจาก Backend DB
   const fetchDoctors = useCallback(async () => {
@@ -175,14 +208,11 @@ export const VitalsPage: React.FC = () => {
       fetchQueues();
     });
 
-    // Fallback polling ทุก 30 วินาที
-    const interval = setInterval(fetchQueues, 30000);
     return () => {
       unsubCreated();
       unsubUpdated();
       unsubReset();
       unsubPatient();
-      clearInterval(interval);
     };
   }, [fetchQueues, fetchDoctors, subscribe]);
 
@@ -204,13 +234,39 @@ export const VitalsPage: React.FC = () => {
   const [currentMedications, setCurrentMedications] = useState<string>(() => initialDraft?.currentMedications || '');
   const [smokingHistory, setSmokingHistory] = useState<string>(() => initialDraft?.smokingHistory || '');
   const [alcoholHistory, setAlcoholHistory] = useState<string>(() => initialDraft?.alcoholHistory || '');
-  const [selectedTriage, setSelectedTriage] = useState<TriageLevelKey>(() => initialDraft?.selectedTriage || 'ปกติ (Normal)');
+  // Advanced screening state (EXPAND-1)
+  const [nurseNotes, setNurseNotes] = useState<string>(() => initialDraft?.nurseNotes || '');
+  const [herbalMedicines, setHerbalMedicines] = useState<string>(() => initialDraft?.herbalMedicines || '');
+  const [dietarySupplements, setDietarySupplements] = useState<string>(() => initialDraft?.dietarySupplements || '');
+  const [hasURI, setHasURI] = useState<boolean | null>(() => (initialDraft?.hasURI !== undefined ? initialDraft.hasURI : null));
+  const [hasTB, setHasTB] = useState<boolean | null>(() => (initialDraft?.hasTB !== undefined ? initialDraft.hasTB : null));
+  const [onAnticoagulant, setOnAnticoagulant] = useState<boolean | null>(() => (initialDraft?.onAnticoagulant !== undefined ? initialDraft.onAnticoagulant : null));
+  const [precautionType, setPrecautionType] = useState<string>(() => initialDraft?.precautionType || '');
+  const [isPregnant, setIsPregnant] = useState<boolean | null>(() => (initialDraft?.isPregnant !== undefined ? initialDraft.isPregnant : null));
+  const [isBreastfeeding, setIsBreastfeeding] = useState<boolean | null>(() => (initialDraft?.isBreastfeeding !== undefined ? initialDraft.isBreastfeeding : null));
+  const [lastMenstrualPeriod, setLastMenstrualPeriod] = useState<string>(() => initialDraft?.lastMenstrualPeriod || '');
+  const [q2Depressed, setQ2Depressed] = useState<boolean | null>(() => (initialDraft?.q2Depressed !== undefined ? initialDraft.q2Depressed : null));
+  const [q2Anhedonia, setQ2Anhedonia] = useState<boolean | null>(() => (initialDraft?.q2Anhedonia !== undefined ? initialDraft.q2Anhedonia : null));
+  const [selectedTriage, setSelectedTriage] = useState<TriageLevelNum>(() => initialDraft?.selectedTriage || 4);
   const [assignedDoctorId, setAssignedDoctorId] = useState<number>(() => initialDraft?.assignedDoctorId || 4);
   const [draftSavedAt, setDraftSavedAt] = useState<string | null>(() => initialDraft?.savedAt || null);
 
-  // Accordion and UI States
+  // Accordion, Error and UI States
   const [isFormOpen, setIsFormOpen] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [pendingWarnings, setPendingWarnings] = useState<Array<{ field: string; message: string }> | null>(null);
+
+  // Clear form errors when input values change
+  const clearFieldError = (field: string) => {
+    if (formErrors[field]) {
+      setFormErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  };
 
   // Searchable Queue Dropdown State
   const [searchQuery, setSearchQuery] = useState<string>(() => initialDraft?.searchQuery || '');
@@ -300,7 +356,19 @@ export const VitalsPage: React.FC = () => {
       Boolean(medicalHistory) ||
       Boolean(currentMedications) ||
       Boolean(smokingHistory) ||
-      Boolean(alcoholHistory);
+      Boolean(alcoholHistory) ||
+      Boolean(nurseNotes) ||
+      Boolean(herbalMedicines) ||
+      Boolean(dietarySupplements) ||
+      hasURI !== null ||
+      hasTB !== null ||
+      onAnticoagulant !== null ||
+      Boolean(precautionType) ||
+      isPregnant !== null ||
+      isBreastfeeding !== null ||
+      Boolean(lastMenstrualPeriod) ||
+      q2Depressed !== null ||
+      q2Anhedonia !== null;
 
     if (hasData) {
       const timer = setTimeout(() => {
@@ -327,6 +395,18 @@ export const VitalsPage: React.FC = () => {
             currentMedications,
             smokingHistory,
             alcoholHistory,
+            nurseNotes,
+            herbalMedicines,
+            dietarySupplements,
+            hasURI,
+            hasTB,
+            onAnticoagulant,
+            precautionType,
+            isPregnant,
+            isBreastfeeding,
+            lastMenstrualPeriod,
+            q2Depressed,
+            q2Anhedonia,
             selectedTriage,
             assignedDoctorId,
             savedAt: nowStr,
@@ -360,6 +440,18 @@ export const VitalsPage: React.FC = () => {
     currentMedications,
     smokingHistory,
     alcoholHistory,
+    nurseNotes,
+    herbalMedicines,
+    dietarySupplements,
+    hasURI,
+    hasTB,
+    onAnticoagulant,
+    precautionType,
+    isPregnant,
+    isBreastfeeding,
+    lastMenstrualPeriod,
+    q2Depressed,
+    q2Anhedonia,
     selectedTriage,
     assignedDoctorId,
   ]);
@@ -459,8 +551,8 @@ export const VitalsPage: React.FC = () => {
     return { bmiValue: bmi, bmiCategory: info };
   }, [weight, height]);
 
-  // Smart Triage Auto-Suggestion based on vitals
-  const suggestedTriageLevel = useMemo<TriageLevelKey>(() => {
+  // Smart Triage Auto-Suggestion based on vitals (1-4)
+  const suggestedTriageLevel = useMemo<TriageLevelNum>(() => {
     const tempNum = parseFloat(temperature);
     const sysNum = parseInt(systolicBP, 10);
     const diaNum = parseInt(diastolicBP, 10);
@@ -468,19 +560,20 @@ export const VitalsPage: React.FC = () => {
     const o2Num = parseInt(spo2, 10);
 
     if (sysNum >= 200 || diaNum >= 120 || (o2Num > 0 && o2Num < 90)) {
-      return 'ฉุกเฉินวิกฤต (Resuscitation)';
+      return 1; // ฉุกเฉินวิกฤต
     }
     if (sysNum >= 160 || diaNum >= 100 || tempNum >= 39.0 || hrNum > 120) {
-      return 'ฉุกเฉินเร่งด่วน (Urgent)';
+      return 2; // ฉุกเฉินเร่งด่วน
     }
     if (tempNum >= 38.0 || sysNum >= 140 || diaNum >= 90 || hrNum > 100) {
-      return 'กึ่งฉุกเฉิน (Semi-Urgent)';
+      return 3; // กึ่งฉุกเฉิน
     }
-    return 'ปกติ (Normal)';
+    return 4; // ปกติ
   }, [temperature, systolicBP, diastolicBP, heartRate, spo2]);
 
   // Handle Form Change
-  const handleChangeField = (field: string, val: string | number) => {
+  const handleChangeField = (field: string, val: any) => {
+    clearFieldError(field);
     switch (field) {
       case 'weight':
         setWeight(String(val));
@@ -533,6 +626,42 @@ export const VitalsPage: React.FC = () => {
       case 'alcoholHistory':
         setAlcoholHistory(String(val));
         break;
+      case 'nurseNotes':
+        setNurseNotes(String(val));
+        break;
+      case 'herbalMedicines':
+        setHerbalMedicines(String(val));
+        break;
+      case 'dietarySupplements':
+        setDietarySupplements(String(val));
+        break;
+      case 'hasURI':
+        setHasURI(val);
+        break;
+      case 'hasTB':
+        setHasTB(val);
+        break;
+      case 'onAnticoagulant':
+        setOnAnticoagulant(val);
+        break;
+      case 'precautionType':
+        setPrecautionType(String(val));
+        break;
+      case 'isPregnant':
+        setIsPregnant(val);
+        break;
+      case 'isBreastfeeding':
+        setIsBreastfeeding(val);
+        break;
+      case 'lastMenstrualPeriod':
+        setLastMenstrualPeriod(String(val));
+        break;
+      case 'q2Depressed':
+        setQ2Depressed(val);
+        break;
+      case 'q2Anhedonia':
+        setQ2Anhedonia(val);
+        break;
       case 'assignedDoctorId':
         setAssignedDoctorId(Number(val));
         break;
@@ -575,6 +704,7 @@ export const VitalsPage: React.FC = () => {
     setSpo2(randSpo2);
     setPainScore(randPain);
     setBloodSugar(randDTX);
+    setFormErrors({});
     if (!chiefComplaint || chiefComplaint.trim() === '') {
       setChiefComplaint(randComplaint);
     }
@@ -591,6 +721,8 @@ export const VitalsPage: React.FC = () => {
     } catch {
       // ignore
     }
+    setFormErrors({});
+    setPendingWarnings(null);
     setSelectedPatientId('');
     setSearchQuery('');
     setWeight('');
@@ -610,15 +742,26 @@ export const VitalsPage: React.FC = () => {
     setCurrentMedications('');
     setSmokingHistory('');
     setAlcoholHistory('');
-    setSelectedTriage('ปกติ (Normal)');
+    setNurseNotes('');
+    setHerbalMedicines('');
+    setDietarySupplements('');
+    setHasURI(null);
+    setHasTB(null);
+    setOnAnticoagulant(null);
+    setPrecautionType('');
+    setIsPregnant(null);
+    setIsBreastfeeding(null);
+    setLastMenstrualPeriod('');
+    setQ2Depressed(null);
+    setQ2Anhedonia(null);
+    setSelectedTriage(4);
     setDraftSavedAt(null);
   };
 
-  // Submit Handler
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Submit Logic Execution
+  const executeSubmit = async () => {
     if (!selectedPatient) {
-      alert('กรุณาเลือกคิวคนไข้ก่อนบันทึก');
+      showToast({ type: 'error', message: 'กรุณาเลือกคิวคนไข้ก่อนบันทึก' });
       return;
     }
 
@@ -626,22 +769,22 @@ export const VitalsPage: React.FC = () => {
 
     const docObj = doctorList.find((d) => d.doctorId === assignedDoctorId) || doctorList[0] || DEFAULT_DOCTORS[0];
 
-    const numWeight = parseFloat(weight) || 0;
-    const numHeight = parseFloat(height) || 0;
-    const numTemp = parseFloat(temperature) || 36.5;
-    const numSys = parseInt(systolicBP, 10) || 120;
-    const numDia = parseInt(diastolicBP, 10) || 80;
-    const numHR = parseInt(heartRate, 10) || 75;
-    const numRR = parseInt(respiratoryRate, 10) || 18;
-    const numSpO2 = parseInt(spo2, 10) || 98;
-    const numPain = parseInt(painScore, 10) || 0;
-    const numBS = parseInt(bloodSugar, 10) || 0;
+    const numWeight = parseFloat(weight);
+    const numHeight = parseFloat(height);
+    const numTemp = parseFloat(temperature);
+    const numSys = parseInt(systolicBP, 10);
+    const numDia = parseInt(diastolicBP, 10);
+    const numHR = parseInt(heartRate, 10);
+    const numRR = respiratoryRate ? parseInt(respiratoryRate, 10) : 0;
+    const numSpO2 = parseInt(spo2, 10);
+    const numPain = painScore ? parseInt(painScore, 10) : 0;
+    const numBS = bloodSugar ? parseInt(bloodSugar, 10) : 0;
 
     const targetPatientId = selectedPatient.patientId || parseInt(selectedPatient.id, 10) || 1;
     const targetQueueId = selectedPatient.queueId || (typeof selectedPatient.id === 'number' ? selectedPatient.id : parseInt(selectedPatient.id, 10));
 
     try {
-      const res = await vitalsApi.record({
+      await vitalsApi.record({
         queue_id: targetQueueId,
         patient_id: targetPatientId,
         queue_number: selectedPatient.queueNo,
@@ -662,17 +805,35 @@ export const VitalsPage: React.FC = () => {
         current_medications: currentMedications.trim(),
         smoking_history: smokingHistory.trim(),
         alcohol_history: alcoholHistory.trim(),
+        nurse_notes: nurseNotes.trim() || undefined,
+        herbal_medicines: herbalMedicines.trim() || undefined,
+        dietary_supplements: dietarySupplements.trim() || undefined,
+        has_uri: hasURI !== null ? hasURI : undefined,
+        has_tb: hasTB !== null ? hasTB : undefined,
+        on_anticoagulant: onAnticoagulant !== null ? onAnticoagulant : undefined,
+        precaution_type: precautionType || undefined,
+        is_pregnant: (selectedPatient.gender === 'หญิง' && isPregnant !== null) ? isPregnant : undefined,
+        is_breastfeeding: (selectedPatient.gender === 'หญิง' && isBreastfeeding !== null) ? isBreastfeeding : undefined,
+        last_menstrual_period: (selectedPatient.gender === 'หญิง' && lastMenstrualPeriod) ? lastMenstrualPeriod : undefined,
+        q2_depressed: q2Depressed !== null ? q2Depressed : undefined,
+        q2_anhedonia: q2Anhedonia !== null ? q2Anhedonia : undefined,
         assigned_doctor_id: docObj.doctorId,
         triage_level: selectedTriage,
       });
 
-      // 1. ดึงรายการคิวล่าสุดจากฐานข้อมูลทันที
+      // 1. แจ้งเตือน Toast สำเร็จ
+      showToast({
+        type: 'success',
+        message: `บันทึกข้อมูลการคัดกรองและส่งต่อคิว ${selectedPatient.queueNo} เรียบร้อย`,
+      });
+
+      // 2. ดึงรายการคิวล่าสุดจากฐานข้อมูลทันที
       const freshQueues = await fetchQueues();
 
-      // 2. เคลียร์ฟอร์ม
+      // 3. เคลียร์ฟอร์ม
       handleResetForm();
 
-      // 3. หาคิวที่ยังรอคัดกรองอยู่จริง
+      // 4. หาคิวที่ยังรอคัดกรองอยู่จริง
       if (freshQueues && freshQueues.length > 0) {
         const remainingWaiting = freshQueues.filter((q) => q.queueStatus === 'รอคัดกรอง');
         if (remainingWaiting.length > 0) {
@@ -687,26 +848,51 @@ export const VitalsPage: React.FC = () => {
       }
     } catch (err: any) {
       console.warn('Record vitals API error:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูลสัญญาณชีพ';
+      showToast({ type: 'error', message: errMsg });
+      // DO NOT reset form, DO NOT fake-update queue status!
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-      // Local fallback กรณีเครือข่ายมีปัญหา (อัปเดตเฉพาะคิวที่เลือกเท่านั้น ไม่อ้างอิงตาม patientId)
-      const updatedQueueList = queueList.map((q) =>
-        q.id === selectedPatient.id || (selectedPatient.queueId && q.queueId === selectedPatient.queueId) || q.queueNo === selectedPatient.queueNo
-          ? { ...q, queueStatus: 'รอพบแพทย์' as const }
-          : q
-      );
-      setQueueList(updatedQueueList);
-      handleResetForm();
-
-      const remainingQueues = updatedQueueList.filter((q) => q.queueStatus === 'รอคัดกรอง');
-      if (remainingQueues.length > 0) {
-        handleSelectPatient(remainingQueues[0]);
-      } else {
-        setSelectedPatientId('');
-        setSearchQuery('');
-      }
+  // Submit Handler
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPatient) {
+      showToast({ type: 'error', message: 'กรุณาเลือกคิวคนไข้ก่อนบันทึก' });
+      return;
     }
 
-    setIsSaving(false);
+    const validation = validateVitalsInput({
+      weight,
+      height,
+      temperature,
+      systolicBP,
+      diastolicBP,
+      heartRate,
+      spo2,
+      respiratoryRate,
+      painScore,
+      bloodSugar,
+    });
+
+    if (!validation.isValid) {
+      setFormErrors(validation.errors);
+      const firstError = Object.values(validation.errors)[0];
+      showToast({ type: 'error', message: firstError || 'กรุณาตรวจสอบข้อมูลสัญญาณชีพให้ถูกต้อง' });
+      return;
+    }
+
+    setFormErrors({});
+
+    if (validation.warnings.length > 0) {
+      showToast({ type: 'warning', message: 'พบค่าสัญญาณชีพผิดปกติ กรุณาตรวจสอบและยืนยัน' });
+      setPendingWarnings(validation.warnings);
+      return;
+    }
+
+    executeSubmit();
   };
 
   return (
@@ -757,6 +943,59 @@ export const VitalsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Warning Confirmation Modal */}
+      {pendingWarnings && (
+        <div className="vitals-modal-overlay">
+          <div className="vitals-modal-card">
+            <div className="vitals-modal-header">
+              <div className="vitals-modal-icon-wrap">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  <line x1="12" y1="9" x2="12" y2="13" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </div>
+              <div className="vitals-modal-header-text">
+                <h3 className="vitals-modal-title">
+                  ยืนยันค่าสัญญาณชีพผิดปกติ
+                </h3>
+                <p className="vitals-modal-desc">
+                  พบค่าสัญญาณชีพที่อยู่นอกเกณฑ์ปกติ กรุณาตรวจสอบก่อนบันทึก
+                </p>
+              </div>
+            </div>
+
+            <div className="vitals-modal-list-box">
+              <ul className="vitals-modal-list">
+                {pendingWarnings.map((w, idx) => (
+                  <li key={idx}>{w.message}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="vitals-modal-actions">
+              <button
+                type="button"
+                className="vitals-modal-btn-cancel"
+                onClick={() => setPendingWarnings(null)}
+              >
+                กลับไปแก้ไข
+              </button>
+              <button
+                type="button"
+                className="vitals-modal-btn-confirm"
+                onClick={() => {
+                  setPendingWarnings(null);
+                  executeSubmit();
+                }}
+              >
+                ยืนยันข้อมูลและบันทึก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 2. Main Two-Column Layout (Unified Screening Console) */}
       <div className="vitals-main-grid">
         {/* Left Column: Vital Signs Recording Form with Integrated Queue Selector */}
@@ -789,6 +1028,18 @@ export const VitalsPage: React.FC = () => {
             currentMedications={currentMedications}
             smokingHistory={smokingHistory}
             alcoholHistory={alcoholHistory}
+            nurseNotes={nurseNotes}
+            herbalMedicines={herbalMedicines}
+            dietarySupplements={dietarySupplements}
+            hasURI={hasURI}
+            hasTB={hasTB}
+            onAnticoagulant={onAnticoagulant}
+            precautionType={precautionType}
+            isPregnant={isPregnant}
+            isBreastfeeding={isBreastfeeding}
+            lastMenstrualPeriod={lastMenstrualPeriod}
+            q2Depressed={q2Depressed}
+            q2Anhedonia={q2Anhedonia}
             assignedDoctorId={assignedDoctorId}
             doctorOptions={doctorList}
             isAccordionOpen={isFormOpen}
@@ -799,6 +1050,7 @@ export const VitalsPage: React.FC = () => {
             onReset={handleResetForm}
             isSaving={isSaving}
             savedDraftTime={draftSavedAt}
+            formErrors={formErrors}
           />
         </div>
 

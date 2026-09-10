@@ -51,6 +51,20 @@ export interface ScreeningHistoryItem {
   alcoholHistory?: string;
   nurseNotes?: string;
 
+  // Specialized Screening Fields (EXPAND-1)
+  herbalMedicines?: string;
+  dietarySupplements?: string;
+  hasURI?: boolean | null;
+  hasTB?: boolean | null;
+  onAnticoagulant?: boolean | null;
+  precautionType?: string;
+  isPregnant?: boolean | null;
+  isBreastfeeding?: boolean | null;
+  lastMenstrualPeriod?: string;
+  q2Depressed?: boolean | null;
+  q2Anhedonia?: boolean | null;
+  screeningPositive?: boolean | null;
+
   // Staff info
   screenedByUserName: string;
   screenedByRole: string;
@@ -79,6 +93,7 @@ export interface PatientProfileSummary {
 export interface ScreeningStats {
   totalRecords: number;
   thisMonthRecords: number;
+  monthLabel?: string;
   highBPRatePercent: number;
   urgentTriageCount: number;
   allergyPatientsCount: number;

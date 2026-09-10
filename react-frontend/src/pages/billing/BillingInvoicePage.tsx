@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import './BillingInvoicePage.css';
-import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
+import { CLINIC_CONFIG, type PatientConfig, normalizeScheme, SCHEME_LABELS, calculateBenefitAmounts } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { QRCodeSVG } from 'qrcode.react';
 import generatePayload from 'promptpay-qr';
@@ -9,6 +9,7 @@ import { BillingInvoiceSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 import { playBillingNotification } from '../../utils/audioQueue';
+import { formatNationalId } from '../../utils/formatters';
 
 interface BillingInvoicePageProps {
   selectedPatientId?: string;
@@ -274,6 +275,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                 gender: pq.gender || 'ชาย',
                 age: pq.age || 35,
                 treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+                registeredRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
                 patientType: 'ผู้ป่วยนอก (OPD)' as const,
                 allergies: cleanAllergies(pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา']),
                 chronicDiseases: cleanChronicDiseases(pq.chronic_diseases || 'ไม่มี'),
@@ -327,6 +329,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                   gender: bq.gender || 'ชาย',
                   age: bq.age || 35,
                   treatmentRights: bq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+                  registeredRights: bq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
                   patientType: 'ผู้ป่วยนอก (OPD)' as const,
                   allergies: cleanAllergies(bq.allergies ? [bq.allergies] : ['ไม่มีประวัติแพ้ยา']),
                   chronicDiseases: cleanChronicDiseases(bq.chronic_diseases || 'ไม่มี'),
@@ -382,6 +385,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
           gender: data.gender || 'ชาย',
           age: data.age || 35,
           treatmentRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+          registeredRights: data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
           patientType: 'ผู้ป่วยนอก (OPD)' as const,
           allergies: cleanAllergies(data.allergies ? [data.allergies] : ['ไม่มีประวัติแพ้ยา']),
           chronicDiseases: cleanChronicDiseases(data.chronic_diseases || 'ไม่มี'),
@@ -419,10 +423,29 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
   }, [subscribe, masterMedicines.length, showQrModal]);
 
   const currentSelectedId = selectedPatientId || localStorage.getItem('billing_active_patient') || '';
+  const storedActivePatient = useMemo<PatientConfig | null>(() => {
+    try {
+      const raw = localStorage.getItem('billing_active_patient_data');
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, [currentSelectedId]);
+
   const activePatient: PatientConfig | undefined = 
     queueList.find(p => p.id === currentSelectedId) || 
-    queueList[0];
+    (storedActivePatient && storedActivePatient.id === currentSelectedId ? storedActivePatient : undefined) ||
+    queueList[0] ||
+    storedActivePatient ||
+    undefined;
+
   const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
+
+  const registeredRights = activePatient?.registeredRights || storedActivePatient?.registeredRights || activePatient?.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
+  const selectedRights = currentRights || activePatient?.treatmentRights || storedActivePatient?.treatmentRights || 'สิทธิ 30 บาท (บัตรทอง / สปสช.)';
+  const registeredKey = normalizeScheme(registeredRights);
+  const selectedKey = normalizeScheme(selectedRights);
+  const isRightsMismatch = registeredKey !== selectedKey;
 
   // ดึงรายการยาและราคาจริงจากฐานข้อมูล สำหรับคนไข้ที่เลือกอยู่ (ถ้ายังไม่มีในแคช)
   useEffect(() => {
@@ -525,20 +548,118 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
 
   const medicalServiceFee = 800; // ค่าตรวจแพทย์ (500) + ค่าบริการคลินิก (300)
   const vatTax = Math.round(medTotal * 0.07);
-  const grandTotal = medTotal + medicalServiceFee + vatTax;
+  const rawTotal = medTotal + medicalServiceFee + vatTax;
+
+  const benefitResult = calculateBenefitAmounts(rawTotal, selectedKey);
+  const grandTotal = benefitResult.netTotal;
+  const discountAmount = benefitResult.discountAmount;
 
   const cashNumber = parseFloat(cashReceived) || 0;
   const changeAmount = cashNumber >= grandTotal ? cashNumber - grandTotal : 0;
 
+  // QR Code Countdown Timer & Timeout States
+  const [qrSecondsLeft, setQrSecondsLeft] = useState(300);
+  const [isQrExpired, setIsQrExpired] = useState(false);
+  const [qrKey, setQrKey] = useState(0);
+  const [testTimeInput, setTestTimeInput] = useState('300');
+
+  // Digital Receipt Modal States (SMS / Gmail Mock)
+  const [showDigitalReceiptModal, setShowDigitalReceiptModal] = useState(false);
+  const [digitalChannel, setDigitalChannel] = useState<'sms' | 'gmail'>('sms');
+  const [recipientPhone, setRecipientPhone] = useState('088-587-5682');
+  const [recipientEmail, setRecipientEmail] = useState('patient.care@gmail.com');
+  const [isSendingDigital, setIsSendingDigital] = useState(false);
+  const [sendingChannel, setSendingChannel] = useState<'sms' | 'gmail' | null>(null);
+  const [digitalSentSuccess, setDigitalSentSuccess] = useState(false);
+  const [digitalSentSuccessMsg, setDigitalSentSuccessMsg] = useState<string | null>(null);
+
+  const handleSendSms = () => {
+    if (!recipientPhone.trim()) {
+      alert('กรุณากรอกหมายเลขโทรศัพท์');
+      return;
+    }
+    setSendingChannel('sms');
+    setDigitalChannel('sms');
+    setDigitalSentSuccess(false);
+    setDigitalSentSuccessMsg(null);
+    setTimeout(() => {
+      setSendingChannel(null);
+      setDigitalSentSuccess(true);
+      setDigitalSentSuccessMsg(`ส่ง SMS ใบเสร็จไปยังหมายเลข ${recipientPhone.trim()} เรียบร้อยแล้ว (จำลองสำเร็จ)`);
+      setReceiptSent(`ส่งใบเสร็จดิจิทัลทาง SMS (${recipientPhone.trim()}) เรียบร้อยแล้ว`);
+      setTimeout(() => setReceiptSent(null), 4000);
+    }, 600);
+  };
+
+  const handleSendGmail = () => {
+    if (!recipientEmail.trim()) {
+      alert('กรุณากรอกที่อยู่อีเมล Gmail');
+      return;
+    }
+    setSendingChannel('gmail');
+    setDigitalChannel('gmail');
+    setDigitalSentSuccess(false);
+    setDigitalSentSuccessMsg(null);
+    setTimeout(() => {
+      setSendingChannel(null);
+      setDigitalSentSuccess(true);
+      setDigitalSentSuccessMsg(`ส่ง Gmail ใบเสร็จไปยัง ${recipientEmail.trim()} เรียบร้อยแล้ว (จำลองสำเร็จ)`);
+      setReceiptSent(`ส่งใบเสร็จดิจิทัลทาง Gmail (${recipientEmail.trim()}) เรียบร้อยแล้ว`);
+      setTimeout(() => setReceiptSent(null), 4000);
+    }, 600);
+  };
+
+  useEffect(() => {
+    if (!showQrModal || paymentMethod !== 'qr' || isPaymentConfirmed) return;
+    if (isQrExpired) return;
+
+    if (qrSecondsLeft <= 0) {
+      setIsQrExpired(true);
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setQrSecondsLeft(prev => {
+        if (prev <= 1) {
+          setIsQrExpired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [showQrModal, paymentMethod, isPaymentConfirmed, isQrExpired, qrSecondsLeft]);
+
+  const formatSeconds = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  };
+
+  const handleRegenerateQr = () => {
+    setIsQrExpired(false);
+    const dur = parseInt(testTimeInput, 10) || 300;
+    setQrSecondsLeft(dur);
+    setQrKey(prev => prev + 1);
+    setReceiptSent('สร้าง QR Code สำหรับชำระเงินใหม่เรียบร้อยแล้ว');
+    setTimeout(() => setReceiptSent(null), 3000);
+  };
+
+  const handleSetTestSeconds = (secs: number) => {
+    setQrSecondsLeft(secs);
+    setIsQrExpired(secs <= 0);
+  };
+
   // สร้าง PromptPay QR Payload แบบ Real-time ตามเบอร์และยอดเงินจริง
   const qrPayload = useMemo(() => {
-    const cleanNumber = (promptPayNumber || '0819998888').replace(/[^0-9]/g, '');
+    const cleanNumber = (promptPayNumber || '0885875682').replace(/[^0-9]/g, '');
     try {
       return generatePayload(cleanNumber, { amount: grandTotal });
     } catch {
       return '00020101021229370016A000000677010111';
     }
-  }, [promptPayNumber, grandTotal]);
+  }, [promptPayNumber, grandTotal, qrKey]);
 
   const handleOpenQr = () => {
     setShowQrModal(true);
@@ -546,20 +667,26 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
     setReceiptSent(null);
     setPaymentMethod('qr');
     setCashReceived('');
+    setIsQrExpired(false);
+    setQrSecondsLeft(300);
   };
 
   // [บุญให้เพิ่มเทคนิคนี้] (Supabase + Optimistic UI + WebSocket) - กดยืนยันรับชำระเงินแล้วอัปเดตหน้าจอทันที 0 ms และส่งขึ้น Supabase เบื้องหลัง
   const handleConfirmPayment = async () => {
     if (!activePatient) return;
+    if (paymentMethod === 'qr' && isQrExpired) {
+      alert('การชำระเงินไม่สำเร็จหรือหมดเวลา: ระบบแจ้งเตือนและอนุญาตให้สร้าง QR Code ใหม่');
+      return;
+    }
     setIsSubmitting(true);
     const submitStart = Date.now();
 
     // 1. Optimistic UI: อัปเดตสถานะสำเร็จบนหน้าจอทันทีใน 0 ms
     setQueueList(prev => prev.map(p => p.id === activePatient.id ? { ...p, visitStatus: 'ชำระเงินเรียบร้อยแล้ว' } : p));
 
-    // 2. ส่งข้อมูลขึ้น Supabase Cloud เบื้องหลัง (Background Sync)
+    // 2. ส่งข้อมูลขึ้น Supabase Cloud / DB เบื้องหลัง (Background Sync)
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -568,8 +695,10 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
         hn: activePatient.hn || 'HN0001',
         patient_name: activePatient.name || 'ผู้ป่วย',
         national_id: activePatient.nationalId || '',
-        total_amount: grandTotal,
+        total_amount: rawTotal,
         net_amount: grandTotal,
+        discount_amount: discountAmount,
+        scheme_type: selectedRights,
         payment_method: paymentMethod === 'qr' ? 'QR Code' : 'เงินสด',
         cash_received: parseFloat(cashReceived) || grandTotal,
         doctor_name: 'นพ.สมเกียรติ มั่นคง',
@@ -577,17 +706,32 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
         medications: JSON.stringify(medicationsList)
       };
 
-      let res = await fetch('/api/billing/confirm', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(payload)
-      });
-      if (!res.ok) {
-        await fetch('/api/system/billing/confirm', {
+      let res: Response;
+      try {
+        res = await fetch('/api/billing/confirm', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        });
+      } catch {
+        res = await fetch('/api/system/billing/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
+      }
+
+      if (!res.ok) {
+        res = await fetch('/api/system/billing/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Payment failed');
       }
     } catch (err) {
       console.error('Failed to confirm payment:', err);
@@ -626,11 +770,6 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
   // สั่งพิมพ์ผ่านเครื่องพิมพ์ (Print Dialog)
   const handleBrowserPrint = () => {
     window.print();
-  };
-
-  const handleSendDigitalReceipt = () => {
-    setReceiptSent('ส่งใบเสร็จดิจิทัลไปยัง SMS/Email ของผู้ป่วยเรียบร้อยแล้ว');
-    setTimeout(() => setReceiptSent(null), 3000);
   };
 
   if (loading) {
@@ -811,7 +950,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '0.9rem', color: '#64748B' }}>
-                <span><strong>เลขประจำตัวประชาชน:</strong> {activePatient.nationalId || '-'}</span>
+                <span><strong>เลขประจำตัวประชาชน:</strong> {formatNationalId(activePatient.nationalId)}</span>
                 <span>•</span>
                 <span><strong>วันที่รับบริการ:</strong> {activePatient.visitDate || new Date().toISOString().split('T')[0]} ({activePatient.visitTime || '10:30'})</span>
               </div>
@@ -869,7 +1008,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                 color: isPaymentConfirmed ? '#15803D' : '#DC2626',
                 border: `1.5px solid ${isPaymentConfirmed ? '#86EFAC' : '#FCA5A5'}`, 
                 padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '800',
-                display: 'inline-flex', alignItems: 'center', gap: '6px', height: '36px', boxSizing: 'border-box'
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '120px', height: '36px', boxSizing: 'border-box'
               }}>
                 {isPaymentConfirmed ? (
                   <>
@@ -887,6 +1026,60 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
           </div>
 
         </div>
+
+        {/* Warning alert when selected rights do not match registered rights */}
+        {isRightsMismatch && (
+          <div style={{
+            marginTop: '16px',
+            padding: '14px 18px',
+            background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.75) 0%, rgba(254, 249, 195, 0.45) 100%)',
+            border: '1px solid rgba(245, 158, 11, 0.45)',
+            borderRadius: '12px',
+            color: '#92400E',
+            fontSize: '13px',
+            lineHeight: '1.45',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            boxShadow: '0 3px 10px -2px rgba(245, 158, 11, 0.15)'
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '34px',
+              height: '34px',
+              borderRadius: '9px',
+              backgroundColor: '#FEF3C7',
+              color: '#D97706',
+              flexShrink: 0
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </div>
+            <div>
+              <div style={{ fontWeight: '800', color: '#B45309', fontSize: '13.5px' }}>
+                สิทธิ์ที่เลือกไม่ตรงกับสิทธิ์ที่บันทึกในระบบ: ระบบแสดงคำเตือนให้ตรวจสอบสิทธิ์อีกครั้ง
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '5px', fontSize: '12px' }}>
+                <span style={{ color: '#78350F' }}>สิทธิ์ที่บันทึกในระบบ:</span>
+                <span style={{ padding: '2px 8px', borderRadius: '5px', backgroundColor: '#EDE9FE', color: '#6D28D9', fontWeight: '600' }}>
+                  {registeredRights}
+                </span>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                </svg>
+                <span style={{ color: '#78350F' }}>สิทธิ์ที่เลือกใช้:</span>
+                <span style={{ padding: '2px 8px', borderRadius: '5px', backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: '600' }}>
+                  {selectedRights}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 2-Column Fee Breakdown */}
@@ -923,13 +1116,27 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
             <div className="fee-divider"></div>
 
             <div className="fee-sub-item">
-              <span>ค่ายารวมสุทธิ</span>
+              <span>ค่ายารวม</span>
               <span>฿ {medTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
             <div className="fee-sub-item">
-              <span>ภาษี (VAT 7%)</span>
-              <span>- ฿ {vatTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              <span>ค่าบริการทางการแพทย์</span>
+              <span>฿ {medicalServiceFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
+            <div className="fee-sub-item">
+              <span>ภาษี (VAT 7%)</span>
+              <span>฿ {vatTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="fee-sub-item" style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+              <span>ยอดรวมก่อนหักสิทธิ์</span>
+              <span>฿ {rawTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
+            {benefitResult.discountAmount > 0 && (
+              <div className="fee-sub-item" style={{ color: '#16A34A', fontWeight: '700' }}>
+                <span>ส่วนลดสิทธิการรักษา ({benefitResult.schemeLabel})</span>
+                <span>- ฿ {benefitResult.discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              </div>
+            )}
 
             <div className="grand-total-row">
               <span className="grand-label">ยอดชำระสุทธิ</span>
@@ -1027,13 +1234,43 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                     </div>
 
                     {/* QR Code Frame */}
-                    <div className="clean-qr-frame">
-                      <QRCodeSVG 
-                        value={qrPayload} 
-                        size={230} 
-                        level="M" 
-                        includeMargin={false}
-                      />
+                    <div className="clean-qr-frame" style={{ position: 'relative' }}>
+                      <div style={{ filter: isQrExpired ? 'blur(4px)' : 'none', opacity: isQrExpired ? 0.35 : 1, transition: 'all 0.25s ease' }}>
+                        <QRCodeSVG 
+                          value={qrPayload} 
+                          size={230} 
+                          level="M" 
+                          includeMargin={false}
+                        />
+                      </div>
+
+                      {isQrExpired && (
+                        <div style={{
+                          position: 'absolute',
+                          inset: 0,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'rgba(255, 255, 255, 0.90)',
+                          borderRadius: '12px',
+                          padding: '16px',
+                          textAlign: 'center',
+                          zIndex: 10
+                        }}>
+                          <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: '8px' }}>
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                          </svg>
+                          <div style={{ fontWeight: '800', color: '#DC2626', fontSize: '15px' }}>
+                            QR Code หมดอายุแล้ว
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748B', marginTop: '4px' }}>
+                            กรุณากดปุ่มสร้าง QR Code ใหม่ด้านล่าง
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="clean-account-details">
@@ -1102,18 +1339,14 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                                 แก้ไข
                               </button>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0px',  // 1. ความห่างระหว่าง "กลุ่มเลขบัญชี" กับ "ชื่อธนาคาร" (ปรับเพิ่ม/ลด เช่น 12px, 20px)
-                              fontSize: '12.5px', color: '#475569', borderTop: '1px dashed #E2E8F0', paddingTop: '6px', // 2. ความห่างจากเส้นประด้านบน
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0px',
+                              fontSize: '12.5px', color: '#475569', borderTop: '1px dashed #E2E8F0', paddingTop: '6px',
                                marginTop: '2px' }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' // 3. ความห่างระหว่างคำว่า "เลขที่บัญชี:" กับ "ตัวเลข"
-
-                              }}>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
                                 <span>เลขที่บัญชี:</span>
-                                <strong style={{ fontFamily: 'monospace', color: 'var(--text-primary)', fontSize: '13.5px', letterSpacing: '0.5px'   // 4. ความห่างระหว่างตัวเลขแต่ละตัว (ช่องไฟตัวเลข)
-
-                                 }}>{bankAccountNumber}</strong>
+                                <strong style={{ fontFamily: 'monospace', color: 'var(--text-primary)', fontSize: '13.5px', letterSpacing: '0.5px' }}>{bankAccountNumber}</strong>
                               </span>
-                              <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', padding: '2px 8px',   // 5. ระยะขอบด้านในของป้ายชื่อธนาคาร
+                              <span style={{ fontSize: '11.5px', color: '#64748B', fontWeight: '600', padding: '2px 8px',
                                  background: '#F1F5F9', borderRadius: '4px', flexShrink: 0 }}>ธ.ออมสิน</span>
                             </div>
                           </div>
@@ -1121,15 +1354,167 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                       </div>
                     </div>
 
-                    <div className="timeout-alert" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                      </svg>
-                      <span>กรุณาชำระเงินให้เสร็จสิ้นภายใน 5 นาที</span>
+                    {/* Countdown Timer / Warning Alert */}
+                    {isQrExpired ? (
+                      <div className="timeout-warning-box" style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '10px',
+                        backgroundColor: '#FEF2F2',
+                        border: '1.5px solid #EF4444',
+                        borderRadius: '8px',
+                        padding: '12px 14px',
+                        color: '#991B1B',
+                        fontSize: '13px',
+                        textAlign: 'left',
+                        margin: '10px 0'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '28px',
+                          height: '28px',
+                          borderRadius: '8px',
+                          backgroundColor: '#FEE2E2',
+                          color: '#DC2626',
+                          flexShrink: 0
+                        }}>
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                            <line x1="12" y1="9" x2="12" y2="13"/>
+                            <line x1="12" y1="17" x2="12.01" y2="17"/>
+                          </svg>
+                        </div>
+                        <div>
+                          <strong style={{ display: 'block', color: '#B91C1C' }}>
+                            การชำระเงินไม่สำเร็จหรือหมดเวลา: ระบบแจ้งเตือนและอนุญาตให้สร้าง QR Code ใหม่
+                          </strong>
+                          <span style={{ fontSize: '11.5px', color: '#7F1D1D' }}>
+                            หมดเวลาการชำระเงิน กรุณากดปุ่มด้านล่างเพื่อสร้าง QR Code ใหม่สำหรับผู้ป่วย
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="timeout-alert" style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        background: qrSecondsLeft <= 30 ? '#FEF2F2' : '#EFF6FF',
+                        color: qrSecondsLeft <= 30 ? '#DC2626' : '#1E40AF',
+                        border: `1.5px solid ${qrSecondsLeft <= 30 ? '#FECACA' : '#BFDBFE'}`,
+                        padding: '8px 14px',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: '600'
+                      }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>
+                          เวลาที่เหลือสำหรับสแกน: <strong style={{ fontFamily: 'monospace', fontSize: '15px' }}>{formatSeconds(qrSecondsLeft)}</strong> นาที
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Developer / Tester Duration Bar */}
+                    <div style={{
+                      margin: '10px 0',
+                      padding: '8px 12px',
+                      background: 'var(--bg-card, #F8FAFC)',
+                      borderRadius: '8px',
+                      border: '1px dashed #CBD5E1',
+                      fontSize: '12px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px', color: '#64748B', fontWeight: '600' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                          ปรับเวลาเพื่อทดสอบ:
+                        </span>
+                        <span style={{ fontSize: '11px', color: '#94A3B8' }}>(ใช้ทดสอบระบบตาม Use Case)</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleSetTestSeconds(5)}
+                          style={{
+                            padding: '4px 8px', borderRadius: '4px',
+                            border: '1px solid #FCA5A5', background: '#FEE2E2',
+                            color: '#B91C1C', fontSize: '11.5px', fontWeight: '700',
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                          title="ตั้งเวลา 5 วินาที เพื่อทดสอบสถานะหมดเวลาอย่างรวดเร็ว"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                          5 วิ (ทดสอบหมดเวลา)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetTestSeconds(30)}
+                          style={{
+                            padding: '4px 8px', borderRadius: '4px',
+                            border: '1px solid #CBD5E1', background: '#FFFFFF',
+                            color: '#475569', fontSize: '11.5px', fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          30 วินาที
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetTestSeconds(60)}
+                          style={{
+                            padding: '4px 8px', borderRadius: '4px',
+                            border: '1px solid #CBD5E1', background: '#FFFFFF',
+                            color: '#475569', fontSize: '11.5px', fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          60 วินาที (1 นาที)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetTestSeconds(300)}
+                          style={{
+                            padding: '4px 8px', borderRadius: '4px',
+                            border: '1px solid #CBD5E1', background: '#FFFFFF',
+                            color: '#475569', fontSize: '11.5px', fontWeight: '600',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          300 วินาที (5 นาที)
+                        </button>
+                      </div>
                     </div>
 
-                    {!isPaymentConfirmed ? (
+                    {/* Action buttons (Regenerate QR or Confirm) */}
+                    {isQrExpired ? (
+                      <button 
+                        type="button" 
+                        className="confirm-qr-btn" 
+                        onClick={handleRegenerateQr}
+                        style={{
+                          background: '#2563EB',
+                          color: '#FFFFFF',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="23 4 23 10 17 10"></polyline>
+                          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                        สร้าง QR Code ใหม่ (Regenerate QR Code)
+                      </button>
+                    ) : !isPaymentConfirmed ? (
                       <button 
                         type="button" 
                         className="confirm-qr-btn" 
@@ -1223,7 +1608,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                         </div>
                         <div style={{ fontSize: '13px', lineHeight: '1.6', marginBottom: '14px' }}>
                           <div><strong>ชื่อผู้ป่วย:</strong> {activePatient.name}</div>
-                          <div><strong>HN:</strong> {activePatient.hn} | <strong>บัตรประชาชน:</strong> {activePatient.nationalId}</div>
+                          <div><strong>HN:</strong> {activePatient.hn} | <strong>บัตรประชาชน:</strong> {formatNationalId(activePatient.nationalId)}</div>
                           <div><strong>วันที่:</strong> {activePatient.visitDate} ({activePatient.visitTime})</div>
                           <div><strong>วิธีชำระเงิน:</strong> {paymentMethod === 'qr' ? 'PromptPay QR Code' : 'เงินสด'}</div>
                         </div>
@@ -1253,6 +1638,16 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                               <td style={{ padding: '6px 0' }}>ภาษี (VAT 7%)</td>
                               <td style={{ textAlign: 'right', padding: '6px 0' }}>{vatTax.toFixed(2)}</td>
                             </tr>
+                            <tr style={{ borderTop: '1px dashed #CBD5E1' }}>
+                              <td style={{ padding: '6px 0' }}>ยอดรวมก่อนหักสิทธิ์</td>
+                              <td style={{ textAlign: 'right', padding: '6px 0' }}>{rawTotal.toFixed(2)}</td>
+                            </tr>
+                            {benefitResult.discountAmount > 0 && (
+                              <tr style={{ color: '#16A34A', fontWeight: '600' }}>
+                                <td style={{ padding: '6px 0' }}>ส่วนลดสิทธิ ({benefitResult.schemeLabel})</td>
+                                <td style={{ textAlign: 'right', padding: '6px 0' }}>-{benefitResult.discountAmount.toFixed(2)}</td>
+                              </tr>
+                            )}
                             <tr style={{ borderTop: '2px solid #0F172A', fontWeight: 'bold' }}>
                               <td style={{ padding: '8px 0' }}>ยอดชำระสุทธิ</td>
                               <td style={{ textAlign: 'right', padding: '8px 0' }}>{grandTotal.toFixed(2)}</td>
@@ -1279,18 +1674,41 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                         </svg>
                         ดาวน์โหลด / พิมพ์ใบเสร็จ (PDF)
                       </button>
+
                       <button 
                         type="button"
-                        className="receipt-btn digital-btn" 
-                        onClick={handleSendDigitalReceipt}
-                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                        className="receipt-btn" 
+                        onClick={() => {
+                          setRecipientPhone(activePatient.phone || '088-587-5682');
+                          setRecipientEmail('patient.care@gmail.com');
+                          setDigitalSentSuccess(false);
+                          setDigitalSentSuccessMsg(null);
+                          setSendingChannel(null);
+                          setShowDigitalReceiptModal(true);
+                        }}
+                        style={{
+                          background: '#0D9488',
+                          color: 'white',
+                          border: 'none',
+                          fontWeight: '700',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px'
+                        }}
+                        title="ส่งใบเสร็จดิจิทัล (SMS / Gmail) กรณีเกิดความขัดข้องในการพิมพ์ (Abnormal Path)"
                       >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                          <polyline points="22,6 12,13 2,6"></polyline>
-                        </svg>
-                        ส่งใบเสร็จดิจิทัล (SMS/Email)
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                          <span style={{ opacity: 0.5 }}>/</span>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        </span>
+                        <span>ส่งใบเสร็จดิจิทัล (SMS / Gmail)</span>
                       </button>
+
                       {onNavigateToDashboard && (
                         <button 
                           type="button"
@@ -1340,6 +1758,16 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                         <span>ภาษี (VAT 7%)</span>
                         <span>฿ {vatTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                       </div>
+                      <div className="summary-item" style={{ fontWeight: '600' }}>
+                        <span>ยอดรวมก่อนหักสิทธิ์</span>
+                        <span>฿ {rawTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      {benefitResult.discountAmount > 0 && (
+                        <div className="summary-item" style={{ color: '#16A34A', fontWeight: '700' }}>
+                          <span>ส่วนลดสิทธิ ({benefitResult.schemeLabel})</span>
+                          <span>- ฿ {benefitResult.discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      )}
                       <div className="summary-divider"></div>
                       <div className="summary-total-item">
                         <span>ยอดรวมทั้งสิ้น</span>
@@ -1450,6 +1878,35 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
 
                 <button
                   type="button"
+                  onClick={() => {
+                    setRecipientPhone(activePatient.phone || '088-587-5682');
+                    setRecipientEmail('patient.care@gmail.com');
+                    setDigitalSentSuccess(false);
+                    setDigitalSentSuccessMsg(null);
+                    setSendingChannel(null);
+                    setShowDigitalReceiptModal(true);
+                  }}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '8px 16px', borderRadius: '8px',
+                    background: '#0D9488', color: '#FFFFFF',
+                    border: 'none', fontSize: '13.5px',
+                    fontWeight: '700', cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(13, 148, 136, 0.25)',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title="ส่งใบเสร็จดิจิทัลกรณีเกิดความขัดข้องในการพิมพ์ (Abnormal Path)"
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    <span style={{ opacity: 0.5 }}>/</span>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  </span>
+                  <span>ส่งใบเสร็จดิจิทัล (SMS / Gmail)</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setShowReceiptPreview(false)}
                   style={{
                     width: '34px', height: '34px', borderRadius: '8px',
@@ -1548,7 +2005,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                     <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1E40AF' }}>{activePatient.hn}</span>
                     {activePatient.nationalId && (
                       <span style={{ color: '#64748B', marginLeft: '10px' }}>
-                        (เลขบัตร: {activePatient.nationalId})
+                        (เลขบัตร: {formatNationalId(activePatient.nationalId)})
                       </span>
                     )}
                   </div>
@@ -1661,6 +2118,12 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                       <span>ภาษีมูลค่าเพิ่ม (VAT 7%):</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>฿ {vatTax.toFixed(2)}</span>
                     </div>
+                    {discountAmount > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#16A34A', fontWeight: '700', marginBottom: '8px' }}>
+                        <span>ส่วนลดสิทธิ ({benefitResult.schemeLabel}):</span>
+                        <span style={{ fontFamily: 'monospace' }}>-฿ {discountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
                     <div style={{
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                       borderTop: '2px solid #0F172A', paddingTop: '8px', fontSize: '15px',
@@ -1695,6 +2158,433 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                 <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '11.5px', color: '#94A3B8' }}>
                   *** เอกสารฉบับนี้พิมพ์จากระบบสารสนเทศคลินิกเวชกรรม ขอขอบพระคุณที่ไว้วางใจใช้บริการ ***
                 </div>
+              </div>
+            </div>
+          </div>
+        </ClinicModalPortal>
+      )}
+
+      {/* Abnormal Path: Digital Receipt Modal (SMS / Gmail Mock Simulation) */}
+      {showDigitalReceiptModal && activePatient && (
+        <ClinicModalPortal isOpen={true} onClose={() => setShowDigitalReceiptModal(false)} className="billing-invoice-container">
+          <div 
+            className="digital-receipt-dialog"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '16px',
+              maxWidth: '560px',
+              width: '100%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '16px 20px',
+              background: 'linear-gradient(135deg, #1E293B 0%, #0F766E 100%)',
+              color: '#FFFFFF',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  background: 'rgba(255,255,255,0.18)',
+                  padding: '6px 8px',
+                  borderRadius: '8px'
+                }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: '800', letterSpacing: '-0.01em' }}>
+                    ส่งใบเสร็จรับเงินดิจิทัล (Digital Receipt)
+                  </h3>
+                  <div style={{ fontSize: '12px', color: '#E2E8F0', opacity: 0.9 }}>
+                    (รองรับกรณีเครื่องพิมพ์ขัดข้อง / ขอรับใบเสร็จทางออนไลน์)
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDigitalReceiptModal(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.15)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#FFFFFF',
+                  width: '28px',
+                  height: '28px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            {/* Abnormal Path Notification Banner (SVG only, no emojis) */}
+            <div style={{
+              background: '#F0FDFA',
+              borderBottom: '1px solid #CCFBF1',
+              padding: '10px 18px',
+              fontSize: '12.5px',
+              color: '#0F766E',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2" style={{ flexShrink: 0 }}>
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="16" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12.01" y2="8"/>
+              </svg>
+              <span>
+                <strong>โหมดสำรอง (Abnormal Path):</strong> ส่งลิงก์ใบเสร็จฉบับเต็มและหลักฐานการชำระเงินทาง SMS หรืออีเมล Gmail ให้ผู้ป่วยโดยตรง
+              </span>
+            </div>
+
+            {/* Modal Body: Single Column with 2-Line Sending Controls */}
+            <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* Line 1: Phone + ส่ง SMS */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', fontWeight: '700', color: '#334155', marginBottom: '6px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                  <span>1. หมายเลขโทรศัพท์ผู้รับ (SMS):</span>
+                </label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: '#F8FAFC',
+                    border: '1.5px solid #CBD5E1',
+                    borderRadius: '8px',
+                    padding: '0 12px',
+                    height: '40px',
+                    boxSizing: 'border-box'
+                  }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    <input
+                      type="tel"
+                      value={recipientPhone}
+                      onChange={(e) => setRecipientPhone(e.target.value)}
+                      placeholder="เช่น 088-587-5682"
+                      style={{
+                        flex: 1,
+                        border: 'none',
+                        background: 'transparent',
+                        fontSize: '14px',
+                        color: '#1E293B',
+                        fontWeight: '600',
+                        outline: 'none',
+                        fontFamily: 'inherit'
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={sendingChannel === 'sms'}
+                    onClick={handleSendSms}
+                    style={{
+                      height: '40px',
+                      padding: '0 18px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: '#2563EB',
+                      color: '#FFFFFF',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      cursor: sendingChannel === 'sms' ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 2px 6px rgba(37, 99, 235, 0.25)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      whiteSpace: 'nowrap',
+                      minWidth: '105px',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {sendingChannel === 'sms' ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="animate-spin"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
+                        <span>กำลังส่ง...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        <span>ส่ง SMS</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Line 2: Gmail + ส่ง Gmail */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12.5px', fontWeight: '700', color: '#334155', marginBottom: '6px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  <span>2. ที่อยู่อีเมลผู้รับ (Gmail):</span>
+                </label>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: '#F8FAFC',
+                    border: '1.5px solid #CBD5E1',
+                    borderRadius: '8px',
+                    padding: '0 12px',
+                    height: '40px',
+                    boxSizing: 'border-box'
+                  }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    <input
+                      type="email"
+                      value={recipientEmail}
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      placeholder="เช่น patient.care@gmail.com"
+                      style={{
+                        flex: 1,
+                        border: 'none',
+                        background: 'transparent',
+                        fontSize: '14px',
+                        color: '#1E293B',
+                        fontWeight: '600',
+                        outline: 'none',
+                        fontFamily: 'inherit'
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={sendingChannel === 'gmail'}
+                    onClick={handleSendGmail}
+                    style={{
+                      height: '40px',
+                      padding: '0 18px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: '#0D9488',
+                      color: '#FFFFFF',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      cursor: sendingChannel === 'gmail' ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 2px 6px rgba(13, 148, 136, 0.25)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      whiteSpace: 'nowrap',
+                      minWidth: '105px',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    {sendingChannel === 'gmail' ? (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="animate-spin"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg>
+                        <span>กำลังส่ง...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        <span>ส่ง Gmail</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Status Message (SVG only) */}
+              {digitalSentSuccessMsg && (
+                <div style={{
+                  padding: '10px 14px',
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  borderRadius: '8px',
+                  color: '#065F46',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                  </svg>
+                  <span>{digitalSentSuccessMsg}</span>
+                </div>
+              )}
+
+              {/* Message Preview Box (All SVGs, No Emojis) */}
+              <div style={{
+                background: '#F8FAFC',
+                borderRadius: '12px',
+                padding: '14px',
+                border: '1px solid #E2E8F0'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ fontSize: '12px', color: '#475569', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F766E" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    <span>ตัวอย่างข้อความที่ผู้ป่วยจะได้รับ:</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: '4px', background: '#E2E8F0', padding: '3px', borderRadius: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setDigitalChannel('sms')}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        background: digitalChannel === 'sms' ? '#FFFFFF' : 'transparent',
+                        color: digitalChannel === 'sms' ? '#2563EB' : '#64748B',
+                        fontSize: '11.5px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: digitalChannel === 'sms' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                      ตัวอย่าง SMS
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDigitalChannel('gmail')}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '4px',
+                        border: 'none',
+                        background: digitalChannel === 'gmail' ? '#FFFFFF' : 'transparent',
+                        color: digitalChannel === 'gmail' ? '#0D9488' : '#64748B',
+                        fontSize: '11.5px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        boxShadow: digitalChannel === 'gmail' ? '0 1px 2px rgba(0,0,0,0.06)' : 'none'
+                      }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                      ตัวอย่าง Gmail
+                    </button>
+                  </div>
+                </div>
+
+                {digitalChannel === 'sms' ? (
+                  <div style={{
+                    background: '#FFFFFF',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    fontSize: '12.5px',
+                    lineHeight: '1.6',
+                    color: '#1E293B',
+                    border: '1px solid #E2E8F0',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <span style={{
+                        background: '#EFF6FF',
+                        color: '#1D4ED8',
+                        fontSize: '11px',
+                        fontWeight: '800',
+                        padding: '2px 8px',
+                        borderRadius: '4px',
+                        border: '1px solid #DBEAFE'
+                      }}>
+                        General Clinic
+                      </span>
+                    </div>
+                    <div>เรียนคุณ <strong>{activePatient.name}</strong></div>
+                    <div style={{ color: '#475569', fontSize: '12px' }}>คลินิกได้รับชำระเงินค่ารักษาพยาบาลเรียบร้อยแล้ว</div>
+                    <div style={{ marginTop: '6px', paddingLeft: '4px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2"><circle cx="12" cy="12" r="3"/></svg>
+                        <span><strong>HN:</strong> {activePatient.hn}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16A34A" strokeWidth="2"><circle cx="12" cy="12" r="3"/></svg>
+                        <span><strong>ยอดสุทธิ:</strong> ฿{grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#64748B" strokeWidth="2"><circle cx="12" cy="12" r="3"/></svg>
+                        <span><strong>สิทธิ:</strong> {selectedRights}</span>
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #E2E8F0', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                      <span style={{ fontSize: '11.5px', color: '#475569' }}>ตรวจสอบใบเสร็จฉบับทางการ:</span>
+                      <span style={{ color: '#2563EB', textDecoration: 'underline', fontSize: '11.5px' }}>https://general-clinic.com/receipt/REC-{activePatient.hn}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{
+                    background: '#FFFFFF',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    fontSize: '12.5px',
+                    color: '#1E293B',
+                    border: '1px solid #E2E8F0',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  }}>
+                    <div style={{ fontSize: '11.5px', color: '#64748B', borderBottom: '1px solid #F1F5F9', paddingBottom: '6px', marginBottom: '8px' }}>
+                      <div><strong>จาก:</strong> General Clinic &lt;receipts@general-clinic.com&gt;</div>
+                      <div><strong>ถึง:</strong> {recipientEmail || 'patient.care@gmail.com'}</div>
+                      <div><strong>หัวข้อ:</strong> ใบเสร็จรับเงินค่ารักษาพยาบาล (E-Receipt) - {activePatient.name}</div>
+                    </div>
+                    <div style={{ lineHeight: '1.5' }}>
+                      เรียนคุณ {activePatient.name},<br/>
+                      ทางคลินิกขอส่งใบเสร็จรับเงินค่ารักษาพยาบาลอิเล็กทรอนิกส์ ยอดสุทธิ <strong>฿{grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong><br/>
+                      <div style={{
+                        marginTop: '8px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        background: '#F1F5F9',
+                        borderRadius: '6px',
+                        border: '1px solid #CBD5E1',
+                        fontSize: '11.5px',
+                        color: '#334155'
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>Official_Receipt_{activePatient.hn}.pdf (142 KB)</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDigitalReceiptModal(false)}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #CBD5E1',
+                    background: '#FFFFFF',
+                    color: '#475569',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  ปิดหน้าต่าง
+                </button>
               </div>
             </div>
           </div>

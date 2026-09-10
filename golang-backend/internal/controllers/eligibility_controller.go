@@ -7,6 +7,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/services"
 	"clinic-backend/internal/ws"
 	"github.com/gin-gonic/gin"
 )
@@ -116,6 +117,13 @@ func SavePatientEligibility(c *gin.Context) {
 		return
 	}
 
+	// Parse ExpireDate using centralized flexible date parser (no silent fallbacks)
+	parsedExpireDate, err := services.ParseFlexibleDatePtr(req.ExpireDate)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รูปแบบวันหมดอายุสิทธิ์ไม่ถูกต้อง กรุณาใช้ DD/MM/YYYY หรือ YYYY-MM-DD"})
+		return
+	}
+
 	// ดึง ID ผู้ใช้จาก JWT
 	var userID *uint
 	if val, exists := c.Get("userID"); exists {
@@ -135,10 +143,6 @@ func SavePatientEligibility(c *gin.Context) {
 	if status == "" {
 		status = "ใช้งานได้"
 	}
-	expireDate := req.ExpireDate
-	if expireDate == "" {
-		expireDate = "31/12/2026"
-	}
 
 	var existingEligibility models.MedicalEligibility
 	result := config.DB.Where("patient_id = ?", req.PatientID).First(&existingEligibility)
@@ -148,7 +152,7 @@ func SavePatientEligibility(c *gin.Context) {
 		existingEligibility.CoverageDetails = req.CoverageDetails
 		existingEligibility.HospitalName = hospitalName
 		existingEligibility.Status = status
-		existingEligibility.ExpireDate = expireDate
+		existingEligibility.ExpireDate = parsedExpireDate
 		existingEligibility.UserID = userID
 		existingEligibility.VerifiedAt = time.Now()
 		if err := config.DB.Save(&existingEligibility).Error; err != nil {
@@ -163,7 +167,7 @@ func SavePatientEligibility(c *gin.Context) {
 			CoverageDetails: req.CoverageDetails,
 			HospitalName:    hospitalName,
 			Status:          status,
-			ExpireDate:      expireDate,
+			ExpireDate:      parsedExpireDate,
 			VerifiedAt:      time.Now(),
 		}
 		if err := config.DB.Create(&newEligibility).Error; err != nil {

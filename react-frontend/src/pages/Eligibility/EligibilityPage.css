@@ -623,13 +623,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 14px;
+  width: 140px;
+  height: 30px;
   border-radius: 9999px;
   font-family: var(--font-primary);
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 18px;
   white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .badge-scheme-gold {
@@ -879,6 +881,43 @@
 
 .scheme-dropdown-filter:focus {
   border-color: #2563EB;
+}
+
+/* ===== Rows Per Page Selector (Matching Queue Page) ===== */
+.queue-items-per-page-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.queue-items-per-page-label {
+  font-family: var(--font-primary);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #64748B;
+  white-space: nowrap;
+}
+
+.queue-items-per-page-select {
+  height: 42px;
+  padding: 0 12px;
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 8px;
+  font-family: var(--font-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.queue-items-per-page-select:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  background: #FFFFFF;
 }
 
 /* Table */
@@ -1561,6 +1600,21 @@ body.dark-mode .scheme-dropdown-filter {
   background: #22272E;
   border: 1px solid #444C56;
   color: #FFFFFF;
+}
+
+body.dark-mode .queue-items-per-page-label {
+  color: #ADBAC7;
+}
+
+body.dark-mode .queue-items-per-page-select {
+  background: #22272E;
+  border: 1px solid #444C56;
+  color: #CDD9E5;
+}
+
+body.dark-mode .queue-items-per-page-select:focus {
+  border-color: #539BF5;
+  background: #2D333B;
 }
 
 body.dark-mode .modern-eligibility-table thead th {

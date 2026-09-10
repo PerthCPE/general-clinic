@@ -3,7 +3,7 @@ import type { User, UserRole } from '../types/auth';
 import { DEMO_USERS, ROLE_DEFAULT_PAGES, PAGE_PERMISSIONS } from '../config/roles';
 
 // โค้ดส่วนของเพื่อน (ระบบเชื่อม Backend)
-import { authApi } from '../services/api';
+import { authApi, ApiRequestError } from '../services/api';
 
 // โค้ดส่วนของคุณ (ระบบคิวและนัดหมาย)
 export interface PatientQueueItem {
@@ -23,7 +23,11 @@ export interface PatientQueueItem {
 interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
-  login: (roleOrUsername: string, password?: string) => Promise<boolean>;
+  login: (roleOrUsername: string, password?: string) => Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }>;
+  // ทางลัด dev/test เท่านั้น สำหรับปุ่ม "Quick Test Login" ในหน้า login — เรียก backend
+  // endpoint พิเศษที่ reset status บัญชี seed กลับเป็น active ให้ก่อนเสมอ ไม่เช็ค password
+  // ต่างจาก login() ด้านบนที่ยังต้องผ่านการเช็ค password/status ตามจริงทุกประการเหมือนเดิม
+  quickDevLogin: (role: UserRole) => Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }>;
   switchRole: (role: UserRole) => Promise<void>;
   logout: () => void;
   hasAccess: (pageId: string) => boolean;
@@ -72,11 +76,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const latest = DEMO_USERS[parsed.role as UserRole];
           return {
             ...parsed,
-            fullName: latest.fullName,
-            roleTitleTh: latest.roleTitleTh,
-            roleTitleEn: latest.roleTitleEn,
-            avatarText: latest.avatarText,
-            avatarColor: latest.avatarColor,
+            // คงชื่อจริงที่ login มา (fullName) ไว้ — ไม่ override ด้วย DEMO_USERS
+            roleTitleTh: parsed.roleTitleTh || latest.roleTitleTh,
+            roleTitleEn: parsed.roleTitleEn || latest.roleTitleEn,
+            avatarColor: parsed.avatarColor || latest.avatarColor,
           };
         }
         return parsed;
@@ -94,27 +97,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     if (currentUser) {
-      // ตรวจสอบว่าชื่อหรือตำแหน่งใน DEMO_USERS เปลี่ยนไปหรือไม่ ถ้าเปลี่ยน ให้อัปเดตทันที
-      if (currentUser.role && DEMO_USERS[currentUser.role]) {
-        const latest = DEMO_USERS[currentUser.role];
-        if (
-          currentUser.fullName !== latest.fullName ||
-          currentUser.roleTitleTh !== latest.roleTitleTh ||
-          currentUser.roleTitleEn !== latest.roleTitleEn ||
-          currentUser.avatarText !== latest.avatarText ||
-          currentUser.avatarColor !== latest.avatarColor
-        ) {
-          setCurrentUser(prev => prev ? ({
-            ...prev,
-            fullName: latest.fullName,
-            roleTitleTh: latest.roleTitleTh,
-            roleTitleEn: latest.roleTitleEn,
-            avatarText: latest.avatarText,
-            avatarColor: latest.avatarColor,
-          }) : null);
-          return;
-        }
-      }
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(currentUser));
     } else {
       localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -134,8 +116,72 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPatientQueue(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
   };
 
+  // ของใหม่: ระบบข้อมูลแบบ Real-time (WebSocket)
+  useEffect(() => {
+    if (!currentUser) return; // เฉพาะตอนล็อกอินถึงจะเชื่อมต่อ WS
+
+    // เชื่อมต่อไปยัง Go Backend WebSocket
+    const wsUrl = `ws://localhost:8080/ws`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log('[WS] Connected (Real-time Sync Active)');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        console.log('[WS] Received real-time event:', payload);
+
+        // คุณสามารถนำข้อมูลนี้ไปอัปเดต State หรือโชว์ Notification ได้ที่นี่
+        if (payload.type === 'QUEUE_CREATED') {
+          // ตัวอย่าง: ถ้าเป็นข้อมูลคิวที่เพิ่มเข้ามาใหม่ สามารถเรียก addAppointment ได้
+          // addAppointment({...});
+        }
+      } catch (err) {
+        console.error('WebSocket message parse error', err);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log('[WS] Disconnected');
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [currentUser]);
+
+  // ของเพื่อน: แปลง response จริงจาก backend (login ปกติ หรือ quick-login) ให้เป็น User —
+  // ใช้ร่วมกันทั้ง login() และ quickDevLogin() เพื่อไม่ให้ logic การสร้าง avatar/fallback
+  // ข้อมูลตกหล่นไม่ตรงกันระหว่างสองทาง
+  const buildUserFromLoginResponse = (res: {
+    user: { id: number; username: string; fullname: string; role: string; phone: string };
+  }): User => {
+    const userRole = res.user.role as UserRole;
+    const fallback = DEMO_USERS[userRole] || DEMO_USERS['registrar'];
+
+    // ใช้ชื่อจริงจาก API เสมอ — ไม่ hardcode ชื่อตาม username/role
+    const fullName = res.user.fullname || res.user.username;
+    // สร้าง avatar text จากชื่อจริง (2 ตัวอักษรแรก)
+    const nameParts = fullName.replace(/^(นพ\.|พญ\.|นพ|พญ)\./i, '').trim();
+    const avatarText = nameParts.substring(0, 2) || fallback.avatarText;
+
+    return {
+      id: String(res.user.id),
+      username: res.user.username,
+      fullName,
+      role: userRole,
+      roleTitleTh: fallback.roleTitleTh,
+      roleTitleEn: fallback.roleTitleEn,
+      department: fallback.department,
+      avatarText,
+      avatarColor: fallback.avatarColor,
+    };
+  };
+
   // ของเพื่อน: ระบบล็อกอิน
-  const login = async (roleOrUsername: string, password?: string): Promise<boolean> => {
+  const login = async (roleOrUsername: string, password?: string): Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }> => {
     try {
       let usernameToSend = roleOrUsername;
       if (roleOrUsername === 'registrar') usernameToSend = 'registrar1';
@@ -145,51 +191,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       else if (roleOrUsername === 'pharmacist') usernameToSend = 'pharmacist1';
       else if (roleOrUsername === 'cashier') usernameToSend = 'cashier1';
 
-      const res = await authApi.login(usernameToSend, password || 'password');
+      // ไม่มี default password ที่ใช้ได้กับทุกบัญชีอีกต่อไป — แต่ละบัญชีมี employee_id ของ
+      // ตัวเองเป็นรหัสผ่านเริ่มต้น ถ้าไม่ได้ส่ง password มาจริงๆ (ไม่ควรเกิดจากฟอร์ม login ปกติ
+      // ที่บังคับกรอกทั้งสองช่องอยู่แล้ว) ปล่อยว่างให้ backend ตอบ 401 ตามจริงดีกว่าเดา
+      const res = await authApi.login(usernameToSend, password ?? '');
       if (res && res.user) {
-        const userRole = res.user.role as UserRole;
-        const fallback = DEMO_USERS[userRole] || DEMO_USERS['registrar'];
-
-        let fullName = res.user.fullname || fallback.fullName;
-        let department = fallback.department;
-        let avatarText = fallback.avatarText;
-        let roleTitleTh = fallback.roleTitleTh;
-
-        if (userRole === 'doctor') {
-          if (res.user.username === 'doctor2' || res.user.fullname?.includes('วิชัย')) {
-            fullName = 'นพ.วิชัย ชาญการแพทย์';
-            department = 'แผนกอายุรกรรมทั่วไป';
-            avatarText = 'WC';
-            roleTitleTh = 'แพทย์ผู้ตรวจ (อายุรกรรม)';
-          } else if (res.user.username === 'doctor3' || res.user.fullname?.includes('เกศรา')) {
-            fullName = 'พญ.เกศรา รักษาดี';
-            department = 'แผนกกุมารเวชกรรม';
-            avatarText = 'KR';
-            roleTitleTh = 'แพทย์ผู้ตรวจ (กุมารเวชกรรม)';
-          } else {
-            fullName = 'พญ.สุดา สุขสมบูรณ์';
-            department = 'แผนกสูตินรีเวช';
-            avatarText = 'SS';
-            roleTitleTh = 'แพทย์ผู้ตรวจ (สูตินรีเวช)';
-          }
-        }
-
-        const loggedInUser: User = {
-          id: String(res.user.id),
-          username: res.user.username,
-          fullName,
-          role: userRole,
-          roleTitleTh,
-          roleTitleEn: fallback.roleTitleEn,
-          department,
-          avatarText,
-          avatarColor: fallback.avatarColor,
-        };
-        setCurrentUser(loggedInUser);
-        return true;
+        setCurrentUser(buildUserFromLoginResponse(res));
+        return { success: true, requiresPasswordChange: res.requires_password_change };
       }
     } catch (err) {
-      console.warn('Backend login error, checking fallback:', err);
+      // สำคัญ: ต้องแยกให้ออกว่า backend "ปฏิเสธ login จริง" (มี HTTP response กลับมา เช่น 401
+      // รหัสผ่านผิด หรือ 403 บัญชีถูกระงับ) กับ backend "ติดต่อไม่ได้เลย" (เน็ตหลุด/server ล่ม)
+      // เดิมโค้ดนี้ catch แล้ว fallback ไป local demo login (ด้านล่าง) ทุกกรณีแบบไม่แยก — พอ
+      // backend ปฏิเสธ login ที่ถูกต้องแล้ว (เช่น บัญชีถูกระงับ) โค้ดกลับไป match DEMO_USERS ด้วย
+      // username เดิม แล้ว setCurrentUser() ให้ "สำเร็จ" แบบปลอมๆ ทั้งที่ไม่เคยได้ token จริง
+      // จาก backend เลย พอหน้าถัดไปเรียก API ใดๆ ก็เจอ "ไม่มี token" แล้ว reload กลับไปหน้า login
+      // ทันที (ถูกต้องแล้วตามเงื่อนไข 401) — แต่ผลลัพธ์ที่ผู้ใช้เห็นคือ login ดูเหมือนสำเร็จแวบเดียว
+      // แล้วจอกระพริบรีโหลดวนซ้ำทุกครั้งที่ลอง เพราะ fake login ใหม่ทุกรอบไม่เคยมี token จริงสักที
+      //
+      // ฉะนั้นถ้า backend ตอบกลับมาจริง (ApiRequestError มี status) ให้เชื่อคำตอบนั้นตรงๆ
+      // ไม่ fallback ไป local demo เด็ดขาด — คืน failure พร้อม error message จริงจาก backend
+      // (เช่น "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ") ให้ผู้ใช้เห็นเฉยๆ ไม่มี reload
+      if (err instanceof ApiRequestError) {
+        console.warn('Backend rejected login (not falling back to local demo):', err.message);
+        return { success: false, error: err.message };
+      }
+      // เคสนี้เหลือแค่ backend ติดต่อไม่ได้จริงๆ (network error) — fallback ไป local demo ต่อได้
+      console.warn('Backend unreachable, checking local fallback:', err);
     }
 
     let matchedUser: User | undefined;
@@ -225,29 +253,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (matchedUser) {
       setCurrentUser(matchedUser);
-      return true;
+      return { success: true, requiresPasswordChange: false };
     }
-    return false;
+    return { success: false };
+  };
+
+  // ทางลัด dev/test เท่านั้น สำหรับปุ่ม "Quick Test Login" — ไม่ fallback ไป local demo เลย
+  // ถ้า backend ปฏิเสธ (เช่น dev mode ปิดอยู่ที่ backend ตอบ 403 "Quick login is only
+  // available in dev mode") เพราะปุ่มนี้มีไว้ให้เห็นสถานะจริงของ dev mode ตรงๆ ไม่ใช่ปิดบัง
+  // ด้วย fake login เหมือนบั๊กเดิมที่เพิ่งแก้ไปใน login() ด้านบน
+  const quickDevLogin = async (role: UserRole): Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }> => {
+    try {
+      const res = await authApi.quickLogin(role);
+      if (res && res.user) {
+        setCurrentUser(buildUserFromLoginResponse(res));
+        return { success: true, requiresPasswordChange: res.requires_password_change };
+      }
+      return { success: false, error: 'ไม่พบข้อมูลผู้ใช้จาก quick login' };
+    } catch (err) {
+      const message = err instanceof ApiRequestError ? err.message : 'เชื่อมต่อ backend ไม่ได้';
+      console.warn('quickDevLogin failed:', err);
+      return { success: false, error: message };
+    }
   };
 
   const switchRole = async (role: UserRole) => {
-    let username = 'cashier1';
-    if (role === 'registrar') username = 'registrar1';
-    else if (role === 'nurse') username = 'nurse1';
-    else if (role === 'nurse_assistant') username = 'assistant1';
-    else if (role === 'doctor') username = 'doctor1';
-    else if (role === 'pharmacist') username = 'pharmacist1';
-    else if (role === 'cashier') username = 'cashier1';
+    // แต่ละบัญชี seed มี employee_id เป็นรหัสผ่านของตัวเอง ไม่มี 'password' กลางที่ใช้ร่วมกัน
+    // ได้อีกต่อไป ต้อง map username -> password ให้ตรงกันเป็นคู่ๆ
+    const credentials: Partial<Record<UserRole, { username: string; password: string }>> = {
+      registrar: { username: 'registrar1', password: 'REC001' },
+      nurse: { username: 'nurse1', password: 'NUR001' },
+      nurse_assistant: { username: 'assistant1', password: 'NUR002' },
+      doctor: { username: 'doctor1', password: 'DOC001' },
+      pharmacist: { username: 'pharmacist1', password: 'PHA001' },
+      cashier: { username: 'cashier1', password: 'CAS001' },
+      admin: { username: 'admin1', password: 'ADM001' },
+      officer: { username: 'officer1', password: 'OFF001' },
+    };
+    const cred = credentials[role];
+    if (!cred) return;
 
     try {
-      await authApi.login(username, 'password');
-    } catch {
-      // ignore
-    }
-
-    const targetUser = DEMO_USERS[role];
-    if (targetUser) {
-      setCurrentUser(targetUser);
+      const res = await authApi.login(cred.username, cred.password);
+      // ตั้ง currentUser เฉพาะตอนที่ backend login สำเร็จจริง (ได้ token จริงกลับมา) เท่านั้น
+      // เดิมโค้ดนี้ตั้ง currentUser แบบ fake เสมอไม่ว่า login จะสำเร็จหรือไม่ (catch แล้วเงียบ)
+      // ถ้า backend ปฏิเสธ (เช่นบัญชีถูกระงับ) จะได้ currentUser ที่ไม่มี token จริงรองรับ —
+      // พอเรียก API ถัดไปจะชน "ไม่มี token" แล้ว reload กลับไปหน้า login ทันที (บั๊กเดียวกับที่
+      // เจอใน login() ด้านบน — ดูคอมเมนต์ตรงนั้นสำหรับรายละเอียดเต็ม)
+      if (res && res.user) {
+        setCurrentUser(DEMO_USERS[role]);
+      }
+    } catch (err) {
+      console.warn('switchRole: login failed, not switching role:', err);
     }
   };
 
@@ -271,6 +328,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         isAuthenticated: currentUser !== null,
         login,
+        quickDevLogin,
         switchRole,
         logout,
         hasAccess,

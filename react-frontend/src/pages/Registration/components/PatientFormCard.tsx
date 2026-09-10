@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import type { Patient, SchemeType } from '../types';
 import { validateThaiNationalID } from '../../../utils/thaiIdValidator';
+import AddressFormSection, { composeAddressPreview } from './AddressFormSection';
 
 interface PatientFormCardProps {
-  onSubmit: (formData: Partial<Patient>) => void;
+  onSubmit: (formData: Partial<Patient> & { issueQueue?: boolean }) => void;
   formRef?: React.RefObject<HTMLDivElement | null>;
 }
 
@@ -11,6 +12,7 @@ const STORAGE_KEY = 'clinic_patient_reg_draft';
 
 const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) => {
   const [isOpen, setIsOpen] = useState(true);
+  const [issueQueue, setIssueQueue] = useState(false);
   const [formData, setFormData] = useState({
     title: 'นาย',
     fullName: '',
@@ -20,6 +22,16 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
     age: '',
     phone: '',
     emergencyContact: '',
+    // Structured Address Fields (Sprint 3)
+    houseNo: '',
+    villageNo: '',
+    villageName: '',
+    alley: '',
+    road: '',
+    subDistrict: '',
+    district: '',
+    province: '',
+    postalCode: '',
     address: '',
     schemeType: 'บัตรทอง (สปสช.)' as SchemeType,
   });
@@ -34,7 +46,7 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.data && (parsed.data.fullName || parsed.data.nationalId || parsed.data.phone)) {
+        if (parsed && parsed.data && (parsed.data.fullName || parsed.data.nationalId || parsed.data.phone || parsed.data.province)) {
           setHasDraft(true);
           setDraftTime(parsed.savedAt || '');
         }
@@ -46,7 +58,7 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
 
   // Save draft whenever formData changes
   useEffect(() => {
-    if (formData.fullName || formData.nationalId || formData.phone || formData.address) {
+    if (formData.fullName || formData.nationalId || formData.phone || formData.province || formData.address) {
       const timer = setTimeout(() => {
         try {
           const payload = {
@@ -203,6 +215,28 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
     }
     if (!formData.phone.trim()) errors.phone = 'กรุณาระบุเบอร์โทรศัพท์';
 
+    // Birth Date validation (Strict: required & valid date)
+    if (!formData.dob.trim()) {
+      errors.dob = 'กรุณาระบุวันเกิด';
+    } else {
+      const parsed = parseDateAndCalculateAge(formData.dob);
+      if (!parsed.valid) {
+        errors.dob = 'รูปแบบวันเกิดไม่ถูกต้อง (กรุณาใช้ วว/ดด/ปปปป เช่น 12/05/2549)';
+      }
+    }
+
+    // Address validation (Sprint 3)
+    if (!formData.province.trim()) {
+      errors.province = 'กรุณาระบุจังหวัด';
+    }
+    if (!formData.district.trim()) {
+      errors.district = 'กรุณาระบุอำเภอ/เขต';
+    }
+    const cleanPostal = formData.postalCode.trim();
+    if (cleanPostal && (cleanPostal.length !== 5 || !/^\d{5}$/.test(cleanPostal))) {
+      errors.postalCode = 'รหัสไปรษณีย์ต้องเป็นตัวเลข 5 หลัก';
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -221,19 +255,35 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
         : `${formData.title}${formData.fullName}`;
 
     const parsed = parseDateAndCalculateAge(formData.dob);
-    const birthDateISO = parsed.valid ? parsed.birthdateISO : formData.dob;
-    const finalAge = parsed.valid ? parseInt(parsed.ageStr, 10) : parseInt(formData.age, 10) || 25;
+    if (!parsed.valid) {
+      setFormErrors((prev) => ({ ...prev, dob: 'รูปแบบวันเกิดไม่ถูกต้อง' }));
+      return;
+    }
+    const birthDateISO = parsed.birthdateISO;
+    const finalAge = parseInt(parsed.ageStr, 10);
+
+    const composedAddr = composeAddressPreview(formData);
 
     onSubmit({
       fullName: fullPatientName,
       nationalId: formData.nationalId,
       gender: formData.gender,
-      dob: birthDateISO || '2000-01-01',
+      dob: birthDateISO,
       age: finalAge,
       phone: formData.phone,
       emergencyContact: formData.emergencyContact,
-      address: formData.address || 'กรุงเทพมหานคร',
+      houseNo: formData.houseNo.trim(),
+      villageNo: formData.villageNo.trim(),
+      villageName: formData.villageName.trim(),
+      alley: formData.alley.trim(),
+      road: formData.road.trim(),
+      subDistrict: formData.subDistrict.trim(),
+      district: formData.district.trim(),
+      province: formData.province.trim(),
+      postalCode: formData.postalCode.trim(),
+      address: composedAddr || formData.address || 'กรุงเทพมหานคร',
       schemeType: formData.schemeType,
+      issueQueue,
     });
 
     // Clear saved draft on submit
@@ -249,6 +299,7 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
   };
 
   const handleReset = () => {
+    setIssueQueue(false);
     setFormData({
       title: 'นาย',
       fullName: '',
@@ -258,6 +309,15 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
       age: '',
       phone: '',
       emergencyContact: '',
+      houseNo: '',
+      villageNo: '',
+      villageName: '',
+      alley: '',
+      road: '',
+      subDistrict: '',
+      district: '',
+      province: '',
+      postalCode: '',
       address: '',
       schemeType: 'บัตรทอง (สปสช.)',
     });
@@ -492,7 +552,7 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
             <span className="reg-section-title">ข้อมูลการติดต่อและที่อยู่</span>
           </div>
 
-          <div className="reg-form-grid">
+          <div className="reg-form-grid" style={{ marginBottom: '16px' }}>
             <div className="reg-form-group">
               <label className="reg-form-label">
                 เบอร์โทรศัพท์ติดต่อ <span className="text-required">*</span>
@@ -517,18 +577,28 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
                 onChange={(e) => handleChange('emergencyContact', e.target.value)}
               />
             </div>
-
-            <div className="reg-form-group span-3">
-              <label className="reg-form-label">ที่อยู่ปัจจุบัน</label>
-              <input
-                type="text"
-                className="reg-form-input"
-                placeholder="บ้านเลขที่, ถนน, ตำบล/แขวง, อำเภอ/เขต, จังหวัด..."
-                value={formData.address}
-                onChange={(e) => handleChange('address', e.target.value)}
-              />
-            </div>
           </div>
+
+          <AddressFormSection
+            values={{
+              houseNo: formData.houseNo,
+              villageNo: formData.villageNo,
+              villageName: formData.villageName,
+              alley: formData.alley,
+              road: formData.road,
+              subDistrict: formData.subDistrict,
+              district: formData.district,
+              province: formData.province,
+              postalCode: formData.postalCode,
+              address: formData.address,
+            }}
+            errors={{
+              province: formErrors.province,
+              district: formErrors.district,
+              postalCode: formErrors.postalCode,
+            }}
+            onChange={(field, val) => handleChange(field, val)}
+          />
         </div>
 
         <div className="reg-form-section">
@@ -555,6 +625,23 @@ const PatientFormCard: React.FC<PatientFormCardProps> = ({ onSubmit, formRef }) 
               </select>
             </div>
           </div>
+        </div>
+
+        {/* Task B1: Checkbox ออกบัตรคิวทันทีหลังลงทะเบียน */}
+        <div className="reg-issue-queue-checkbox-wrap">
+          <label className="reg-checkbox-label" htmlFor="reg-issue-queue-chk">
+            <input
+              type="checkbox"
+              id="reg-issue-queue-chk"
+              className="reg-custom-checkbox"
+              checked={issueQueue}
+              onChange={(e) => setIssueQueue(e.target.checked)}
+            />
+            <span className="reg-checkbox-text">ออกบัตรคิวทันทีหลังลงทะเบียน</span>
+          </label>
+          <p className="reg-checkbox-hint">
+            ติ๊กเมื่อผู้ป่วยมาถึงคลินิกแล้วและต้องการเข้ารับบริการทันที
+          </p>
         </div>
 
         <div className="reg-form-actions-row">

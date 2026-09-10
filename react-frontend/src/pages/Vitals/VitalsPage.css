@@ -777,7 +777,8 @@ body.dark-mode .vitals-draft-badge {
 }
 
 .vitals-card-body.expanded {
-  max-height: 2000px;
+  max-height: none;
+  overflow: visible;
   padding: 28px 36px 36px;
 }
 
@@ -2612,4 +2613,545 @@ body.dark-mode .vitals-history-table td {
 
 body.dark-mode .vitals-history-table tr:hover td {
   background: #373E47;
+}
+
+/* ================================================================
+   ===== ERROR TOAST BANNER =====
+   ================================================================ */
+.vitals-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #FEF2F2;
+  border: 1px solid #EF4444;
+  color: #B91C1C;
+  padding: 14px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);
+  animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+}
+
+.vitals-error-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.vitals-error-banner-content svg {
+  flex-shrink: 0;
+  color: #DC2626;
+}
+
+.vitals-error-banner-close {
+  background: transparent;
+  border: none;
+  color: #B91C1C;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+}
+
+.vitals-error-banner-close:hover {
+  opacity: 1;
+  background: rgba(185, 28, 28, 0.1);
+}
+
+body.dark-mode .vitals-error-banner {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #FCA5A5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-mode .vitals-error-banner-content svg {
+  color: #EF4444;
+}
+
+body.dark-mode .vitals-error-banner-close {
+  color: #FCA5A5;
+}
+
+body.dark-mode .vitals-error-banner-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* ================================================================
+   ===== WARNING CONFIRMATION MODAL =====
+   ================================================================ */
+.vitals-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+  padding: 16px;
+  animation: fadeIn 0.2s ease;
+}
+
+.vitals-modal-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 480px;
+  width: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+  animation: modalScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+}
+
+@keyframes modalScaleUp {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.vitals-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.vitals-modal-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #FEF3C7;
+  border: 1px solid #FDE68A;
+  color: #D97706;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vitals-modal-header-text {
+  flex: 1;
+}
+
+.vitals-modal-title {
+  font-family: var(--font-heading, 'Kanit', 'Plus Jakarta Sans', sans-serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: #0F172A;
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+}
+
+.vitals-modal-desc {
+  font-size: 13.5px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.vitals-modal-list-box {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin: 16px 0 20px 0;
+}
+
+.vitals-modal-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #B45309;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+
+.vitals-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.vitals-modal-btn-cancel {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.vitals-modal-btn-cancel:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+.vitals-modal-btn-confirm {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #FFFFFF;
+  background: #2563EB;
+  border: 1px solid #1D4ED8;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.2);
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.vitals-modal-btn-confirm:hover {
+  background: #1D4ED8;
+}
+
+/* Elevated Dark Slate Theme for Warning Modal */
+body.dark-mode .vitals-modal-card {
+  background: #212836;
+  border-color: #333F53;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+}
+
+body.dark-mode .vitals-modal-icon-wrap {
+  background: rgba(217, 119, 6, 0.2);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #FBBF24;
+}
+
+body.dark-mode .vitals-modal-title {
+  color: #F8FAFC;
+}
+
+body.dark-mode .vitals-modal-desc {
+  color: #ADBAC7;
+}
+
+body.dark-mode .vitals-modal-list-box {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+body.dark-mode .vitals-modal-list {
+  color: #FCD34D;
+}
+
+body.dark-mode .vitals-modal-btn-cancel {
+  background: #2D3748;
+  border-color: #444C56;
+  color: #CDD9E5;
+}
+
+body.dark-mode .vitals-modal-btn-cancel:hover {
+  background: #373E47;
+  color: #FFFFFF;
+}
+
+body.dark-mode .vitals-modal-btn-confirm {
+  background: #2563EB;
+  border-color: #3B82F6;
+  color: #FFFFFF;
+}
+
+body.dark-mode .vitals-modal-btn-confirm:hover {
+  background: #1D4ED8;
+}
+
+/* ================================================================
+   ===== 12. ADVANCED SCREENING & 2Q DEPRESSION STYLES =====
+   ================================================================ */
+.vitals-advanced-screening-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+}
+
+.vitals-screening-subcard {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vitals-screening-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vitals-subcard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vitals-subcard-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1E293B;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vitals-subcard-icon {
+  width: 18px;
+  height: 18px;
+  color: #2563EB;
+  flex-shrink: 0;
+}
+
+.vitals-tristate-group {
+  display: flex;
+  width: 100%;
+  background: #F1F5F9;
+  border: 1px solid #CBD5E1;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+  box-sizing: border-box;
+}
+
+.vitals-tristate-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 8px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748B;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  font-family: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vitals-tristate-btn:hover {
+  color: #1E293B;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.vitals-tristate-btn.active.unassessed {
+  background: #FFFFFF;
+  color: #475569;
+  border-color: #CBD5E1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.vitals-tristate-btn.active.yes,
+.vitals-tristate-btn.active.no,
+.vitals-tristate-btn.active.custom-pregnant,
+.vitals-tristate-btn.active.custom-anticoag {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #1D4ED8;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+}
+
+.vitals-banner-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #FFFBEB;
+  border: 1.5px solid #F59E0B;
+  color: #92400E;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.5;
+  animation: fadeIn 0.25s ease;
+}
+
+.vitals-banner-positive {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #FFF7ED;
+  border: 1.5px solid #EA580C;
+  color: #9A3412;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  animation: fadeIn 0.25s ease;
+}
+
+.vitals-banner-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.vitals-date-input {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+}
+
+.vitals-2q-card {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: all 0.25s ease;
+}
+
+.vitals-2q-card.positive-alert {
+  background: #FFF7ED;
+  border-color: #FDBA74;
+}
+
+.vitals-2q-card.positive-alert .vitals-subcard-title {
+  color: #C2410C;
+}
+
+.vitals-2q-card.positive-alert .vitals-subcard-icon {
+  color: #EA580C;
+}
+
+.vitals-2q-desc {
+  font-size: 13px;
+  color: #64748B;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.vitals-2q-card.positive-alert .vitals-2q-desc {
+  color: #9A3412;
+}
+
+.vitals-2q-item {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vitals-2q-question-text {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1E293B;
+  line-height: 1.45;
+}
+
+/* Elevated Dark Slate Theme for Advanced Screening */
+body.dark-mode .vitals-screening-subcard {
+  background: #1C2230;
+  border-color: #333F53;
+}
+
+body.dark-mode .vitals-subcard-title {
+  color: #F8FAFC;
+}
+
+body.dark-mode .vitals-subcard-icon {
+  color: #60A5FA;
+}
+
+body.dark-mode .vitals-tristate-group {
+  background: #212836;
+  border-color: #333F53;
+}
+
+body.dark-mode .vitals-tristate-btn {
+  color: #94A3B8;
+}
+
+body.dark-mode .vitals-tristate-btn:hover {
+  color: #F8FAFC;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+body.dark-mode .vitals-tristate-btn.active.unassessed {
+  background: #2D3748;
+  color: #E2E8F0;
+  border-color: #4B5563;
+}
+
+body.dark-mode .vitals-tristate-btn.active.yes,
+body.dark-mode .vitals-tristate-btn.active.no,
+body.dark-mode .vitals-tristate-btn.active.custom-pregnant,
+body.dark-mode .vitals-tristate-btn.active.custom-anticoag {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #3B82F6;
+}
+
+body.dark-mode .vitals-banner-warning {
+  background: rgba(217, 119, 6, 0.15);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #FCD34D;
+}
+
+body.dark-mode .vitals-banner-positive {
+  background: rgba(234, 88, 12, 0.18);
+  border-color: rgba(249, 115, 22, 0.45);
+  color: #FDBA74;
+}
+
+body.dark-mode .vitals-2q-card {
+  background: #1C2230;
+  border-color: #333F53;
+}
+
+body.dark-mode .vitals-2q-card.positive-alert {
+  background: rgba(234, 88, 12, 0.12);
+  border-color: rgba(249, 115, 22, 0.45);
+}
+
+body.dark-mode .vitals-2q-card.positive-alert .vitals-subcard-title {
+  color: #FDBA74;
+}
+
+body.dark-mode .vitals-2q-card.positive-alert .vitals-subcard-icon {
+  color: #FB923C;
+}
+
+body.dark-mode .vitals-2q-card.positive-alert .vitals-2q-desc {
+  color: #FCD34D;
+}
+
+body.dark-mode .vitals-2q-desc {
+  color: #94A3B8;
+}
+
+body.dark-mode .vitals-2q-item {
+  background: #212836;
+  border-color: #333F53;
+}
+
+body.dark-mode .vitals-2q-question-text {
+  color: #F8FAFC;
 }

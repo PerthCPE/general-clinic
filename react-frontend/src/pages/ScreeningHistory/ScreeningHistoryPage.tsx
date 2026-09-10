@@ -13,10 +13,26 @@ import { PatientVitalsTrendCard } from './components/PatientVitalsTrendCard';
 import { ScreeningDetailModal } from './components/ScreeningDetailModal';
 import { vitalsApi, type BackendScreening } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
-import { formatQueueNo, formatNationalId, formatPhone, formatHN } from '../../utils/formatters';
+import { useToast } from '../../components/Toast/ToastProvider';
+import { formatQueueNo, formatNationalId, formatPhone, formatHN, maskNationalId } from '../../utils/formatters';
+import Pagination from '../../components/Pagination/Pagination';
 import './ScreeningHistoryPage.css';
 
 export { formatQueueNo };
+
+const formatTriageText = (level: number | string | undefined): TriageLevelKey => {
+  if (level === 1 || level === '1') return 'ฉุกเฉินวิกฤต (Resuscitation)';
+  if (level === 2 || level === '2') return 'ฉุกเฉินเร่งด่วน (Urgent)';
+  if (level === 3 || level === '3') return 'กึ่งฉุกเฉิน (Semi-Urgent)';
+  if (level === 4 || level === '4') return 'ปกติ (Normal)';
+  if (typeof level === 'string') {
+    if (level.includes('วิกฤต') || level.includes('Resuscitation')) return 'ฉุกเฉินวิกฤต (Resuscitation)';
+    if (level.includes('กึ่ง') || level.includes('Semi-Urgent')) return 'กึ่งฉุกเฉิน (Semi-Urgent)';
+    if (level.includes('ฉุกเฉิน') || level.includes('เร่งด่วน') || level.includes('Urgent') || level.includes('Emergency')) return 'ฉุกเฉินเร่งด่วน (Urgent)';
+    if (level.includes('ปกติ') || level.includes('Normal')) return 'ปกติ (Normal)';
+  }
+  return 'ปกติ (Normal)';
+};
 
 const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
   let dateOnly = 'วันนี้';
@@ -34,8 +50,19 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
   }
 
   const patient = s.visit_record?.patient;
-  const birthYear = patient?.birthdate ? new Date(patient.birthdate).getFullYear() : 1990;
-  const age = new Date().getFullYear() - birthYear;
+  let age = 0;
+  if (patient?.birthdate) {
+    try {
+      const d = new Date(patient.birthdate);
+      if (!isNaN(d.getTime())) {
+        const bYear = d.getFullYear() >= 2400 ? d.getFullYear() - 543 : d.getFullYear();
+        const calcAge = new Date().getFullYear() - bYear;
+        age = calcAge >= 0 ? calcAge : 0;
+      }
+    } catch {
+      // ignore
+    }
+  }
 
   let bmiCat: 'ผอม' | 'ปกติ' | 'ท้วม (น้ำหนักเกิน)' | 'อ้วนระดับ 1' | 'อ้วนระดับ 2' = 'ปกติ';
   if (s.bmi < 18.5) bmiCat = 'ผอม';
@@ -45,26 +72,33 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
   else bmiCat = 'อ้วนระดับ 2';
 
   const rawDocId = s.assigned_doctor_id || s.assigned_doctor?.id || 1;
-  let roomNum = 1;
-  let defaultDocName = 'พญ.สุดา สุขสมบูรณ์';
-  if (rawDocId === 1 || rawDocId === 4) {
-    roomNum = 1;
-    defaultDocName = 'พญ.สุดา สุขสมบูรณ์';
-  } else if (rawDocId === 2 || rawDocId === 5) {
-    roomNum = 2;
-    defaultDocName = 'นพ.วิชัย ชาญการแพทย์';
-  } else if (rawDocId === 3 || rawDocId === 6) {
-    roomNum = 3;
-    defaultDocName = 'พญ.เกศรา รักษาดี';
-  } else {
-    roomNum = ((rawDocId - 1) % 3) + 1;
-    defaultDocName = roomNum === 1 ? 'พญ.สุดา สุขสมบูรณ์' : roomNum === 2 ? 'นพ.วิชัย ชาญการแพทย์' : 'พญ.เกศรา รักษาดี';
+  const docName =
+    s.assigned_doctor?.fullname ||
+    (rawDocId === 15 || rawDocId === 4 || rawDocId === 1
+      ? 'พญ.สุดา สุขสมบูรณ์'
+      : rawDocId === 16 || rawDocId === 5 || rawDocId === 2
+      ? 'นพ.วิชัย ชาญการแพทย์'
+      : rawDocId === 17 || rawDocId === 6 || rawDocId === 3
+      ? 'พญ.เกศรา รักษาดี'
+      : 'พญ.สุดา สุขสมบูรณ์');
+
+  let roomName = 'ห้องตรวจ 1';
+  const visitDept = s.visit_record?.department || '';
+  if (visitDept.includes('ห้องตรวจ 3') || docName.includes('เกศรา') || rawDocId === 17 || rawDocId === 6 || rawDocId === 3) {
+    roomName = 'ห้องตรวจ 3';
+  } else if (visitDept.includes('ห้องตรวจ 2') || docName.includes('วิชัย') || rawDocId === 16 || rawDocId === 5 || rawDocId === 2) {
+    roomName = 'ห้องตรวจ 2';
+  } else if (visitDept.includes('ห้องตรวจ 1') || docName.includes('สุดา') || rawDocId === 15 || rawDocId === 4 || rawDocId === 1) {
+    roomName = 'ห้องตรวจ 1';
+  } else if (visitDept.includes('ห้องตรวจ')) {
+    const match = visitDept.match(/ห้องตรวจ\s*\d+/);
+    roomName = match ? match[0] : 'ห้องตรวจ 1';
   }
 
-  const docName = s.assigned_doctor?.fullname || defaultDocName;
-  const roomName = `ห้องตรวจ ${roomNum}`;
-  const queueFormatted = formatQueueNo(s.visit_id || s.id || 1);
+  const rawQueueNo = s.visit_record?.queue_number || '';
+  const queueFormatted = rawQueueNo ? formatQueueNo(rawQueueNo) : formatQueueNo(s.visit_id || s.id || 1);
   const hnFormatted = patient?.hn ? formatHN(patient.hn) : formatHN(s.visit_record?.patient_id || s.id || 1);
+  const canonicalTriage = formatTriageText(s.triage_level);
 
   return {
     id: String(s.id),
@@ -93,7 +127,7 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
     spo2: s.spo2 || 98,
     painScore: s.pain_score !== undefined ? s.pain_score : 0,
     bloodSugar: s.blood_sugar !== undefined ? s.blood_sugar : 0,
-    triageLevel: (s.triage_level as TriageLevelKey) || 'ปกติ (Normal)',
+    triageLevel: canonicalTriage,
     chiefComplaint: s.chief_complaint || 'ตรวจสุขภาพทั่วไป',
     allergies: s.allergies || 'ปฏิเสธการแพ้ยา',
     foodAllergies: s.food_allergies || 'ปฏิเสธการแพ้อาหาร',
@@ -101,7 +135,19 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
     currentMedications: s.current_medications || 'ไม่มี',
     smokingHistory: s.smoking_history || 'ไม่สูบ',
     alcoholHistory: s.alcohol_history || 'ไม่ดื่ม',
-    nurseNotes: s.nurse_notes || 'สัญญาณชีพและประวัติได้รับการบันทึกเรียบร้อย',
+    nurseNotes: s.nurse_notes || '',
+    herbalMedicines: s.herbal_medicines || '',
+    dietarySupplements: s.dietary_supplements || '',
+    hasURI: s.has_uri,
+    hasTB: s.has_tb,
+    onAnticoagulant: s.on_anticoagulant,
+    precautionType: s.precaution_type || '',
+    isPregnant: s.is_pregnant,
+    isBreastfeeding: s.is_breastfeeding,
+    lastMenstrualPeriod: s.last_menstrual_period || '',
+    q2Depressed: s.q2_depressed,
+    q2Anhedonia: s.q2_anhedonia,
+    screeningPositive: s.screening_positive,
     screenedByUserName: s.screened_by?.fullname || 'พว. กานดา คัดกรอง',
     screenedByRole: s.screened_by?.role === 'nurse' ? 'พยาบาลคัดกรอง' : 'ผู้ช่วยพยาบาล',
     assignedDoctorId: s.assigned_doctor_id || 1,
@@ -112,6 +158,7 @@ const mapBackendScreeningToUI = (s: BackendScreening): ScreeningHistoryItem => {
 
 export const ScreeningHistoryPage: React.FC = () => {
   const { currentUser } = useAuth();
+  const { showToast } = useToast();
 
   // Records State from Live Backend
   const [records, setRecords] = useState<ScreeningHistoryItem[]>([]);
@@ -121,16 +168,18 @@ export const ScreeningHistoryPage: React.FC = () => {
   const fetchHistory = useCallback(async () => {
     setIsLoading(true);
     try {
-      const data = await vitalsApi.getAllHistory();
-      if (Array.isArray(data)) {
-        setRecords(data.map(mapBackendScreeningToUI));
+      const res = await vitalsApi.getAllHistory();
+      const rawList = Array.isArray(res) ? res : (res && typeof res === 'object' && 'data' in res ? (res as any).data : []);
+      if (Array.isArray(rawList)) {
+        setRecords(rawList.map(mapBackendScreeningToUI));
       }
     } catch (err) {
       console.warn('Could not fetch screening history from backend:', err);
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดประวัติการคัดกรองได้' });
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   const { subscribe } = useWebSocket();
 
@@ -242,7 +291,22 @@ export const ScreeningHistoryPage: React.FC = () => {
   // Total Statistics (Dynamically calculated to match actual records in database)
   const stats: ScreeningStats = useMemo(() => {
     const total = records.length;
-    const thisMonth = records.filter((r) => r.dateOnly.includes('/2026') || r.dateOnly.includes('วันนี้')).length;
+    const now = new Date();
+    const currentMonthStr = (now.getMonth() + 1).toString().padStart(2, '0');
+    const currentYearBE = (now.getFullYear() + 543).toString();
+    const currentYearCE = now.getFullYear().toString();
+    const monthPatternBE = `/${currentMonthStr}/${currentYearBE}`;
+    const monthPatternCE = `/${currentMonthStr}/${currentYearCE}`;
+
+    const THAI_MONTHS = [
+      'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+      'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+    ];
+    const monthLabel = `${THAI_MONTHS[now.getMonth()]} ${currentYearBE}`;
+
+    const thisMonth = records.filter(
+      (r) => r.dateOnly.includes(monthPatternBE) || r.dateOnly.includes(monthPatternCE) || r.dateOnly.includes('วันนี้')
+    ).length;
     const highBPCount = records.filter((r) => r.systolicBP >= 140 || r.diastolicBP >= 90).length;
     const urgentCount = records.filter(
       (r) => r.triageLevel.includes('ฉุกเฉิน') || r.triageLevel.includes('วิกฤต') || r.triageLevel.includes('เร่งด่วน')
@@ -254,6 +318,7 @@ export const ScreeningHistoryPage: React.FC = () => {
     return {
       totalRecords: total,
       thisMonthRecords: thisMonth,
+      monthLabel,
       highBPRatePercent: total > 0 ? Math.round((highBPCount / total) * 100) : 0,
       urgentTriageCount: urgentCount,
       allergyPatientsCount: allergyCount,
@@ -580,11 +645,14 @@ export const ScreeningHistoryPage: React.FC = () => {
                 paginatedRecords.map((item) => {
                   const isHighSys = item.systolicBP >= 140;
                   const isHighDia = item.diastolicBP >= 90;
-                  const isCrisis = item.systolicBP >= 180 || item.diastolicBP >= 110;
+                  const isCrisisBP = item.systolicBP >= 180 || item.diastolicBP >= 110;
 
-                  const isUrgent = item.triageLevel.includes('เร่งด่วน') || item.triageLevel.includes('วิกฤต');
+                  const isCrisis = item.triageLevel.includes('วิกฤต');
                   const isSemi = item.triageLevel.includes('กึ่ง');
-                  const triageClass = isUrgent
+                  const isUrgent = (item.triageLevel.includes('เร่งด่วน') || item.triageLevel.includes('ฉุกเฉิน')) && !isSemi && !isCrisis;
+                  const triageClass = isCrisis
+                    ? 'triage-badge-red'
+                    : isUrgent
                     ? 'triage-badge-orange'
                     : isSemi
                     ? 'triage-badge-yellow'
@@ -604,7 +672,7 @@ export const ScreeningHistoryPage: React.FC = () => {
                       <td>
                         <div className="scr-patient-cell">
                           <span className="patient-name">{item.patientName}</span>
-                          <span className="patient-id-code">{item.nationalId}</span>
+                          <span className="patient-id-code">{maskNationalId(item.nationalId)}</span>
                         </div>
                       </td>
 
@@ -697,46 +765,14 @@ export const ScreeningHistoryPage: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination Bar */}
-        {filteredRecords.length > 0 && (
-          <div className="scr-pagination-bar">
-            <div className="pagination-info">
-              แสดงหน้า <strong>{currentPage}</strong> จากทั้งหมด <strong>{totalPages}</strong> หน้า (
-              {filteredRecords.length} รายการ)
-            </div>
-
-            <div className="pagination-buttons">
-              <button
-                type="button"
-                className="page-btn nav-btn"
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-              >
-                Previous
-              </button>
-
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                <button
-                  key={pageNum}
-                  type="button"
-                  className={`page-btn num-btn ${currentPage === pageNum ? 'active' : ''}`}
-                  onClick={() => setCurrentPage(pageNum)}
-                >
-                  {pageNum}
-                </button>
-              ))}
-
-              <button
-                type="button"
-                className="page-btn nav-btn"
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Modern Reusable Pagination Component */}
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={filteredRecords.length}
+          itemsPerPage={itemsPerPage}
+          onPageChange={(p) => setCurrentPage(p)}
+        />
           </div>
         )}
       </div>

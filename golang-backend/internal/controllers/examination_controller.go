@@ -393,6 +393,15 @@ func SaveExamination(c *gin.Context) {
 		item dto.PrescriptionItemDTO
 		med  models.Medicine
 	}
+	hasRawPrescriptions := false
+	for _, p := range req.Prescriptions {
+		if p.MedicineID > 0 || strings.TrimSpace(p.MedicineName) != "" ||
+			strings.TrimSpace(p.Name) != "" || strings.TrimSpace(p.MedicineCode) != "" ||
+			strings.TrimSpace(p.Code) != "" {
+			hasRawPrescriptions = true
+			break
+		}
+	}
 	resolvedRx := make([]resolvedPrescription, 0, len(req.Prescriptions))
 
 	for _, p := range req.Prescriptions {
@@ -579,12 +588,19 @@ func SaveExamination(c *gin.Context) {
 			}
 		}
 
-		// เซ็นปิดการตรวจ = ปิดเคสและส่งคิวต่อไปห้องยา
+		// เซ็นปิดการตรวจ = ปิดเคสและส่งคิวต่อไปห้องยา หรือข้ามไปห้องการเงินถ้าไม่มียา
 		if signing {
 			q, ok, err := applyVisitStatusTx(tx, &visit, models.VisitStatusCompleted,
 				doctorID, "", now)
 			if err != nil {
 				return err
+			}
+			if ok && !hasRawPrescriptions {
+				q.Status = "รอชำระเงิน"
+				q.Department = ResolveDepartmentForStatus(q, "รอชำระเงิน")
+				if err := tx.Save(&q).Error; err != nil {
+					return err
+				}
 			}
 			updatedQueue, hasQueue = q, ok
 			visitStatus = visit.Status
@@ -690,144 +706,182 @@ func SaveExamination(c *gin.Context) {
 		// dispensings คือ "ของจริงที่ห้องยาจะจ่าย" ใบร่างที่แพทย์ยังแก้ได้ต้องไม่หลุดมาถึงนี่
 		// ส่วนประวัติของแพทย์อ่านจาก prescription_detail ซึ่งเขียนทุกครั้งที่กดบันทึก
 		config.DB.Where("visit_id = ?", visit.ID).Delete(&models.Dispensing{})
-		var medList []gin.H
 
-		for _, r := range resolvedRx {
-			p := r.item
-			med := r.med
+		if !hasRawPrescriptions {
+			config.DB.Where("visit_id = ?", visit.ID).Delete(&models.MedicineQueue{})
+		} else {
+			var medList []gin.H
 
-			medName := p.MedicineName
-			if medName == "" {
-				medName = p.Name
-			}
-			if medName == "" && med.Name != "" {
-				medName = med.Name
-			}
-			if medName == "" {
-				medName = "ยาตามคำสั่งแพทย์"
+			for _, r := range resolvedRx {
+				p := r.item
+				med := r.med
+
+				medName := p.MedicineName
+				if medName == "" {
+					medName = p.Name
+				}
+				if medName == "" && med.Name != "" {
+					medName = med.Name
+				}
+				if medName == "" {
+					medName = "ยาตามคำสั่งแพทย์"
+				}
+
+				medCode := p.MedicineCode
+				if medCode == "" {
+					medCode = p.Code
+				}
+				if medCode == "" && med.MedicineCode != "" {
+					medCode = med.MedicineCode
+				}
+				if medCode == "" {
+					medCode = fmt.Sprintf("MED-%03d", p.MedicineID)
+				}
+
+				docIDForDisp := doctorID
+				var docProfile models.Doctor
+				if doctorID > 0 {
+					if err := config.DB.Where("user_id = ?", doctorID).First(&docProfile).Error; err == nil {
+						docIDForDisp = docProfile.ID
+					}
+				}
+
+				disp := models.Dispensing{
+					VisitID:      visit.ID,
+					MedicineID:   p.MedicineID,
+					DoctorID:     docIDForDisp,
+					Quantity:     p.Quantity,
+					Dosage:       p.Dosage,
+					Instructions: p.Instructions,
+				}
+				if err := config.DB.Create(&disp).Error; err != nil {
+					disp.DoctorID = 0
+					config.DB.Omit("DoctorID").Create(&disp)
+				}
+				prescriptionCount++
+
+				genName := p.GenericName
+				if genName == "" && med.GenericName != "" {
+					genName = med.GenericName
+				}
+				cat := p.Category
+				if cat == "" {
+					cat = "ยาสามัญ"
+				}
+				props := med.Properties
+				if props == "" {
+					props = "บรรเทาอาการตามแพทย์สั่ง"
+				}
+
+				medList = append(medList, gin.H{
+					"medId":        medCode,
+					"name":         medName,
+					"genericName":  genName,
+					"category":     cat,
+					"properties":   props,
+					"dosage":       p.Dosage,
+					"instructions": p.Instructions,
+					"price":        p.UnitPrice,
+					"quantity":     p.Quantity,
+					"stock":        med.StockQuantity,
+					"stockStatus":  "พร้อมจ่าย",
+				})
 			}
 
-			medCode := p.MedicineCode
-			if medCode == "" {
-				medCode = p.Code
-			}
-			if medCode == "" && med.MedicineCode != "" {
-				medCode = med.MedicineCode
-			}
-			if medCode == "" {
-				medCode = fmt.Sprintf("MED-%03d", p.MedicineID)
-			}
-
-			docIDForDisp := doctorID
-			var docProfile models.Doctor
-			if doctorID > 0 {
-				if err := config.DB.Where("user_id = ?", doctorID).First(&docProfile).Error; err == nil {
-					docIDForDisp = docProfile.ID
+			// เคสสั่งยาแต่จับคู่คลังไม่เจอ ให้ส่งข้อมูล raw prescription ไปยังห้องยา
+			if len(resolvedRx) == 0 {
+				for _, p := range req.Prescriptions {
+					mName := p.MedicineName
+					if mName == "" {
+						mName = p.Name
+					}
+					if mName == "" {
+						mName = "ยาตามคำสั่งแพทย์"
+					}
+					mCode := p.MedicineCode
+					if mCode == "" {
+						mCode = p.Code
+					}
+					if mCode == "" {
+						mCode = "MED-UNMATCHED"
+					}
+					medList = append(medList, gin.H{
+						"medId":        mCode,
+						"name":         mName,
+						"genericName":  p.GenericName,
+						"category":     p.Category,
+						"properties":   "ระบุโดยแพทย์ (จับคู่คลังยาอัตโนมัติไม่พบ)",
+						"dosage":       p.Dosage,
+						"instructions": p.Instructions,
+						"price":        p.UnitPrice,
+						"quantity":     p.Quantity,
+						"stock":        0,
+						"stockStatus":  "ไม่พบคลังยา",
+					})
 				}
 			}
 
-			disp := models.Dispensing{
-				VisitID:      visit.ID,
-				MedicineID:   p.MedicineID,
-				DoctorID:     docIDForDisp,
-				Quantity:     p.Quantity,
-				Dosage:       p.Dosage,
-				Instructions: p.Instructions,
-			}
-			if err := config.DB.Create(&disp).Error; err != nil {
-				disp.DoctorID = 0
-				config.DB.Omit("DoctorID").Create(&disp)
-			}
-			prescriptionCount++
+			medsJSON, _ := json.Marshal(medList)
 
-			genName := p.GenericName
-			if genName == "" && med.GenericName != "" {
-				genName = med.GenericName
+			// สรุปคำแนะนำและคำวินิจฉัยของแพทย์
+			adviceParts := []string{}
+			if req.PrimaryDiagnosis != nil && req.PrimaryDiagnosis.Name != "" {
+				adviceParts = append(adviceParts, fmt.Sprintf("คำวินิจฉัยหลัก: %s (%s)", req.PrimaryDiagnosis.Name, req.PrimaryDiagnosis.Code))
 			}
-			cat := p.Category
-			if cat == "" {
-				cat = "ยาสามัญ"
+			if req.Counseling.MedicationAdvice != "" {
+				adviceParts = append(adviceParts, fmt.Sprintf("คำแนะนำการใช้ยา: %s", req.Counseling.MedicationAdvice))
 			}
-			props := med.Properties
-			if props == "" {
-				props = "บรรเทาอาการตามแพทย์สั่ง"
+			if req.TreatmentPlan != "" {
+				adviceParts = append(adviceParts, fmt.Sprintf("แผนการรักษา: %s", req.TreatmentPlan))
+			}
+			if len(adviceParts) == 0 {
+				adviceParts = append(adviceParts, "พักผ่อนให้เพียงพอ และทานยาตามแพทย์สั่งอย่างเคร่งครัด")
+			}
+			fullAdvice := strings.Join(adviceParts, " | ")
+
+			var existingMQ models.MedicineQueue
+			mQueueNo := ""
+			if hasQueue && updatedQueue.QueueNumber != "" {
+				mQueueNo = updatedQueue.QueueNumber
+			} else {
+				var mqCount int64
+				config.DB.Model(&models.MedicineQueue{}).Count(&mqCount)
+				mQueueNo = fmt.Sprintf("M-%03d", mqCount+1)
 			}
 
-			medList = append(medList, gin.H{
-				"medId":        medCode,
-				"name":         medName,
-				"genericName":  genName,
-				"category":     cat,
-				"properties":   props,
-				"dosage":       p.Dosage,
-				"instructions": p.Instructions,
-				"price":        p.UnitPrice,
-				"quantity":     p.Quantity,
-				"stock":        med.StockQuantity,
-				"stockStatus":  "พร้อมจ่าย",
+			if err := config.DB.Where("visit_id = ?", visit.ID).First(&existingMQ).Error; err != nil {
+				medQ := models.MedicineQueue{
+					QueueNumber:  mQueueNo,
+					HN:           pat.HN,
+					PatientName:  pat.FullName,
+					NationalID:   pat.NationalID,
+					Gender:       pat.Gender,
+					Age:          age,
+					SchemeType:   pat.SchemeType,
+					VisitID:      visit.ID,
+					DoctorAdvice: fullAdvice,
+					Status:       "pending",
+					Medications:  string(medsJSON),
+				}
+				config.DB.Create(&medQ)
+			} else {
+				existingMQ.Medications = string(medsJSON)
+				existingMQ.DoctorAdvice = fullAdvice
+				existingMQ.Status = "pending"
+				config.DB.Save(&existingMQ)
+			}
+
+			ws.BroadcastEvent("MEDICINE_QUEUE_CREATED", gin.H{
+				"visit_id":      visit.ID,
+				"hn":            pat.HN,
+				"patient_name":  pat.FullName,
+				"queue_number":  mQueueNo,
+				"doctor_advice": fullAdvice,
+				"medications":   medList,
 			})
 		}
 
-		medsJSON, _ := json.Marshal(medList)
-
-		// สรุปคำแนะนำและคำวินิจฉัยของแพทย์
-		adviceParts := []string{}
-		if req.PrimaryDiagnosis != nil && req.PrimaryDiagnosis.Name != "" {
-			adviceParts = append(adviceParts, fmt.Sprintf("คำวินิจฉัยหลัก: %s (%s)", req.PrimaryDiagnosis.Name, req.PrimaryDiagnosis.Code))
-		}
-		if req.Counseling.MedicationAdvice != "" {
-			adviceParts = append(adviceParts, fmt.Sprintf("คำแนะนำการใช้ยา: %s", req.Counseling.MedicationAdvice))
-		}
-		if req.TreatmentPlan != "" {
-			adviceParts = append(adviceParts, fmt.Sprintf("แผนการรักษา: %s", req.TreatmentPlan))
-		}
-		if len(adviceParts) == 0 {
-			adviceParts = append(adviceParts, "พักผ่อนให้เพียงพอ และทานยาตามแพทย์สั่งอย่างเคร่งครัด")
-		}
-		fullAdvice := strings.Join(adviceParts, " | ")
-
-		var existingMQ models.MedicineQueue
-		mQueueNo := ""
-		if hasQueue && updatedQueue.QueueNumber != "" {
-			mQueueNo = updatedQueue.QueueNumber
-		} else {
-			var mqCount int64
-			config.DB.Model(&models.MedicineQueue{}).Count(&mqCount)
-			mQueueNo = fmt.Sprintf("M-%03d", mqCount+1)
-		}
-
-		if err := config.DB.Where("visit_id = ?", visit.ID).First(&existingMQ).Error; err != nil {
-			medQ := models.MedicineQueue{
-				QueueNumber:  mQueueNo,
-				HN:           pat.HN,
-				PatientName:  pat.FullName,
-				NationalID:   pat.NationalID,
-				Gender:       pat.Gender,
-				Age:          age,
-				SchemeType:   pat.SchemeType,
-				VisitID:      visit.ID,
-				DoctorAdvice: fullAdvice,
-				Status:       "pending",
-				Medications:  string(medsJSON),
-			}
-			config.DB.Create(&medQ)
-		} else {
-			existingMQ.Medications = string(medsJSON)
-			existingMQ.DoctorAdvice = fullAdvice
-			existingMQ.Status = "pending"
-			config.DB.Save(&existingMQ)
-		}
-
 		ws.BroadcastEvent("VISIT_UPDATED", visit)
-		ws.BroadcastEvent("MEDICINE_QUEUE_CREATED", gin.H{
-			"visit_id":      visit.ID,
-			"hn":            pat.HN,
-			"patient_name":  pat.FullName,
-			"queue_number":  mQueueNo,
-			"doctor_advice": fullAdvice,
-			"medications":   medList,
-		})
-
 		if hasQueue {
 			config.DB.Preload("Patient").First(&updatedQueue, updatedQueue.ID)
 			ws.BroadcastEvent("QUEUE_UPDATED", updatedQueue)

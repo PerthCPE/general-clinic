@@ -15,6 +15,8 @@ import {
   clearAllDocumentMessages,
   acknowledgeDocumentMessage,
 } from '../../services/documentMessageStorage';
+import { useWebSocket } from '../../context/WebSocketContext';
+import { getSharedAudioContext } from '../../utils/audioContext';
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -49,11 +51,57 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   const docMessageRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
-  const [isAdminFontEnabled, setIsAdminFontEnabled] = useState(false);
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const searchRef = useRef<HTMLDivElement>(null);
+  const { subscribe } = useWebSocket();
 
   const [isAckLoading, setIsAckLoading] = useState(false);
+
+  useEffect(() => {
+    // WebSocket ยิงหา client ทุกตัว จึงต้องกรองตาม role ไม่งั้นกระดิ่งของทุก role จะเด้งพร้อมกัน
+    const role = currentUser?.role;
+    const isPharmacy = role === 'pharmacist' || role === 'admin';
+    const isCashier = role === 'cashier' || role === 'admin';
+
+    const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', (data: any) => {
+      if (!isPharmacy) return;
+      setNotifications(prev => [{
+        id: Date.now().toString() + Math.random(),
+        category: 'ห้องยา',
+        message: `มีใบสั่งยาใหม่ส่งมาจากห้องตรวจแพทย์ รอจัดยาสำหรับ ${data?.patient_name || 'ผู้ป่วย'}`,
+        time: 'เมื่อสักครู่',
+        isUnread: true,
+      }, ...prev]);
+    });
+
+    const unsubBill = subscribe('BILLING_CREATED', (data: any) => {
+      if (!isCashier) return;
+      setNotifications(prev => [{
+        id: Date.now().toString() + Math.random(),
+        category: 'การชำระเงิน',
+        message: `รอชำระเงินสำหรับ ${data?.patient_name || 'ผู้ป่วย'}`,
+        time: 'เมื่อสักครู่',
+        isUnread: true,
+      }, ...prev]);
+    });
+
+    const unsubPay = subscribe('PAYMENT_CONFIRMED', () => {
+      if (!isCashier) return;
+      setNotifications(prev => [{
+        id: Date.now().toString() + Math.random(),
+        category: 'การชำระเงิน',
+        message: `ชำระเงินเรียบร้อยแล้ว ออกใบเสร็จสำเร็จ`,
+        time: 'เมื่อสักครู่',
+        isUnread: true,
+      }, ...prev]);
+    });
+
+    return () => {
+      unsubMedQ();
+      unsubBill();
+      unsubPay();
+    };
+  }, [subscribe, currentUser?.role]);
 
   // Sync Document Messages from storage & events
   useEffect(() => {
@@ -175,27 +223,9 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   }, [docMessages, allDocsSearch, allDocsFilter]);
 
   useEffect(() => {
-    const isFontEnabled = localStorage.getItem('adminFontEnabled') === 'true';
-    setIsAdminFontEnabled(isFontEnabled);
-    if (isFontEnabled) {
-      document.body.classList.add('admin-font-theme');
-    }
-
     const soundSetting = localStorage.getItem('notificationSoundEnabled');
     setIsSoundEnabled(soundSetting !== 'false'); // Default true
   }, []);
-
-  const toggleAdminFont = () => {
-    const isEnabled = !isAdminFontEnabled;
-    setIsAdminFontEnabled(isEnabled);
-    if (isEnabled) {
-      document.body.classList.add('admin-font-theme');
-      localStorage.setItem('adminFontEnabled', 'true');
-    } else {
-      document.body.classList.remove('admin-font-theme');
-      localStorage.removeItem('adminFontEnabled');
-    }
-  };
 
   const toggleNotificationSound = () => {
     const newVal = !isSoundEnabled;
@@ -363,20 +393,19 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
 
   const playBeep = () => {
     try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) {
-        const ctx = new AudioCtx();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        gain.gain.setValueAtTime(0.05, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.1);
-      }
+      // ใช้ AudioContext กลาง ห้ามสร้างใหม่ทุกครั้ง (Chrome จำกัด ~6 context ต่อแท็บ)
+      const ctx = getSharedAudioContext();
+      if (!ctx || ctx.state !== 'running') return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.1);
     } catch {
       // ละเว้น
     }
@@ -744,7 +773,12 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
 
               {/* Sub-header info bar */}
               <div className="doc-message-info-bar">
-                <span>📁 เอกสารที่ส่งต่อจากเจ้าหน้าที่ธุรการ</span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  เอกสารที่ส่งต่อจากเจ้าหน้าที่ธุรการ
+                </span>
               </div>
 
               {/* Message List */}
@@ -765,7 +799,19 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                       onClick={() => handleOpenMessageItem(msg)}
                     >
                       <div className="doc-message-item-icon">
-                        {msg.priority === 'emergency' ? '🚨' : msg.priority === 'urgent' ? '⚡' : '📄'}
+                        {msg.priority === 'emergency' ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                          </svg>
+                        ) : msg.priority === 'urgent' ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
+                          </svg>
+                        )}
                       </div>
                       <div className="doc-message-item-content">
                         <div className="doc-message-item-top">
@@ -983,8 +1029,11 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                   ทำเครื่องหมายอ่านแล้วทั้งหมด
                 </button>
                 {(speakingId || isSpeakingAll) && (
-                  <button className="stop-speech-footer-btn" onClick={stopSpeech}>
-                    ⏹️ หยุดการอ่านเสียง
+                  <button className="stop-speech-footer-btn" onClick={stopSpeech} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <rect x="4" y="4" width="16" height="16" rx="2" />
+                    </svg>
+                    หยุดการอ่านเสียง
                   </button>
                 )}
               </div>
@@ -1057,25 +1106,6 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 </span>
               </button>
 
-              {/* 3. สลับรูปแบบตัวอักษร (ทดสอบ) */}
-              <button
-                className="dropdown-menu-item dropdown-item-3"
-                onClick={() => {
-                  toggleAdminFont();
-                  setIsDropdownOpen(false);
-                }}
-              >
-                <span className="theme-toggle-text">
-                  {isAdminFontEnabled ? 'ยกเลิกฟอนต์ทดสอบ' : 'ทดสอบฟอนต์ระบบจัดการสิทธิ์'}
-                </span>
-                <span className="theme-toggle-icon-wrapper" style={{ marginLeft: '8px' }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="4 7 4 4 20 4 20 7"></polyline>
-                    <line x1="9" y1="20" x2="15" y2="20"></line>
-                    <line x1="12" y1="4" x2="12" y2="20"></line>
-                  </svg>
-                </span>
-              </button>
 
               {/* 4. เปิด/ปิด เสียงแจ้งเตือน */}
               <button
@@ -1443,9 +1473,15 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             <div className="doc-all-modal-body">
               {filteredAllDocs.length === 0 ? (
                 <div className="doc-all-empty">
-                  <div className="doc-all-empty-icon">📭</div>
-                  <h4>{allDocsFilter === 'unread' ? 'ไม่มีเอกสารที่ยังไม่ได้อ่าน' : 'ไม่มีเอกสารในคลังขณะนี้'}</h4>
-                  <p>{allDocsFilter === 'unread' ? 'คุณได้อ่านเอกสารทั้งหมดครบถ้วนแล้ว' : 'ยังไม่มีข้อความหรือเอกสารส่งต่อในระบบ'}</p>
+                  <div className="doc-all-empty-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 12h-6l-2 3h-4l-2-3H2v7a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-7z" />
+                      <path d="M5.45 5.11L2 12v0h20v0l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+                    </svg>
+                  </div>
+                  <h4>{allDocsFilter === 'unread' ? 'ไม่มีเอกสารที่ยังไม่ได้อ่าน' : 'ไม่พบเอกสารที่ค้นหา'}</h4>
+                  <p>{allDocsFilter === 'unread' ? 'คุณได้อ่านเอกสารทั้งหมดครบถ้วนแล้ว' : 'ลองเปลี่ยนคำค้นหาใหม่อีกครั้ง'}</p>
+
                 </div>
               ) : (
                 <div className="doc-all-grid">
@@ -1458,7 +1494,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                       <div className="doc-all-card-top">
                         <div className="doc-all-card-badges">
                           <span className={`doc-message-tag ${msg.priority}`}>
-                            {msg.priority === 'emergency' ? '🚨 ฉุกเฉินมาก' : msg.priority === 'urgent' ? '⚡ ด่วน' : 'ปกติ'}
+                            {msg.priority === 'emergency' ? 'ฉุกเฉินมาก' : msg.priority === 'urgent' ? 'ด่วน' : 'ปกติ'}
                           </span>
                           <span className="doc-all-type-tag">{msg.type}</span>
                           {msg.isAcknowledged ? (
@@ -1521,8 +1557,13 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                       setIsAllDocsModalOpen(false);
                       onNavigate('dms-documents');
                     }}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                   >
-                    📋 ไปที่หน้าจัดการเอกสารธุรการ &rarr;
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+                    </svg>
+                    ไปที่หน้าจัดการเอกสารธุรการ &rarr;
                   </button>
                 )}
               </div>

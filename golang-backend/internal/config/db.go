@@ -26,12 +26,12 @@ func ConnectDB() {
 		AppConfig.DBSSLMode,
 	)
 
-	// gorm connect to db (เปิด PreferSimpleProtocol: true เพื่อรองรับ Supabase / PgBouncer Pooler)
+	// gorm connect to db (PreferSimpleProtocol and PrepareStmt configured dynamically from environment)
 	database, err := gorm.Open(postgres.New(postgres.Config{
 		DSN:                  dsn,
-		PreferSimpleProtocol: true,
+		PreferSimpleProtocol: AppConfig.DBPreferSimpleProtocol,
 	}), &gorm.Config{
-		PrepareStmt: false,
+		PrepareStmt: AppConfig.DBPrepareStmt,
 	})
 
 	if err != nil {
@@ -89,6 +89,10 @@ func ConnectDB() {
 			&models.PatientHistory{},
 			&models.Examination{},
 			&models.Diagnosis{},
+			&models.QueueCounter{},
+			&models.Appointment{},
+			&models.SystemAccess{},
+			&models.TreatmentRight{},
 		)
 		if err != nil {
 			log.Fatal("Database Migration Failed. Error: ", err)
@@ -101,6 +105,14 @@ func ConnectDB() {
 			&models.PatientMedicine{},
 			&models.BillingQueue{},
 			&models.MedicineQueue{},
+			&models.QueueCounter{},
+			&models.Appointment{},
+			&models.SystemAccess{},
+			&models.TreatmentRight{},
+			&models.Billing{},
+			&models.BillingHistory{},
+			&models.QRPayment{},
+			&models.Dispensing{},
 			&models.Document{},
 			&models.DocumentForward{},
 		)
@@ -136,6 +148,11 @@ func ConnectDB() {
 	database.Exec("ALTER TABLE examinations ADD COLUMN IF NOT EXISTS prescription_detail text DEFAULT ''")
 	database.Exec("ALTER TABLE dispensings DROP CONSTRAINT IF EXISTS fk_dispensings_doctor")
 	database.Exec("ALTER TABLE dispensings ALTER COLUMN doctor_id DROP NOT NULL")
+	database.Exec("ALTER TABLE billings DROP CONSTRAINT IF EXISTS fk_billings_visit_record")
+	database.Exec("ALTER TABLE billings ALTER COLUMN visit_id DROP NOT NULL")
+	database.Exec("ALTER TABLE dispensings DROP CONSTRAINT IF EXISTS fk_dispensings_visit_record")
+	database.Exec("DROP INDEX IF EXISTS idx_billings_receipt_number")
+	database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_billings_receipt_number_partial ON billings (receipt_number) WHERE receipt_number IS NOT NULL AND receipt_number <> ''")
 
 	// เอกสารที่แพทย์ออกให้ผู้ป่วย (ใบรับรองแพทย์ / ใบรับรองยานอกบัญชี) เก็บเป็น JSON
 	database.Exec("ALTER TABLE examinations ADD COLUMN IF NOT EXISTS issued_documents text DEFAULT ''")
@@ -165,6 +182,7 @@ func ConnectDB() {
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS dietary_supplements text DEFAULT ''")
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS q2_depressed boolean")
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS q2_anhedonia boolean")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS screening_positive boolean")
 
 	// ⚡ Database Indexes สำหรับเร่งความเร็วการ Query คิว, คนไข้, ประวัติการเงิน บน Supabase
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_created_at ON queues(created_at)")
@@ -189,15 +207,100 @@ func ConnectDB() {
 	// สามตัวแรกคือคู่ที่ query ของแพทย์ filter พร้อมกันเสมอ ถ้าไม่มี index
 	// PostgreSQL ต้องไล่อ่านทั้งตาราง (Seq Scan) ทุกครั้งที่เปิดหน้า
 	//
-	// idx_visit_records_patient_date สำคัญที่สุด
-	// หน้าประวัติหา "การมาตรวจครั้งล่าสุดของผู้ป่วยแต่ละคน" ด้วย
-	// DISTINCT ON (patient_id) ... ORDER BY patient_id, visit_date DESC
-	// ซึ่งจะเร็วก็ต่อเมื่อ index เรียงตามลำดับเดียวกันเป๊ะ (patient_id, visit_date DESC)
-	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_patient_date ON visit_records(patient_id, visit_date DESC)")
-	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_status_date ON visit_records(status, visit_date DESC)")
-	database.Exec("CREATE INDEX IF NOT EXISTS idx_diagnoses_visit_primary ON diagnoses(visit_id, is_primary)")
-	database.Exec("CREATE INDEX IF NOT EXISTS idx_screenings_visit_id ON screenings(visit_id)")
-	database.Exec("CREATE INDEX IF NOT EXISTS idx_examinations_visit_id ON examinations(visit_id)")
+	// ⚡ [Sprint 1] Triage canonical integer conversion & check constraint (1-4)
+	database.Exec(`DO $$
+	BEGIN
+		IF EXISTS (
+			SELECT 1 FROM information_schema.columns 
+			WHERE table_name = 'screenings' 
+			  AND column_name = 'triage_level' 
+			  AND data_type IN ('text', 'character varying')
+		) THEN
+			UPDATE screenings
+			SET triage_level = CASE
+				WHEN triage_level LIKE '%วิกฤต%' OR triage_level LIKE '%Resuscitation%' OR triage_level = '1' THEN '1'
+				WHEN triage_level LIKE '%กึ่ง%' OR triage_level LIKE '%Semi-Urgent%' OR triage_level = '3' THEN '3'
+				WHEN triage_level LIKE '%ฉุกเฉิน%' OR triage_level LIKE '%เร่งด่วน%' OR triage_level LIKE '%Urgent%' OR triage_level LIKE '%Emergency%' OR triage_level = '2' THEN '2'
+				WHEN triage_level LIKE '%ปกติ%' OR triage_level LIKE '%Normal%' OR triage_level = '4' THEN '4'
+				ELSE '4'
+			END;
+
+			ALTER TABLE screenings 
+			ALTER COLUMN triage_level TYPE integer USING (triage_level::integer);
+		END IF;
+
+		ALTER TABLE screenings ALTER COLUMN triage_level SET DEFAULT 4;
+		ALTER TABLE screenings ALTER COLUMN triage_level SET NOT NULL;
+
+		IF NOT EXISTS (
+			SELECT 1 FROM information_schema.constraint_column_usage 
+			WHERE table_name = 'screenings' 
+			  AND constraint_name = 'chk_screenings_triage_level'
+		) THEN
+			ALTER TABLE screenings 
+			ADD CONSTRAINT chk_screenings_triage_level CHECK (triage_level BETWEEN 1 AND 4);
+		END IF;
+	END $$;`)
+
+	// ⚡ [Sprint 1] Daily queue numbering sequence & unique constraint
+	database.Exec("ALTER TABLE queues ADD COLUMN IF NOT EXISTS service_date DATE DEFAULT CURRENT_DATE")
+	database.Exec("UPDATE queues SET service_date = DATE(created_at AT TIME ZONE 'Asia/Bangkok') WHERE service_date IS NULL")
+	database.Exec(`
+		INSERT INTO queue_counters (service_date, last_number, created_at, updated_at)
+		SELECT 
+			service_date,
+			COALESCE(MAX(('x' || lpad(SUBSTRING(queue_number FROM 2), 8, '0'))::bit(32)::bigint), 0) AS last_number,
+			NOW(),
+			NOW()
+		FROM queues
+		WHERE service_date IS NOT NULL 
+		  AND queue_number ~* '^Q[0-9A-Fa-f]{1,4}$'
+		GROUP BY service_date
+		ON CONFLICT (service_date) DO UPDATE
+		SET last_number = GREATEST(queue_counters.last_number, EXCLUDED.last_number),
+		    updated_at = NOW()
+	`)
+
+	// ⚡ [Sprint 1] VisitRecord idempotency & traceability
+	database.Exec("ALTER TABLE visit_records ADD COLUMN IF NOT EXISTS queue_id BIGINT")
+	database.Exec("ALTER TABLE visit_records ADD COLUMN IF NOT EXISTS queue_number VARCHAR(20) DEFAULT ''")
+	database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_visit_queue_unique ON visit_records (queue_id) WHERE queue_id IS NOT NULL")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_queue_number ON visit_records (queue_number)")
+
+	// ⚡ แผนกการรักษาของนัดหมาย: เก็บเป็นคอลัมน์ตรงๆ แทนการฝังไว้ใน clinical_note
+	//
+	// เดิมฟอร์มนัดหมายเก็บชื่อแผนกเป็นข้อความนำหน้าใน clinical_note แบบ
+	// "หมวด: <ชื่อแผนก>\nหมายเหตุ: ..." ทำให้เทียบค่าแผนกตรงๆ ไม่ได้เลย (การ์ดสถิติแยกตาม
+	// แผนกในแดชบอร์ดนัดหมายจึงเป็น 0 คนเสมอ ไม่ว่าจะมีนัดหมายกี่รายการก็ตาม)
+	// ย้ายมาเก็บเป็นคอลัมน์ department ตรงๆ ค่าต้องตรงกับ doctors.specialty จริง
+	// (ดู TREATMENT_DEPARTMENTS ใน react-frontend/src/config/roles.ts — single source of truth)
+	database.Exec("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS department text DEFAULT ''")
+
+	// Backfill แถวเก่าที่เคยฝังชื่อแผนกไว้ใน clinical_note แบบ "หมวด: <ชื่อแผนกเก่า>"
+	// map เฉพาะชื่อที่พอแปลตรงกับแผนกจริงได้เท่านั้น (อายุรกรรม / ตรวจโรคทั่วไป≈เวชศาสตร์ครอบครัว)
+	// "จิตวิทยา" กับ "กายภาพบำบัด" ไม่มี specialty จริงรองรับในตาราง doctors เลย จึงเจตนาไม่ map
+	// ให้ปล่อย department ว่างไว้ ดีกว่าเดาให้ผิดแผนก — ข้อความเดิมยังอยู่ครบใน clinical_note
+	database.Exec(`
+		UPDATE appointments
+		SET department = CASE
+			WHEN clinical_note ~ 'หมวด: อายุรกรรม' THEN 'อายุรกรรมทั่วไป'
+			WHEN clinical_note ~ 'หมวด: ตรวจโรคทั่วไป' THEN 'เวชศาสตร์ครอบครัว'
+			ELSE ''
+		END
+		WHERE (department IS NULL OR department = '')
+		  AND clinical_note ~ '^หมวด: '
+	`)
+
+	// ตัด prefix "หมวด: ...\n" ที่ backfill ไปแล้วออกจาก clinical_note เหลือแต่เนื้อหาหมายเหตุจริง
+	database.Exec(`
+		UPDATE appointments
+		SET clinical_note = regexp_replace(clinical_note, '^หมวด: [^\n]*\n?(หมายเหตุ: )?', '')
+		WHERE clinical_note ~ '^หมวด: '
+	`)
+
+	// Normalize ค่า department ของบัญชีผู้ใช้เดิมที่สะกดไม่ตรงชุดแผนกใหม่
+	// (สำรวจพบ 1 บัญชี: "อายุรกรรม" -> ชื่อแผนกจริงคือ "อายุรกรรมทั่วไป")
+	database.Exec("UPDATE users SET department = 'อายุรกรรมทั่วไป' WHERE department = 'อายุรกรรม'")
 
 	DB = database
 
@@ -246,31 +349,56 @@ func seedDoctorProfiles() {
 }
 
 func seedDatabase() {
-	hashPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), 10)
-	passStr := string(hashPassword)
-
 	// 1. Seed Users & Doctors
-	users := []models.User{
-		{Username: "officer1", Password: passStr, Role: "officer", FullName: "คุณสมจิต ดีใจ", Phone: "081-555-0001"},
-		{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "นายสมเกียรติ ยินดีต้อนรับ", Phone: "081-111-0001"},
-		{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
-		{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
-		{Username: "pharmacist1", Password: passStr, Role: "pharmacist", FullName: "ดร.บุญ สั่งยา", Phone: "081-333-0001"},
-		{Username: "cashier1", Password: passStr, Role: "cashier", FullName: "นส.รวย การเงิน", Phone: "081-444-0001"},
-		{Username: "doctor1", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
-		{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
-		{Username: "doctor3", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
+	//
+	// รหัสพนักงาน (EmployeeID) ของแต่ละคนเป็นทั้ง login identifier สำรอง (Login() รับ
+	// username/email/employee_id) และรหัสผ่านเริ่มต้น (ตรงตาม pattern เดียวกับ CreateAccount
+	// ที่ตั้งรหัสผ่านเริ่มต้น = employee_id ตรงๆ ไม่มี prefix) — จึงต้อง hash แยกรายคน
+	// แทนที่จะใช้ hash เดียว ("password") ที่ใช้ร่วมกันทุกคนแบบเดิม
+	type seedUser struct {
+		Username, Email, Role, FullName, Phone, EmployeeID string
+	}
+	seedUsers := []seedUser{
+		{"officer1", "officer1@clinic.local", "officer", "คุณสมจิต ดีใจ", "081-555-0001", "OFF001"},
+		{"registrar1", "registrar1@clinic.local", "registrar", "คุณสุภาพร เวชระเบียน", "081-111-0001", "REC001"},
+		{"nurse1", "nurse1@clinic.local", "nurse", "พว. กานดา คัดกรอง", "081-111-0002", "NUR001"},
+		{"assistant1", "assistant1@clinic.local", "nurse_assistant", "นายสมคิด ช่วยเหลือดี", "081-111-0003", "NUR002"},
+		{"pharmacist1", "pharmacist1@clinic.local", "pharmacist", "ดร.บุญ สั่งยา", "081-333-0001", "PHA001"},
+		{"cashier1", "cashier1@clinic.local", "cashier", "นส.รวย การเงิน", "081-444-0001", "CAS001"},
+		{"doctor1", "doctor1@clinic.local", "doctor", "พญ.สุดา สุขสมบูรณ์", "081-222-0001", "DOC001"},
+		{"doctor2", "doctor2@clinic.local", "doctor", "นพ.วิชัย ชาญการแพทย์", "081-222-0002", "DOC002"},
+		{"doctor3", "doctor3@clinic.local", "doctor", "พญ.เกศรา รักษาดี", "081-222-0003", "DOC003"},
+		{"admin1", "admin1@clinic.local", "admin", "ผู้ดูแลระบบ คลินิก", "081-999-0001", "ADM001"},
+	}
+
+	users := make([]models.User, len(seedUsers))
+	for i, su := range seedUsers {
+		hashPassword, _ := bcrypt.GenerateFromPassword([]byte(su.EmployeeID), 10)
+		users[i] = models.User{
+			Username:   su.Username,
+			Email:      su.Email,
+			Password:   string(hashPassword),
+			Role:       su.Role,
+			FullName:   su.FullName,
+			Phone:      su.Phone,
+			EmployeeID: su.EmployeeID,
+		}
 	}
 	for i := range users {
 		var existing models.User
 		if err := DB.Where("username = ?", users[i].Username).First(&existing).Error; err != nil {
 			DB.Create(&users[i])
 		} else {
-			// อัปเดตข้อมูล FullName, Role, Phone ให้ตรงกับค่า seed ล่าสุดเสมอ
+			// อัปเดตข้อมูล FullName, Role, Phone, Email, EmployeeID ให้ตรงกับค่า seed ล่าสุดเสมอ
+			// ไม่แตะ Password ตรงนี้โดยเจตนา — ถ้าเจ้าของบัญชีเคยเปลี่ยนรหัสผ่านจริงไปแล้ว
+			// (ผ่าน RequiresPasswordChange flow ครั้งแรก) ห้าม restart แล้วรีเซ็ตทับรหัสผ่านจริง
+			// กลับไปเป็นค่าเริ่มต้นอีก
 			DB.Model(&existing).Updates(map[string]interface{}{
-				"full_name": users[i].FullName,
-				"role":      users[i].Role,
-				"phone":     users[i].Phone,
+				"full_name":   users[i].FullName,
+				"role":        users[i].Role,
+				"phone":       users[i].Phone,
+				"email":       users[i].Email,
+				"employee_id": users[i].EmployeeID,
 			})
 		}
 	}
@@ -371,3 +499,5 @@ func seedDatabase() {
 		}
 	}
 }
+
+

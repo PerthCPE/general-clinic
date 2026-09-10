@@ -262,7 +262,10 @@ func main() {
 	count := flag.Int("n", 6, "จำนวนรายการที่ต้องการสร้าง")
 	regInterval := flag.Duration("reg-interval", 5*time.Minute, "ระยะเวลาหน่วงการลงทะเบียนคนไข้ใหม่ในโหมด continuous (เช่น 5m, 10m)")
 	queueInterval := flag.Duration("queue-interval", 15*time.Second, "ระยะเวลาหน่วงการยิง Master Queue ในโหมด continuous (เช่น 15s, 30s)")
-	password := flag.String("password", "password", "รหัสผ่านของ user ที่ใช้เดิน flow")
+	// รหัสผ่านของ registrar1 คือ employee_id ของบัญชีนั้น (REC001) ไม่ใช่ "password" แบบเดิมแล้ว
+	// (seedDatabase() ใน internal/config/db.go เปลี่ยนไปใช้ employee_id เป็นรหัสผ่านเริ่มต้น
+	// ของแต่ละ seed account แยกกัน) override ด้วย -password ได้ถ้ารหัสผ่านจริงถูกเปลี่ยนไปแล้ว
+	password := flag.String("password", "REC001", "รหัสผ่านของ user ที่ใช้เดิน flow (ค่าเริ่มต้นตรงกับ employee_id ของ registrar1)")
 	flag.Parse()
 
 	url := strings.TrimRight(*baseURL, "/")

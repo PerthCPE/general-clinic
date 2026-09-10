@@ -1,17 +1,19 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import PatientSearchCard from './components/PatientSearchCard';
 import PatientFormCard from './components/PatientFormCard';
+import { Pagination } from '../../components/Pagination/Pagination';
 import type { Patient, SchemeType } from './types';
 import { patientApi, queueApi, type BackendPatient, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { useToast } from '../../components/Toast/ToastProvider';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
 import './RegistrationPage.css';
 
 export { formatHN, formatQueueNo, formatNationalId, formatPhone };
 
 const mapBackendPatientToUI = (p: BackendPatient): Patient => {
-  let age = 30;
-  let formattedDob = '01/01/2543';
+  let age = 0;
+  let formattedDob = '-';
 
   if (p.birthdate) {
     try {
@@ -20,7 +22,7 @@ const mapBackendPatientToUI = (p: BackendPatient): Patient => {
         const birthYear = d.getFullYear() >= 2400 ? d.getFullYear() - 543 : d.getFullYear();
         const currentYear = new Date().getFullYear();
         const calcAge = currentYear - birthYear;
-        age = calcAge > 0 ? calcAge : 1;
+        age = calcAge >= 0 ? calcAge : 0;
         formattedDob = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${birthYear + 543}`;
       }
     } catch {
@@ -47,11 +49,20 @@ const mapBackendPatientToUI = (p: BackendPatient): Patient => {
     hn: formatHN(p.hn || patientSeq),
     fullName: p.fullname,
     nationalId: formatNationalId(p.national_id),
-    dob: formattedDob || '01/01/2000',
-    age: age > 0 ? age : 30,
+    dob: formattedDob,
+    age: age,
     gender: (p.gender as 'ชาย' | 'หญิง' | 'อื่นๆ') || 'ชาย',
     phone: formatPhone(p.phone_number),
     emergencyContact: p.emergency_contact || '-',
+    houseNo: p.house_no || '',
+    villageNo: p.village_no || '',
+    villageName: p.village_name || '',
+    alley: p.alley || '',
+    road: p.road || '',
+    subDistrict: p.sub_district || '',
+    district: p.district || '',
+    province: p.province || '',
+    postalCode: p.postal_code || '',
     address: p.address || 'กรุงเทพมหานคร',
     schemeType: (p.scheme_type as SchemeType) || 'บัตรทอง (สปสช.)',
     chronicDiseases: p.chronic_diseases || '',
@@ -60,22 +71,34 @@ const mapBackendPatientToUI = (p: BackendPatient): Patient => {
   };
 };
 
+interface RegSuccessResult {
+  patient: Patient;
+  queueIssued: boolean;
+  queueNumber?: string;
+}
+
 function RegistrationPage() {
   const [allPatients, setAllPatients] = useState<Patient[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(15);
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searchResult, setSearchResult] = useState<Patient | null>(null);
   const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
+  const [regSuccessModal, setRegSuccessModal] = useState<RegSuccessResult | null>(null);
   const [isRecentOpen, setIsRecentOpen] = useState(true);
   const { subscribe } = useWebSocket();
+  const { showToast } = useToast();
 
   const formSectionRef = useRef<HTMLDivElement>(null);
 
-  // ดึงรายชื่อผู้ป่วยทั้งหมด และคิวที่กำลัง active จาก Backend DB จริง
+  // ดึงรายชื่อผู้ป่วยทั้งหมด และคิวที่กำลัง active จาก Backend DB จริง (Zero Mock)
   const fetchPatients = useCallback(async () => {
     setIsLoading(true);
+    setFetchError(null);
     try {
       const [patientsData, queuesData] = await Promise.all([
         patientApi.getAll(),
@@ -86,21 +109,34 @@ function RegistrationPage() {
         const allMapped = patientsData.map(mapBackendPatientToUI);
         setAllPatients(allMapped);
 
-        // หา ID ของผู้ป่วยทั้งหมดที่มีคิวแล้วในระบบ (เพื่อไม่ให้ผู้ป่วยที่ออกบัตรคิวไปแล้วโผล่มาในตาราง "รอเข้าคิว")
+        // หา ID ของผู้ป่วยทั้งหมดที่มีคิวแล้วในระบบ
+        const queueList = Array.isArray(queuesData)
+          ? queuesData
+          : queuesData && typeof queuesData === 'object' && Array.isArray((queuesData as any).data)
+          ? (queuesData as any).data
+          : [];
+
         const queuedPatientIds = new Set(
-          (Array.isArray(queuesData) ? queuesData : []).map((q) => q.patient_id)
+          queueList.map((q: any) => q.patient_id)
         );
 
         // กรองเอาเฉพาะผู้ป่วยที่ยังไม่ได้ออกบัตรคิวเข้าตรวจ
         const unqueued = patientsData.filter((p) => !queuedPatientIds.has(p.id));
         setPatients(unqueued.map(mapBackendPatientToUI));
+      } else {
+        setAllPatients([]);
+        setPatients([]);
       }
     } catch (err) {
-      console.warn('Could not fetch patients from backend:', err);
+      console.error('Could not fetch patients from backend:', err);
+      setFetchError('ไม่สามารถโหลดรายชื่อผู้ป่วยจากระบบได้ กรุณากดลองใหม่อีกครั้ง');
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดรายชื่อผู้ป่วยจากระบบได้' });
+      setAllPatients([]);
+      setPatients([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     fetchPatients();
@@ -190,52 +226,75 @@ function RegistrationPage() {
     setNotFoundQuery(null);
   };
 
-  // ส่งต่อเข้าคิวตรวจ -> ยิง Backend ออกบัตรคิวจริง และลบออกจากรายชื่อรอเข้าคิวทันที
+  // ส่งต่อเข้าคิวตรวจ -> ยิง Backend ออกบัตรคิวจริง และลบออกจากรายชื่อรอเข้าคิวทันทีเฉพาะเมื่อสำเร็จ
   const handleAssignQueue = async (patient: Patient) => {
     try {
       let patientId = patient.id;
       if (!patientId) {
-        try {
-          const res = await patientApi.search(patient.nationalId.replace(/[-\s]/g, ''));
-          if (res) {
-            patientId = Array.isArray(res) ? res[0]?.id : res.id;
-          }
-        } catch {
-          // ignore
+        const res = await patientApi.search(patient.nationalId.replace(/[-\s]/g, ''));
+        if (res) {
+          patientId = Array.isArray(res) ? res[0]?.id : res.id;
         }
       }
 
-      if (patientId) {
-        await queueApi.create(patientId, 'แผนกคัดกรอง', 'ส่งเข้าคิวจากการลงทะเบียน');
+      if (!patientId) {
+        throw new Error('ไม่พบข้อมูลรหัสผู้ป่วยในระบบ');
       }
-    } catch (err) {
-      console.warn('Queue assign error:', err);
+
+      const qRes = await queueApi.create(patientId, 'แผนกคัดกรอง', 'ส่งเข้าคิวจากการลงทะเบียน');
+
+      // เอาผู้ป่วยออกจากรายการ "ผู้ป่วยที่ยังไม่ได้เข้าคิว" เมื่อสำเร็จเท่านั้น
+      setPatients((prev) =>
+        prev.filter((p) => p.hn !== patient.hn && p.nationalId !== patient.nationalId && (!patient.id || p.id !== patient.id))
+      );
+
+      // ปิดข้อมูลผู้ป่วยที่เปิดอยู่ใน search / modal
+      setSearchResult(null);
+      setNotFoundQuery(null);
+      setSelectedPatientModal(null);
+      fetchPatients();
+
+      const qNum = qRes?.queue?.queue_number || '';
+      showToast({
+        type: 'success',
+        message: qNum ? `ส่งเข้าคิวสำเร็จ ${qNum}` : `ส่งเข้าคิวสำเร็จ ${patient.fullName}`,
+      });
+    } catch (err: any) {
+      console.error('Queue assign error:', err);
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'เกิดข้อผิดพลาดในการส่งผู้ป่วยเข้าคิว';
+      showToast({ type: 'error', message: errMsg });
+      // ห้ามลบคนไข้ออกจาก setPatients เพื่อคงสถานะเดิมไว้
     }
-
-    // เอาผู้ป่วยออกจากรายการ "ผู้ป่วยที่ยังไม่ได้เข้าคิว" ทันที
-    setPatients((prev) =>
-      prev.filter((p) => p.hn !== patient.hn && p.nationalId !== patient.nationalId && (!patient.id || p.id !== patient.id))
-    );
-
-    // ปิดข้อมูลผู้ป่วยที่เปิดอยู่ใน search / modal
-    setSearchResult(null);
-    setNotFoundQuery(null);
-    setSelectedPatientModal(null);
   };
 
-  // ลงทะเบียนผู้ป่วยใหม่ บันทึกลง Database จริง
-  const handleFormSubmit = async (formData: Partial<Patient>) => {
+  // ส่งต่อเข้าคิวจาก Success Modal (กรณีเลือกส่งเข้าคิวทันทีหลังลงทะเบียนแบบไม่ออกคิว)
+  const handleAssignQueueFromSuccessModal = async (patient: Patient) => {
+    await handleAssignQueue(patient);
+    setRegSuccessModal(null);
+  };
+
+  // ลงทะเบียนผู้ป่วยใหม่ บันทึกลง Database จริง (Sprint 3.2: รองรับ issueQueue flag)
+  const handleFormSubmit = async (formData: Partial<Patient> & { issueQueue?: boolean }) => {
+    if (!formData.dob || !formData.dob.trim()) {
+      showToast({ type: 'error', message: 'กรุณาระบุวันเกิดของผู้ป่วย' });
+      return;
+    }
+
     try {
       // แปลงวันเกิด DD/MM/YYYY (พ.ศ. หรือ ค.ศ.) เป็น YYYY-MM-DD
-      let birthDateStr = formData.dob || '2000-01-01';
-      if (formData.dob && formData.dob.includes('/')) {
+      let birthDateStr = formData.dob;
+      if (formData.dob.includes('/')) {
         const parts = formData.dob.split('/');
         if (parts.length === 3) {
           let yr = parseInt(parts[2], 10);
           if (yr >= 2400) yr = yr - 543;
           birthDateStr = `${yr}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
         }
-      } else if (formData.dob && formData.dob.includes('-')) {
+      } else if (formData.dob.includes('-')) {
         const parts = formData.dob.split('-');
         if (parts.length === 3 && parts[0].length === 4) {
           let yr = parseInt(parts[0], 10);
@@ -244,15 +303,27 @@ function RegistrationPage() {
         }
       }
 
+      const shouldIssueQueue = formData.issueQueue ?? false;
+
       const payload = {
         national_id: (formData.nationalId || '').replace(/[-\s]/g, ''),
-        fullname: formData.fullName || 'ผู้ป่วยใหม่',
+        fullname: formData.fullName || '',
         gender: formData.gender || 'ชาย',
         birthdate: birthDateStr,
-        address: formData.address || 'กรุงเทพมหานคร',
+        house_no: formData.houseNo || '',
+        village_no: formData.villageNo || '',
+        village_name: formData.villageName || '',
+        alley: formData.alley || '',
+        road: formData.road || '',
+        sub_district: formData.subDistrict || '',
+        district: formData.district || '',
+        province: formData.province || '',
+        postal_code: formData.postalCode || '',
+        address: formData.address || '',
         phone_number: (formData.phone || '').replace(/[-\s]/g, ''),
         emergency_contact: formData.emergencyContact || '-',
         scheme_type: formData.schemeType || 'บัตรทอง (สปสช.)',
+        issue_queue: shouldIssueQueue,
         chronic_diseases: formData.chronicDiseases || '',
         allergies: formData.allergies || '',
       };
@@ -260,37 +331,39 @@ function RegistrationPage() {
       const res = await patientApi.register(payload);
       if (res && res.patient) {
         const newUI = mapBackendPatientToUI(res.patient);
-        setPatients((prev) => [newUI, ...prev.filter((p) => p.hn !== newUI.hn && p.id !== newUI.id)]);
+        if (!res.queue_issued) {
+          // ถ้ายังไม่ได้ออกคิว ให้เพิ่มเข้าไปในรายการ "ผู้ป่วยรอเข้าคิว"
+          setPatients((prev) => [newUI, ...prev.filter((p) => p.hn !== newUI.hn && p.id !== newUI.id)]);
+        }
+        setAllPatients((prev) => [newUI, ...prev.filter((p) => p.hn !== newUI.hn && p.id !== newUI.id)]);
         setSearchResult(null);
+        setRegSuccessModal({
+          patient: newUI,
+          queueIssued: res.queue_issued,
+          queueNumber: res.queue_number,
+        });
+
+        if (res.queue_issued && res.queue_number) {
+          showToast({
+            type: 'success',
+            message: `ลงทะเบียนสำเร็จ HN${newUI.hn.replace('HN', '')} คิว ${res.queue_number}`,
+          });
+        } else {
+          showToast({
+            type: 'success',
+            message: `ลงทะเบียนสำเร็จ HN${newUI.hn.replace('HN', '')}`,
+          });
+        }
         return;
       }
     } catch (err: any) {
-      console.warn('Register error:', err);
+      console.error('Register error:', err);
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.message ||
+        'เกิดข้อผิดพลาดในการลงทะเบียนผู้ป่วย กรุณาตรวจสอบข้อมูลหรือการเชื่อมต่อระบบ';
+      showToast({ type: 'error', message: errMsg });
     }
-
-    // Fallback UI
-    const now = new Date();
-    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')} น.`;
-    const dateStr = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear() + 543}`;
-
-    const newPatient: Patient = {
-      hn: formatHN(patients.length + 1),
-      fullName: formData.fullName || 'ผู้ป่วยใหม่',
-      nationalId: formData.nationalId || '0-0000-00000-00-0',
-      dob: formData.dob || '01/01/2000',
-      age: formData.age || 30,
-      gender: formData.gender || 'ชาย',
-      phone: formData.phone || '-',
-      emergencyContact: formData.emergencyContact || '-',
-      address: formData.address || 'กรุงเทพมหานคร',
-      schemeType: (formData.schemeType as SchemeType) || 'บัตรทอง (สปสช.)',
-      chronicDiseases: '',
-      allergies: '',
-      registeredAt: `${dateStr} ${timeStr}`,
-    };
-
-    setPatients((prev) => [newPatient, ...prev]);
-    setSearchResult(null);
   };
 
   const scrollToForm = () => {
@@ -304,13 +377,23 @@ function RegistrationPage() {
     return 'badge-scheme-private';
   };
 
-  // สถิติสรุป
+  // สถิติสรุป (คำนวณจากผู้ป่วยทั้งหมดในคลินิก เพื่อให้ยอดสิทธิ์ตรงกับหน้าสิทธิ์การรักษา U2)
+  const pool = allPatients.length > 0 ? allPatients : patients;
   const stats = {
     total: patients.length,
-    gold: patients.filter((p) => p.schemeType === 'บัตรทอง (สปสช.)').length,
-    social: patients.filter((p) => p.schemeType === 'ประกันสังคม (ม.33)').length,
-    gov: patients.filter((p) => p.schemeType === 'สิทธิ์ข้าราชการ').length,
+    gold: pool.filter((p) => p.schemeType === 'บัตรทอง (สปสช.)').length,
+    social: pool.filter((p) => p.schemeType === 'ประกันสังคม (ม.33)').length,
+    gov: pool.filter((p) => p.schemeType === 'สิทธิ์ข้าราชการ').length,
   };
+
+  // Client-side pagination สำหรับตารางผู้ป่วยรอออกบัตรคิว (Unqueued Patients)
+  const totalItems = patients.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const validCurrentPage = Math.max(1, Math.min(currentPage, totalPages));
+  const paginatedPatients = useMemo(() => {
+    const start = (validCurrentPage - 1) * itemsPerPage;
+    return patients.slice(start, start + itemsPerPage);
+  }, [patients, validCurrentPage, itemsPerPage]);
 
   return (
     <div className="registration-page">
@@ -359,7 +442,7 @@ function RegistrationPage() {
       {/* 2. New Patient Registration Form Section */}
       <PatientFormCard onSubmit={handleFormSubmit} formRef={formSectionRef} />
 
-      {/* 3. Recent Registered Patients Dropdown Accordion Card */}
+      {/* 3. Patient List & Unqueued Table Accordion Card */}
       <div className="reg-card">
         <div className="reg-card-header" onClick={() => setIsRecentOpen(!isRecentOpen)}>
           <div className="reg-header-title-wrap">
@@ -375,12 +458,14 @@ function RegistrationPage() {
               </svg>
             </div>
             <div>
-              <h2 className="reg-card-title">รายชื่อผู้ป่วยที่ลงทะเบียนล่าสุด (Recent Patients)</h2>
-              <p className="reg-card-subtitle">รายการผู้ป่วยที่บันทึกข้อมูลเข้าสู่ระบบคลินิก</p>
+              <h2 className="reg-card-title">รายชื่อผู้ป่วยรอออกบัตรคิว (Unqueued Patients)</h2>
+              <p className="reg-card-subtitle">รายการผู้ป่วยที่บันทึกข้อมูลเข้าสู่ระบบแล้ว แต่ยังไม่ได้ออกบัตรคิวเข้าห้องตรวจ</p>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span className="reg-count-pill">{patients.length} คนไข้</span>
+            <span className="reg-count-pill">
+              {patients.length} รอคิว
+            </span>
             <button className={`reg-card-toggle reg-recent-toggle ${isRecentOpen ? 'open' : ''}`} aria-label="Toggle Dropdown">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -389,7 +474,58 @@ function RegistrationPage() {
           </div>
         </div>
 
-        <div className={`reg-card-body reg-recent-body ${isRecentOpen ? 'expanded' : ''}`} style={{ padding: isRecentOpen ? '0' : '0' }}>
+        <div className={`reg-card-body reg-recent-body ${isRecentOpen ? 'expanded' : ''}`}>
+          {/* Table Controls Bar (Items Per Page Selector) */}
+          <div className="reg-table-controls-bar">
+            <div className="reg-table-info-wrap">
+              <span className="reg-table-desc">
+                รายชื่อผู้ป่วยรอออกบัตรคิวทั้งหมด {totalItems} คน
+              </span>
+            </div>
+            <div className="reg-items-per-page-wrap">
+              <label htmlFor="reg-items-per-page" className="reg-items-per-page-label">
+                แสดง:
+              </label>
+              <select
+                id="reg-items-per-page"
+                className="reg-items-per-page-select"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                aria-label="จำนวนแถวที่แสดงต่อหน้า"
+              >
+                <option value={10}>10 แถว</option>
+                <option value={15}>15 แถว</option>
+                <option value={25}>25 แถว</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Error Banner with Retry */}
+          {fetchError && (
+            <div style={{ padding: '12px 24px 0 24px' }}>
+              <div className="reg-fetch-error-banner">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>{fetchError}</span>
+                </div>
+                <button
+                  type="button"
+                  className="reg-retry-btn"
+                  onClick={fetchPatients}
+                >
+                  ลองใหม่อีกครั้ง
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="table-responsive">
             <table className="reg-recent-table">
               <thead>
@@ -403,7 +539,7 @@ function RegistrationPage() {
                 </tr>
               </thead>
               <tbody>
-                {patients.length === 0 ? (
+                {paginatedPatients.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="reg-empty-table-cell">
                       <div className="reg-empty-wrap">
@@ -416,67 +552,82 @@ function RegistrationPage() {
                             strokeLinejoin="round"
                           />
                         </svg>
-                        <p>ไม่มีรายชื่อผู้ป่วยรอเข้าคิว (ผู้ป่วยทั้งหมดถูกส่งเข้าคิวตรวจแล้ว)</p>
+                        <p>
+                          {isLoading
+                            ? 'กำลังโหลดรายชื่อผู้ป่วยจากระบบ...'
+                            : 'ไม่มีรายชื่อผู้ป่วยรอออกบัตรคิว (ผู้ป่วยทั้งหมดถูกส่งเข้าห้องตรวจเรียบร้อยแล้ว)'}
+                        </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  patients.map((p) => (
-                    <tr key={p.hn} className="reg-table-row">
-                      <td className="col-reg-hn">
-                        <span className="reg-hn-tag">{p.hn}</span>
-                      </td>
-                      <td className="col-reg-patient">
-                        <div className="reg-patient-cell">
-                          <span className="patient-name-link" onClick={() => setSelectedPatientModal(p)}>
-                            {p.fullName}
+                  paginatedPatients.map((p) => {
+                    return (
+                      <tr key={p.hn} className="reg-table-row">
+                        <td className="col-reg-hn">
+                          <span className="reg-hn-tag">{p.hn}</span>
+                        </td>
+                        <td className="col-reg-patient">
+                          <div className="reg-patient-cell">
+                            <span className="patient-name-link" onClick={() => setSelectedPatientModal(p)}>
+                              {p.fullName}
+                            </span>
+                            <span className="patient-sub-meta">
+                              <span className="font-mono">{p.nationalId}</span> • เพศ {p.gender}, {p.age} ปี
+                            </span>
+                          </div>
+                        </td>
+                        <td className="col-reg-phone">
+                          <span className="font-phone">{p.phone}</span>
+                        </td>
+                        <td className="col-reg-scheme">
+                          <span className={`scheme-pill ${getSchemeClass(p.schemeType)}`}>
+                            {p.schemeType}
                           </span>
-                          <span className="patient-sub-meta">
-                            <span className="font-mono">{p.nationalId}</span> • เพศ {p.gender}, {p.age} ปี
-                          </span>
-                        </div>
-                      </td>
-                      <td className="col-reg-phone">
-                        <span className="font-phone">{p.phone}</span>
-                      </td>
-                      <td className="col-reg-scheme">
-                        <span className={`scheme-pill ${getSchemeClass(p.schemeType)}`}>
-                          {p.schemeType}
-                        </span>
-                      </td>
-                      <td className="col-reg-time">
-                        <div className="reg-time-cell">
-                          <span className="time-main-text">
-                            {p.registeredAt.includes(' ') ? p.registeredAt.split(' ')[1] : p.registeredAt}
-                          </span>
-                          {p.registeredAt.includes(' ') && (
-                            <span className="time-sub-date">{p.registeredAt.split(' ')[0]}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="col-reg-action">
-                        <button
-                          type="button"
-                          className="btn-quick-assign-queue"
-                          title="ส่งเข้าคิวตรวจทันที"
-                          onClick={() => handleAssignQueue(p)}
-                        >
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="btn-icon-svg">
-                            <path
-                              fillRule="evenodd"
-                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          <span>เข้าคิว</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="col-reg-time">
+                          <div className="reg-time-cell">
+                            <span className="time-main-text">
+                              {p.registeredAt.includes(' ') ? p.registeredAt.split(' ')[1] : p.registeredAt}
+                            </span>
+                            {p.registeredAt.includes(' ') && (
+                              <span className="time-sub-date">{p.registeredAt.split(' ')[0]}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="col-reg-action">
+                          <button
+                            type="button"
+                            className="btn-quick-assign-queue"
+                            title="ส่งเข้าคิวตรวจทันที"
+                            onClick={() => handleAssignQueue(p)}
+                          >
+                            <svg viewBox="0 0 20 20" fill="currentColor" className="btn-icon-svg">
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            <span>เข้าคิว</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Client-side Pagination Component */}
+          <Pagination
+            currentPage={validCurrentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(p) => setCurrentPage(p)}
+          />
         </div>
       </div>
 
@@ -546,6 +697,111 @@ function RegistrationPage() {
               >
                 ปิดหน้าต่าง
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Registration Success Result Modal (Sprint 3.2 Task B2) */}
+      {regSuccessModal && (
+        <div className="reg-modal-backdrop" onClick={() => setRegSuccessModal(null)}>
+          <div className="reg-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="reg-modal-header">
+              <div className="modal-title-wrap">
+                <div className={`reg-header-icon-box ${regSuccessModal.queueIssued ? 'green-box' : 'blue-box'}`}>
+                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path
+                      d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="reg-modal-title">
+                    {regSuccessModal.queueIssued
+                      ? 'ลงทะเบียนและออกบัตรคิวเรียบร้อย'
+                      : 'ลงทะเบียนเรียบร้อย (ยังไม่ออกบัตรคิว)'}
+                  </h3>
+                  <p className="reg-card-subtitle" style={{ margin: 0, fontSize: '13px' }}>
+                    {regSuccessModal.queueIssued
+                      ? 'ผู้ป่วยถูกบันทึกข้อมูลและส่งเข้าคิวรอคัดกรองแล้ว'
+                      : 'บันทึกข้อมูลประวัติผู้ป่วยและออกรหัส HN สำเร็จ'}
+                  </p>
+                </div>
+              </div>
+              <button
+                className="reg-modal-close"
+                onClick={() => setRegSuccessModal(null)}
+                aria-label="ปิดหน้าต่าง"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            <div className="reg-modal-body">
+              <div className="reg-modal-card">
+                <div className="reg-modal-row">
+                  <span className="modal-lbl">รหัส HN:</span>
+                  <span className="reg-modal-hn font-bold">{regSuccessModal.patient.hn}</span>
+                </div>
+                <div className="reg-modal-row">
+                  <span className="modal-lbl">ชื่อ-นามสกุล:</span>
+                  <span className="modal-val font-bold">{regSuccessModal.patient.fullName}</span>
+                </div>
+                <div className="reg-modal-row">
+                  <span className="modal-lbl">เลขประจำตัวประชาชน:</span>
+                  <span className="modal-val font-mono">{regSuccessModal.patient.nationalId}</span>
+                </div>
+                <div className="reg-modal-row">
+                  <span className="modal-lbl">สิทธิการรักษา:</span>
+                  <span className={`scheme-pill ${getSchemeClass(regSuccessModal.patient.schemeType)}`}>
+                    {regSuccessModal.patient.schemeType}
+                  </span>
+                </div>
+              </div>
+
+              {regSuccessModal.queueIssued && regSuccessModal.queueNumber && (
+                <div className="reg-success-queue-box">
+                  <span className="reg-success-queue-lbl">หมายเลขคิวตรวจ (Queue Number)</span>
+                  <span className="reg-success-queue-val">{regSuccessModal.queueNumber}</span>
+                  <span className="reg-success-queue-dept">แผนก: จุดคัดกรอง • สถานะ: รอคัดกรอง</span>
+                </div>
+              )}
+            </div>
+
+            <div className="reg-modal-footer">
+              {!regSuccessModal.queueIssued ? (
+                <>
+                  <button
+                    type="button"
+                    className="reg-modal-btn-queue"
+                    onClick={() => handleAssignQueueFromSuccessModal(regSuccessModal.patient)}
+                  >
+                    ส่งเข้าคิวเลย
+                  </button>
+                  <button
+                    type="button"
+                    className="reg-modal-btn-close"
+                    onClick={() => setRegSuccessModal(null)}
+                  >
+                    ปิด
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="reg-modal-btn-queue"
+                  onClick={() => setRegSuccessModal(null)}
+                >
+                  ตกลง
+                </button>
+              )}
             </div>
           </div>
         </div>

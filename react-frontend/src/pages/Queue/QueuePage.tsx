@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { queueApi, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
-import { formatQueueNo, formatNationalId } from '../../utils/formatters';
+import { useToast } from '../../components/Toast/ToastProvider';
+import { formatQueueNo, formatNationalId, maskNationalId } from '../../utils/formatters';
 import { callQueueAudio, getSpokenDepartmentText } from '../../utils/audioQueue';
+import Pagination from '../../components/Pagination/Pagination';
 import './QueuePage.css';
 
 export { formatQueueNo };
@@ -133,12 +135,27 @@ const STATUS_OPTIONS: { value: QueueStatus; labelTh: string; desc: string }[] = 
 
 const QueuePage: React.FC = () => {
   const [queueList, setQueueList] = useState<QueueItem[]>([]);
+  const [totalItems, setTotalItems] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'in_service' | 'cash_pharmacy' | 'completed_cancelled'>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 8;
+  const [itemsPerPage, setItemsPerPage] = useState<number>(25);
+
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    waitingScreening: 0,
+    waitingDoctor: 0,
+    inExamination: 0,
+    waitingTreatment: 0,
+    waitingBilling: 0,
+    waitingPharmacy: 0,
+    completed: 0,
+    cancelled: 0,
+  });
 
   // State สำหรับ Modal Edit Status
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -147,112 +164,97 @@ const QueuePage: React.FC = () => {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [statusNote, setStatusNote] = useState('');
 
+  const { showToast } = useToast();
+
   // State สำหรับดูข้อความเต็มของจุดบริการ & การคัดกรอง
   const [detailModalQueue, setDetailModalQueue] = useState<QueueItem | null>(null);
 
   const { subscribe } = useWebSocket();
+  const abortControllerRef = React.useRef<AbortController | null>(null);
+  const latestRequestIdRef = React.useRef<number>(0);
 
-  // ดึงรายการคิวจริงจาก Backend DB
-  const fetchQueues = useCallback(async () => {
+  // ดึงรายการคิวจริงจาก Backend DB (Server-Side Pagination & Filtered COUNT) (Zero Mock)
+  const fetchQueues = useCallback(async (targetPage?: number) => {
+    const pageToFetch = targetPage !== undefined ? targetPage : currentPage;
     setIsLoading(true);
-    try {
-      const data = await queueApi.getList();
-      if (Array.isArray(data)) {
-        if (data.length > 0) {
-          setQueueList(data.map(mapBackendQueueToUI));
-        } else {
-          setQueueList([]);
-        }
-      }
-    } catch (err) {
-      console.warn('Could not fetch queue list from backend:', err);
-    } finally {
-      setIsLoading(false);
+
+    // D5: Cancel previous pending request to avoid race condition
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
-  }, []);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    const requestId = ++latestRequestIdRef.current;
+
+    try {
+      const res = await queueApi.getList(
+        {
+          page: pageToFetch,
+          limit: itemsPerPage,
+          status: statusFilter,
+          search: searchQuery.trim(),
+          category: selectedCategory,
+        },
+        { signal: controller.signal }
+      );
+
+      if (requestId !== latestRequestIdRef.current) return;
+
+      if (res && typeof res === 'object' && 'data' in res && 'total' in res) {
+        const paginated = res as any;
+        const mappedList = Array.isArray(paginated.data) ? paginated.data.map(mapBackendQueueToUI) : [];
+        setQueueList(mappedList);
+        setTotalItems(paginated.total || 0);
+        const computedTotalPages = paginated.total_pages || Math.ceil((paginated.total || 0) / itemsPerPage) || 1;
+        setTotalPages(computedTotalPages);
+
+        if (paginated.stats) {
+          setStats(paginated.stats);
+        }
+
+        // Edge case D1 & B1: Auto clamp using Math.min(currentPage, totalPages)
+        if (pageToFetch > computedTotalPages && computedTotalPages > 0) {
+          setCurrentPage((prev) => Math.max(1, Math.min(prev, computedTotalPages)));
+        }
+      } else {
+         throw new Error('Invalid data format');
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return;
+      }
+      console.error('Could not fetch queue list from backend:', err);
+      setQueueList([]);
+      setTotalItems(0);
+      setTotalPages(1);
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดรายการคิวจากระบบได้' });
+    } finally {
+      if (requestId === latestRequestIdRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, [currentPage, itemsPerPage, statusFilter, searchQuery, selectedCategory, showToast]);
 
   useEffect(() => {
-    fetchQueues();
+    fetchQueues(currentPage);
+  }, [fetchQueues, currentPage]);
 
-    // ดักฟังเหตุการณ์ Real-time WebSocket จากเครื่องอื่น
+  // Real-time WebSocket: D4: Stay on current page, do NOT bounce to page 1
+  useEffect(() => {
     const unsubCreated = subscribe('QUEUE_CREATED', () => {
-      fetchQueues();
+      fetchQueues(currentPage);
     });
     const unsubUpdated = subscribe('QUEUE_UPDATED', () => {
-      fetchQueues();
+      fetchQueues(currentPage);
     });
 
-    // Fallback polling ทุก 30 วินาที
-    const interval = setInterval(fetchQueues, 30000);
     return () => {
       unsubCreated();
       unsubUpdated();
-      clearInterval(interval);
     };
-  }, [fetchQueues, subscribe]);
+  }, [subscribe, fetchQueues, currentPage]);
 
-  // คำนวณสรุปสถิติจำนวนคิวแต่ละสถานะ
-  const stats = {
-    total: queueList.length,
-    active: queueList.filter((q) => !['เสร็จสิ้น', 'ยกเลิกคิว'].includes(q.status)).length,
-    waitingScreening: queueList.filter((q) => q.status === 'รอคัดกรอง').length,
-    waitingDoctor: queueList.filter((q) => q.status === 'รอพบแพทย์').length,
-    inExamination: queueList.filter((q) => q.status === 'กำลังตรวจ').length,
-    waitingTreatment: queueList.filter((q) => q.status === 'รอทำหัตถการ').length,
-    waitingBilling: queueList.filter((q) => q.status === 'รอชำระเงิน').length,
-    waitingPharmacy: queueList.filter((q) => q.status === 'รอรับยา').length,
-    completed: queueList.filter((q) => q.status === 'เสร็จสิ้น').length,
-    cancelled: queueList.filter((q) => q.status === 'ยกเลิกคิว').length,
-  };
-
-  // กรองข้อมูลตาม Search และ Status Filter (เรียงลำดับคิวตามลำดับการให้บริการ)
-  const filteredQueue = React.useMemo(() => {
-    return queueList.filter((item) => {
-      const matchSearch =
-        item.queueNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.idCard.includes(searchQuery);
-
-      let matchStatus = true;
-      if (selectedCategory === 'all') {
-        if (statusFilter === 'all') {
-          // คิวรอรับบริการทั้งหมด (แยกเสร็จสิ้นและยกเลิกออก)
-          matchStatus = !['เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status);
-        } else {
-          matchStatus = item.status === statusFilter;
-        }
-      } else if (selectedCategory === 'in_service') {
-        if (statusFilter === 'in_service_all') {
-          matchStatus = ['รอคัดกรอง', 'รอพบแพทย์', 'กำลังตรวจ', 'รอทำหัตถการ'].includes(item.status);
-        } else {
-          matchStatus = item.status === statusFilter;
-        }
-      } else if (selectedCategory === 'cash_pharmacy') {
-        if (statusFilter === 'cash_pharmacy_all') {
-          matchStatus = ['รอชำระเงิน', 'รอรับยา'].includes(item.status);
-        } else {
-          matchStatus = item.status === statusFilter;
-        }
-      } else if (selectedCategory === 'completed_cancelled') {
-        if (statusFilter === 'completed_cancelled_all') {
-          // รวมเสร็จสิ้นและยกเลิกคิวมาอยู่ด้วยกัน
-          matchStatus = ['เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status);
-        } else {
-          matchStatus = item.status === statusFilter;
-        }
-      } else {
-        matchStatus = statusFilter === 'all' ? true : item.status === statusFilter;
-      }
-
-      return matchSearch && matchStatus;
-    });
-  }, [queueList, searchQuery, statusFilter, selectedCategory]);
-
-  // การตัดหน้า (Pagination)
-  const totalPages = Math.ceil(filteredQueue.length / itemsPerPage) || 1;
-  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
-  const startIndex = (validCurrentPage - 1) * itemsPerPage;
-  const currentItems = filteredQueue.slice(startIndex, startIndex + itemsPerPage);
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages || 1);
 
   // เปิด Modal เพื่อแก้ไขสถานะ
   const handleOpenEditModal = (item: QueueItem) => {
@@ -315,25 +317,37 @@ const QueuePage: React.FC = () => {
 
     try {
       await queueApi.updateStatus(selectedQueue.id, newStatus, selectedDepartment, statusNote.trim() || selectedQueue.note);
+      
+      // อัปเดต state เฉพาะเมื่อ API สำเร็จเท่านั้น
+      setQueueList((prev) =>
+        prev.map((item) =>
+          item.id === selectedQueue.id
+            ? {
+                ...item,
+                status: newStatus,
+                department: selectedDepartment,
+                note: statusNote.trim() || item.note,
+              }
+            : item
+        )
+      );
+
+      setIsModalOpen(false);
+      showToast({
+        type: 'success',
+        message: `เปลี่ยนสถานะคิวเป็น "${newStatus}" สำเร็จ`,
+      });
       fetchQueues();
-    } catch (err) {
-      console.warn('Update queue status error:', err);
+    } catch (err: any) {
+      console.error('Update queue status error:', err);
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'ไม่สามารถเปลี่ยนสถานะคิวได้';
+      showToast({ type: 'error', message: errMsg });
+      // ห้ามแตะ setQueueList เพื่อคง state เดิมไว้
     }
-
-    setQueueList((prev) =>
-      prev.map((item) =>
-        item.id === selectedQueue.id
-          ? {
-              ...item,
-              status: newStatus,
-              department: selectedDepartment,
-              note: statusNote.trim() || item.note,
-            }
-          : item
-      )
-    );
-
-    setIsModalOpen(false);
   };
 
   const handleCallQueue = (item: QueueItem, e?: React.MouseEvent) => {
@@ -368,8 +382,6 @@ const QueuePage: React.FC = () => {
   return (
     <div className="queue-page">
       {/* Page Header */}
-
-      {/* Page Header */}
       <div className="queue-page-header">
         <div className="queue-header-left">
           <h1 className="queue-title">จัดการคิวผู้ป่วย (Queue Management)</h1>
@@ -399,7 +411,7 @@ const QueuePage: React.FC = () => {
             </div>
           </div>
           <div className="stat-value">{stats.active}</div>
-          <div className="stat-sub-text">กำลังรับบริการในระบบทั้งหมด</div>
+          <div className="stat-sub-text">คิวที่กำลังรับบริการในระบบ (ยกเว้นเสร็จสิ้น/ยกเลิก)</div>
         </div>
 
         <div
@@ -479,196 +491,247 @@ const QueuePage: React.FC = () => {
 
       {/* Main Table Card */}
       <div className="queue-table-card">
-        {/* Table Controls (Search & Status Filter Pills) */}
+        {/* Table Controls (Search, Per-Page Dropdown & Status Filter Pills) */}
         <div className="table-controls">
-          <div className="search-bar-wrap">
-            <svg className="table-search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M9 17A8 8 0 109 1a8 8 0 000 16zM19 19l-4.35-4.35"
-                stroke="currentColor"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+          {/* Tier 1: Search Bar & Rows-per-page dropdown */}
+          <div className="table-toolbar-tier">
+            <div className="search-bar-wrap">
+              <svg className="table-search-icon" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M9 17A8 8 0 109 1a8 8 0 000 16zM19 19l-4.35-4.35"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <input
+                type="text"
+                className="table-search-input"
+                placeholder="ค้นหาด้วยหมายเลขคิว หรือ ชื่อคนไข้..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                }}
               />
-            </svg>
-            <input
-              type="text"
-              className="table-search-input"
-              placeholder="ค้นหาด้วยหมายเลขคิว หรือ ชื่อคนไข้..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-            {searchQuery && (
-              <button className="clear-search-btn" onClick={() => setSearchQuery('')} aria-label="Clear search">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
-            )}
+              {searchQuery && (
+                <button className="clear-search-btn" onClick={() => setSearchQuery('')} aria-label="Clear search">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            {/* Items Per Page Dropdown */}
+            <div className="queue-items-per-page-wrap">
+              <label htmlFor="queue-items-per-page" className="queue-items-per-page-label">
+                แสดง:
+              </label>
+              <select
+                id="queue-items-per-page"
+                className="queue-items-per-page-select"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                aria-label="จำนวนแถวที่แสดงต่อหน้า"
+              >
+                <option value={10}>10 แถว</option>
+                <option value={25}>25 แถว</option>
+                <option value={50}>50 แถว</option>
+              </select>
+            </div>
           </div>
 
+          {/* Tier 2: Status Filter Pills Bar */}
           {selectedCategory !== 'all' && (
-            <div className="status-filter-pills-bar">
-              {selectedCategory === 'in_service' && (
-              <>
-                <button
-                  type="button"
-                  className={`filter-pill-btn ${statusFilter === 'in_service_all' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('in_service_all');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span>ทั้งหมดในกลุ่มนี้</span>
-                  <span className="pill-count">
-                    {stats.waitingScreening + stats.waitingDoctor + stats.inExamination + stats.waitingTreatment}
-                  </span>
-                </button>
+            <div className="status-filter-tier" role="group" aria-label="กรองตามสถานะคิว">
+              <div className="status-filter-pills-bar">
+                {selectedCategory === 'in_service' && (
+                  <>
+                    <button
+                      type="button"
+                      className={`filter-pill-btn ${statusFilter === 'in_service_all' ? 'active' : ''} ${(stats.waitingScreening + stats.waitingDoctor + stats.inExamination + stats.waitingTreatment) === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'in_service_all'}
+                      disabled={(stats.waitingScreening + stats.waitingDoctor + stats.inExamination + stats.waitingTreatment) === 0}
+                      onClick={() => {
+                        setStatusFilter('in_service_all');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-all"></span>
+                      <span>ทั้งหมดในกลุ่มนี้</span>
+                      <span className="pill-count">
+                        {stats.waitingScreening + stats.waitingDoctor + stats.inExamination + stats.waitingTreatment}
+                      </span>
+                    </button>
 
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-screening ${statusFilter === 'รอคัดกรอง' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอคัดกรอง');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-screening"></span>
-                  <span>รอคัดกรอง</span>
-                  <span className="pill-count">{stats.waitingScreening}</span>
-                </button>
+                    <button
+                      type="button"
+                      className={`filter-pill-btn pill-screening ${statusFilter === 'รอคัดกรอง' ? 'active' : ''} ${stats.waitingScreening === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'รอคัดกรอง'}
+                      disabled={stats.waitingScreening === 0}
+                      onClick={() => {
+                        setStatusFilter('รอคัดกรอง');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-screening"></span>
+                      <span>รอคัดกรอง</span>
+                      <span className="pill-count">{stats.waitingScreening}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-doctor ${statusFilter === 'รอพบแพทย์' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอพบแพทย์');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-doctor"></span>
-                  <span>รอพบแพทย์</span>
-                  <span className="pill-count">{stats.waitingDoctor}</span>
-                </button>
+                    <button
+                      type="button"
+                      className={`filter-pill-btn pill-doctor ${statusFilter === 'รอพบแพทย์' ? 'active' : ''} ${stats.waitingDoctor === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'รอพบแพทย์'}
+                      disabled={stats.waitingDoctor === 0}
+                      onClick={() => {
+                        setStatusFilter('รอพบแพทย์');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-doctor"></span>
+                      <span>รอพบแพทย์</span>
+                      <span className="pill-count">{stats.waitingDoctor}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-examination ${statusFilter === 'กำลังตรวจ' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('กำลังตรวจ');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-examination"></span>
-                  <span>กำลังตรวจ</span>
-                  <span className="pill-count">{stats.inExamination}</span>
-                </button>
+                    <button
+                      type="button"
+                      className={`filter-pill-btn pill-examination ${statusFilter === 'กำลังตรวจ' ? 'active' : ''} ${stats.inExamination === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'กำลังตรวจ'}
+                      disabled={stats.inExamination === 0}
+                      onClick={() => {
+                        setStatusFilter('กำลังตรวจ');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-examination"></span>
+                      <span>กำลังตรวจ</span>
+                      <span className="pill-count">{stats.inExamination}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-treatment ${statusFilter === 'รอทำหัตถการ' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอทำหัตถการ');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-treatment"></span>
-                  <span>รอทำหัตถการ</span>
-                  <span className="pill-count">{stats.waitingTreatment}</span>
-                </button>
-              </>
-            )}
+                    <button
+                      type="button"
+                      className={`filter-pill-btn pill-treatment ${statusFilter === 'รอทำหัตถการ' ? 'active' : ''} ${stats.waitingTreatment === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'รอทำหัตถการ'}
+                      disabled={stats.waitingTreatment === 0}
+                      onClick={() => {
+                        setStatusFilter('รอทำหัตถการ');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-treatment"></span>
+                      <span>รอทำหัตถการ</span>
+                      <span className="pill-count">{stats.waitingTreatment}</span>
+                    </button>
+                  </>
+                )}
 
-            {selectedCategory === 'cash_pharmacy' && (
-              <>
-                <button
-                  type="button"
-                  className={`filter-pill-btn ${statusFilter === 'cash_pharmacy_all' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('cash_pharmacy_all');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span>ทั้งหมดในกลุ่มนี้</span>
-                  <span className="pill-count">{stats.waitingBilling + stats.waitingPharmacy}</span>
-                </button>
+                {selectedCategory === 'cash_pharmacy' && (
+                  <>
+                    <button
+                      type="button"
+                      className={`filter-pill-btn ${statusFilter === 'cash_pharmacy_all' ? 'active' : ''} ${(stats.waitingBilling + stats.waitingPharmacy) === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'cash_pharmacy_all'}
+                      disabled={(stats.waitingBilling + stats.waitingPharmacy) === 0}
+                      onClick={() => {
+                        setStatusFilter('cash_pharmacy_all');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-all"></span>
+                      <span>ทั้งหมดในกลุ่มนี้</span>
+                      <span className="pill-count">{stats.waitingBilling + stats.waitingPharmacy}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-billing ${statusFilter === 'รอชำระเงิน' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอชำระเงิน');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-billing"></span>
-                  <span>รอชำระเงิน</span>
-                  <span className="pill-count">{stats.waitingBilling}</span>
-                </button>
+                    <button
+                      type="button"
+                      className={`filter-pill-btn pill-billing ${statusFilter === 'รอชำระเงิน' ? 'active' : ''} ${stats.waitingBilling === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'รอชำระเงิน'}
+                      disabled={stats.waitingBilling === 0}
+                      onClick={() => {
+                        setStatusFilter('รอชำระเงิน');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-billing"></span>
+                      <span>รอชำระเงิน</span>
+                      <span className="pill-count">{stats.waitingBilling}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-pharmacy ${statusFilter === 'รอรับยา' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('รอรับยา');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-pharmacy"></span>
-                  <span>รอรับยา</span>
-                  <span className="pill-count">{stats.waitingPharmacy}</span>
-                </button>
-              </>
-            )}
+                    <button
+                      type="button"
+                      className={`filter-pill-btn pill-pharmacy ${statusFilter === 'รอรับยา' ? 'active' : ''} ${stats.waitingPharmacy === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'รอรับยา'}
+                      disabled={stats.waitingPharmacy === 0}
+                      onClick={() => {
+                        setStatusFilter('รอรับยา');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-pharmacy"></span>
+                      <span>รอรับยา</span>
+                      <span className="pill-count">{stats.waitingPharmacy}</span>
+                    </button>
+                  </>
+                )}
 
-            {selectedCategory === 'completed_cancelled' && (
-              <>
-                <button
-                  type="button"
-                  className={`filter-pill-btn ${statusFilter === 'completed_cancelled_all' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('completed_cancelled_all');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span>ทั้งหมดในกลุ่มนี้</span>
-                  <span className="pill-count">{stats.completed + stats.cancelled}</span>
-                </button>
+                {selectedCategory === 'completed_cancelled' && (
+                  <>
+                    <button
+                      type="button"
+                      className={`filter-pill-btn ${statusFilter === 'completed_cancelled_all' ? 'active' : ''} ${(stats.completed + stats.cancelled) === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'completed_cancelled_all'}
+                      disabled={(stats.completed + stats.cancelled) === 0}
+                      onClick={() => {
+                        setStatusFilter('completed_cancelled_all');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-all"></span>
+                      <span>ทั้งหมดในกลุ่มนี้</span>
+                      <span className="pill-count">{stats.completed + stats.cancelled}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-completed ${statusFilter === 'เสร็จสิ้น' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('เสร็จสิ้น');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-completed"></span>
-                  <span>เสร็จสิ้นการบริการ</span>
-                  <span className="pill-count">{stats.completed}</span>
-                </button>
+                    <button
+                      type="button"
+                      className={`filter-pill-btn pill-completed ${statusFilter === 'เสร็จสิ้น' ? 'active' : ''} ${stats.completed === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'เสร็จสิ้น'}
+                      disabled={stats.completed === 0}
+                      onClick={() => {
+                        setStatusFilter('เสร็จสิ้น');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-completed"></span>
+                      <span>เสร็จสิ้นการบริการ</span>
+                      <span className="pill-count">{stats.completed}</span>
+                    </button>
 
-                <button
-                  type="button"
-                  className={`filter-pill-btn pill-cancelled ${statusFilter === 'ยกเลิกคิว' ? 'active' : ''}`}
-                  onClick={() => {
-                    setStatusFilter('ยกเลิกคิว');
-                    setCurrentPage(1);
-                  }}
-                >
-                  <span className="pill-dot dot-cancelled"></span>
-                  <span>ยกเลิกคิว</span>
-                  <span className="pill-count">{stats.cancelled}</span>
-                </button>
-              </>
-            )}
-          </div>
-        )}
-      </div>
+                    <button
+                      type="button"
+                      className={`filter-pill-btn pill-cancelled ${statusFilter === 'ยกเลิกคิว' ? 'active' : ''} ${stats.cancelled === 0 ? 'pill-zero-count' : ''}`}
+                      aria-pressed={statusFilter === 'ยกเลิกคิว'}
+                      disabled={stats.cancelled === 0}
+                      onClick={() => {
+                        setStatusFilter('ยกเลิกคิว');
+                        setCurrentPage(1);
+                      }}
+                    >
+                      <span className="pill-dot dot-cancelled"></span>
+                      <span>ยกเลิกคิว</span>
+                      <span className="pill-count">{stats.cancelled}</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Responsive Queue Table */}
         <div className="table-responsive">
@@ -683,8 +746,8 @@ const QueuePage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {currentItems.length > 0 ? (
-                currentItems.map((item) => (
+              {queueList.length > 0 ? (
+                queueList.map((item) => (
                   <tr key={item.id} className="queue-table-row">
                     <td className="col-queue-no">
                       <div className="queue-locked-wrapper">
@@ -714,7 +777,7 @@ const QueuePage: React.FC = () => {
                           {item.patientName}
                         </span>
                         <span className="patient-sub-text" title={`${item.idCard} • เวลา ${item.time}`}>
-                          {item.idCard} • เวลา {item.time}
+                          {maskNationalId(item.idCard)} • เวลา {item.time}
                         </span>
                       </div>
                     </td>
@@ -759,7 +822,7 @@ const QueuePage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="empty-table-cell">
+                  <td colSpan={5} className="empty-table-cell">
                     <div className="empty-state">
                       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" />
@@ -774,41 +837,14 @@ const QueuePage: React.FC = () => {
           </table>
         </div>
 
-        {/* Pagination Footer */}
-        <div className="table-pagination-footer">
-          <div className="pagination-info">
-            แสดง {filteredQueue.length > 0 ? startIndex + 1 : 0} ถึง{' '}
-            {Math.min(startIndex + itemsPerPage, filteredQueue.length)} จาก {filteredQueue.length} รายการ
-          </div>
-          <div className="pagination-controls">
-            <button
-              type="button"
-              className="pagination-btn pagination-prev"
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-            >
-              ย้อนกลับ
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-              <button
-                key={pageNum}
-                type="button"
-                className={`pagination-btn pagination-num ${currentPage === pageNum ? 'active' : ''}`}
-                onClick={() => setCurrentPage(pageNum)}
-              >
-                {pageNum}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="pagination-btn pagination-next"
-              disabled={currentPage === totalPages || totalPages === 0}
-              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-            >
-              ถัดไป
-            </button>
-          </div>
-        </div>
+        {/* Modern Pagination Footer (5-slot sliding window, jump input, auto-clamp) */}
+        <Pagination
+          currentPage={validCurrentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          itemsPerPage={itemsPerPage}
+          onPageChange={(p) => setCurrentPage(p)}
+        />
       </div>
 
       {/* Modern Modal for Editing Status */}

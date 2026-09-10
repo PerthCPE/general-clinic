@@ -1,5 +1,5 @@
 import React from 'react';
-import type { TriageLevelKey, TriageLevelInfo } from '../types';
+import type { TriageLevelNum, TriageLevelKey, TriageLevelInfo } from '../types';
 
 export const TRIAGE_LEVELS: TriageLevelInfo[] = [
   {
@@ -49,9 +49,9 @@ export const TRIAGE_LEVELS: TriageLevelInfo[] = [
 ];
 
 interface TriageWidgetProps {
-  selectedTriage: TriageLevelKey;
-  onSelectTriage: (level: TriageLevelKey) => void;
-  suggestedLevel?: TriageLevelKey;
+  selectedTriage: TriageLevelNum | TriageLevelKey;
+  onSelectTriage: (level: TriageLevelNum) => void;
+  suggestedLevel?: TriageLevelNum | TriageLevelKey;
 }
 
 export const TriageWidget: React.FC<TriageWidgetProps> = ({
@@ -59,6 +59,11 @@ export const TriageWidget: React.FC<TriageWidgetProps> = ({
   onSelectTriage,
   suggestedLevel,
 }) => {
+  const suggestedInfo = TRIAGE_LEVELS.find(
+    (lvl) => lvl.levelNum === suggestedLevel || lvl.key === suggestedLevel
+  );
+  const showSuggestNotice = suggestedInfo && suggestedInfo.levelNum !== 4;
+
   return (
     <div className="vitals-widget-card">
       <div className="vitals-widget-header">
@@ -76,7 +81,7 @@ export const TriageWidget: React.FC<TriageWidgetProps> = ({
           </div>
           <div>
             <h3 className="vitals-widget-title">ระดับการคัดแยก (Triage Level)</h3>
-            <p className="vitals-widget-subtitle">Emergency Acuity Classification</p>
+            <p className="vitals-widget-subtitle">Emergency Acuity Classification (1-4)</p>
           </div>
         </div>
       </div>
@@ -84,13 +89,13 @@ export const TriageWidget: React.FC<TriageWidgetProps> = ({
       <div className="vitals-widget-body">
 
         {/* Suggestion notice if vitals trigger high priority */}
-        {suggestedLevel && suggestedLevel !== 'ปกติ (Normal)' && (
+        {showSuggestNotice && suggestedInfo && (
           <div className="triage-suggest-notice">
             <svg className="suggest-alert-icon" viewBox="0 0 20 20" width="16" height="16" fill="currentColor">
               <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
             <span>
-              ระบบตรวจพบค่าสัญญาณชีพผิดปกติ แนะนำ: <strong>{suggestedLevel}</strong>
+              ระบบตรวจพบค่าสัญญาณชีพผิดปกติ แนะนำ: <strong>{suggestedInfo.labelTh}</strong>
             </span>
           </div>
         )}
@@ -98,13 +103,13 @@ export const TriageWidget: React.FC<TriageWidgetProps> = ({
         {/* 4 Level Selection Grid */}
         <div className="triage-level-options">
           {TRIAGE_LEVELS.map((lvl) => {
-            const isSelected = selectedTriage === lvl.key;
+            const isSelected = selectedTriage === lvl.levelNum || selectedTriage === lvl.key;
             return (
               <button
-                key={lvl.key}
+                key={lvl.levelNum}
                 type="button"
                 className={`triage-option-btn ${lvl.badgeClass} ${isSelected ? 'active' : ''}`}
-                onClick={() => onSelectTriage(lvl.key)}
+                onClick={() => onSelectTriage(lvl.levelNum)}
               >
                 <div className="triage-opt-indicator"></div>
                 <div className="triage-opt-content">
@@ -122,3 +127,4 @@ export const TriageWidget: React.FC<TriageWidgetProps> = ({
     </div>
   );
 };
+

@@ -1,0 +1,186 @@
+/* ================================================================
+   ===== GLOBAL TOAST NOTIFICATION SYSTEM STYLES =====
+   ================================================================ */
+
+.global-toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 420px;
+  width: calc(100vw - 32px);
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.global-toast-item {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #FFFFFF;
+  color: #1E293B;
+  border: 1px solid #E2E8F0;
+  border-left-width: 4px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  font-family: var(--font-primary, 'IBM Plex Sans Thai', 'Inter', sans-serif);
+  font-size: 14px;
+  line-height: 1.45;
+  outline: none;
+  animation: globalToastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+}
+
+.global-toast-item:focus-visible {
+  box-shadow: 0 0 0 2px #2563EB, 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+}
+
+/* ===== 4 Color Variants ===== */
+.global-toast-item.global-toast-success {
+  border-left-color: #16A34A;
+}
+
+.global-toast-item.global-toast-error {
+  border-left-color: #DC2626;
+}
+
+.global-toast-item.global-toast-warning {
+  border-left-color: #EA580C;
+}
+
+.global-toast-item.global-toast-info {
+  border-left-color: #2563EB;
+}
+
+/* ===== Icon Styling ===== */
+.global-toast-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.global-toast-icon.success {
+  color: #16A34A;
+}
+
+.global-toast-icon.error {
+  color: #DC2626;
+}
+
+.global-toast-icon.warning {
+  color: #EA580C;
+}
+
+.global-toast-icon.info {
+  color: #2563EB;
+}
+
+/* ===== Message Content ===== */
+.global-toast-message {
+  flex: 1;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+/* ===== Close Button ===== */
+.global-toast-close-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  margin: -2px -4px -2px 0;
+  color: #94A3B8;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.global-toast-close-btn:hover {
+  color: #475569;
+  background-color: #F1F5F9;
+}
+
+/* ===== Dark Mode (Elevated Dark Slate Palette) ===== */
+.dark-mode .global-toast-item,
+[data-theme="dark"] .global-toast-item,
+body.dark-mode .global-toast-item {
+  background: #1C2230;
+  color: #F1F5F9;
+  border-color: #333F53;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+}
+
+.dark-mode .global-toast-item.global-toast-success,
+[data-theme="dark"] .global-toast-item.global-toast-success,
+body.dark-mode .global-toast-item.global-toast-success {
+  border-left-color: #16A34A;
+}
+
+.dark-mode .global-toast-item.global-toast-error,
+[data-theme="dark"] .global-toast-item.global-toast-error,
+body.dark-mode .global-toast-item.global-toast-error {
+  border-left-color: #DC2626;
+}
+
+.dark-mode .global-toast-item.global-toast-warning,
+[data-theme="dark"] .global-toast-item.global-toast-warning,
+body.dark-mode .global-toast-item.global-toast-warning {
+  border-left-color: #EA580C;
+}
+
+.dark-mode .global-toast-item.global-toast-info,
+[data-theme="dark"] .global-toast-item.global-toast-info,
+body.dark-mode .global-toast-item.global-toast-info {
+  border-left-color: #2563EB;
+}
+
+.dark-mode .global-toast-close-btn,
+[data-theme="dark"] .global-toast-close-btn,
+body.dark-mode .global-toast-close-btn {
+  color: #64748B;
+}
+
+.dark-mode .global-toast-close-btn:hover,
+[data-theme="dark"] .global-toast-close-btn:hover,
+body.dark-mode .global-toast-close-btn:hover {
+  color: #CBD5E1;
+  background-color: #273142;
+}
+
+/* ===== Animations ===== */
+@keyframes globalToastSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateX(40px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+/* ===== Responsive (Mobile & Tablet) ===== */
+@media (max-width: 768px) {
+  .global-toast-container {
+    bottom: 16px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+    max-width: none;
+  }
+  
+  .global-toast-item {
+    padding: 12px 14px;
+    font-size: 13.5px;
+  }
+}

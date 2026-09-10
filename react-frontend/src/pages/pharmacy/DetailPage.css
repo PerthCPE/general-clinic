@@ -745,7 +745,7 @@ body.dark-mode .detail-page-container .alert-text strong {
 /* Toast Notification Banner - Compact & Clean UI */
 .detail-page-container .bottom-left-toast {
   position: fixed;
-  top: 88px;
+  top: 24px;
   right: 28px;
   padding: 10px 18px;
   border-radius: 12px;
@@ -757,7 +757,7 @@ body.dark-mode .detail-page-container .alert-text strong {
   align-items: center;
   gap: 10px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.12), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
-  z-index: 999;
+  z-index: 99999;
   animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   transition: opacity 0.4s ease, transform 0.4s ease;
 }
@@ -877,8 +877,8 @@ body.dark-mode .detail-page-container table {
 }
 
 .detail-page-container table th {
-  font-size: 0.92rem !important;
-  font-weight: 500 !important;
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
 }
 
 body.dark-mode .detail-page-container table th {
@@ -887,7 +887,7 @@ body.dark-mode .detail-page-container table th {
 }
 
 .detail-page-container table td {
-  font-size: 0.95rem;
+  font-size: 13.5px !important;
 }
 
 body.dark-mode .detail-page-container table tr {
@@ -1055,6 +1055,12 @@ body.dark-mode .detail-page-container input[type="text"] {
   background-color: #0F172A !important;
   border-color: #334155 !important;
   color: #F8FAFC !important;
+}
+
+body.dark-mode .detail-page-container .search-card button {
+  background-color: #1E293B !important;
+  border-color: #334155 !important;
+  color: #E2E8F0 !important;
 }
 
 /* Recent Patients Table Smooth Scrollbar */

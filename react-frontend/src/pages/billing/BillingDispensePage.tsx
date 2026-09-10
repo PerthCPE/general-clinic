@@ -1,11 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import './BillingDispensePage.css';
-import { CLINIC_CONFIG, type PatientConfig } from '../../config/clinicConfig';
+import { CLINIC_CONFIG, type PatientConfig, normalizeScheme, SCHEME_LABELS, calculateBenefitAmounts } from '../../config/clinicConfig';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
 import { BillingDispenseSkeleton } from '../../components/Common/ClinicSkeleton';
 import { playBillingNotification } from '../../utils/audioQueue';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
+import { formatNationalId } from '../../utils/formatters';
+import { RefreshCw } from 'lucide-react';
 
 interface ToastState {
   message: string;
@@ -125,6 +127,7 @@ export default function BillingDispensePage({
   }, [localPatientId]);
   const [isSearchExpanded, setIsSearchExpanded] = useState(true);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // คิวเริ่มต้น - เริ่มเป็น [] จนกว่าจะดึงข้อมูลจาก DB ได้
   const [queueList, setQueueList] = useState<PatientConfig[]>([]);
@@ -277,8 +280,7 @@ export default function BillingDispensePage({
   };
 
   // Real-time Queue & Billing Listener (ดึงทั้งคิวรอชำระเงิน และประวัติที่ชำระเงินเสร็จสิ้นแล้ว ซิงค์ตรงกับระบบจัดการยา 100%)
-  useEffect(() => {
-    const fetchInitialQueue = async (isFirst = false) => {
+  const fetchInitialQueue = useCallback(async (isFirst = false) => {
       const startTime = Date.now();
       try {
         const token = localStorage.getItem('token');
@@ -368,7 +370,8 @@ export default function BillingDispensePage({
               shortName: pName,
               gender: pq.gender || 'หญิง',
               age: pq.age || 35,
-              treatmentRights: pq.scheme_type || 'บัตรทอง (สปสช.)',
+              treatmentRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+              registeredRights: pq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
               patientType: 'ผู้ป่วยนอก (OPD)' as const,
               allergies: cleanAllergies(pq.allergies ? [pq.allergies] : ['ไม่มีประวัติแพ้ยา']),
               chronicDiseases: cleanChronicDiseases(pq.chronic_diseases || 'ไม่มี'),
@@ -415,7 +418,8 @@ export default function BillingDispensePage({
                 shortName: bq.patient_name || 'ผู้ป่วย',
                 gender: bq.gender || 'หญิง',
                 age: bq.age || 35,
-                treatmentRights: bq.scheme_type || 'บัตรทอง (สปสช.)',
+                treatmentRights: bq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+                registeredRights: bq.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
                 patientType: 'ผู้ป่วยนอก (OPD)' as const,
                 allergies: cleanAllergies(bq.allergies ? [bq.allergies] : ['ไม่มีประวัติแพ้ยา']),
                 chronicDiseases: cleanChronicDiseases(bq.chronic_diseases || 'ไม่มี'),
@@ -480,6 +484,7 @@ export default function BillingDispensePage({
                 gender: 'ชาย',
                 age: 35,
                 treatmentRights: 'ชำระเงินแล้ว',
+                registeredRights: bh.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
                 patientType: 'ผู้ป่วยนอก (OPD)' as const,
                 allergies: cleanAllergies(bh.allergies ? [bh.allergies] : ['ไม่มีประวัติแพ้ยา']),
                 chronicDiseases: cleanChronicDiseases(bh.chronic_diseases || 'ไม่มี'),
@@ -546,8 +551,21 @@ export default function BillingDispensePage({
           }, remaining);
         }
       }
-    };
-    
+    }, [masterMedicines]);
+
+  const handleRefreshBilling = async () => {
+    setIsRefreshing(true);
+    try {
+      await fetchInitialQueue();
+      triggerToast('อัปเดตข้อมูลคิวการเงินล่าสุดเรียบร้อย', 'success');
+    } catch (err) {
+      console.error('Failed to refresh billing queue:', err);
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
+  };
+
+  useEffect(() => {
     fetchInitialQueue(true);
 
     // Smart Background Polling ทุกๆ 12 วินาที เพื่อดึงคิวการเงินล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket เรียลไทม์)
@@ -561,8 +579,7 @@ export default function BillingDispensePage({
       fetchInitialQueue();
       if (data) {
         const pName = data.patient_name || 'ผู้ป่วย';
-        triggerToast(`ได้รับคิวใหม่สำหรับการเงิน: ${pName} (${data.queue_number || ''})`, 'doctor');
-
+        triggerToast(`รับคิวชำระเงินเข้ามาใหม่ — ${pName}`, 'doctor');
       }
     });
 
@@ -606,7 +623,7 @@ export default function BillingDispensePage({
       unsubBillHist();
       unsubPay();
     };
-  }, [subscribe, masterMedicines.length]);
+  }, [subscribe, fetchInitialQueue]);
 
   // Real-time Query Medications from DB for Active Billing Patient
   useEffect(() => {
@@ -733,21 +750,41 @@ export default function BillingDispensePage({
     }
   };
 
+  const rawMedTotal = activePatient && Array.isArray(activePatient.medications) 
+    ? activePatient.medications.reduce((sum, m: any) => sum + ((Number(m?.price || m?.unit_price) || 0) * (Number(m?.quantity) || 1)), 0) 
+    : 0;
+
+  const currentRegisteredRights = activePatient?.registeredRights || activePatient?.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
+  const currentSelectedRights = currentRights || activePatient?.treatmentRights || 'สิทธิ 30 บาท (บัตรทอง / สปสช.)';
+  const currentRegisteredKey = normalizeScheme(currentRegisteredRights);
+  const currentSelectedKey = normalizeScheme(currentSelectedRights);
+  const isRightsMismatch = currentRegisteredKey !== currentSelectedKey;
+  const benefitResult = calculateBenefitAmounts(rawMedTotal, currentSelectedKey);
+  const medTotal = benefitResult.netTotal;
+
   const handleProceedToInvoice = () => {
     if (!activePatient) return;
+
+    if (isRightsMismatch) {
+      const confirmProceed = window.confirm(
+        `สิทธิ์ที่เลือกไม่ตรงกับสิทธิ์ที่บันทึกในระบบ: ระบบแสดงคำเตือนให้ตรวจสอบสิทธิ์อีกครั้ง\n\n• สิทธิ์ที่บันทึกในระบบ: ${currentRegisteredRights}\n• สิทธิ์ที่เลือกใช้: ${currentSelectedRights}\n\nคุณต้องการดำเนินการต่อไปยังหน้าออกใบเสร็จหรือไม่?`
+      );
+      if (!confirmProceed) return;
+    }
+
     if (onSelectPatientId) {
       onSelectPatientId(activePatient.id);
     }
     localStorage.setItem('billing_active_patient', activePatient.id);
-    localStorage.setItem('billing_active_patient_data', JSON.stringify(activePatient));
+    localStorage.setItem('billing_active_patient_data', JSON.stringify({
+      ...activePatient,
+      treatmentRights: currentSelectedRights,
+      registeredRights: currentRegisteredRights
+    }));
     if (onNavigateToBilling) {
       onNavigateToBilling();
     }
   };
-
-  const medTotal = activePatient && Array.isArray(activePatient.medications) 
-    ? activePatient.medications.reduce((sum, m: any) => sum + ((Number(m?.price || m?.unit_price) || 0) * (Number(m?.quantity) || 1)), 0) 
-    : 0;
 
   if (isInitialLoading) {
     return <BillingDispenseSkeleton />;
@@ -923,6 +960,7 @@ export default function BillingDispensePage({
                     borderRadius: '8px',
                     border: '1px solid #CBD5E1',
                     fontSize: '13.5px',
+                    height: '42px',
                     outline: 'none',
                     boxSizing: 'border-box'
                   }}
@@ -938,7 +976,7 @@ export default function BillingDispensePage({
                 <button
                   onClick={() => setSearchQueueInput('')}
                   style={{
-                    padding: '9px 14px',
+                    padding: '0 14px',
                     borderRadius: '8px',
                     border: '1px solid #CBD5E1',
                     background: '#F1F5F9',
@@ -948,7 +986,9 @@ export default function BillingDispensePage({
                     cursor: 'pointer',
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: '4px'
+                    gap: '4px',
+                    height: '42px',
+                    boxSizing: 'border-box'
                   }}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -958,6 +998,32 @@ export default function BillingDispensePage({
                   ล้าง
                 </button>
               )}
+              <button
+                onClick={handleRefreshBilling}
+                disabled={isRefreshing}
+                title="รีเฟรชข้อมูลคิวล่าสุดจากระบบแพทย์และห้องยา"
+                style={{
+                  padding: '0 16px',
+                  background: '#F1F5F9',
+                  color: '#334155',
+                  border: '1.5px solid #CBD5E1',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  fontSize: '13.5px',
+                  height: '42px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  transition: 'all 0.2s ease',
+                  flexShrink: 0,
+                  boxSizing: 'border-box'
+                }}
+              >
+                <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} style={{ color: '#2563EB' }} />
+                <span>รีเฟรชข้อมูล</span>
+              </button>
             </div>
 
             {/* Status Filter Tabs (เหมือนหน้าจัดการยา) */}
@@ -1019,25 +1085,27 @@ export default function BillingDispensePage({
             <div 
               className="billing-queue-scroll-container"
               style={{ 
-                overflowX: 'auto', 
+                overflowX: 'hidden', 
                 overflowY: 'auto', 
                 maxHeight: '340px', 
                 border: '1px solid #E2E8F0', 
                 borderRadius: '10px',
-                marginTop: '4px'
+                marginTop: '4px',
+                width: '100%',
+                boxSizing: 'border-box'
               }}
             >
-              <table style={{ width: '100%', minWidth: '960px', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13.5px' }}>
+              <table style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--bg-card, #F8FAFC)' }}>
-                  <tr style={{ color: 'var(--text-primary)', background: 'var(--bg-card, #F8FAFC)', borderBottom: '2px solid #E2E8F0', height: '46px', whiteSpace: 'nowrap' }}>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '90px' }}>ลำดับคิว</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '100px' }}>HN</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '100px' }}>VN</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '140px' }}>เลขบัตรประชาชน</th>
-                    <th style={{ padding: '12px 14px 12px 30px', fontWeight: '700', fontSize: '13.5px', textAlign: 'left', minWidth: '180px' }}>ชื่อ-นามสกุล</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '110px' }}>สถานะคิว</th>
-                    <th style={{ padding: '12px 10px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '140px' }}>สิทธิการรักษา</th>
-                    <th style={{ padding: '12px 12px', fontWeight: '700', fontSize: '13.5px', textAlign: 'center', width: '130px' }}>การดำเนินการ</th>
+                  <tr style={{ color: 'var(--text-primary)', background: 'var(--bg-card, #F8FAFC)', borderBottom: '2px solid #E2E8F0', height: '44px', whiteSpace: 'nowrap' }}>
+                    <th style={{ padding: '10px 2px', fontWeight: '700', fontSize: '13px', textAlign: 'center', width: '7.5%' }}>ลำดับคิว</th>
+                    <th style={{ padding: '10px 2px', fontWeight: '700', fontSize: '13px', textAlign: 'center', width: '8.5%' }}>HN</th>
+                    <th style={{ padding: '10px 2px', fontWeight: '700', fontSize: '13px', textAlign: 'center', width: '10.5%' }}>VN</th>
+                    <th style={{ padding: '10px 2px', fontWeight: '700', fontSize: '13px', textAlign: 'center', width: '14.5%' }}>เลขบัตรประชาชน</th>
+                    <th style={{ padding: '10px 8px 10px 14px', fontWeight: '700', fontSize: '13px', textAlign: 'left', width: '18%' }}>ชื่อ-นามสกุล</th>
+                    <th style={{ padding: '10px 2px', fontWeight: '700', fontSize: '13px', textAlign: 'center', width: '13%' }}>สถานะคิว</th>
+                    <th style={{ padding: '10px 2px', fontWeight: '700', fontSize: '13px', textAlign: 'center', width: '15.5%' }}>สิทธิการรักษา</th>
+                    <th style={{ padding: '10px 2px', fontWeight: '700', fontSize: '13px', textAlign: 'center', width: '12.5%' }}>การดำเนินการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1056,11 +1124,11 @@ export default function BillingDispensePage({
                             transition: 'background 0.15s ease'
                           }}
                         >
-                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                          <td style={{ padding: '8px 2px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                             <span style={{ 
                               color: isCompleted ? '#64748B' : '#2563EB', 
                               fontWeight: '700', 
-                              fontSize: '14px',
+                              fontSize: '13px',
                               fontFamily: 'monospace',
                               whiteSpace: 'nowrap', 
                               display: 'inline-block'
@@ -1068,37 +1136,57 @@ export default function BillingDispensePage({
                               {p.queueNumber && p.queueNumber.startsWith('Q') ? p.queueNumber : (p.queueNumber || `Q${String(index + 1).padStart(4, '0')}`)}
                             </span>
                           </td>
-                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                            <CopyableText value={(p.hn || '').replace(/[-]/g, '')} color={isCompleted ? '#64748B' : '#2563EB'} />
+                          <td style={{ padding: '8px 2px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                            <CopyableText 
+                              value={(p.hn || '').replace(/[-]/g, '')} 
+                              color={isCompleted ? '#64748B' : '#2563EB'} 
+                              style={{ padding: '2px 4px', gap: '3px', fontSize: '12.5px' }}
+                            />
                           </td>
-                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
-                            <span style={{ color: isCompleted ? '#94A3B8' : 'var(--text-primary)', fontWeight: '600', fontFamily: 'monospace', fontSize: '12.5px' }}>
-                              <CopyableText value={p.vn || '-'} />
+                          <td style={{ padding: '8px 2px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                            <span style={{ color: isCompleted ? '#94A3B8' : 'var(--text-primary)', fontWeight: '600', fontFamily: 'monospace', fontSize: '12px' }}>
+                              <CopyableText value={p.vn || '-'} style={{ padding: '2px 4px', gap: '3px', fontSize: '12px' }} />
                             </span>
                           </td>
-                          <td className="patient-table-sub" style={{ padding: '10px 10px', fontFamily: 'monospace', fontSize: '13px', whiteSpace: 'nowrap', textAlign: 'center', color: isCompleted ? '#94A3B8' : '#64748B' }}>
-                            {p.nationalId || '-'}
+                          <td className="patient-table-sub" style={{ padding: '8px 2px', fontFamily: 'monospace', fontSize: '12px', whiteSpace: 'nowrap', textAlign: 'center', color: isCompleted ? '#94A3B8' : '#64748B' }}>
+                            {p.nationalId && p.nationalId !== '-' ? (
+                              <CopyableText 
+                                value={p.nationalId.replace(/-/g, '')} 
+                                displayValue={formatNationalId(p.nationalId)} 
+                                color={isCompleted ? '#94A3B8' : '#475569'} 
+                                style={{ padding: '2px 4px', gap: '3px', fontSize: '11.5px' }}
+                              />
+                            ) : '-'}
                           </td>
-                          <td style={{ padding: '10px 14px 10px 30px', whiteSpace: 'nowrap', textAlign: 'left' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontWeight: '700', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isCompleted ? '#64748B' : '#2563EB'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                <circle cx="12" cy="7" r="4"/>
-                              </svg>
+                          <td style={{ padding: '8px 8px 8px 14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}>
+                            <span 
+                              title={p.name}
+                              style={{ 
+                                fontWeight: '700', 
+                                color: 'var(--text-primary)', 
+                                fontSize: '13px', 
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                display: 'inline-block',
+                                maxWidth: '100%'
+                              }}
+                            >
                               {p.name}
-                            </div>
+                            </span>
                           </td>
-                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                          <td style={{ padding: '8px 2px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                             <span style={{ 
                               background: isCompleted ? '#F0FDF4' : '#DBEAFE',
                               color: isCompleted ? '#15803D' : '#1E40AF',
                               border: `1.5px solid ${isCompleted ? '#86EFAC' : '#93C5FD'}`,
-                              padding: '4px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700',
-                              whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center'
+                              borderRadius: '9999px', fontSize: '11.5px', fontWeight: '700',
+                              whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center',
+                              width: '100px', minWidth: '100px', maxWidth: '100px', height: '26px', boxSizing: 'border-box'
                             }}>
                               {isCompleted ? (
-                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="20 6 9 17 4 12"></polyline>
                                   </svg>
                                   ชำระเงินแล้ว
@@ -1108,9 +1196,9 @@ export default function BillingDispensePage({
                               )}
                             </span>
                           </td>
-                          <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                          <td style={{ padding: '8px 2px', whiteSpace: 'nowrap', textAlign: 'center' }}>
                             {(() => {
-                              const rights = p.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
+                              const rights = p.registeredRights || p.treatmentRights || 'สิทธิ 30 บาท (สปสช.)';
                               const is30 = rights.includes('30') || rights.includes('สปสช') || rights.includes('บัตรทอง');
                               const isSSO = rights.includes('ประกันสังคม');
                               const isGov = rights.includes('ข้าราชการ') || rights.includes('รัฐวิสาหกิจ');
@@ -1156,9 +1244,9 @@ export default function BillingDispensePage({
                                     background: bg,
                                     color: color,
                                     border: `1.5px solid ${border}`,
-                                    padding: '4px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: '700',
+                                    borderRadius: '9999px', fontSize: '11.5px', fontWeight: '700',
                                     whiteSpace: 'nowrap', display: 'inline-flex', justifyContent: 'center', alignItems: 'center',
-                                    minWidth: '100px'
+                                    width: '124px', minWidth: '124px', maxWidth: '124px', height: '26px', boxSizing: 'border-box'
                                   }}
                                 >
                                   {label}
@@ -1166,7 +1254,7 @@ export default function BillingDispensePage({
                               );
                             })()}
                           </td>
-                          <td style={{ padding: '10px 12px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '8px 2px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                             {isCompleted ? (
                               <button 
                                 type="button"
@@ -1178,25 +1266,29 @@ export default function BillingDispensePage({
                                   }
                                 }}
                                 style={{ 
-                                  padding: '6px 14px', 
+                                  width: '92px',
+                                  minWidth: '92px',
+                                  maxWidth: '92px',
+                                  height: '28px',
                                   background: isSelected ? '#0D9488' : '#F0FDFA', 
                                   color: isSelected ? '#FFFFFF' : '#0F766E', 
                                   border: '1.5px solid #99F6E4', 
-                                  borderRadius: '8px', 
+                                  borderRadius: '7px', 
                                   cursor: 'pointer', 
                                   fontWeight: '700', 
-                                  fontSize: '12.5px',
+                                  fontSize: '11.5px',
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
                                   justifyContent: 'center', 
-                                  gap: '5px',
+                                  gap: '4px',
                                   whiteSpace: 'nowrap',
                                   boxShadow: isSelected ? '0 2px 4px rgba(13, 148, 136, 0.25)' : 'none',
-                                  transition: 'all 0.15s ease'
+                                  transition: 'all 0.15s ease',
+                                  boxSizing: 'border-box'
                                 }}
                                 title="ดูรายละเอียดใบเสร็จและรายการที่ชำระแล้ว"
                               >
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
                                   <polyline points="20 6 9 17 4 12"></polyline>
                                 </svg>
                                 ดูใบเสร็จ
@@ -1209,25 +1301,29 @@ export default function BillingDispensePage({
                                   localStorage.setItem('billing_active_patient_data', JSON.stringify(p));
                                 }}
                                 style={{ 
-                                  padding: '6px 14px', 
+                                  width: '92px',
+                                  minWidth: '92px',
+                                  maxWidth: '92px',
+                                  height: '28px',
                                   background: isSelected ? '#10B981' : '#2563EB', 
                                   color: 'white', 
                                   border: 'none', 
-                                  borderRadius: '8px', 
+                                  borderRadius: '7px', 
                                   cursor: 'pointer', 
                                   fontWeight: '700', 
-                                  fontSize: '12.5px',
+                                  fontSize: '11.5px',
                                   display: 'inline-flex', 
                                   alignItems: 'center', 
                                   justifyContent: 'center', 
-                                  gap: '5px',
+                                  gap: '4px',
                                   whiteSpace: 'nowrap',
                                   boxShadow: isSelected ? '0 2px 6px rgba(16, 185, 129, 0.25)' : '0 2px 6px rgba(37, 99, 235, 0.25)',
-                                  transition: 'all 0.15s ease'
+                                  transition: 'all 0.15s ease',
+                                  boxSizing: 'border-box'
                                 }}
                                 title="เลือกคนไข้นี้เพื่อคิดเงินและออกบิล"
                               >
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                   <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
                                 </svg>
                                 {isSelected ? 'เลือกอยู่' : 'เลือกคิว'}
@@ -1239,7 +1335,7 @@ export default function BillingDispensePage({
                     })
                   ) : (
                     <tr>
-                      <td colSpan={7} style={{ padding: '24px', textAlign: 'center', color: '#64748B', background: 'var(--bg-card, #F8FAFC)' }}>
+                      <td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: '#64748B', background: 'var(--bg-card, #F8FAFC)' }}>
                         ไม่พบข้อมูลผู้ป่วยที่ตรงกับเงื่อนไขการค้นหา
                       </td>
                     </tr>
@@ -1298,8 +1394,9 @@ export default function BillingDispensePage({
                       <CopyableText label="HN" value={(activePatient.hn || '').replace(/[-]/g, '')} color="#1E40AF" />
                     </span>
                     {(activePatient.status === 'completed' || activePatient.visitStatus?.includes('เสร็จสิ้น') || activePatient.visitStatus?.includes('ชำระเงินแล้ว')) && (
-                      <span style={{ background: '#DCFCE7', color: '#15803D', border: '1.5px solid #86EFAC', padding: '4px 10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '700' }}>
-                        ✓ ชำระเงินแล้ว
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#DCFCE7', color: '#15803D', border: '1.5px solid #86EFAC', padding: '4px 10px', borderRadius: '8px', fontSize: '12.5px', fontWeight: '700' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        ชำระเงินแล้ว
                       </span>
                     )}
                   </div>
@@ -1320,7 +1417,12 @@ export default function BillingDispensePage({
                     <>
                       <span style={{ color: '#CBD5E1' }}>•</span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--text-primary)', fontWeight: '600' }}>
-                        <CopyableText label="เลขบัตร ปชช." value={activePatient.nationalId} color="#0F172A" />
+                        <CopyableText 
+                          label="เลขบัตร ปชช." 
+                          value={activePatient.nationalId.replace(/-/g, '')} 
+                          displayValue={formatNationalId(activePatient.nationalId)} 
+                          color="#0F172A" 
+                        />
                       </span>
                     </>
                   )}
@@ -1334,7 +1436,7 @@ export default function BillingDispensePage({
                   สิทธิการรักษา (TREATMENT RIGHTS)
                 </span>
                 <span className="info-val" style={{ color: '#1D4ED8', fontWeight: '800', fontSize: '15px' }}>
-                  {currentRights}
+                  {activePatient?.registeredRights || activePatient?.treatmentRights || 'จ่ายตรง / เงินสด (Self Pay / Cash)'}
                 </span>
               </div>
               <div className="info-box">
@@ -1560,6 +1662,62 @@ export default function BillingDispensePage({
                 <option value="ประกันสุขภาพเอกชน (Private Insurance)">ประกันสุขภาพเอกชน (Private Insurance)</option>
                 <option value="จ่ายตรง / เงินสด (Self Pay / Cash)">จ่ายตรง / เงินสด (Self Pay / Cash)</option>
               </select>
+
+              {/* Warning box when selected rights do not match registered rights */}
+              {isRightsMismatch && (
+                <div style={{
+                  marginTop: '12px',
+                  padding: '12px 14px',
+                  background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.7) 0%, rgba(254, 249, 195, 0.4) 100%)',
+                  border: '1px solid rgba(245, 158, 11, 0.45)',
+                  borderRadius: '10px',
+                  color: '#92400E',
+                  fontSize: '12px',
+                  lineHeight: '1.45',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  textAlign: 'left',
+                  boxShadow: '0 2px 8px -2px rgba(245, 158, 11, 0.15)'
+                }}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '8px',
+                    backgroundColor: '#FEF3C7',
+                    color: '#D97706',
+                    flexShrink: 0,
+                    marginTop: '2px'
+                  }}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                      <line x1="12" y1="9" x2="12" y2="13"/>
+                      <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: '700', color: '#B45309', fontSize: '12.5px' }}>
+                      สิทธิ์ที่เลือกไม่ตรงกับสิทธิ์ที่บันทึกในระบบ: ระบบแสดงคำเตือนให้ตรวจสอบสิทธิ์อีกครั้ง
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px', fontSize: '11px' }}>
+                      <span style={{ color: '#78350F' }}>สิทธิ์ในระบบ:</span>
+                      <span style={{ padding: '1px 6px', borderRadius: '4px', backgroundColor: '#EDE9FE', color: '#6D28D9', fontWeight: '600' }}>
+                        {currentRegisteredRights}
+                      </span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                      </svg>
+                      <span style={{ color: '#78350F' }}>สิทธิ์ที่เลือก:</span>
+                      <span style={{ padding: '1px 6px', borderRadius: '4px', backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: '600' }}>
+                        {currentSelectedRights}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="summary-items">
@@ -1582,6 +1740,18 @@ export default function BillingDispensePage({
             </div>
 
             <div className="summary-divider"></div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#64748B', fontSize: '13px', marginBottom: '6px' }}>
+              <span>ค่ายารวมก่อนหักสิทธิ์:</span>
+              <span>฿ {rawMedTotal.toLocaleString()}</span>
+            </div>
+
+            {benefitResult.discountAmount > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16A34A', fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>
+                <span>ส่วนลดสิทธิ ({benefitResult.schemeLabel}):</span>
+                <span>- ฿ {benefitResult.discountAmount.toLocaleString()}</span>
+              </div>
+            )}
 
             <div className="summary-total-row main-total">
               <span>ค่ายารวมสุทธิ:</span>

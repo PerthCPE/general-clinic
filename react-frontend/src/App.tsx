@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WebSocketProvider } from './context/WebSocketContext';
+import { ToastProvider } from './components/Toast/ToastProvider';
 import Sidebar from './components/Sidebar/Sidebar';
 import Topbar from './components/Topbar/Topbar';
 import { GlobalAudioListener } from './components/GlobalAudioListener/GlobalAudioListener';
@@ -82,15 +83,7 @@ function MainApp() {
   };
 
   if (!isAuthenticated) {
-    return (
-      <LoginPage
-        onLoginSuccess={() => {
-          if (currentUser) {
-            setActivePage(ROLE_DEFAULT_PAGES[currentUser.role]);
-          }
-        }}
-      />
-    );
+    return <LoginPage />;
   }
 
   const renderContent = () => {
@@ -256,8 +249,10 @@ function App() {
   return (
     <AuthProvider>
       <WebSocketProvider>
-        <GlobalAudioListener />
-        <MainApp />
+        <ToastProvider>
+          <GlobalAudioListener />
+          <MainApp />
+        </ToastProvider>
       </WebSocketProvider>
     </AuthProvider>
   );
