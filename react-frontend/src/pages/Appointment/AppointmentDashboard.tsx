@@ -32,9 +32,11 @@ export default function AppointmentDashboard() {
   
   const [appointments, setAppointments] = useState<BackendAppointment[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
-  
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 8; 
+  const itemsPerPage = 8;
 
   const isDoctor = currentUser?.role === 'doctor';
   const isRegistrar = currentUser?.role === 'registrar' || currentUser?.role === 'admin';
@@ -44,9 +46,15 @@ export default function AppointmentDashboard() {
       const data = await appointmentApi.getList();
       if (data) {
         setAppointments(data);
+        setErrorMsg(null);
       }
     } catch (err) {
       console.error("Failed to fetch appointments", err);
+      setErrorMsg('ไม่สามารถโหลดข้อมูลการนัดหมายได้ กรุณาลองรีเฟรชหน้านี้ใหม่อีกครั้ง');
+    } finally {
+      // ใช้เกต isLoading เฉพาะตอนโหลดครั้งแรก การรีเฟรชพื้นหลัง (WS / หลังแก้ไข)
+      // ไม่ต้องเด้งกลับไปเป็นหน้า loading เต็มจออีก
+      setIsLoading(false);
     }
   };
 
@@ -131,6 +139,7 @@ export default function AppointmentDashboard() {
       fetchAppointments();
     } catch (err) {
       console.error(err);
+      alert('ไม่สามารถอัปเดตสถานะได้');
     }
   };
 
@@ -159,14 +168,27 @@ export default function AppointmentDashboard() {
       
       <div className="appt-title-row">
         <h1 className="appt-title">แดชบอร์ดสรุปภาพรวมนัดหมาย</h1>
-        <input 
-          type="date" 
-          value={selectedDate} 
+        <input
+          type="date"
+          value={selectedDate}
           onChange={(e) => { setSelectedDate(e.target.value); setCurrentPage(1); }}
           className="appt-date-select"
         />
       </div>
 
+      {errorMsg && (
+        <div className="appt-error-banner">
+          <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="appt-card appt-loading-state">
+          <span className="appt-spinner" />
+          <span>กำลังโหลดข้อมูลนัดหมาย...</span>
+        </div>
+      ) : (
+      <>
       {/* 1. ส่วนการ์ดใหญ่หลัก (ยอดรวม & ความคืบหน้า) */}
       <div className="appt-metrics-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', marginBottom: '16px' }}>
         
@@ -364,6 +386,8 @@ export default function AppointmentDashboard() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }
