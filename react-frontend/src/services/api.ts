@@ -1081,6 +1081,11 @@ export const adminApi = {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
+    bulkUpdateSystemAccess: (payload: { user_id: number; accesses: { module_name: string; access_level: number }[]; }) =>
+      request<{ message: string }>('/api/admin/system-access/bulk', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
   };
 
 export interface BackendAppointment {
