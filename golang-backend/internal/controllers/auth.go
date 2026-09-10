@@ -32,6 +32,14 @@ func Login(c *gin.Context) {
 		return
 	}
 
+	// บัญชีที่ถูกระงับ (suspended) หรือปิดใช้งาน (inactive) ห้าม login สำเร็จ แม้รหัสผ่านจะถูกต้องก็ตาม
+	// เดิมจุดนี้ไม่เคยเช็ค status เลย — บัญชีที่ถูกระงับก็ยังล็อกอินได้ตามปกติ (พบระหว่างสำรวจ
+	// จริง: pharmacist1 มี status="inactive" แต่ยังล็อกอินผ่านได้)
+	if user.Status == "suspended" || user.Status == "inactive" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ"})
+		return
+	}
+
 	// password checking
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
 	if err != nil {
