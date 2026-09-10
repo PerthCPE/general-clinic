@@ -15,6 +15,17 @@ type UpdateAccountStatusRequest struct {
 	Status string `json:"status" binding:"required"`
 }
 
+// DTO สำหรับแก้ไขบัญชีทั้งใบ (ต่างจาก UpdateAccountStatusRequest ที่แก้ได้แค่ status)
+// ทุกฟิลด์เป็น optional — ส่งเฉพาะฟิลด์ที่ต้องการแก้ ฟิลด์ที่เว้นว่างจะไม่ถูกแตะต้อง
+type UpdateAccountRequest struct {
+	FullName   string `json:"fullname"`
+	Email      string `json:"email"`
+	Phone      string `json:"phone"`
+	Role       string `json:"role"`
+	Department string `json:"department"`
+	Status     string `json:"status"`
+}
+
 // DTO สำหรับ System Access
 type CreateSystemAccessRequest struct {
 	UserID      uint   `json:"user_id" binding:"required"`

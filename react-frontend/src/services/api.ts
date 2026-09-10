@@ -1076,6 +1076,11 @@ export const adminApi = {
         method: 'PUT',
         body: JSON.stringify({ status }),
       }),
+    updateAccount: (id: number | string, payload: { fullname?: string; email?: string; phone?: string; role?: string; department?: string; status?: string; }) =>
+      request<{ message: string; user: BackendUser }>('/api/admin/users/' + id, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      }),
     createSystemAccess: (payload: { user_id: number; access_level: number; module_name: string; }) =>
       request<any>('/api/admin/system-access', {
         method: 'POST',

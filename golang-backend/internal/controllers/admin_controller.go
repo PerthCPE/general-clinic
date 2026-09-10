@@ -97,6 +97,55 @@ func (ctrl *AdminController) UpdateAccountStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Status updated successfully"})
 }
 
+// UpdateAccount แก้ไขบัญชีทั้งใบ (ชื่อ/อีเมล/เบอร์โทร/ตำแหน่ง/แผนก/สถานะ)
+// ต่างจาก UpdateAccountStatus ที่แก้ได้แค่ status อย่างเดียว
+func (ctrl *AdminController) UpdateAccount(c *gin.Context) {
+	id := c.Param("id")
+	var req dto.UpdateAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// ส่งเฉพาะฟิลด์ที่ไม่ว่าง เพื่อรองรับการแก้แบบ partial ไม่ให้ฟิลด์ที่ไม่ได้ส่งมาถูกเคลียร์ทิ้ง
+	updates := map[string]interface{}{}
+	if req.FullName != "" {
+		updates["full_name"] = req.FullName
+	}
+	if req.Email != "" {
+		updates["email"] = req.Email
+	}
+	if req.Phone != "" {
+		updates["phone"] = req.Phone
+	}
+	if req.Role != "" {
+		updates["role"] = req.Role
+	}
+	if req.Department != "" {
+		updates["department"] = req.Department
+	}
+	if req.Status != "" {
+		updates["status"] = req.Status
+	}
+
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No fields to update"})
+		return
+	}
+
+	if err := ctrl.DB.Model(&models.User{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update account"})
+		return
+	}
+
+	var user models.User
+	if err := ctrl.DB.First(&user, id).Error; err != nil {
+		c.JSON(http.StatusOK, gin.H{"message": "Account updated successfully"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Account updated successfully", "user": user})
+}
+
 // --- System Access ---
 
 func (ctrl *AdminController) CreateSystemAccess(c *gin.Context) {

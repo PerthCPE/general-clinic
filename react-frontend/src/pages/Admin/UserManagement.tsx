@@ -222,10 +222,17 @@ const UserManagement: React.FC = () => {
         alert('เกิดข้อผิดพลาด: ' + err.message);
       }
     } else {
-      // In edit mode, maybe just update status for now
+      // แก้ไขบัญชีทั้งใบ (ชื่อ/อีเมล/เบอร์โทร/ตำแหน่ง/แผนก/สถานะ) ผ่าน endpoint เดียว
       try {
-        let backendStatus = formData.status === 'กำลังใช้งาน' ? 'active' : (formData.status === 'ระงับใช้งาน' ? 'suspended' : 'pending');
-        await adminApi.updateAccountStatus(formData.internalId, backendStatus);
+        const backendStatus = formData.status === 'กำลังใช้งาน' ? 'active' : (formData.status === 'ระงับใช้งาน' ? 'suspended' : 'pending');
+        await adminApi.updateAccount(formData.internalId, {
+          fullname: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          role: roleToEnglish[formData.role] || 'officer',
+          department: formData.department,
+          status: backendStatus,
+        });
         alert('อัปเดตข้อมูลสำเร็จ');
         fetchUsers();
       } catch (err: any) {

@@ -170,6 +170,7 @@ func SetUpRoutes(r *gin.Engine) {
 	{
 		adminRoutes.GET("/users", adminCtrl.GetAccounts)
 		adminRoutes.POST("/users", adminCtrl.CreateAccount)
+		adminRoutes.PUT("/users/:id", adminCtrl.UpdateAccount)
 		adminRoutes.PUT("/users/:id/status", adminCtrl.UpdateAccountStatus)
 		adminRoutes.POST("/system-access", adminCtrl.CreateSystemAccess)
 		adminRoutes.POST("/system-access/bulk", adminCtrl.BulkUpdateSystemAccess)
