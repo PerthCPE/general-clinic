@@ -231,6 +231,8 @@ func SetUpRoutes(r *gin.Engine) {
 		systemRoutes.GET("/pharmacy/queues", controllers.GetPharmacyQueues)
 		systemRoutes.GET("/medicines", controllers.GetMedicines)
 		systemRoutes.POST("/medicines/create", controllers.CreateMedicine)
+		systemRoutes.POST("/medicines/stock", controllers.UpdateMedicineStock)
+		systemRoutes.POST("/pharmacy/medicines/stock", controllers.UpdateMedicineStock)
 		systemRoutes.PUT("/medicines/:id", controllers.UpdateMedicineDetails)
 		systemRoutes.POST("/medicines/:id", controllers.UpdateMedicineDetails)
 		systemRoutes.POST("/medicines/update", controllers.UpdateMedicineDetails)

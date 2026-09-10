@@ -193,6 +193,38 @@ export default function DetailPage({
 
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // สต็อกยาปัจจุบันจากฐานข้อมูลคลังยา (Synced with DB)
+  const [warehouseStockMap, setWarehouseStockMap] = useState<Record<string, number>>({});
+
+  // ฟังก์ชันซิงค์จำนวนสต็อกยาจริงจากฐานข้อมูลคลังยา
+  const fetchWarehouseStock = useCallback(async (): Promise<Record<string, number>> => {
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+      const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+      let res = await fetch('/api/pharmacy/medicines', { headers });
+      if (!res.ok) res = await fetch('/api/system/medicines');
+      if (res.ok) {
+        const data = await res.json();
+        const meds = data?.medicines || (Array.isArray(data) ? data : []);
+        if (Array.isArray(meds)) {
+          const map: Record<string, number> = {};
+          meds.forEach((m: any) => {
+            const stock = m.stock_quantity !== undefined ? m.stock_quantity : (m.stock !== undefined ? m.stock : 0);
+            if (m.medicine_code) map[m.medicine_code.toLowerCase().trim()] = stock;
+            if (m.name) map[m.name.toLowerCase().trim()] = stock;
+            if (m.id) map[String(m.id).toLowerCase().trim()] = stock;
+          });
+          setWarehouseStockMap(map);
+          return map;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch warehouse stock:', err);
+    }
+    return {};
+  }, []);
+
   // ฟังก์ชันดึงข้อมูลคิวห้องยาจากเซิร์ฟเวอร์แบบ Real-time รองรับการส่งพารามิเตอร์ค้นหา (q)
   const fetchQueues = useCallback(async (isInitial = false, query = '') => {
     const loadStartTime = Date.now();
@@ -201,8 +233,8 @@ export default function DetailPage({
       const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
       const qParam = query ? `?q=${encodeURIComponent(query)}` : '';
 
-      // ดึงทั้งคิวห้องยา และประวัติการเงิน (Billing History) แบบ Parallel เพื่อประสิทธิภาพสูงสุด
-      const [pRes, bRes] = await Promise.all([
+      // ดึงทั้งคิวห้องยา ประวัติการเงิน และสต็อกยาจริงจากคลังยาแบบ Parallel เพื่อประสิทธิภาพสูงสุด
+      const [pRes, bRes, stockData] = await Promise.all([
         fetch(`${API_BASE_URL}/pharmacy/queues${qParam}`, { headers })
           .then(r => r.ok ? r : fetch(`/api/pharmacy/queues${qParam}`, { headers }))
           .then(r => r.ok ? r : fetch(`/api/system/pharmacy/queues${qParam}`))
@@ -210,7 +242,8 @@ export default function DetailPage({
         fetch(`${API_BASE_URL}/billing/history`, { headers })
           .then(r => r.ok ? r : fetch('/api/billing/history', { headers }))
           .then(r => r.ok ? r : fetch('/api/system/billing/history'))
-          .catch(() => null)
+          .catch(() => null),
+        fetchWarehouseStock()
       ]);
 
       let completedHistories: any[] = [];
@@ -264,18 +297,25 @@ export default function DetailPage({
               visitTime: new Date(pq.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
               createdAt: pq.created_at,
               doctorAdvice: cleanDoctorAdvice(pq.doctor_advice),
-              medications: rawMeds.map((m: any) => ({
-                medId: m.medId || m.medicine_code || 'MED-001',
-                name: m.name || m.medicine_name || 'ยาตามแพทย์สั่ง',
-                dosage: cleanDosage(m.dosage, m.name),
-                instructions: cleanInstructions(m.instructions, m.name),
-                stock: m.stock || m.stock_quantity || 100,
-                stockStatus: (m.stock || m.stock_quantity || 100) > 10 ? ('in-stock' as const) : ('low-stock' as const),
-                quantity: m.quantity && m.quantity > 0 ? m.quantity : 10,
-                price: m.price && m.price > 0 ? m.price : (m.unit_price || 15),
-                unit_price: m.unit_price && m.unit_price > 0 ? m.unit_price : (m.price || 15),
-                properties: m.properties || 'บรรเทาอาการตามแพทย์สั่ง'
-              }))
+              medications: rawMeds.map((m: any) => {
+                const medCode = (m.medId || m.medicine_code || '').toLowerCase().trim();
+                const medName = (m.name || m.medicine_name || '').toLowerCase().trim();
+                const currentStock = stockData[medCode] !== undefined 
+                  ? stockData[medCode] 
+                  : (stockData[medName] !== undefined ? stockData[medName] : (m.stock_quantity !== undefined ? m.stock_quantity : (m.stock !== undefined ? m.stock : 0)));
+                return {
+                  medId: m.medId || m.medicine_code || 'MED-001',
+                  name: m.name || m.medicine_name || 'ยาตามแพทย์สั่ง',
+                  dosage: cleanDosage(m.dosage, m.name),
+                  instructions: cleanInstructions(m.instructions, m.name),
+                  stock: currentStock,
+                  stockStatus: currentStock <= 0 ? ('out-stock' as const) : (currentStock <= 10 ? ('low-stock' as const) : ('in-stock' as const)),
+                  quantity: m.quantity && m.quantity > 0 ? m.quantity : 10,
+                  price: m.price && m.price > 0 ? m.price : (m.unit_price || 15),
+                  unit_price: m.unit_price && m.unit_price > 0 ? m.unit_price : (m.price || 15),
+                  properties: m.properties || 'บรรเทาอาการตามแพทย์สั่ง'
+                };
+              })
             };
           });
 
@@ -310,18 +350,25 @@ export default function DetailPage({
                   visitDate: new Date(bh.created_at || Date.now()).toLocaleDateString('th-TH'),
                   visitTime: new Date(bh.created_at || Date.now()).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.',
                   doctorAdvice: cleanDoctorAdvice(bh.doctor_advice),
-                  medications: parsedMeds.map((m: any) => ({
-                    medId: m.medId || m.medicine_code || 'MED-001',
-                    name: m.name || m.medicine_name || 'ยาตามแพทย์สั่ง',
-                    dosage: cleanDosage(m.dosage, m.name || m.medicine_name),
-                    instructions: cleanInstructions(m.instructions, m.name || m.medicine_name),
-                    stock: 100,
-                    stockStatus: 'in-stock',
-                    quantity: m.quantity || 1,
-                    price: m.price || m.unit_price || 0,
-                    unit_price: m.unit_price || m.price || 0,
-                    properties: m.properties || 'บรรเทาอาการตามแพทย์สั่ง'
-                  }))
+                  medications: parsedMeds.map((m: any) => {
+                    const medCode = (m.medId || m.medicine_code || '').toLowerCase().trim();
+                    const medName = (m.name || m.medicine_name || '').toLowerCase().trim();
+                    const currentStock = stockData[medCode] !== undefined 
+                      ? stockData[medCode] 
+                      : (stockData[medName] !== undefined ? stockData[medName] : (m.stock_quantity !== undefined ? m.stock_quantity : (m.stock !== undefined ? m.stock : 0)));
+                    return {
+                      medId: m.medId || m.medicine_code || 'MED-001',
+                      name: m.name || m.medicine_name || 'ยาตามแพทย์สั่ง',
+                      dosage: cleanDosage(m.dosage, m.name || m.medicine_name),
+                      instructions: cleanInstructions(m.instructions, m.name || m.medicine_name),
+                      stock: currentStock,
+                      stockStatus: currentStock <= 0 ? ('out-stock' as const) : (currentStock <= 10 ? ('low-stock' as const) : ('in-stock' as const)),
+                      quantity: m.quantity || 1,
+                      price: m.price || m.unit_price || 0,
+                      unit_price: m.unit_price || m.price || 0,
+                      properties: m.properties || 'บรรเทาอาการตามแพทย์สั่ง'
+                    };
+                  })
                 });
               }
             });
@@ -386,8 +433,8 @@ export default function DetailPage({
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchQueues(false, patientIdInput.trim());
-    triggerToast('อัปเดตข้อมูลคิวห้องยาล่าสุดเรียบร้อย', 'success');
+    await Promise.all([fetchQueues(false, patientIdInput.trim()), fetchWarehouseStock()]);
+    triggerToast('อัปเดตข้อมูลคิวและสต็อกยาในคลังเรียบร้อย', 'success');
   };
 
   const handleSearch = async () => {
@@ -395,16 +442,18 @@ export default function DetailPage({
     await fetchQueues(false, patientIdInput.trim());
   };
 
-  // Real-time Queue Listener จากระบบแพทย์
+  // Real-time Queue Listener จากระบบแพทย์ และ Real-time Stock Sync
   useEffect(() => {
     let isMounted = true;
 
     fetchQueues(true);
+    fetchWarehouseStock();
 
     // Smart Background Polling ทุกๆ 12 วินาที เพื่อดึงคิวล่าสุดอย่างต่อเนื่อง (Fallback คู่กับ WebSocket เรียลไทม์)
     const pollInterval = setInterval(() => {
       if (!document.hidden && isMounted) {
         fetchQueues(false);
+        fetchWarehouseStock();
       }
     }, 12000);
 
@@ -456,6 +505,15 @@ export default function DetailPage({
       triggerToast(`ได้รับใบสั่งยาเรียบร้อย — ${data?.patient_name || 'ผู้ป่วย'}`, 'doctor');
     });
 
+    const unsubStock = subscribe('MEDICINE_STOCK_UPDATED', () => {
+      fetchWarehouseStock();
+    });
+
+    const unsubDispense = subscribe('DISPENSE_RECORDED', () => {
+      fetchWarehouseStock();
+      fetchQueues();
+    });
+
     return () => {
       isMounted = false;
       clearInterval(pollInterval);
@@ -467,8 +525,32 @@ export default function DetailPage({
       unsubVisit();
       unsubCreated();
       unsubMedQ();
+      unsubStock();
+      unsubDispense();
     };
-  }, [subscribe, fetchQueues]);
+  }, [subscribe, fetchQueues, fetchWarehouseStock]);
+
+  // ซิงค์จำนวนยาในตารางใบสั่งยากับจำนวนสต็อกในคลังยาตลอดเวลา
+  useEffect(() => {
+    if (Object.keys(warehouseStockMap).length > 0) {
+      setQueueList(prev => prev.map(p => {
+        if (!p.medications || p.medications.length === 0) return p;
+        const updatedMeds = p.medications.map(med => {
+          const medCode = (med.medId || '').toLowerCase().trim();
+          const medName = (med.name || '').toLowerCase().trim();
+          const realStock = warehouseStockMap[medCode] !== undefined
+            ? warehouseStockMap[medCode]
+            : (warehouseStockMap[medName] !== undefined ? warehouseStockMap[medName] : med.stock);
+          return {
+            ...med,
+            stock: realStock,
+            stockStatus: realStock <= 0 ? ('out-stock' as const) : (realStock <= 10 ? ('low-stock' as const) : ('in-stock' as const))
+          };
+        });
+        return { ...p, medications: updatedMeds };
+      }));
+    }
+  }, [warehouseStockMap]);
 
   // Real-time Query Medications from DB for Active Patient Visit
   useEffect(() => {
@@ -485,6 +567,11 @@ export default function DetailPage({
                 const fetchedMeds = data.dispensing.map((item: any) => {
                   const m = item.medicine || item.Medicine || item;
                   const medName = m.name || item.name || 'ยาบรรเทาอาการ';
+                  const medCode = (m.medicine_code || m.code || `MED-${item.medicine_id || 1}`).toLowerCase().trim();
+                  const nameKey = medName.toLowerCase().trim();
+                  const currentStock = warehouseStockMap[medCode] !== undefined 
+                    ? warehouseStockMap[medCode] 
+                    : (warehouseStockMap[nameKey] !== undefined ? warehouseStockMap[nameKey] : (m.stock_quantity !== undefined ? m.stock_quantity : 0));
                   return {
                     medId: m.medicine_code || m.code || `MED-${item.medicine_id || 1}`,
                     name: medName,
@@ -496,13 +583,53 @@ export default function DetailPage({
                     price: m.unit_price || m.price || 10,
                     unit_price: m.unit_price || m.price || 10,
                     quantity: item.quantity || 10,
-                    stock: m.stock_quantity || 100,
-                    stockStatus: (m.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
+                    stock: currentStock,
+                    stockStatus: (currentStock <= 0 ? 'out-stock' : (currentStock <= 10 ? 'low-stock' : 'in-stock')) as 'in-stock' | 'low-stock' | 'out-stock'
                   };
                 });
                 setQueueList(prev => prev.map(q => q.id === activePatient.id ? { ...q, medications: fetchedMeds } : q));
                 medsFound = true;
               }
+            }
+          }
+
+          if (!medsFound && activePatient.visitId) {
+            try {
+              const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+              const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+              let exRes = await fetch(`/api/doctor/visits/${activePatient.visitId}/examination`, { headers });
+              if (exRes.ok) {
+                const exData = await exRes.json();
+                const examRx = exData.examination?.prescriptions || exData.prescriptions || [];
+                if (Array.isArray(examRx) && examRx.length > 0) {
+                  const fetchedMeds = examRx.map((item: any) => {
+                    const medName = item.medicine_name || item.name || 'ยาบรรเทาอาการ';
+                    const medCode = (item.medicine_code || item.code || `MED-${item.medicine_id || 1}`).toLowerCase().trim();
+                    const nameKey = medName.toLowerCase().trim();
+                    const currentStock = warehouseStockMap[medCode] !== undefined 
+                      ? warehouseStockMap[medCode] 
+                      : (warehouseStockMap[nameKey] !== undefined ? warehouseStockMap[nameKey] : 100);
+                    return {
+                      medId: item.medicine_code || item.code || `MED-${item.medicine_id || 1}`,
+                      name: medName,
+                      genericName: item.generic_name || '',
+                      category: item.category || 'ยาสามัญ',
+                      properties: 'ยาบรรเทาอาการตามแพทย์สั่ง',
+                      dosage: cleanDosage(item.dosage, medName),
+                      instructions: cleanInstructions(item.instructions, medName),
+                      price: item.unit_price || item.price || 10,
+                      unit_price: item.unit_price || item.price || 10,
+                      quantity: item.quantity || 10,
+                      stock: currentStock,
+                      stockStatus: (currentStock <= 0 ? 'out-stock' : (currentStock <= 10 ? 'low-stock' : 'in-stock')) as 'in-stock' | 'low-stock' | 'out-stock'
+                    };
+                  });
+                  setQueueList(prev => prev.map(q => q.id === activePatient.id ? { ...q, medications: fetchedMeds } : q));
+                  medsFound = true;
+                }
+              }
+            } catch (exErr) {
+              console.warn('Fallback examination prescription fetch error:', exErr);
             }
           }
 
@@ -515,6 +642,11 @@ export default function DetailPage({
                 const fetchedMeds = hnData.dispensings.map((item: any) => {
                   const m = item.medicine || item.Medicine || item;
                   const medName = m.name || item.name || 'ยาบรรเทาอาการ';
+                  const medCode = (m.medicine_code || m.code || `MED-${item.medicine_id || 1}`).toLowerCase().trim();
+                  const nameKey = medName.toLowerCase().trim();
+                  const currentStock = warehouseStockMap[medCode] !== undefined 
+                    ? warehouseStockMap[medCode] 
+                    : (warehouseStockMap[nameKey] !== undefined ? warehouseStockMap[nameKey] : (m.stock_quantity !== undefined ? m.stock_quantity : 0));
                   return {
                     medId: m.medicine_code || m.code || `MED-${item.medicine_id || 1}`,
                     name: medName,
@@ -526,8 +658,8 @@ export default function DetailPage({
                     price: m.unit_price || m.price || 10,
                     unit_price: m.unit_price || m.price || 10,
                     quantity: item.quantity || 10,
-                    stock: m.stock_quantity || 100,
-                    stockStatus: (m.stock_quantity || 100) > 10 ? 'พร้อมจ่าย' : 'ใกล้หมด'
+                    stock: currentStock,
+                    stockStatus: (currentStock <= 0 ? 'out-stock' : (currentStock <= 10 ? 'low-stock' : 'in-stock')) as 'in-stock' | 'low-stock' | 'out-stock'
                   };
                 });
                 setQueueList(prev => prev.map(q => q.id === activePatient.id ? { ...q, medications: fetchedMeds, doctorAdvice: cleanDoctorAdvice(hnData.doctor_advice || q.doctorAdvice) } : q));
@@ -549,6 +681,42 @@ export default function DetailPage({
   // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - กดยืนยันจ่ายยาแล้วอัปเดตหน้าจอทันทีใน 0 ms และส่งขึ้น Supabase เบื้องหลัง
   const handleSendToBilling = async () => {
     if (!activePatient) return;
+
+    // 0. 🔍 ตรวจสอบสต็อกยากับคลังยาล่าสุดก่อนส่งไปการเงิน (เฉพาะกรณีมีรายการยาที่สั่งจ่าย)
+    const currentMeds = activePatient.medications || [];
+    if (currentMeds.length > 0) {
+      const latestStockMap = await fetchWarehouseStock();
+      const deficientMeds: Array<{ name: string; medId: string; requested: number; available: number }> = [];
+
+      currentMeds.forEach(med => {
+        const medCode = (med.medId || '').toLowerCase().trim();
+        const medName = (med.name || '').toLowerCase().trim();
+        const available = (latestStockMap && (latestStockMap[medCode] !== undefined || latestStockMap[medName] !== undefined))
+          ? (latestStockMap[medCode] !== undefined ? latestStockMap[medCode] : latestStockMap[medName])
+          : (med.stock ?? 0);
+
+        const requested = med.quantity || 1;
+        if (requested > available) {
+          deficientMeds.push({
+            name: med.name,
+            medId: med.medId,
+            requested,
+            available
+          });
+        }
+      });
+
+      if (deficientMeds.length > 0) {
+        let warnMessage = 'ไม่สามารถจ่ายยาและส่งข้อมูลไปยังระบบการเงินได้ เนื่องจากยาในคลังไม่เพียงพอ\n\nรายการยาที่ขาด:\n';
+        deficientMeds.forEach((item, idx) => {
+          warnMessage += `${idx + 1}. ${item.name} (${item.medId}): สั่งจ่าย ${item.requested} เม็ด | มีในคลังเพียง ${item.available} เม็ด (ขาด ${item.requested - item.available} เม็ด)\n`;
+        });
+        warnMessage += '\nกรุณาปรับลดจำนวนยาที่จะจ่าย หรือเติมยาเข้าคลังยาก่อนดำเนินการ';
+        alert(warnMessage);
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     const submitStart = Date.now();
     const pName = activePatient.name;
@@ -620,6 +788,8 @@ export default function DetailPage({
         throw new Error(errorData.error || 'Dispense failed');
       } else {
         const data = await res.json();
+        // ซิงค์จำนวนสต็อกยาจริงจากฐานข้อมูลคลังยาหลังตัดจ่ายสำเร็จ
+        await fetchWarehouseStock();
         if (data.warnings && data.warnings.length > 0) {
            let msg = 'มียาบางรายการจ่ายได้ไม่ครบตามจำนวน:\n';
            data.warnings.forEach((w: any) => {
@@ -967,25 +1137,62 @@ export default function DetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {queueList
-                    .filter(p => {
-                      if (statFilter === 'pending') return p.status === 'pending';
-                      if (statFilter === 'dispensed') return p.status === 'dispensed';
-                      if (statFilter === 'completed') return p.status === 'completed';
-                      return true;
-                    })
-                    .filter(p => {
-                      if (!patientIdInput) return true;
-                      const q = patientIdInput.toLowerCase().trim();
-                      const matchHn = (p.hn || '').toLowerCase().includes(q) || (p.hn || '').toLowerCase().replace(/^hn-?/, '').includes(q.replace(/^hn-?/, ''));
-                      const matchName = (p.name || '').toLowerCase().includes(q);
-                      const matchId = (p.id || '').toLowerCase().includes(q);
-                      const matchQueue = (p.queueNumber || '').toLowerCase().includes(q);
-                      const matchVn = (p.vn || '').toLowerCase().includes(q);
-                      const matchCard = (p.nationalId || '').replace(/-/g, '').includes(q.replace(/-/g, ''));
-                      return matchHn || matchName || matchId || matchQueue || matchVn || matchCard;
-                    })
-                    .map((p, index) => {
+                  {(() => {
+                    const filteredQueue = queueList
+                      .filter(p => {
+                        if (statFilter === 'pending') return p.status === 'pending';
+                        if (statFilter === 'dispensed') return p.status === 'dispensed';
+                        if (statFilter === 'completed') return p.status === 'completed';
+                        return true;
+                      })
+                      .filter(p => {
+                        if (!patientIdInput) return true;
+                        const q = patientIdInput.toLowerCase().trim();
+                        const matchHn = (p.hn || '').toLowerCase().includes(q) || (p.hn || '').toLowerCase().replace(/^hn-?/, '').includes(q.replace(/^hn-?/, ''));
+                        const matchName = (p.name || '').toLowerCase().includes(q);
+                        const matchId = (p.id || '').toLowerCase().includes(q);
+                        const matchQueue = (p.queueNumber || '').toLowerCase().includes(q);
+                        const matchVn = (p.vn || '').toLowerCase().includes(q);
+                        const matchCard = (p.nationalId || '').replace(/-/g, '').includes(q.replace(/-/g, ''));
+                        return matchHn || matchName || matchId || matchQueue || matchVn || matchCard;
+                      });
+
+                    if (filteredQueue.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={8} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary, #64748B)' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                              </svg>
+                              <span style={{ fontSize: '16px', fontWeight: '600' }}>ไม่พบรายการสั่งยา</span>
+                              <span style={{ fontSize: '13.5px', opacity: 0.8 }}>
+                                {patientIdInput ? 'ลองเปลี่ยนคำค้นหา หรือกดปุ่มล้างด้านบน' : 'ยังไม่มีรายการคิวในระบบ'}
+                              </span>
+                              {patientIdInput && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPatientIdInput('');
+                                    fetchQueues(false, '');
+                                  }}
+                                  style={{
+                                    marginTop: '4px', padding: '6px 16px', borderRadius: '8px',
+                                    background: '#2563EB', color: '#FFFFFF', border: 'none',
+                                    fontWeight: '600', fontSize: '13px', cursor: 'pointer'
+                                  }}
+                                >
+                                  ล้างการค้นหา
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return filteredQueue.map((p, index) => {
                       const isCompleted = p.status === 'completed';
                       const isDispensed = p.status === 'dispensed' || isCompleted;
                       const isSelected = localPatientId === p.id;
@@ -1058,13 +1265,21 @@ export default function DetailPage({
                             </span>
                           </td>
                           <td style={{ padding: '10px 10px', whiteSpace: 'nowrap', verticalAlign: 'middle', textAlign: 'center' }}>
-                            <span style={{ color: isCompleted ? '#94A3B8' : '#EF4444', fontWeight: '600', fontSize: '12.5px' }}>
+                            <span style={{ color: isCompleted ? '#94A3B8' : '#475569', fontWeight: '600', fontSize: '12.5px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                               {(() => {
                                 if (isCompleted) return '-';
                                 // Simple fallback for wait time calculation
                                 if (!p.createdAt) return '-';
                                 const minutes = Math.floor((Date.now() - new Date(p.createdAt).getTime()) / 60000);
-                                return minutes >= 0 ? `${minutes} นาที` : '0 นาที';
+                                return (
+                                  <>
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                                      <circle cx="12" cy="12" r="10"></circle>
+                                      <polyline points="12 6 12 12 16 14"></polyline>
+                                    </svg>
+                                    {minutes >= 0 ? `${minutes} นาที` : '0 นาที'}
+                                  </>
+                                );
                               })()}
                             </span>
                           </td>
@@ -1118,7 +1333,8 @@ export default function DetailPage({
                           </td>
                         </tr>
                       );
-                    })}
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -1340,7 +1556,22 @@ export default function DetailPage({
                         </tr>
                       </thead>
                       <tbody>
-                        {activePatient.medications.map((med, index) => {
+                        {activePatient.medications.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary, #64748B)' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                  <line x1="3" y1="9" x2="21" y2="9"></line>
+                                  <line x1="9" y1="21" x2="9" y2="9"></line>
+                                </svg>
+                                <span style={{ fontSize: '16px', fontWeight: '600' }}>ไม่พบรายการสั่งยา</span>
+                                <span style={{ fontSize: '13.5px', opacity: 0.8 }}>ไม่พบใบสั่งยาของผู้ป่วยรายนี้</span>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                        activePatient.medications.map((med, index) => {
                           const unitPrice = (med as any).unit_price || med.price || 15;
                           const qty = med.quantity || 10;
                           return (
@@ -1530,7 +1761,8 @@ export default function DetailPage({
                               </td>
                             </tr>
                           );
-                        })}
+                        })
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -1548,7 +1780,12 @@ export default function DetailPage({
                       ใบสั่งยานี้ส่งต่อไปยังห้องการเงินเรียบร้อยแล้ว (รอผู้ป่วยชำระเงินที่ห้องการเงิน)
                     </div>
                   ) : (
-                    <button className="confirm-send-billing-btn" onClick={handleSendToBilling}>
+                    <button 
+                      className="confirm-send-billing-btn" 
+                      onClick={handleSendToBilling}
+                      disabled={isSubmitting}
+                      title="ยืนยันการจ่ายยาและส่งต่อไปยังห้องการเงิน"
+                    >
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
                         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                         <polyline points="22 4 12 14.01 9 11.01"/>

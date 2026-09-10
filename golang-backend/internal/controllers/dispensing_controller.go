@@ -230,6 +230,51 @@ func GetDispensingByVisit(c *gin.Context) {
 		}
 	}
 
+	// Fallback เพิ่มเติม: ดึงจาก Examination.PrescriptionDetail หากยังไม่พบ
+	if len(items) == 0 {
+		var exam models.Examination
+		if config.DB.Where("visit_id = ?", visitID).Order("id desc").First(&exam).Error == nil {
+			if exam.PrescriptionDetail != "" && exam.PrescriptionDetail != "[]" && exam.PrescriptionDetail != "null" {
+				var savedRx []struct {
+					MedicineID   uint    `json:"medicine_id"`
+					MedicineCode string  `json:"medicine_code"`
+					MedicineName string  `json:"medicine_name"`
+					Name         string  `json:"name"`
+					Code         string  `json:"code"`
+					Dosage       string  `json:"dosage"`
+					Instructions string  `json:"instructions"`
+					Quantity     int     `json:"quantity"`
+					UnitPrice    float64 `json:"unit_price"`
+				}
+				if err := json.Unmarshal([]byte(exam.PrescriptionDetail), &savedRx); err == nil {
+					for _, p := range savedRx {
+						mName := p.MedicineName
+						if mName == "" {
+							mName = p.Name
+						}
+						mCode := p.MedicineCode
+						if mCode == "" {
+							mCode = p.Code
+						}
+						med := FindMedicineByNameOrCode(mCode, mName)
+						qty := p.Quantity
+						if qty <= 0 {
+							qty = 10
+						}
+						items = append(items, models.Dispensing{
+							VisitID:      exam.VisitID,
+							MedicineID:   med.ID,
+							Quantity:     qty,
+							Dosage:       p.Dosage,
+							Instructions: p.Instructions,
+							Medicine:     med,
+						})
+					}
+				}
+			}
+		}
+	}
+
 	// เติมข้อมูล Medicine จากตารางยาเสมอ เพื่อให้ได้ราคาจริงตามตารางยา
 	for i := range items {
 		if items[i].Medicine.UnitPrice <= 0 || items[i].Medicine.Name == "" {
@@ -788,7 +833,9 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 	ws.BroadcastEvent("DISPENSE_RECORDED", gin.H{"visit_id": req.VisitID, "action": "dispensed"})
 	ws.BroadcastEvent("BILLING_CREATED", billingPayload)
 	ws.BroadcastEvent("QUEUE_UPDATED", gin.H{"action": "status_changed", "status": "รอชำระเงิน", "visit_id": req.VisitID})
+	ws.BroadcastEvent("MEDICINE_STOCK_UPDATED", gin.H{"action": "dispensed", "visit_id": req.VisitID})
 
+	InvalidateMedicinesCache()
 	InvalidatePharmacyQueueCache()
 	InvalidateBillingQueueCache()
 
@@ -1490,6 +1537,87 @@ func GetPharmacyQueues(c *gin.Context) {
 				})
 			}
 		}
+
+		if len(medList) == 0 && mq.VisitID > 0 {
+			// Fallback เพิ่มเติม: ดึงจาก Examination.PrescriptionDetail
+			var exam models.Examination
+			if config.DB.Where("visit_id = ?", mq.VisitID).Order("id desc").First(&exam).Error == nil {
+				if exam.PrescriptionDetail != "" && exam.PrescriptionDetail != "[]" && exam.PrescriptionDetail != "null" {
+					var savedRx []struct {
+						MedicineID   uint    `json:"medicine_id"`
+						MedicineCode string  `json:"medicine_code"`
+						MedicineName string  `json:"medicine_name"`
+						Name         string  `json:"name"`
+						Code         string  `json:"code"`
+						GenericName  string  `json:"generic_name"`
+						Category     string  `json:"category"`
+						Dosage       string  `json:"dosage"`
+						Instructions string  `json:"instructions"`
+						Quantity     int     `json:"quantity"`
+						UnitPrice    float64 `json:"unit_price"`
+					}
+					if err := json.Unmarshal([]byte(exam.PrescriptionDetail), &savedRx); err == nil {
+						for _, p := range savedRx {
+							mName := p.MedicineName
+							if mName == "" {
+								mName = p.Name
+							}
+							mCode := p.MedicineCode
+							if mCode == "" {
+								mCode = p.Code
+							}
+							med := FindMedicineByNameOrCode(mCode, mName)
+							if mCode == "" && med.MedicineCode != "" {
+								mCode = med.MedicineCode
+							}
+							if mName == "" && med.Name != "" {
+								mName = med.Name
+							}
+							cat := p.Category
+							if cat == "" {
+								cat = med.Category
+							}
+							if cat == "" {
+								cat = "ยาสามัญ"
+							}
+							genName := p.GenericName
+							if genName == "" {
+								genName = med.GenericName
+							}
+							props := med.Properties
+							if props == "" {
+								props = "บรรเทาอาการตามแพทย์สั่ง"
+							}
+							uPrice := med.UnitPrice
+							if uPrice <= 0 {
+								uPrice = p.UnitPrice
+							}
+							if uPrice <= 0 {
+								uPrice = 10
+							}
+							qty := p.Quantity
+							if qty <= 0 {
+								qty = 10
+							}
+							medList = append(medList, gin.H{
+								"medId":        mCode,
+								"name":         mName,
+								"genericName":  genName,
+								"category":     cat,
+								"properties":   props,
+								"dosage":       CleanDosage(p.Dosage, mName),
+								"instructions": CleanInstructions(p.Instructions, mName),
+								"price":        uPrice,
+								"quantity":     qty,
+								"stock":        med.StockQuantity,
+								"stockStatus":  "พร้อมจ่าย",
+							})
+						}
+					}
+				}
+			}
+		}
+
 		if medList == nil {
 			medList = []gin.H{}
 		}
