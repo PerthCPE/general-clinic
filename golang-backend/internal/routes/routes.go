@@ -182,6 +182,7 @@ func SetUpRoutes(r *gin.Engine) {
 		adminRoutes.PUT("/users/:id", adminCtrl.UpdateAccount)
 		adminRoutes.PUT("/users/:id/status", adminCtrl.UpdateAccountStatus)
 		adminRoutes.PUT("/users/:id/reset-password", adminCtrl.ResetPassword)
+		adminRoutes.DELETE("/users/:id", adminCtrl.DeleteAccount)
 		adminRoutes.POST("/system-access", adminCtrl.CreateSystemAccess)
 		adminRoutes.POST("/system-access/bulk", adminCtrl.BulkUpdateSystemAccess)
 	}

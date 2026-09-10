@@ -3,6 +3,8 @@ import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus, Cop
 import { Snackbar, Alert } from '@mui/material';
 import { adminApi, type BackendUser } from '../../services/api';
 import { TREATMENT_DEPARTMENTS } from '../../config/roles';
+// อ่าน currentUser อย่างเดียวผ่าน useAuth() เพื่อกันลบบัญชีตัวเอง — ไม่แก้ AuthContext.tsx เลย
+import { useAuth } from '../../context/AuthContext';
 import './UserManagement.css';
 
 interface SystemUser {
@@ -53,7 +55,7 @@ const roleToEnglish: Record<string, string> = {
 // englishToRole ต้องเป็นค่าผกผัน (inverse) ของ roleToEnglish แบบตรงตัวสำหรับทุก role จริงที่ backend
 // ส่งมาได้ — ห้าม map role ที่ต่างกันไปเป็น Thai label เดียวกันโดยไม่มี roleToEnglish คู่กันแบบ 1:1
 // (เคย map 'officer'/'nurse_assistant' ไปชนป้ายของ role อื่นมาก่อน ทำให้กด "บันทึกการแก้ไข" แล้ว
-// role ถูกเปลี่ยนเงียบๆ ไปเป็น role อื่นที่ไม่ตรงกับที่ backend ส่งมาจริง — ดู CLAUDE.md/PLAN.md 3.1)
+// role ถูกเปลี่ยนเงียบๆ ไปเป็น role อื่นที่ไม่ตรงกับที่ backend ส่งมาจริง)
 const englishToRole: Record<string, string> = {
   'doctor': 'แพทย์', 'nurse': 'พยาบาลและผู้ช่วยพยาบาล', 'nurse_assistant': 'ผู้ช่วยพยาบาล',
   'pharmacist': 'เภสัชกร', 'registrar': 'พนักงานเวชระเบียน', 'cashier': 'พนักงานธุรการการเงิน',
@@ -98,6 +100,7 @@ const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
 };
 
 const UserManagement: React.FC = () => {
+  const { currentUser } = useAuth();
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -214,7 +217,7 @@ const UserManagement: React.FC = () => {
     // เลขรันชนกันเห็นได้จาก seed เอง: nurse1=NUR001, assistant1=NUR002) — เปลี่ยนเฉพาะบัญชีใหม่ที่
     // จะสร้างต่อจากนี้เท่านั้น ไม่แตะ employee_id ของบัญชีเดิม (assistant1 ยังเป็น NUR002 เหมือนเดิม
     // เพราะการเปลี่ยนของเดิมกระทบ seed script/QuickLogin/AuthContext.tsx ที่ hardcode ค่านี้ไว้
-    // หลายจุด — ดู PLAN.md ส่วนที่ 2)
+    // หลายจุด)
     else if (roleEn === 'nurse_assistant' || roleTh === 'ผู้ช่วยพยาบาล') prefix = 'NAS';
     else if (roleEn === 'nurse' || roleTh === 'พยาบาล') prefix = 'NUR';
     else if (roleEn === 'pharmacist' || roleTh === 'เภสัชกร') prefix = 'PHA';
@@ -403,7 +406,9 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: string, userName: string, internalId: number) => {
+  // ระงับบัญชี (status -> suspended) — กู้คืนได้ในภายหลังผ่านฟอร์มแก้ไข ต่างจาก handleDeleteAccount
+  // ด้านล่างที่เป็นการลบถาวรจริง (ตั้งชื่อใหม่จาก handleDeleteUser เดิม กันสับสนกับฟังก์ชันลบถาวร)
+  const handleSuspendAccount = async (userId: string, userName: string, internalId: number) => {
     if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการระงับบัญชีของ "${userName}"?`)) {
       try {
         await adminApi.updateAccountStatus(internalId, 'suspended');
@@ -411,6 +416,31 @@ const UserManagement: React.FC = () => {
       } catch (err: any) {
         alert('เกิดข้อผิดพลาด: ' + err.message);
       }
+    }
+  };
+
+  // ลบบัญชีถาวร (hard delete จริง ไม่มี soft delete กันไว้) — ปุ่มนี้โชว์เฉพาะบัญชีที่ระงับใช้งาน
+  // อยู่แล้วเท่านั้น (ดู JSX) แต่ backend เป็นคนตัดสินใจจริงว่าลบได้ไหม (เช็คสถานะ/ข้อมูลผูก/
+  // admin คนสุดท้าย/ตัวเองซ้ำอีกชั้น) — เจอ error อะไรก็โชว์เหตุผลจาก backend ตรงๆ ให้ admin เห็น
+  const handleDeleteAccount = async (user: SystemUser) => {
+    // เช็คกันลบตัวเองฝั่ง frontend ไว้ก่อนเป็นด่านแรก (UX สุกใส — บัญชีตัวเองจริงๆ ไม่ควรมีทางมาถึง
+    // สถานะ "ระงับใช้งาน" ได้เลยตั้งแต่ต้น เพราะ backend กันไว้แล้วไม่ให้ admin ระงับตัวเอง แต่กันซ้ำ
+    // ไว้เผื่อข้อมูลเก่าที่ค้างมาก่อนกฎนี้จะมีผล) backend เป็นด่านตัดสินจริงอยู่ดี
+    if (currentUser && String(user.internalId) === currentUser.id) {
+      alert('ไม่สามารถลบบัญชีของตัวเองได้');
+      return;
+    }
+    if (!window.confirm(
+      `ต้องการลบบัญชีของ "${user.name}" อย่างถาวรใช่หรือไม่?\n\n` +
+      `การลบนี้ไม่สามารถย้อนกลับได้ ข้อมูลบัญชีจะถูกลบออกจากระบบทั้งหมด (ต่างจากการระงับที่ยังกู้คืนได้ในภายหลัง)`
+    )) {
+      return;
+    }
+    try {
+      await adminApi.deleteAccount(user.internalId);
+      fetchUsers();
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
     }
   };
 
@@ -552,9 +582,17 @@ const UserManagement: React.FC = () => {
                         <button className="btn-reset" onClick={() => handleResetPassword(user.name, user.internalId)} title="รีเซ็ตรหัสผ่าน">
                           <RotateCcw size={16} strokeWidth={2} />
                         </button>
-                        <button className="btn-delete" onClick={() => handleDeleteUser(user.id, user.name, user.internalId)} title="ระงับบัญชี">
-                          <Trash2 size={16} strokeWidth={2} />
-                        </button>
+                        {/* ปุ่มระงับ กับ ปุ่มลบถาวร แยกกันตามสถานะปัจจุบัน ไม่โชว์คู่กัน — ระงับได้เฉพาะ
+                            บัญชีที่ยังไม่ถูกระงับ ส่วนลบถาวรได้เฉพาะบัญชีที่ระงับอยู่แล้วเท่านั้น */}
+                        {user.status !== 'ระงับใช้งาน' ? (
+                          <button className="btn-delete" onClick={() => handleSuspendAccount(user.id, user.name, user.internalId)} title="ระงับบัญชี">
+                            <Ban size={16} strokeWidth={2} />
+                          </button>
+                        ) : (
+                          <button className="btn-delete" onClick={() => handleDeleteAccount(user)} title="ลบบัญชีถาวร">
+                            <Trash2 size={16} strokeWidth={2} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

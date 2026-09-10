@@ -26,6 +26,35 @@ func validatePhone(phone string) error {
 	return nil
 }
 
+// countActiveAdmins นับจำนวนบัญชี role=admin ที่สถานะยัง active อยู่ในระบบ ใช้เช็คก่อนระงับ/
+// เปลี่ยน role/ลบบัญชี admin ว่าจะทำให้ระบบเหลือ admin ที่ใช้งานได้จริง 0 คนหรือไม่
+func countActiveAdmins(db *gorm.DB) (int64, error) {
+	var count int64
+	err := db.Model(&models.User{}).Where("role = ? AND status = ?", "admin", "active").Count(&count).Error
+	return count, err
+}
+
+// currentUserID ดึง user id ของผู้ที่ยิง request นี้จาก JWT claims (ตั้งไว้โดย
+// middleware.AuthRequired ผ่าน c.Set("userID", claims["user_id"])) — claims ที่ผ่าน jwt.MapClaims
+// จะ decode ตัวเลขทุกตัวเป็น float64 เสมอ (พฤติกรรมมาตรฐานของ encoding/json ตอน unmarshal ใส่
+// interface{}) ต้องแปลงกลับเป็น uint เองก่อนเทียบกับ models.User.ID
+func currentUserID(c *gin.Context) (uint, bool) {
+	raw, exists := c.Get("userID")
+	if !exists {
+		return 0, false
+	}
+	switch v := raw.(type) {
+	case float64:
+		return uint(v), true
+	case uint:
+		return v, true
+	case int:
+		return uint(v), true
+	default:
+		return 0, false
+	}
+}
+
 // AdminController จัดการระบบสิทธิ์และบัญชี
 type AdminController struct {
 	DB *gorm.DB
@@ -119,7 +148,36 @@ func (ctrl *AdminController) UpdateAccountStatus(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.DB.Model(&models.User{}).Where("id = ?", id).Update("status", req.Status).Error; err != nil {
+	// ต้องโหลดบัญชีเป้าหมายมาก่อนเสมอ (เดิมไม่โหลดเลย ยิง UPDATE ตรงๆ ด้วย id ที่อาจไม่มีจริงก็ได้
+	// แบบเงียบๆ) เพราะ guard ด้านล่างต้องรู้ role/status ปัจจุบันของบัญชีนี้ก่อนอนุญาตเปลี่ยนสถานะ
+	var user models.User
+	if err := ctrl.DB.First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// ห้าม admin ระงับ/เปลี่ยนสถานะบัญชีของตัวเอง (ไม่ว่าจะเป็น admin คนสุดท้ายหรือไม่ก็ตาม) —
+	// endpoint นี้อยู่หลัง RoleRequired("admin") เสมอ ผู้ยิง request จึงเป็น admin แน่นอน
+	if selfID, ok := currentUserID(c); ok && selfID == user.ID && req.Status != "active" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "ไม่สามารถระงับบัญชีของตัวเองได้"})
+		return
+	}
+
+	// ห้ามระงับ/เปลี่ยนสถานะผู้ดูแลระบบ (admin) ที่ active อยู่คนสุดท้ายของระบบ — กันไม่ให้ระบบเหลือ
+	// admin ที่ใช้งานได้จริง 0 คน (กฎ "admin คนสุดท้าย")
+	if user.Role == "admin" && user.Status == "active" && req.Status != "active" {
+		count, err := countActiveAdmins(ctrl.DB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify admin count"})
+			return
+		}
+		if count <= 1 {
+			c.JSON(http.StatusConflict, gin.H{"error": "ไม่สามารถระงับบัญชีผู้ดูแลระบบคนสุดท้ายที่ใช้งานอยู่ได้"})
+			return
+		}
+	}
+
+	if err := ctrl.DB.Model(&user).Update("status", req.Status).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})
 		return
 	}
@@ -134,6 +192,43 @@ func (ctrl *AdminController) UpdateAccount(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
+	}
+
+	// ต้องโหลดบัญชีเป้าหมายมาก่อนเสมอ (เดิมไม่โหลดเลยจนกว่าจะ UPDATE เสร็จแล้ว) เพราะ guard ด้านล่าง
+	// ต้องรู้ role/status ปัจจุบันก่อนอนุญาตเปลี่ยน role/status
+	var user models.User
+	if err := ctrl.DB.First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// ห้าม admin แก้ role ตัวเองให้หลุดจาก admin หรือ suspend ตัวเองผ่าน endpoint นี้ (เหมือนกับ
+	// UpdateAccountStatus) — ไม่บล็อกการแก้ฟิลด์อื่น (ชื่อ/อีเมล/เบอร์/แผนก) ของตัวเอง
+	if selfID, ok := currentUserID(c); ok && selfID == user.ID {
+		if req.Role != "" && req.Role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "ไม่สามารถเปลี่ยนตำแหน่ง (role) ของบัญชีตัวเองได้"})
+			return
+		}
+		if req.Status != "" && req.Status != "active" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "ไม่สามารถระงับบัญชีของตัวเองได้"})
+			return
+		}
+	}
+
+	// ห้ามเปลี่ยน role ออกจาก admin หรือระงับสถานะของผู้ดูแลระบบ (admin) ที่ active อยู่คนสุดท้าย
+	// ของระบบ — กันไม่ให้ระบบเหลือ admin ที่ใช้งานได้จริง 0 คน
+	roleLeavingAdmin := req.Role != "" && req.Role != "admin"
+	statusLeavingActive := req.Status != "" && req.Status != "active"
+	if user.Role == "admin" && user.Status == "active" && (roleLeavingAdmin || statusLeavingActive) {
+		count, err := countActiveAdmins(ctrl.DB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify admin count"})
+			return
+		}
+		if count <= 1 {
+			c.JSON(http.StatusConflict, gin.H{"error": "ไม่สามารถเปลี่ยนตำแหน่งหรือระงับบัญชีผู้ดูแลระบบคนสุดท้ายที่ใช้งานอยู่ได้"})
+			return
+		}
 	}
 
 	// ส่งเฉพาะฟิลด์ที่ไม่ว่าง เพื่อรองรับการแก้แบบ partial ไม่ให้ฟิลด์ที่ไม่ได้ส่งมาถูกเคลียร์ทิ้ง
@@ -166,17 +261,111 @@ func (ctrl *AdminController) UpdateAccount(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.DB.Model(&models.User{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+	// อัปเดตผ่าน &user ที่โหลดไว้แล้วข้างบน (แทน &models.User{} ตัวเปล่า) — GORM จะ sync ค่าที่
+	// เปลี่ยนกลับเข้า struct user ให้อัตโนมัติ จึงไม่ต้อง query ซ้ำรอบสองเพื่อเอาข้อมูลล่าสุดไปตอบกลับ
+	if err := ctrl.DB.Model(&user).Updates(updates).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update account"})
 		return
 	}
 
+	c.JSON(http.StatusOK, gin.H{"message": "Account updated successfully", "user": user})
+}
+
+// DeleteAccount ลบบัญชีถาวร (hard delete จริง — models.User ไม่มี soft delete ของ GORM เลย
+// ไม่มีฟิลด์ DeletedAt เลยไม่มีอะไรกันไว้ ลบแล้ว username/employee_id เดิมสร้างซ้ำได้ทันที)
+// อนุญาตเฉพาะบัญชีที่สถานะ "suspended" และไม่มีข้อมูลอื่นผูกอยู่ในตารางธุรกิจใดๆ เท่านั้น
+// ห้ามลบตัวเอง ห้ามลบจน admin ที่ active เหลือ 0 คนในระบบ (ปกติกฎ "ห้ามระงับ admin คนสุดท้าย" ใน
+// UpdateAccountStatus/UpdateAccount กันไว้ตั้งแต่ต้นทางแล้ว จุดนี้เช็คซ้ำเป็นด่านสุดท้ายเผื่อมีทางอ้อม)
+func (ctrl *AdminController) DeleteAccount(c *gin.Context) {
+	id := c.Param("id")
+
 	var user models.User
 	if err := ctrl.DB.First(&user, id).Error; err != nil {
-		c.JSON(http.StatusOK, gin.H{"message": "Account updated successfully"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Account updated successfully", "user": user})
+
+	if user.Status != "suspended" {
+		c.JSON(http.StatusConflict, gin.H{"error": "ลบได้เฉพาะบัญชีที่ถูกระงับใช้งาน (suspended) เท่านั้น"})
+		return
+	}
+
+	if selfID, ok := currentUserID(c); ok && selfID == user.ID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "ไม่สามารถลบบัญชีของตัวเองได้"})
+		return
+	}
+
+	if user.Role == "admin" {
+		count, err := countActiveAdmins(ctrl.DB)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify admin count"})
+			return
+		}
+		// user ที่กำลังจะลบสถานะ suspended อยู่แล้ว (เช็คผ่านมาแล้วข้างบน) จึงไม่ถูกนับใน count นี้
+		// อยู่แล้ว (countActiveAdmins กรองเฉพาะ status=active) — เงื่อนไขนี้จึงกันเฉพาะกรณี "ระบบไม่
+		// เหลือ admin ที่ active อยู่เลยสักคน" ไม่ใช่กันไม่ให้ระงับ admin คนสุดท้าย (ขั้นตอนนั้นถูก
+		// กันไว้ที่ UpdateAccountStatus/UpdateAccount ไปแล้วก่อนจะมาถึงจุดที่ลบได้จริง)
+		if count == 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "ไม่สามารถลบบัญชีผู้ดูแลระบบนี้ได้ เนื่องจากระบบไม่มีผู้ดูแลระบบที่ใช้งานอยู่เหลืออยู่เลย"})
+			return
+		}
+	}
+
+	// เช็คว่ามีข้อมูลอื่นผูกกับบัญชีนี้อยู่หรือไม่ — ครอบคลุมทุกตารางที่มี FK ชี้ไปที่ users.id
+	// (ไม่ใช่แค่ตัวอย่าง "นัดหมาย/ประวัติการตรวจ/ใบเสร็จ" ที่คุยกัน — ใบเสร็จ (Billing) ไม่มี FK
+	// ชี้ไปที่ users.id ตรงๆ เชื่อมผ่าน visit_records.doctor_id อีกทีเท่านั้น จึงครอบคลุมอยู่แล้วใน
+	// เช็ค visit_records ด้านล่าง) system_accesses ไม่อยู่ในลิสต์นี้เพราะเป็นแค่ config สิทธิ์ ไม่ใช่
+	// ข้อมูลผู้ป่วย/ธุรกิจ ลบทิ้งอัตโนมัติได้เลยด้านล่าง
+	uid := user.ID
+	relatedChecks := []struct {
+		label string
+		query func() *gorm.DB
+	}{
+		{"นัดหมายที่เป็นแพทย์ผู้ตรวจ", func() *gorm.DB { return ctrl.DB.Model(&models.Appointment{}).Where("doctor_id = ?", uid) }},
+		{"นัดหมายที่เป็นผู้รับนัด (เวชระเบียน)", func() *gorm.DB { return ctrl.DB.Model(&models.Appointment{}).Where("register_id = ?", uid) }},
+		{"เอกสารที่สร้างไว้ (DMS)", func() *gorm.DB { return ctrl.DB.Model(&models.Document{}).Where("created_by = ?", uid) }},
+		{"เอกสารที่เคยอนุมัติ (DMS)", func() *gorm.DB { return ctrl.DB.Model(&models.Document{}).Where("approved_by = ?", uid) }},
+		{"เอกสารที่ถูกส่งต่อให้ (DMS)", func() *gorm.DB { return ctrl.DB.Model(&models.DocumentForward{}).Where("forwarded_to = ?", uid) }},
+		{"ตารางเวรที่สร้างไว้", func() *gorm.DB { return ctrl.DB.Model(&models.DoctorSchedule{}).Where("created_by = ?", uid) }},
+		{"คำขอลาที่เคยอนุมัติ", func() *gorm.DB { return ctrl.DB.Model(&models.LeaveRequest{}).Where("approved_by = ?", uid) }},
+		{"คำขอแลกเวรที่ยื่นไว้", func() *gorm.DB { return ctrl.DB.Model(&models.ShiftSwapRequest{}).Where("requester_id = ?", uid) }},
+		{"คำขอแลกเวรที่ถูกขอ", func() *gorm.DB { return ctrl.DB.Model(&models.ShiftSwapRequest{}).Where("receiver_id = ?", uid) }},
+		{"คิวที่ลงทะเบียนไว้", func() *gorm.DB { return ctrl.DB.Model(&models.Queue{}).Where("created_by_user_id = ?", uid) }},
+		{"คิวที่มอบหมายเป็นแพทย์เจ้าของคิว", func() *gorm.DB { return ctrl.DB.Model(&models.Queue{}).Where("assigned_doctor_id = ?", uid) }},
+		{"ประวัติการตรวจ (Visit Records)", func() *gorm.DB { return ctrl.DB.Model(&models.VisitRecord{}).Where("doctor_id = ?", uid) }},
+		{"ประวัติการคัดกรองที่ทำไว้", func() *gorm.DB { return ctrl.DB.Model(&models.Screening{}).Where("screened_by_user_id = ?", uid) }},
+		{"ประวัติการคัดกรองที่มอบหมายเป็นแพทย์", func() *gorm.DB { return ctrl.DB.Model(&models.Screening{}).Where("assigned_doctor_id = ?", uid) }},
+		{"ประวัติผู้ป่วยที่เคยแก้ไขล่าสุด", func() *gorm.DB { return ctrl.DB.Model(&models.PatientHistory{}).Where("updated_by_user_id = ?", uid) }},
+		{"สิทธิการรักษาที่บันทึกไว้", func() *gorm.DB { return ctrl.DB.Model(&models.MedicalEligibility{}).Where("user_id = ?", uid) }},
+		{"โปรไฟล์แพทย์", func() *gorm.DB { return ctrl.DB.Model(&models.Doctor{}).Where("user_id = ?", uid) }},
+	}
+
+	for _, chk := range relatedChecks {
+		var count int64
+		if err := chk.query().Count(&count).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to verify related records"})
+			return
+		}
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": fmt.Sprintf("ไม่สามารถลบบัญชีนี้ได้ เนื่องจากยังมีข้อมูล%sผูกอยู่ (%d รายการ)", chk.label, count)})
+			return
+		}
+	}
+
+	tx := ctrl.DB.Begin()
+	if err := tx.Where("user_id = ?", uid).Delete(&models.SystemAccess{}).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear system access records"})
+		return
+	}
+	if err := tx.Delete(&user).Error; err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete account"})
+		return
+	}
+	tx.Commit()
+
+	c.JSON(http.StatusOK, gin.H{"message": "Account deleted successfully"})
 }
 
 // ResetPassword ตั้งรหัสผ่านชั่วคราวใหม่ให้บัญชี (admin-assisted, ไม่มีระบบส่งอีเมล)

@@ -1141,6 +1141,12 @@ export const adminApi = {
       request<{ message: string; temporary_password: string; requires_password_change: boolean }>('/api/admin/users/' + id + '/reset-password', {
         method: 'PUT',
       }),
+    // ลบบัญชีถาวร (hard delete) — backend อนุญาตเฉพาะบัญชีที่สถานะ suspended และไม่มีข้อมูลอื่น
+    // ผูกอยู่เท่านั้น ปฏิเสธด้วย error message บอกเหตุผลถ้าไม่เข้าเงื่อนไข
+    deleteAccount: (id: number | string) =>
+      request<{ message: string }>('/api/admin/users/' + id, {
+        method: 'DELETE',
+      }),
     createSystemAccess: (payload: { user_id: number; access_level: number; module_name: string; }) =>
       request<any>('/api/admin/system-access', {
         method: 'POST',
