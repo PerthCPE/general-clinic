@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus } from 'lucide-react';
+import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus, Copy, Check } from 'lucide-react';
 import { adminApi, type BackendUser } from '../../services/api';
 import { TREATMENT_DEPARTMENTS } from '../../config/roles';
 import './UserManagement.css';
@@ -74,11 +74,14 @@ const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<{ userName: string; tempPassword: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
-  
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
   const [activeFilter, setActiveFilter] = useState<'ทั้งหมด' | 'กำลังใช้งาน' | 'รอการยืนยัน' | 'ระงับใช้งาน'>('ทั้งหมด');
   const [deptFilter, setDeptFilter] = useState<string>('ทั้งหมด');
 
@@ -136,6 +139,18 @@ const UserManagement: React.FC = () => {
       return matchStatus && matchDept;
     });
   }, [users, activeFilter, deptFilter]);
+
+  // เดิมตารางตัดแสดงแค่ filteredUsers.slice(0, itemsPerPage) แถวแรกเสมอ โดยไม่มีปุ่มไปหน้าถัดไป
+  // เลย — บัญชีที่อยู่เกินแถวที่ itemsPerPage กำหนด (เช่นตอนนี้มี 19+ บัญชี แต่ itemsPerPage
+  // default = 10) จึงมองไม่เห็นเลยไม่ว่า backend จะเรียงลำดับมาแบบไหนก็ตาม เพิ่ม pagination จริง
+  // ให้เข้าถึงได้ครบทุกบัญชี และรีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/itemsPerPage เปลี่ยน
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, deptFilter, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
+  const pageStartIndex = (currentPage - 1) * itemsPerPage;
+  const currentTableData = filteredUsers.slice(pageStartIndex, pageStartIndex + itemsPerPage);
 
   const departmentsInUse = useMemo(() => {
     const depts = new Set(users.map(u => u.department));
@@ -258,9 +273,39 @@ const UserManagement: React.FC = () => {
     }
     try {
       const res = await adminApi.resetPassword(internalId);
-      alert(`รีเซ็ตรหัสผ่านสำเร็จ\n\nรหัสผ่านชั่วคราวของ "${userName}":\n${res.temporary_password}\n\nกรุณาแจ้งรหัสนี้ให้พนักงานเอง ระบบจะบังคับให้เปลี่ยนรหัสผ่านใหม่ทันทีที่ล็อกอินครั้งถัดไป`);
+      // แสดงรหัสผ่านผ่าน modal ที่ render เองแทน alert() ของเบราว์เซอร์ — alert() แบบเดิม
+      // กดคัดลอกไม่ได้ และในบางเครื่องข้อความภาษาไทยขึ้นเป็น ???? (native dialog แปลง
+      // encoding ตาม system codepage ไม่ใช่ UTF-8 เหมือน HTML/React render ปกติ)
+      setResetResult({ userName, tempPassword: res.temporary_password });
+      setCopied(false);
     } catch (err: any) {
       alert('เกิดข้อผิดพลาด: ' + err.message);
+    }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!resetResult) return;
+    const text = resetResult.tempPassword;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback สำหรับ context ที่ไม่ secure (http ธรรมดา) ซึ่ง navigator.clipboard ใช้ไม่ได้
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Copy to clipboard failed', err);
+      alert('คัดลอกไม่สำเร็จ กรุณาคัดลอกด้วยตนเอง');
     }
   };
 
@@ -364,7 +409,7 @@ const UserManagement: React.FC = () => {
               ) : filteredUsers.length === 0 ? (
                 <tr><td colSpan={6} style={{textAlign: 'center', padding: '24px', color: '#62748E'}}>ไม่มีข้อมูลผู้ใช้งานที่ตรงตามเงื่อนไข</td></tr>
               ) : (
-                filteredUsers.slice(0, itemsPerPage).map((user) => (
+                currentTableData.map((user) => (
                   <tr key={user.id}>
                     <td>
                       <div className="user-info">
@@ -415,6 +460,32 @@ const UserManagement: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="um-pagination">
+            <span className="um-pagination-info">
+              แสดงหน้า {currentPage} จาก {totalPages} (ทั้งหมด {filteredUsers.length} รายการ)
+            </span>
+            <div className="um-pagination-buttons">
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              >
+                หน้าก่อนหน้า
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              >
+                หน้าถัดไป
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {isModalOpen && (
@@ -530,6 +601,31 @@ const UserManagement: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {resetResult && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <h3>รีเซ็ตรหัสผ่านสำเร็จ</h3>
+              <button className="btn-close" onClick={() => setResetResult(null)}>×</button>
+            </div>
+            <p style={{ fontSize: 14, color: 'var(--text-color)', lineHeight: 1.6, marginBottom: 16 }}>
+              รหัสผ่านชั่วคราวของ <strong>{resetResult.userName}</strong> — กรุณาแจ้งรหัสนี้ให้พนักงานเอง
+              ระบบจะบังคับให้เปลี่ยนรหัสผ่านใหม่ทันทีที่ล็อกอินครั้งถัดไป รหัสนี้จะไม่แสดงซ้ำอีก
+            </p>
+            <div className="reset-password-box">
+              <code>{resetResult.tempPassword}</code>
+              <button type="button" className="btn-copy-password" onClick={handleCopyPassword}>
+                {copied ? <Check size={15} strokeWidth={2.5} /> : <Copy size={15} strokeWidth={2} />}
+                {copied ? 'คัดลอกแล้ว' : 'คัดลอก'}
+              </button>
+            </div>
+            <div className="modal-actions" style={{ gridColumn: 'auto' }}>
+              <button type="button" className="btn-primary" onClick={() => setResetResult(null)}>ปิด</button>
+            </div>
           </div>
         </div>
       )}

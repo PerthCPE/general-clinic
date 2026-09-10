@@ -76,6 +76,25 @@ body.dark-mode .admin-page-container .bg-red-light { background-color: rgba(239,
 .admin-page-container .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .admin-page-container .table-header h3 { margin: 0; font-size: 16px; }
 
+/* Pagination — เดิมมีแค่ dropdown เลือกจำนวนต่อหน้า แต่ไม่มีปุ่มไปหน้าถัดไปเลย
+   บัญชีที่เกินหน้าแรกจึงเข้าถึงไม่ได้เสมอไม่ว่า backend จะเรียงลำดับมาแบบไหน */
+.admin-page-container .um-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 4px 4px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.admin-page-container .um-pagination-info { font-size: 13px; color: #6b7280; }
+body.dark-mode .admin-page-container .um-pagination-info { color: #9ca3af; }
+.admin-page-container .um-pagination-buttons { display: flex; gap: 8px; }
+.admin-page-container .um-pagination-buttons .btn-primary:disabled {
+  opacity: 0.5; cursor: not-allowed;
+}
+
 /* === เพิ่ม CSS สำหรับ Dropdown แสดงจำนวนหน้า === */
 .admin-page-container .table-actions { display: flex; align-items: center; gap: 16px; }
 .admin-page-container .rows-per-page { font-size: 13px; color: #6b7280; display: flex; align-items: center; gap: 8px;}
@@ -178,6 +197,42 @@ body.dark-mode .admin-page-container .form-group label { color: #d1d5db; }
 body.dark-mode .admin-page-container .input-disabled { background-color: #374151 !important; color: #60a5fa !important; }
 
 .admin-page-container .status-select-input { font-weight: 500; }
+
+/* กล่องแสดงรหัสผ่านชั่วคราวหลังรีเซ็ต + ปุ่มคัดลอก (แทน alert() เดิมที่คัดลอกไม่ได้) */
+.admin-page-container .reset-password-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--bg-color, #f3f4f6);
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+.admin-page-container .reset-password-box code {
+  font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-color, #111827);
+  word-break: break-all;
+}
+.admin-page-container .btn-copy-password {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.admin-page-container .btn-copy-password:hover { background-color: #1d4ed8; }
 
 .admin-page-container .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 32px; grid-column: span 2; }
 .admin-page-container .btn-cancel {
