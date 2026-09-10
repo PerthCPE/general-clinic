@@ -1,5 +1,6 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Copy, Check } from 'lucide-react';
+import { formatNationalId } from '../../utils/formatters';
 
 interface CopyableTextProps {
   value: string;
@@ -57,7 +58,16 @@ export const CopyableText: React.FC<CopyableTextProps> = ({
     }
   };
 
-  const textToShow = displayValue !== undefined ? displayValue : value;
+  const isIdCard = Boolean(
+    (label && (label.includes('บัตร') || label.includes('ปชช'))) ||
+    (!label && typeof value === 'string' && /^\d{13}$/.test(value.trim()))
+  );
+
+  const textToShow = displayValue !== undefined
+    ? displayValue
+    : (isIdCard && typeof value === 'string' && value.replace(/\D/g, '').length === 13)
+      ? formatNationalId(value)
+      : value;
 
   return (
     <span

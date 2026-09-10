@@ -55,10 +55,95 @@ body.dark-mode .patient-history-container .page-subtitle {
   padding: 20px 24px;
   margin-bottom: 24px;
   display: flex;
-  gap: 20px;
-  align-items: flex-end;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
   border: 1px solid #E2E8F0;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.patient-history-container .sort-select {
+  width: 100%;
+  padding: 8px 36px 8px 14px;
+  border-radius: 8px;
+  border: 1.5px solid #CBD5E1;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1E293B;
+  background-color: #FFFFFF;
+  cursor: pointer;
+  appearance: none;
+  outline: none;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: border-color 0.2s;
+}
+
+.patient-history-container .sort-select:focus {
+  border-color: #2563EB;
+}
+
+body.dark-mode .patient-history-container .sort-select {
+  background-color: #2D2D2D;
+  border-color: #475569;
+  color: #F8FAFC;
+}
+
+.patient-history-container .patient-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  align-items: center;
+  padding-top: 16px;
+  border-top: 1px solid #F1F5F9;
+}
+
+.patient-history-container .filter-col-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.patient-history-container .filter-row-label {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #475569;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.patient-history-container .select-wrapper {
+  position: relative;
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.patient-history-container .select-chevron-icon {
+  position: absolute;
+  right: 12px;
+  pointer-events: none;
+  color: #64748B;
+}
+
+@media (max-width: 860px) {
+  .patient-history-container .patient-filters-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
+body.dark-mode .patient-history-container .patient-filters-grid {
+  border-top-color: #334155;
+}
+
+body.dark-mode .patient-history-container .filter-row-label {
+  color: #CBD5E1;
+}
+
+body.dark-mode .patient-history-container .select-chevron-icon {
+  color: #94A3B8;
 }
 
 body.dark-mode .patient-history-container .search-card {
@@ -207,9 +292,13 @@ body.dark-mode .patient-history-container .patient-table td {
   color: #DC2626;
   font-weight: 700;
   font-size: 12px;
-  padding: 2px 8px;
   border-radius: 12px;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 24px;
+  box-sizing: border-box;
 }
 
 .patient-history-container .disease-badges {

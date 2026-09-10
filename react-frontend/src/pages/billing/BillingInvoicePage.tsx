@@ -9,6 +9,7 @@ import { BillingInvoiceSkeleton } from '../../components/Common/ClinicSkeleton';
 import { ClinicModalPortal, ClinicActionLoadingModal } from '../../components/Common/ClinicModalPortal';
 import { CLINIC_ANIMATION_CONFIG } from '../../config/animationConfig';
 import { playBillingNotification } from '../../utils/audioQueue';
+import { formatNationalId } from '../../utils/formatters';
 
 interface BillingInvoicePageProps {
   selectedPatientId?: string;
@@ -588,7 +589,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
       }
     } catch (err) {
       console.error('Failed to confirm payment:', err);
-      alert('ไม่สามารถยืนยันการชำระเงินได้: ' + (err as Error).message);
+      if ((err as Error).message.includes('Invalid or Expired token')) { alert('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'); localStorage.removeItem('token'); localStorage.removeItem('clinic_auth_token'); window.location.href = '/login'; } else { alert('ไม่สามารถยืนยันการชำระเงินได้: ' + (err as Error).message); }
     } finally {
       // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;
@@ -624,11 +625,6 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
   // สั่งพิมพ์ผ่านเครื่องพิมพ์ (Print Dialog)
   const handleBrowserPrint = () => {
     window.print();
-  };
-
-  const handleSendDigitalReceipt = () => {
-    setReceiptSent('ส่งใบเสร็จดิจิทัลไปยัง SMS/Email ของผู้ป่วยเรียบร้อยแล้ว');
-    setTimeout(() => setReceiptSent(null), 3000);
   };
 
   if (loading) {
@@ -809,7 +805,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap', fontSize: '0.9rem', color: '#64748B' }}>
-                <span><strong>เลขประจำตัวประชาชน:</strong> {activePatient.nationalId || '-'}</span>
+                <span><strong>เลขประจำตัวประชาชน:</strong> {formatNationalId(activePatient.nationalId)}</span>
                 <span>•</span>
                 <span><strong>วันที่รับบริการ:</strong> {activePatient.visitDate || new Date().toISOString().split('T')[0]} ({activePatient.visitTime || '10:30'})</span>
               </div>
@@ -867,7 +863,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                 color: isPaymentConfirmed ? '#15803D' : '#DC2626',
                 border: `1.5px solid ${isPaymentConfirmed ? '#86EFAC' : '#FCA5A5'}`, 
                 padding: '6px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '800',
-                display: 'inline-flex', alignItems: 'center', gap: '6px', height: '36px', boxSizing: 'border-box'
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '120px', height: '36px', boxSizing: 'border-box'
               }}>
                 {isPaymentConfirmed ? (
                   <>
@@ -1221,7 +1217,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                         </div>
                         <div style={{ fontSize: '13px', lineHeight: '1.6', marginBottom: '14px' }}>
                           <div><strong>ชื่อผู้ป่วย:</strong> {activePatient.name}</div>
-                          <div><strong>HN:</strong> {activePatient.hn} | <strong>บัตรประชาชน:</strong> {activePatient.nationalId}</div>
+                          <div><strong>HN:</strong> {activePatient.hn} | <strong>บัตรประชาชน:</strong> {formatNationalId(activePatient.nationalId)}</div>
                           <div><strong>วันที่:</strong> {activePatient.visitDate} ({activePatient.visitTime})</div>
                           <div><strong>วิธีชำระเงิน:</strong> {paymentMethod === 'qr' ? 'PromptPay QR Code' : 'เงินสด'}</div>
                         </div>
@@ -1276,18 +1272,6 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                           <rect x="6" y="14" width="12" height="8"></rect>
                         </svg>
                         ดาวน์โหลด / พิมพ์ใบเสร็จ (PDF)
-                      </button>
-                      <button 
-                        type="button"
-                        className="receipt-btn digital-btn" 
-                        onClick={handleSendDigitalReceipt}
-                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-                      >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                          <polyline points="22,6 12,13 2,6"></polyline>
-                        </svg>
-                        ส่งใบเสร็จดิจิทัล (SMS/Email)
                       </button>
                       {onNavigateToDashboard && (
                         <button 
@@ -1546,7 +1530,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                     <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#1E40AF' }}>{activePatient.hn}</span>
                     {activePatient.nationalId && (
                       <span style={{ color: '#64748B', marginLeft: '10px' }}>
-                        (เลขบัตร: {activePatient.nationalId})
+                        (เลขบัตร: {formatNationalId(activePatient.nationalId)})
                       </span>
                     )}
                   </div>

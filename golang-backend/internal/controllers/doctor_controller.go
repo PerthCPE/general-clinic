@@ -441,6 +441,7 @@ func applyVisitStatusTx(tx *gorm.DB, visit *models.VisitRecord, newStatus string
 	if strings.TrimSpace(note) != "" {
 		queue.Note = note
 	}
+	queue.Department = ResolveDepartmentForStatus(queue, queue.Status)
 
 	if err := tx.Save(&queue).Error; err != nil {
 		return models.Queue{}, false, err

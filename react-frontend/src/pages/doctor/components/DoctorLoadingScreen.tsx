@@ -65,6 +65,22 @@ const Bone: React.FC<{ className?: string; style?: React.CSSProperties }> = ({ c
   />
 );
 
+/** ซ่อน scrollbar ระหว่างที่หน้ายังไม่มีข้อมูลพร้อมใช้งาน และคืนค่าเดิมเมื่อออกจากสถานะนี้ */
+function usePageScrollLock(): void {
+  React.useLayoutEffect(() => {
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, []);
+}
+
 interface DoctorLoadingScreenProps {
   /** ข้อความบอกว่ากำลังโหลดอะไรอยู่ ไม่ส่งมาก็ได้ จะใช้ข้อความกลางๆ */
   message?: string;
@@ -72,6 +88,7 @@ interface DoctorLoadingScreenProps {
 
 export const DoctorLoadingScreen: React.FC<DoctorLoadingScreenProps> = ({ message }) => {
   const { language } = useLanguage();
+  usePageScrollLock();
 
   return (
     <div role="status" aria-live="polite" className="relative">
@@ -117,8 +134,8 @@ export const DoctorLoadingScreen: React.FC<DoctorLoadingScreenProps> = ({ messag
         {/* --- Section: Stat Cards skeleton --- */}
         <section className="space-y-4">
           <Bone className="!rounded-lg" style={{ width: 140, height: 22 }} />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[0, 1, 2].map((i) => (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {[0, 1, 2, 3].map((i) => (
               <div
                 key={i}
                 className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-2xs flex items-center justify-between"
@@ -184,7 +201,7 @@ export const DoctorLoadingScreen: React.FC<DoctorLoadingScreenProps> = ({ messag
  */
 interface DoctorErrorScreenProps {
   message: string;
-  onRetry?: () => void;
+  onRetry?: () => void | Promise<void>;
 }
 
 /**
@@ -234,8 +251,32 @@ function toHumanMessage(raw: string, isTh: boolean): { title: string; detail: st
 
 export const DoctorErrorScreen: React.FC<DoctorErrorScreenProps> = ({ message, onRetry }) => {
   const { language } = useLanguage();
+  const [isRetrying, setIsRetrying] = React.useState(false);
+  usePageScrollLock();
   const isTh = language === 'th';
   const { title, detail } = toHumanMessage(message, isTh);
+
+  const handleRetry = async () => {
+    if (!onRetry || isRetrying) return;
+
+    const startedAt = Date.now();
+    setIsRetrying(true);
+    try {
+      await onRetry();
+    } finally {
+      // API บางข้อผิดพลาดตอบกลับแทบจะทันที ทำให้ Skeleton กระพริบจนมองไม่เห็น
+      // แสดงอย่างน้อย 800ms แต่หากโหลดจริงนานกว่านั้นจะรอจนคำขอจบตามปกติ
+      const remainingDelay = Math.max(0, 800 - (Date.now() - startedAt));
+      if (remainingDelay > 0) {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, remainingDelay));
+      }
+      setIsRetrying(false);
+    }
+  };
+
+  if (isRetrying) {
+    return <DoctorLoadingScreen message={isTh ? 'กำลังลองเชื่อมต่ออีกครั้ง' : 'Retrying connection'} />;
+  }
 
   return (
     <div className="min-h-[calc(100vh-134px)] flex flex-col items-center justify-center -translate-y-12 gap-4 text-center px-6">
@@ -251,7 +292,7 @@ export const DoctorErrorScreen: React.FC<DoctorErrorScreenProps> = ({ message, o
       {onRetry && (
         <button
           type="button"
-          onClick={onRetry}
+          onClick={() => { void handleRetry(); }}
           className="px-4 py-2 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow-md active:scale-95 transition-all cursor-pointer"
         >
           {isTh ? 'ลองใหม่อีกครั้ง' : 'Try again'}

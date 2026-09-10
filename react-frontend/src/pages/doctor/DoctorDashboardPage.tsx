@@ -99,7 +99,7 @@ const DoctorDashboardPage: React.FC<DoctorDashboardPageProps> = ({ onNavigate })
   // เช็คว่า patients ว่างด้วย เพราะถ้ายังมีข้อมูลเก่าค้างอยู่บนจอ การรีเฟรชรอบหลัง
   // ที่พลาดไปรอบเดียวไม่ควรลบทั้งหน้าทิ้งแล้วขึ้น error
   if (error && patients.length === 0) {
-    return <DoctorErrorScreen message={error} onRetry={() => { void refresh(); }} />;
+    return <DoctorErrorScreen message={error} onRetry={refresh} />;
   }
 
   return (

@@ -1,158 +1,180 @@
-# Clinic Management System (ระบบจัดการคลินิกทั่วไป)
-### ENG23 3031 System Analysis and Design | Team T08
+# 🏥 General Clinic Management System (ระบบสารสนเทศการบริหารจัดการคลินิกเวชกรรมทั่วไป - CLINICMS)
+> **ENG23 3031 System Analysis and Design | กลุ่มที่ 8 (Team 8) | Section 1**
 
-ระบบจัดการข้อมูลสารสนเทศภายในคลินิกเวชกรรมรักษาทั่วไป เพื่ออำนวยความสะดวกในการบริหารจัดการงาน ตั้งแต่การลงทะเบียนคนไข้ ซักประวัติ ตรวจรักษาของแพทย์ จ่ายยา การเงิน การนัดหมาย และการจัดการตารางงานธุรการ
-
----
-
-## Tech Stack
-
-### Backend
-* **Language**: Go (Golang) `v1.26+`
-* **Web Framework**: Gin Web Framework `v1.12+`
-* **ORM**: GORM `v1.31+`
-* **Database**: PostgreSQL 16 (Local Docker for Dev/Test, Supabase Cloud DB for Staging/Demo)
-* **Authentication**: JWT (JSON Web Token) & Role-Based Access Control (RBAC)
-
-### Frontend
-* **Framework**: React `v19` + TypeScript (TS)
-* **Build Tool**: Vite `v8`
-* **UI Library**: Material-UI (MUI v6)
+ระบบสารสนเทศครบวงจรสำหรับการบริหารจัดการคลินิกเวชกรรมรักษาทั่วไป ออกแบบและพัฒนาด้วยสถาปัตยกรรม Micro-module Clean Architecture และ Real-time WebSocket Synchronization เชื่อมโยงขั้นตอนการทำงานทางการแพทย์ตั้งแต่การลงทะเบียนผู้ป่วย การตรวจคัดกรอง การตรวจรักษา จ่ายยา การเงิน การนัดหมาย และงานเอกสารธุรการอย่างไร้รอยต่อ
 
 ---
 
-## Project Structure
-
-```text
-general-clinic/
-├── docker-compose.yml            # Docker Compose: PostgreSQL 16 & Adminer
-├── golang-backend/               # โฟลเดอร์ระบบหลังบ้าน (Go)
-│   ├── cmd/
-│   │   ├── main.go               # เซิร์ฟเวอร์หลัก (API + WebSocket)
-│   │   ├── migrate/main.go       # ตัวรัน Database Migration (001-006)
-│   │   └── clean_seed/main.go    # ตัวล้างและเตรียม Seed Data
-│   ├── migrations/               # สคริปต์ SQL Migration (001_*.sql - 006_*.sql)
-│   ├── internal/
-│   │   ├── config/               # การเชื่อมต่อฐานข้อมูลและการโหลด Config
-│   │   ├── controllers/          # ลอจิกการทำงานและ API Endpoints
-│   │   ├── dto/                  # Data Transfer Objects
-│   │   ├── middleware/           # Auth, Roles, CORS Guard
-│   │   ├── models/               # โครงสร้างตารางฐานข้อมูล (Schema)
-│   │   ├── routes/               # เส้นทาง API
-│   │   ├── testutils/            # Test Guards & Helpers
-│   │   └── ws/                   # WebSocket Hub & Broadcaster
-│   ├── .env.example              # ตัวอย่างไฟล์ Config สำหรับ Docker & Supabase
-│   ├── .env.local                # Config สำหรับ Local Docker Dev
-│   ├── .env.test                 # Config สำหรับ Unit / Integration Tests
-│   └── go.mod
-│
-└── react-frontend/               # โฟลเดอร์ระบบหน้าบ้าน (React + Vite)
-    ├── src/
-    │   ├── components/           # Reusable Components (Pagination, etc.)
-    │   ├── pages/                # หน้าจอการทำงานแต่ละแผนก
-    │   ├── context/              # Auth & RBAC Context
-    │   ├── services/             # API Client & Contracts
-    │   └── main.tsx
-    └── package.json
-```
+### 🔷 1. ระบบลงทะเบียน ค้นหาผู้ป่วย และออกบัตรคิว (Patient Registration & Queue Management)
+- **รหัส Use Case**: U1 (Patient Registration), U4 (Queue Management)
+- **บทบาทที่เกี่ยวข้อง**: 
+egistrar (เจ้าหน้าที่เวชระเบียน), 
+urse / 
+urse_assistant
+- **ฟีเจอร์หลัก**:
+  - ลงทะเบียนผู้ป่วยใหม่พร้อมระบบตรวจสอบ Checksum บัตรประชาชน 13 หลัก และคำนวณเลขอายุอัตโนมัติ
+  - ออกรหัส Hospital Number (HN) รูปแบบฐานสิบหก 4 หลัก: HN0001 ถึง HNFFFF
+  - ค้นหาประวัติผู้ป่วยเดิมแบบ Real-time ด้วยเลขบัตรประชาชน, HN, ชื่อ-นามสกุล หรือเบอร์โทรศัพท์
+  - ออกหมายเลขคิวรับบริการฐานสิบหก: Q0001 ถึง QFFFF
+  - กระดานควบคุมคิวแบบ Real-time WebSocket พร้อมระบบเสียงสังเคราะห์ภาษาไทยประกาศเรียกคิว (callQueueAudio)
 
 ---
 
-## Quick Start (วิธีการเปิดใช้งานโปรเจกต์)
-
-> [!IMPORTANT]
-> **Dev/Test Environment Policy**: การพัฒนาและการทดสอบทั้งหมด (รวมถึงการรัน `go test`) ต้องทำบน **Local Docker PostgreSQL** เท่านั้น เพื่อป้องกันปัญหา Supabase Egress Overrun โดย Supabase จะใช้เฉพาะการนำเสนอหรือ Demo จริงเท่านั้น
-
-### Step 1: Start Database Containers (Docker Compose)
-
-เปิด Docker Desktop และรันคำสั่ง:
-
-```bash
-docker compose up -d
-```
-
-ตรวจสอบสถานะ Containers:
-* **PostgreSQL (Database)**: `localhost:5433` (Container: `clinic_postgres`)
-* **Adminer (Database GUI)**: `http://localhost:8081` (Container: `clinic_adminer`)
-
-#### ข้อมูลการเชื่อมต่อ Adminer (`http://localhost:8081`):
-* **System**: `PostgreSQL`
-* **Server**: `clinic_postgres` (หรือ `localhost:5433` หากต่อจากภายนอก)
-* **Username**: `clinic`
-* **Password**: `clinic_dev_2569`
-* **Database**: `clinic`
+### 🔷 2. ระบบตรวจสอบสิทธิ์การรักษาพยาบาล (Medical Eligibility Verification)
+- **รหัส Use Case**: U2 (Eligibility Check)
+- **บทบาทที่เกี่ยวข้อง**: 
+egistrar
+- **ฟีเจอร์หลัก**:
+  - เชื่อมโยงจำลองข้อมูลสิทธิ์การรักษากับ สปสช. (บัตรทอง UC), ประกันสังคม (SSS), จ่ายตรงข้าราชการ (CSMBS), และประกันสุขภาพเอกชน
+  - แสดงสถานะความคุ้มครอง โรงพยาบาลคู่สัญญา และวันหมดอายุแบบ Real-time
+  - บันทึกและยืนยันสิทธิประโยชน์ในรอบการเข้ารับบริการ พร้อมระบบเก็บบันทึก Eligibility Audit History
 
 ---
 
-### Step 2: Run Database Migrations
+### 🔷 3. ระบบซักประวัติ วัดสัญญาณชีพ และคัดแยกความรุนแรง (Screening, Vitals & Triage)
+- **รหัส Use Case**: U3 (Record Vital Signs & Triage)
+- **บทบาทที่เกี่ยวข้อง**: 
+urse (พยาบาลคัดกรอง), 
+urse_assistant (ผู้ช่วยพยาบาล)
+- **ฟีเจอร์หลัก**:
+  - บันทึกสัญญาณชีพทางการแพทย์ครบถ้วน: ความดันโลหิต (BP Systolic/Diastolic), อัตราการเต้นของหัวใจ (Heart Rate), อัตราการหายใจ (RR), อุณหภูมิ (Temp), SpO2, Pain Score, DTX
+  - **Real-time BMI Gauge Widget**: คำนวณค่าดัชนีมวลกายอัตโนมัติตามมาตรฐานเอเชีย (WHO Asian Standard 5 ระดับ)
+  - **Triage Acuity Classification (Level 1–5)**: จัดระดับความเร่งด่วนทางการแพทย์ พร้อมระบบไฟกะพริบแจ้งเตือนสีม่วงเมื่อพบภาวะฉุกเฉินวิกฤต (Crisis BP / Low SpO2)
+  - ส่งต่อข้อมูลเข้าห้องตรวจแพทย์ (ห้องตรวจ 1, 2, 3) พร้อมเปลี่ยนสถานะคิวเป็น รอพบแพทย์ แบบ Atomic Transaction
 
-รันตัวจัดการ Migration อัตโนมัติ (รองรับ Idempotent และเก็บประวัติใน `schema_migrations`):
+---
 
-```bash
+### 🔷 4. ระบบแดชบอร์ดประวัติการคัดกรองสัญญาณชีพ (Screening History Dashboard)
+- **รหัส Use Case**: U5 (Screening History Dashboard & Audit)
+- **บทบาทที่เกี่ยวข้อง**: 
+urse, 
+urse_assistant, doctor
+- **ฟีเจอร์หลัก**:
+  - แดชบอร์ดสรุปสถิติผู้ป่วยคัดกรองทั้งหมด, กลุ่มเสี่ยงความดันโลหิตสูง (BP Alert), และเคสฉุกเฉินวิกฤต
+  - ตัวกรองสืบค้นประวัติย้อนหลังตามชื่อ-สกุล, HN, ระดับ Triage และช่วงวันที่
+  - ตารางประวัติแบบ Collapsible Accordion พร้อม Modal แสดงรายละเอียดผลการตรวจคัดกรองฉบับเต็ม
+
+---
+
+### 🔷 5. ระบบห้องตรวจแพทย์และการตรวจรักษา (Doctor Consultation & Medical Records)
+- **บทบาทที่เกี่ยวข้อง**: doctor (แพทย์ตรวจรักษา)
+- **ฟีเจอร์หลัก**:
+  - กระดานคิวรอตรวจของแพทย์ประจำห้องตรวจแบบ Real-time
+  - บันทึกผลการตรวจร่างกาย (Physical Examination), การวินิจฉัยโรคตามรหัสสากล (ICD-10)
+  - ระบบสั่งยาอิเล็กทรอนิกส์ (E-Prescription) เชื่อมตรงไปยังห้องยาและแคชเชียร์
+  - ตรวจสอบประวัติเวชระเบียนย้อนหลังของผู้ป่วย (Patient Records & Consultation History)
+  - จัดการตารางเวลาออกตรวจของแพทย์ (Doctor Schedule)
+
+---
+
+### 🔷 6. ระบบคลังยาและการจ่ายยา (Pharmacy, Inventory & Dispensing)
+- **บทบาทที่เกี่ยวข้อง**: pharmacist (เภสัชกร)
+- **ฟีเจอร์หลัก**:
+  - รับใบสั่งยาจากห้องตรวจแพทย์ ดำเนินการจัดยาและตรวจสอบความถูกต้อง
+  - บันทึกยืนยันการจ่ายยาและตัดยอดสต็อกยาในคลังยาอัตโนมัติ (Atomic Stock Deduction)
+  - บริหารจัดการคลังยา เพิ่มสต็อกยา (Stock In) และแจ้งเตือนเมื่อยาใกล้หมด (Low Stock Alert)
+  - ตรวจสอบประวัติการรับยาของผู้ป่วยย้อนหลัง (Patient Dispensing History)
+
+---
+
+### 🔷 7. ระบบการเงิน การชำระเงิน และออกใบเสร็จ (Billing, Invoices & Payment)
+- **บทบาทที่เกี่ยวข้อง**: cashier (เจ้าหน้าที่การเงิน)
+- **ฟีเจอร์หลัก**:
+  - คำนวณสรุปค่ารักษาพยาบาล ค่ายา ค่าตรวจ และค่าบริการทางการแพทย์
+  - คำนวณส่วนลดสิทธิประโยชน์ตามสิทธิ์การรักษาของผู้ป่วยโดยอัตโนมัติ
+  - ออกใบแจ้งหนี้และใบเสร็จรับเงิน (Invoice & Receipt Generation) ป้องกันปัญหา Duplicate Receipt Number
+  - ระบบสร้าง Dynamic PromptPay QR Code ตามยอดเงินที่ต้องชำระ
+  - แดชบอร์ดสรุปรายรับประจำวันและการเงินของคลินิก
+
+---
+
+### 🔷 8. ระบบงานสารบรรณ จัดการเอกสารและการส่งต่อ (Document Management System - DMS & Officer)
+- **บทบาทที่เกี่ยวข้อง**: officer (เจ้าหน้าที่ธุรการ/สารบรรณ)
+- **ฟีเจอร์หลัก**:
+  - จัดเก็บและบริหารจัดการเอกสารทางการแพทย์ เอกสารส่งตัว และเอกสารราชการ
+  - ระบบส่งต่อเอกสารระหว่างแผนกภายในคลินิก (Document Forwarding)
+  - บริหารจัดการตารางนัดหมายและตารางเวลาบุคลากรทางการแพทย์ (Schedule Management)
+
+---
+
+### 🔷 9. ระบบนัดหมายผู้ป่วย (Appointment Management System)
+- **บทบาทที่เกี่ยวข้อง**: 
+egistrar, 
+urse, doctor, officer
+- **ฟีเจอร์หลัก**:
+  - ทำการนัดหมายผู้ป่วยล่วงหน้า ระบุวัน เวลา แผนก และแพทย์ผู้รับผิดชอบ
+  - แดชบอร์ดติดตามสถานะการนัดหมายและแจ้งเตือนผู้ป่วยก่อนถึงวันนัด
+
+---
+
+### 🔷 10. ระบบบริหารจัดการผู้ใช้และสิทธิ์การเข้าถึง (Admin User Management & RBAC)
+- **บทบาทที่เกี่ยวข้อง**: dmin (ผู้ดูแลระบบ)
+- **ฟีเจอร์หลัก**:
+  - จัดการรายชื่อผู้ใช้งาน บุคลากรทางการแพทย์ และบทบาทหน้าที่ (User Management)
+  - กำหนดและอนุมัติสิทธิ์การเข้าถึงระบบตาม Role (Grant Access & Permission Control)
+
+---
+
+## 🛠️ เทคโนโลยีและสถาปัตยกรรม (Tech Stack)
+
+### Backend (Go)
+- **Language**: Go (Golang) 1.22+
+- **Web Framework**: Gin Web Framework
+- **ORM & Database**: GORM เชื่อมต่อ PostgreSQL 16 (รองรับทั้ง Local Docker และ Supabase Cloud DB)
+- **Real-time Engine**: Gorilla WebSocket Hub & Event Broadcaster
+- **Authentication**: JWT (JSON Web Token) พร้อม RBAC Middleware Guards
+
+### Frontend (React)
+- **Framework**: React 19 + TypeScript (Strict Type Safety)
+- **Build Tool**: Vite 8
+- **Design System**: Elevated Dark Slate Theme
+  - Background Surface: #212836
+  - Topbar & Header: #1C2230
+  - Border Colors: #333F53 / #2F3B4E
+  - Primary Brand Blue: #2563EB
+- **Icons**: Medical SVG Icons Only (ตามกฎ Zero Raw Unicode Emoji)
+
+---
+
+## 🚀 วิธีการติดตั้งและเปิดใช้งาน (Quick Start Guide)
+
+### 1. ติดตั้งและเริ่มทำงาน Backend (Golang)
+`ash
 cd golang-backend
+
+# รัน Migration ฐานข้อมูล
 go run ./cmd/migrate/main.go
-```
 
----
-
-### Step 3: Seed Clean Test Data
-
-ล้างข้อมูลเก่าและเตรียมชุดข้อมูลตั้งต้น (Users ครบทุก Role, ผู้ป่วย 20 คน, สิทธิ์การรักษา, คิว 15 คิว, การคัดกรอง):
-
-```bash
+# Seed ข้อมูลตั้งต้นสำหรับทดสอบ (Users, Patients, Queues, Medicines)
 go run ./cmd/clean_seed/main.go
-```
 
----
-
-### Step 4: Run Backend Server
-
-```bash
+# เริ่มการทำงานของ Backend Server
 go run ./cmd/main.go
-```
-*ระบบ Backend จะทำงานที่ `http://localhost:8080`*
+`
+*Backend Server จะทำงานที่: http://localhost:8080*
 
----
-
-### Step 5: Run Frontend Server
-
-เปิด Terminal ใหม่:
-
-```bash
+### 2. ติดตั้งและเริ่มทำงาน Frontend (React)
+`ash
 cd react-frontend
+
+# ติดตั้ง Dependencies
 npm install
+
+# เริ่มการทำงานของ Frontend Dev Server
 npm run dev
-```
-*ระบบ Frontend จะทำงานที่ `http://localhost:5173`*
+`
+*Frontend Application จะทำงานที่: http://localhost:5173*
 
 ---
 
-## Test Accounts & Credentials (บัญชีทดสอบ)
+## 🧪 การทดสอบระบบ (Verification & Testing)
 
-บัญชีทดสอบทั้งหมดใช้รหัสผ่านเริ่มต้น: `password`
-
-| Username | Role | แผนก / หน้าที่ | สิทธิ์ที่เข้าถึงได้ |
-| :--- | :--- | :--- | :--- |
-| `registrar1` | `registrar` | เวชระเบียน | ค้นหาผู้ป่วย, ลงทะเบียนผู้ป่วยใหม่, ตรวจสอบ/บันทึกสิทธิ์, ออกบัตรคิว |
-| `nurse1` | `nurse` | พยาบาลคัดกรอง | จัดการคิว, ซักประวัติ/บันทึกสัญญาณชีพ, ประวัติคัดกรอง |
-| `assistant1` | `nurse_assistant` | ผู้ช่วยพยาบาล | จัดการคิว, ซักประวัติ/บันทึกสัญญาณชีพ, ประวัติคัดกรอง (Parity กับ Nurse) |
-| `doctor1` | `doctor` | แพทย์ตรวจรักษา | ตารางตรวจแพทย์, บันทึกการวินิจฉัยและสั่งยา |
-| `doctor2` | `doctor` | แพทย์ตรวจรักษา | ตารางตรวจแพทย์, บันทึกการวินิจฉัยและสั่งยา |
-| `pharmacist1` | `pharmacist` | เภสัชกรรม | คิวจ่ายยา, ตรวจสอบและบันทึกการจ่ายยา |
-| `cashier1` | `cashier` | การเงิน | คิวชำระเงิน, ออกใบเสร็จ, ตรวจสอบการชำระเงิน QR |
-| `officer1` | `officer` | เจ้าหน้าที่ทั่วไป | จัดการตารางแพทย์, งานธุรการ |
-| `admin1` | `admin` | ผู้ดูแลระบบ | จัดการผู้ใช้งาน, สิทธิ์ และการตั้งค่าระบบทั้งหมด |
-
----
-
-## Running Tests
-
-รัน Backend Test Suites ทั้งหมดอย่างปลอดภัยบน Local Docker:
-
-```bash
+`ash
+# 1. รัน Backend Test Suite ทั้งหมด
 cd golang-backend
-go test -v ./...
-```
+go test ./...
 
-> [!NOTE]
-> ระบบมี **Supabase Production Guard** ใน `internal/testutils/guard.go` ซึ่งจะปฏิเสธการรัน Test ทันทีหากตรวจพบว่า `DB_HOST` ชี้ไปยัง Supabase
+# 2. ตรวจสอบ Type Check และ Build Frontend สำหรับ Production
+cd react-frontend
+npm run build
+`
