@@ -100,6 +100,7 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'registration', title: 'ลงทะเบียนผู้ป่วย', iconType: 'registration', path: '/registration' },
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
     { id: 'eligibility', title: 'ตรวจสอบสิทธิ์การรักษา', iconType: 'eligibility', path: '/eligibility' },
+    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' },
   ],
   nurse: [
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
@@ -169,7 +170,7 @@ export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'billing-invoice': ['cashier'],
   'billing-dashboard': ['cashier'],
   'appointment-form': ['doctor'],
-  'appointment-dashboard': ['doctor'],
+  'appointment-dashboard': ['doctor', 'registrar'],
   'admin-users': ['admin'],
   'admin-access': ['admin'],
   'doctor-dashboard': ['doctor'],
