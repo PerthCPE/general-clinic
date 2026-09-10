@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Autocomplete, TextField, Snackbar, Alert, CircularProgress } from '@mui/material';
+import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { patientApi, vitalsApi, appointmentApi, type BackendPatient, type BackendDoctor } from '../../services/api';
 import { TREATMENT_DEPARTMENTS } from '../../config/roles';
@@ -149,8 +150,8 @@ export default function AppointmentForm() {
 
         {isLoading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
-            <CircularProgress />
-            <span style={{ marginLeft: 12, alignSelf: 'center', color: '#64748B' }}>กำลังโหลดข้อมูล...</span>
+            <CircularProgress size={28} />
+            <span style={{ marginLeft: 12, alignSelf: 'center', color: 'var(--text-muted)' }}>กำลังโหลดข้อมูลผู้ป่วยและแพทย์...</span>
           </div>
         ) : (
           <div className="form-grid">
@@ -273,8 +274,9 @@ export default function AppointmentForm() {
             </div>
 
             {errorMsg && (
-              <div className="input-group full-width" style={{ color: '#EF4444', fontSize: '0.9rem' }}>
-                ⚠ {errorMsg}
+              <div className="input-group full-width form-error-banner">
+                <AlertCircle size={18} strokeWidth={2} />
+                <span>{errorMsg}</span>
               </div>
             )}
 
