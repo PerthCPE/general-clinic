@@ -382,7 +382,7 @@ body.dark-mode .billing-dashboard-container .purple-badge {
 
 .billing-dashboard-container .table-wrapper {
   width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden;
   box-sizing: border-box;
 }
 

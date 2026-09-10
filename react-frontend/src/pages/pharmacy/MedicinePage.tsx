@@ -2357,26 +2357,36 @@ export default function MedicinePage() {
                         <td style={{ padding: '10px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <CopyableText value={med.id} color="#2563EB" />
                         </td>
-                        <td className="med-name-cell" style={{ textAlign: 'left', padding: '12px 16px' }}>
+                        <td 
+                          className="med-name-cell" 
+                          onClick={() => { setDetailModalMed(med); setIsEditingDetailMed(false); }}
+                          style={{ 
+                            textAlign: 'left', 
+                            padding: '12px 16px',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.backgroundColor = '#EFF6FF';
+                            const nameEl = e.currentTarget.querySelector('.med-name-text') as HTMLElement;
+                            if (nameEl) { nameEl.style.color = '#1D4ED8'; nameEl.style.textDecoration = 'underline'; }
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.backgroundColor = '';
+                            const nameEl = e.currentTarget.querySelector('.med-name-text') as HTMLElement;
+                            if (nameEl) { nameEl.style.color = '#2563EB'; nameEl.style.textDecoration = 'none'; }
+                          }}
+                          title="คลิกเพื่อดูรายละเอียดตัวยาและสรรพคุณ"
+                        >
                           <span 
-                            onClick={() => { setDetailModalMed(med); setIsEditingDetailMed(false); }}
+                            className="med-name-text"
                             style={{ 
                               fontWeight: '700', 
                               color: '#2563EB', 
                               fontSize: '14px',
-                              cursor: 'pointer',
                               whiteSpace: 'nowrap',
                               transition: 'all 0.15s ease'
                             }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = '#1D4ED8';
-                              e.currentTarget.style.textDecoration = 'underline';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#2563EB';
-                              e.currentTarget.style.textDecoration = 'none';
-                            }}
-                            title="คลิกเพื่อดูรายละเอียดตัวยาและสรรพคุณ"
                           >
                             {med.name}
                           </span>

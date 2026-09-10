@@ -25,6 +25,26 @@ export function getSharedAudioContext(): AudioContext | null {
   return ctx;
 }
 
+/**
+ * คืนค่า AudioContext กลางที่ "พร้อมเล่นเสียงแล้ว" (state === 'running')
+ *
+ * สำคัญ: ctx.resume() เป็น async — ถ้าไม่ await แล้วรีบ schedule oscillator ทันที
+ * ตอน context ยัง suspended (เช่น แท็บอยู่ background) เสียงจะถูกตั้งเวลาไว้ในอดีต
+ * พอ context ตื่นขึ้นมาช่วงเวลานั้นผ่านไปแล้ว -> ไม่มีเสียง (อาการ "บางทีติด บางทีไม่ติด")
+ */
+export async function resumeSharedAudioContext(): Promise<AudioContext | null> {
+  const c = getSharedAudioContext();
+  if (!c) return null;
+  if (c.state === 'suspended') {
+    try {
+      await c.resume();
+    } catch {
+      return null;
+    }
+  }
+  return c.state === 'running' ? c : null;
+}
+
 /** ปลดล็อกเสียงเมื่อผู้ใช้มี interaction ครั้งแรก — เรียกจาก event listener เท่านั้น */
 export function initAudioContext(): void {
   const c = getSharedAudioContext();

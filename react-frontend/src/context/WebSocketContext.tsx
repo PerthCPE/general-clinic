@@ -29,10 +29,25 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const getWsUrl = () => {
-    const httpUrl = API_BASE_URL.replace(/\/$/, '');
-    const wsProtocol = httpUrl.startsWith('https') ? 'wss:' : 'ws:';
-    const host = httpUrl.replace(/^https?:\/\//, '');
-    return `${wsProtocol}//${host}/ws`;
+    const toWs = (httpUrl: string) => {
+      const clean = httpUrl.replace(/\/$/, '');
+      const wsProtocol = clean.startsWith('https') ? 'wss:' : 'ws:';
+      return `${clean.replace(/^https?:\/\//, `${wsProtocol}//`)}/ws`;
+    };
+
+    // 1. ถ้ากำหนด API_BASE_URL ไว้ชัดเจน ใช้อันนั้น
+    if (API_BASE_URL) return toWs(API_BASE_URL);
+
+    // 2. API_BASE_URL ว่าง (เรียก REST ผ่าน relative /api ให้ Vite proxy) —
+    //    แต่ Vite proxy ไม่ครอบ /ws จึงต้องต่อ WebSocket ตรงไปที่ backend เอง
+    const envTarget =
+      (import.meta.env.VITE_API_TARGET as string | undefined) ||
+      (import.meta.env.VITE_API_URL as string | undefined);
+    if (envTarget) return toWs(envTarget);
+
+    // 3. สุดท้าย: เดาจาก host ปัจจุบัน + พอร์ต backend dev มาตรฐาน 8080
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${wsProtocol}//${window.location.hostname}:8080/ws`;
   };
 
   const connect = useCallback(() => {

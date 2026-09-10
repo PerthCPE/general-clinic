@@ -10,7 +10,11 @@ type BillingHistory struct {
 	HN            string    `gorm:"not null;index" json:"hn"`
 	PatientName   string    `gorm:"not null" json:"patient_name"`
 	NationalID    string    `json:"national_id"`
+	QueueNumber   string    `json:"queue_number"`
 	DoctorName    string    `json:"doctor_name"`
+	DoctorAdvice  string    `json:"doctor_advice"`
+	TreatmentRight string   `gorm:"default:'สิทธิ 30 บาท (สปสช.)'" json:"treatment_right"`
+	Vitals        string    `json:"vitals"`
 	TotalAmount   float64   `gorm:"not null;default:0" json:"total_amount"`
 	Discount      float64   `gorm:"default:0" json:"discount"`
 	NetAmount     float64   `gorm:"not null;default:0" json:"net_amount"`

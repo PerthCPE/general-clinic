@@ -93,6 +93,7 @@ export default function BillingInvoicePage({
   const [showQrModal, setShowQrModal] = useState(false);
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
   const [isPaymentConfirmed, setIsPaymentConfirmed] = useState(false);
+  const [confirmedPatient, setConfirmedPatient] = useState<PatientConfig | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [receiptSent, setReceiptSent] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'qr' | 'cash'>('qr');
@@ -433,10 +434,12 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
   }, [currentSelectedId]);
 
   const activePatient: PatientConfig | undefined = 
+    (isPaymentConfirmed && confirmedPatient ? confirmedPatient : undefined) ||
     queueList.find(p => p.id === currentSelectedId) || 
     (storedActivePatient && storedActivePatient.id === currentSelectedId ? storedActivePatient : undefined) ||
     queueList[0] ||
     storedActivePatient ||
+    confirmedPatient ||
     undefined;
 
   const currentRights = activePatient ? (patientRightsMap?.[activePatient.id] || activePatient.treatmentRights) : '';
@@ -446,6 +449,9 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
   const registeredKey = normalizeScheme(registeredRights);
   const selectedKey = normalizeScheme(selectedRights);
   const isRightsMismatch = registeredKey !== selectedKey;
+  const isGovRight = selectedRights.includes('ข้าราชการ') || selectedRights.includes('กรมบัญชีกลาง') || selectedKey === 'gov';
+  const isSelfPay = !isGovRight && (selectedKey === 'cash' || selectedRights.includes('เงินสด') || selectedRights.includes('Self Pay') || selectedRights.includes('ชำระเงินเอง') || (selectedRights.includes('จ่ายตรง') && !selectedRights.includes('กรมบัญชีกลาง')));
+  const isSubmitBlocked = isRightsMismatch && !isSelfPay;
 
   // ดึงรายการยาและราคาจริงจากฐานข้อมูล สำหรับคนไข้ที่เลือกอยู่ (ถ้ายังไม่มีในแคช)
   useEffect(() => {
@@ -662,6 +668,15 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
   }, [promptPayNumber, grandTotal, qrKey]);
 
   const handleOpenQr = () => {
+    if (isSubmitBlocked) {
+      alert(
+        `สิทธิ์ที่เลือกไม่ตรงกับสิทธิ์ที่บันทึกในระบบ: ไม่อนุญาตให้ดำเนินการชำระเงิน\n\n` +
+        `• สิทธิ์ที่บันทึกในระบบ: ${registeredRights}\n` +
+        `• สิทธิ์ที่เลือกใช้: ${selectedRights}\n\n` +
+        `ระบบอนุญาตเฉพาะกรณีเลือกสิทธิ์ที่ตรงกับข้อมูลของผู้ป่วย หรือเลือก 'จ่ายตรง / เงินสด' เท่านั้น`
+      );
+      return;
+    }
     setShowQrModal(true);
     setIsPaymentConfirmed(false);
     setReceiptSent(null);
@@ -674,6 +689,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
   // [บุญให้เพิ่มเทคนิคนี้] (Supabase + Optimistic UI + WebSocket) - กดยืนยันรับชำระเงินแล้วอัปเดตหน้าจอทันที 0 ms และส่งขึ้น Supabase เบื้องหลัง
   const handleConfirmPayment = async () => {
     if (!activePatient) return;
+    setConfirmedPatient(activePatient);
     if (paymentMethod === 'qr' && isQrExpired) {
       alert('การชำระเงินไม่สำเร็จหรือหมดเวลา: ระบบแจ้งเตือนและอนุญาตให้สร้าง QR Code ใหม่');
       return;
@@ -695,10 +711,13 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
         hn: activePatient.hn || 'HN0001',
         patient_name: activePatient.name || 'ผู้ป่วย',
         national_id: activePatient.nationalId || '',
+        queue_number: activePatient.queueNumber || activePatient.ticket || 'Q0001',
         total_amount: rawTotal,
         net_amount: grandTotal,
         discount_amount: discountAmount,
         scheme_type: selectedRights,
+        treatment_right: selectedRights,
+        vitals: activePatient.vitals || 'ความดัน 120/80 mmHg | ปกติ',
         payment_method: paymentMethod === 'qr' ? 'QR Code' : 'เงินสด',
         cash_received: parseFloat(cashReceived) || grandTotal,
         doctor_name: 'นพ.สมเกียรติ มั่นคง',
@@ -776,7 +795,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
     return <BillingInvoiceSkeleton />;
   }
 
-  if (!activePatient) {
+  if (!activePatient && !confirmedPatient) {
     return (
       <div className="billing-invoice-container">
         <div style={{ 
@@ -969,7 +988,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                   if (r.includes('ประกันสังคม')) return 'สิทธิประกันสังคม (Social Security)';
                   if (r.includes('ข้าราชการ') || r.includes('กรมบัญชีกลาง')) return 'สิทธิข้าราชการ / จ่ายตรงกรมบัญชีกลาง';
                   if (r.includes('ประกันสุขภาพ') || r.includes('เอกชน')) return 'ประกันสุขภาพเอกชน (Private Insurance)';
-                  if (r.includes('ชำระเงินเอง') || r.includes('เงินสด') || r.includes('จ่ายตรง')) return 'จ่ายตรง / เงินสด (Self Pay / Cash)';
+                  if (r.includes('ชำระเงินเอง') || r.includes('เงินสด') || (r.includes('จ่ายตรง') && !r.includes('กรมบัญชีกลาง') && !r.includes('ข้าราชการ'))) return 'จ่ายตรง / เงินสด (Self Pay / Cash)';
                   return r || 'สิทธิ 30 บาท (บัตรทอง / สปสช.)';
                 })()}
                 onChange={(e) => {
@@ -1027,58 +1046,61 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
 
         </div>
 
-        {/* Warning alert when selected rights do not match registered rights */}
-        {isRightsMismatch && (
-          <div style={{
-            marginTop: '16px',
-            padding: '14px 18px',
-            background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.75) 0%, rgba(254, 249, 195, 0.45) 100%)',
-            border: '1px solid rgba(245, 158, 11, 0.45)',
-            borderRadius: '12px',
-            color: '#92400E',
-            fontSize: '13px',
-            lineHeight: '1.45',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '14px',
-            boxShadow: '0 3px 10px -2px rgba(245, 158, 11, 0.15)'
-          }}>
+        {/* Warning banner when selected rights do not match registered rights */}
+        {isRightsMismatch && isSubmitBlocked && (
             <div style={{
+              margin: '0 0 20px 0',
+              padding: '14px 18px',
+              background: '#FEF2F2',
+              border: '1.5px solid #F87171',
+              borderRadius: '12px',
+              color: '#991B1B',
+              fontSize: '13px',
+              lineHeight: '1.5',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '34px',
-              height: '34px',
-              borderRadius: '9px',
-              backgroundColor: '#FEF3C7',
-              color: '#D97706',
-              flexShrink: 0
+              alignItems: 'flex-start',
+              gap: '12px',
+              boxShadow: '0 4px 12px -2px rgba(239, 68, 68, 0.12)'
             }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
-              </svg>
-            </div>
-            <div>
-              <div style={{ fontWeight: '800', color: '#B45309', fontSize: '13.5px' }}>
-                สิทธิ์ที่เลือกไม่ตรงกับสิทธิ์ที่บันทึกในระบบ: ระบบแสดงคำเตือนให้ตรวจสอบสิทธิ์อีกครั้ง
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '5px', fontSize: '12px' }}>
-                <span style={{ color: '#78350F' }}>สิทธิ์ที่บันทึกในระบบ:</span>
-                <span style={{ padding: '2px 8px', borderRadius: '5px', backgroundColor: '#EDE9FE', color: '#6D28D9', fontWeight: '600' }}>
-                  {registeredRights}
-                </span>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '34px',
+                height: '34px',
+                borderRadius: '9px',
+                backgroundColor: '#FEE2E2',
+                color: '#DC2626',
+                flexShrink: 0
+              }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="15" y1="9" x2="9" y2="15"></line>
+                  <line x1="9" y1="9" x2="15" y2="15"></line>
                 </svg>
-                <span style={{ color: '#78350F' }}>สิทธิ์ที่เลือกใช้:</span>
-                <span style={{ padding: '2px 8px', borderRadius: '5px', backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: '600' }}>
-                  {selectedRights}
-                </span>
+              </div>
+              <div>
+                <div style={{ fontWeight: '800', color: '#991B1B', fontSize: '13.5px' }}>
+                  สิทธิ์ที่เลือกไม่ตรงกับสิทธิ์ที่บันทึกในระบบ: ไม่อนุญาตให้ดำเนินการต่อ
+                </div>
+                <div style={{ fontSize: '12px', color: '#B91C1C', marginTop: '2px' }}>
+                  (ระบบอนุญาตเฉพาะสิทธิ์ที่บันทึกในระบบ หรือเลือก "จ่ายตรง / เงินสด" เท่านั้น)
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginTop: '6px', fontSize: '12px' }}>
+                  <span style={{ color: '#7F1D1D' }}>สิทธิ์ที่บันทึกในระบบ:</span>
+                  <span style={{ padding: '2px 8px', borderRadius: '5px', backgroundColor: '#EDE9FE', color: '#6D28D9', fontWeight: '600' }}>
+                    {registeredRights}
+                  </span>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                  </svg>
+                  <span style={{ color: '#7F1D1D' }}>สิทธิ์ที่เลือกใช้:</span>
+                  <span style={{ padding: '2px 8px', borderRadius: '5px', backgroundColor: '#FEE2E2', color: '#991B1B', fontWeight: '600' }}>
+                    {selectedRights}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
         )}
       </div>
 
@@ -1147,13 +1169,44 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
       </div>
 
       <div className="bottom-action-bar">
-        <button className="pay-qr-btn" onClick={handleOpenQr}>
+        <button 
+          className="pay-qr-btn" 
+          onClick={handleOpenQr}
+          disabled={isSubmitBlocked}
+          style={{
+            opacity: isSubmitBlocked ? 0.45 : 1,
+            cursor: isSubmitBlocked ? 'not-allowed' : 'pointer',
+            filter: isSubmitBlocked ? 'grayscale(0.6)' : 'none',
+            transition: 'all 0.2s ease'
+          }}
+          title={isSubmitBlocked ? "ไม่สามารถดำเนินการชำระเงินได้เนื่องจากสิทธิไม่ตรงกับระบบ" : "ดำเนินการชำระเงิน"}
+        >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
             <rect x="2" y="5" width="20" height="14" rx="2"/>
             <line x1="2" y1="10" x2="22" y2="10"/>
           </svg>
           <span>ดำเนินการชำระเงิน (Proceed to Payment)</span>
         </button>
+        {isSubmitBlocked && (
+          <div style={{
+            marginTop: '10px',
+            textAlign: 'center',
+            fontSize: '12.5px',
+            color: '#DC2626',
+            fontWeight: '600',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '6px'
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span>ปุ่มชำระเงินถูกระงับ: กรุณาเลือกสิทธิ์ให้ตรงกับระบบ ({registeredRights}) หรือเลือก "จ่ายตรง / เงินสด"</span>
+          </div>
+        )}
       </div>
 
       {/* Payment Modal */}

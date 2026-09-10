@@ -52,7 +52,7 @@ export const normalizeScheme = (r?: string): string => {
   if (s.includes('ประกันสังคม') || s.includes('social')) return 'sso';
   if (s.includes('ข้าราชการ') || s.includes('กรมบัญชีกลาง') || s.includes('gov')) return 'gov';
   if (s.includes('ประกันสุขภาพ') || s.includes('เอกชน') || s.includes('insurance')) return 'private';
-  if (s.includes('จ่ายตรง') || s.includes('เงินสด') || s.includes('ชำระ') || s.includes('cash') || s.includes('self')) return 'cash';
+  if (s.includes('เงินสด') || s.includes('ชำระเงินเอง') || s.includes('cash') || s.includes('self') || (s.includes('จ่ายตรง') && !s.includes('ข้าราชการ') && !s.includes('กรมบัญชีกลาง'))) return 'cash';
   return '30baht';
 };
 
