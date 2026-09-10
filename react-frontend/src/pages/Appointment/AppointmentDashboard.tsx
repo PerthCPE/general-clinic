@@ -39,7 +39,10 @@ export default function AppointmentDashboard() {
   const itemsPerPage = 8;
 
   const isDoctor = currentUser?.role === 'doctor';
-  const isRegistrar = currentUser?.role === 'registrar' || currentUser?.role === 'admin';
+  // สิทธิ์แก้ไข (วันที่/เวลา/สถานะ): nurse_assistant ได้เต็ม (แทนที่ registrar เดิมที่ถูกตัดออก
+  // ทั้งหมดตามนโยบายใหม่) + admin คงไว้เหมือนเดิม — nurse ไม่อยู่ในนี้โดยตั้งใจ เพราะได้สิทธิ์
+  // แบบดูอย่างเดียวเท่านั้น (ตกไปใช้ branch แสดงข้อความ/badge ธรรมดาแทน input/select ที่แก้ได้)
+  const canEdit = currentUser?.role === 'nurse_assistant' || currentUser?.role === 'admin';
 
   const fetchAppointments = async () => {
     try {
@@ -297,7 +300,7 @@ export default function AppointmentDashboard() {
                       <span className={`dept-badge badge-${row.deptColor}`}>{row.dept}</span>
                     </td>
                     <td>
-                      {isRegistrar ? (
+                      {canEdit ? (
                         <input 
                           type="date"
                           value={row.date}
@@ -310,7 +313,7 @@ export default function AppointmentDashboard() {
                       )}
                     </td>
                     <td>
-                      {isRegistrar ? (
+                      {canEdit ? (
                         <select
                           value={row.time}
                           onChange={(e) => handleTimeChange(row.id, e.target.value)}
@@ -328,7 +331,7 @@ export default function AppointmentDashboard() {
                     </td>
                     <td><span className="phone-text">{row.phone}</span></td>
                     <td>
-                      {isRegistrar ? (
+                      {canEdit ? (
                         <select 
                           value={row.status}
                           onChange={(e) => handleStatusChange(row.id, e.target.value)}

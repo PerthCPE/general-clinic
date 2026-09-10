@@ -178,27 +178,37 @@ func SetUpRoutes(r *gin.Engine) {
 	}
 
 	// ===== 6. Appointments Module =====
+	//
+	// สิทธิ์เข้าหน้าแดชบอร์ดนัดหมายเปลี่ยนนโยบายรอบนี้ (ย้อนกลับ registrar, เพิ่ม nurse_assistant
+	// แบบแก้ไขได้เต็ม, เพิ่ม nurse แบบดูอย่างเดียว) แบ่งเป็น 3 กลุ่มสิทธิ์ให้ตรงกับพฤติกรรมจริง:
 	apptCtrl := controllers.NewAppointmentController(config.DB)
 	apptRoutes := api.Group("/appointments")
 	{
-		// ดู/แก้ไขนัดหมายที่มีอยู่แล้ว (แดชบอร์ดนัดหมาย) -> doctor, admin, nurse, registrar
-		// เพิ่ม registrar เข้ามาให้ตรงกับที่ frontend เปิดสิทธิ์ไว้แล้ว (PAGE_PERMISSIONS
-		// ['appointment-dashboard']) — เจ้าหน้าที่เวชระเบียนต้องเลื่อนนัด/อัปเดตสถานะผู้ป่วย
-		// ที่มาถึงได้จากหน้านี้
+		// ดูรายการนัดหมาย -> ทุก role ที่เข้าหน้านี้ได้ (PAGE_PERMISSIONS['appointment-dashboard']
+		// = doctor, nurse_assistant, nurse) รวม admin ไว้ด้วยเผื่ออนาคต — nurse ดูได้อย่างเดียว
+		// จึงต้องอยู่ในกลุ่มนี้ (GET) แต่ห้ามอยู่ในกลุ่มแก้ไข/สร้างด้านล่าง
 		apptRead := apptRoutes.Group("")
-		apptRead.Use(middleware.RoleRequired("doctor", "admin", "nurse", "registrar"))
+		apptRead.Use(middleware.RoleRequired("doctor", "admin", "nurse_assistant", "nurse"))
 		{
 			apptRead.GET("", apptCtrl.GetAppointments)
-			apptRead.PUT("/:id/status", apptCtrl.UpdateAppointmentStatus)
-			apptRead.PUT("/:id/schedule", apptCtrl.UpdateAppointmentSchedule)
 		}
 
-		// สร้างนัดหมายใหม่ -> doctor, admin, nurse เท่านั้น (ไม่รวม registrar โดยตั้งใจ:
-		// หน้า "สร้างนัดหมาย" ฝั่ง frontend เปิดให้เฉพาะ doctor ผ่าน PAGE_PERMISSIONS
-		// ['appointment-form'] อยู่แล้ว งานนี้ขอแค่เปิดสิทธิ์ดู/แก้ไขให้ registrar เท่านั้น
-		// ถ้าจะให้ registrar สร้างนัดหมายได้ด้วย ต้องเพิ่มสิทธิ์ทั้งสองจุดพร้อมกัน)
+		// แก้ไขนัดหมายที่มีอยู่แล้ว (วันที่/เวลา/สถานะ) -> doctor, admin, nurse_assistant
+		// registrar ถูกตัดออกทั้งหมดตามนโยบายใหม่ (เคยเพิ่มไว้ก่อนหน้านี้ ย้อนกลับแล้ว)
+		// nurse ไม่อยู่ในกลุ่มนี้โดยตั้งใจ — nurse ได้สิทธิ์แบบดูอย่างเดียวเท่านั้น
+		apptEdit := apptRoutes.Group("")
+		apptEdit.Use(middleware.RoleRequired("doctor", "admin", "nurse_assistant"))
+		{
+			apptEdit.PUT("/:id/status", apptCtrl.UpdateAppointmentStatus)
+			apptEdit.PUT("/:id/schedule", apptCtrl.UpdateAppointmentSchedule)
+		}
+
+		// สร้างนัดหมายใหม่ -> doctor, admin เท่านั้น (หน้า "สร้างนัดหมาย" ฝั่ง frontend เปิดให้
+		// เฉพาะ doctor ผ่าน PAGE_PERMISSIONS['appointment-form'] อยู่แล้ว)
+		// nurse_assistant ไม่รวม (เหมือน registrar เดิม — ได้แค่ดู/แก้ไขนัดหมายที่มีอยู่ ไม่ใช่สร้างใหม่)
+		// nurse ไม่รวมเช่นกัน (read-only ต้องไม่มีสิทธิ์เขียนใดๆ เลยแม้จะยิง API ตรงก็ตาม)
 		apptWrite := apptRoutes.Group("")
-		apptWrite.Use(middleware.RoleRequired("doctor", "admin", "nurse"))
+		apptWrite.Use(middleware.RoleRequired("doctor", "admin"))
 		{
 			apptWrite.POST("", apptCtrl.CreateAppointment)
 		}

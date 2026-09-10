@@ -100,17 +100,18 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'registration', title: 'ลงทะเบียนผู้ป่วย', iconType: 'registration', path: '/registration' },
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
     { id: 'eligibility', title: 'ตรวจสอบสิทธิ์การรักษา', iconType: 'eligibility', path: '/eligibility' },
-    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' },
   ],
   nurse: [
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
     { id: 'vitals', title: 'บันทึกสัญญาณชีพ', iconType: 'vitals', path: '/vitals' },
     { id: 'vitals-history', title: 'ประวัติการคัดกรอง', iconType: 'history', path: '/vitals-history' },
+    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย (ดูอย่างเดียว)', iconType: 'dashboard', path: '/appointment-dashboard' },
   ],
   nurse_assistant: [
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
     { id: 'vitals', title: 'บันทึกสัญญาณชีพ', iconType: 'vitals', path: '/vitals' },
     { id: 'vitals-history', title: 'ประวัติการคัดกรอง', iconType: 'history', path: '/vitals-history' },
+    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' },
   ],
   pharmacist: [
     { id: 'pharmacy-dispense', title: 'บันทึกและจ่ายยา', iconType: 'dispense', path: '/pharmacy-dispense' },
@@ -170,7 +171,7 @@ export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'billing-invoice': ['cashier'],
   'billing-dashboard': ['cashier'],
   'appointment-form': ['doctor'],
-  'appointment-dashboard': ['doctor', 'registrar'],
+  'appointment-dashboard': ['doctor', 'nurse_assistant', 'nurse'],
   'admin-users': ['admin'],
   'admin-access': ['admin'],
   'doctor-dashboard': ['doctor'],
