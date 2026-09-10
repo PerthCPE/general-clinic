@@ -23,7 +23,11 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     server: {
-      host: '127.0.0.1',
+      // ต้องเป็น 'localhost' ห้ามเป็น '127.0.0.1' — localStorage แยก origin กันตาม hostname
+      // เป๊ะๆ (แม้ IP จะชี้ไปที่เดียวกัน) ถ้าใครเปิดหน้าเว็บผ่าน localhost:5173 บ้าง
+      // 127.0.0.1:5173 บ้าง จะได้ token/session คนละชุดกันเงียบๆ ทำให้ดูเหมือน login ไม่ติด
+      // หรือ auth state หลุดโดยไม่มี error ชัดเจน
+      host: 'localhost',
       proxy: {
         '/api': {
           target: apiTarget,
