@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { eligibilityApi, patientApi, type BackendEligibility } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { useToast } from '../../components/Toast/ToastProvider';
 import { formatNationalId } from '../../utils/formatters';
-import { clinicMockStore } from '../../mocks/clinicMockStore';
 import { validateThaiNationalID } from '../../utils/thaiIdValidator';
 import Pagination from '../../components/Pagination/Pagination';
 import './EligibilityPage.css';
@@ -73,6 +73,8 @@ const EligibilityPage: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  const { showToast } = useToast();
+
   // Accordion Dropdown States สำหรับการ์ดทั้ง 2 ใบ
   const [isCheckCardOpen, setIsCheckCardOpen] = useState(true);
   const [isHistoryCardOpen, setIsHistoryCardOpen] = useState(true);
@@ -86,58 +88,21 @@ const EligibilityPage: React.FC = () => {
   // State Modal รายละเอียดสิทธิ์
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<EligibilityHistoryItem | null>(null);
 
-  // ดึงประวัติการตรวจสอบสิทธิ์ทั้งหมดจาก Backend DB
+  // ดึงประวัติการตรวจสอบสิทธิ์ทั้งหมดจาก Backend DB จริง (Zero Mock)
   const fetchHistory = useCallback(async () => {
     try {
       const data = await eligibilityApi.getHistory();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         setHistoryList(data.map(mapBackendEligibilityToUI));
       } else {
-        const mockPatients = clinicMockStore.getPatients();
-        setHistoryList(
-          mockPatients.map((p) => ({
-            id: String(p.id),
-            date: '04/09/2569',
-            nationalId: formatNationalId(p.nationalId),
-            patientName: p.fullName,
-            schemeType: p.schemeType,
-            coverage: p.schemeType.includes('บัตรทอง')
-              ? 'ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชีและบริการพิเศษ'
-              : p.schemeType.includes('ประกันสังคม')
-              ? 'ผู้ประกันตนมาตรา 33 ครอบคลุมการรักษาตามเกณฑ์ สปส.'
-              : p.schemeType.includes('ข้าราชการ')
-              ? 'จ่ายตรงกรมบัญชีกลาง เบิกค่ายาและค่ารักษาได้ตามสิทธิ์'
-              : 'คุ้มครองตามเงื่อนไขกรมธรรม์',
-            hospitalName: 'โรงพยาบาลคลินิกเวชกรรมชุมชน',
-            status: 'ใช้งานได้',
-            verifiedAt: `${p.registeredAt || '04/09/2569 08:30 น.'}`,
-          }))
-        );
+        setHistoryList([]);
       }
     } catch (err) {
-      console.warn('Could not fetch eligibility history from backend, using clinicMockStore:', err);
-      const mockPatients = clinicMockStore.getPatients();
-      setHistoryList(
-        mockPatients.map((p) => ({
-          id: String(p.id),
-          date: '04/09/2569',
-          nationalId: formatNationalId(p.nationalId),
-          patientName: p.fullName,
-          schemeType: p.schemeType,
-          coverage: p.schemeType.includes('บัตรทอง')
-            ? 'ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชีและบริการพิเศษ'
-            : p.schemeType.includes('ประกันสังคม')
-            ? 'ผู้ประกันตนมาตรา 33 ครอบคลุมการรักษาตามเกณฑ์ สปส.'
-            : p.schemeType.includes('ข้าราชการ')
-            ? 'จ่ายตรงกรมบัญชีกลาง เบิกค่ายาและค่ารักษาได้ตามสิทธิ์'
-            : 'คุ้มครองตามเงื่อนไขกรมธรรม์',
-          hospitalName: 'โรงพยาบาลคลินิกเวชกรรมชุมชน',
-          status: 'ใช้งานได้',
-          verifiedAt: `${p.registeredAt || '04/09/2569 08:30 น.'}`,
-        }))
-      );
+      console.error('Could not fetch eligibility history from backend:', err);
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดประวัติการตรวจสอบสิทธิ์ได้' });
+      setHistoryList([]);
     }
-  }, []);
+  }, [showToast]);
 
   const { subscribe } = useWebSocket();
 
@@ -169,13 +134,22 @@ const EligibilityPage: React.FC = () => {
     ).length,
   };
 
-  // ตรวจสอบสิทธิ์จริงผ่าน Backend API
+  // ตรวจสอบสิทธิ์จริงผ่าน Backend API (Strict Validation & Zero Mock Fallback)
   const handleCheckEligibility = async (idToSearch?: string) => {
     const rawId = (idToSearch || searchNationalId).trim();
     const cleanId = rawId.replace(/[-\s]/g, '');
 
     if (!cleanId) {
       setErrorMessage('กรุณาระบุเลขประจำตัวประชาชน 13 หลัก');
+      showToast({ type: 'error', message: 'กรุณาระบุเลขประจำตัวประชาชน 13 หลัก' });
+      setCurrentResult(null);
+      return;
+    }
+
+    if (!/^\d{13}$/.test(cleanId)) {
+      setErrorMessage('กรุณาระบุเลขประจำตัวประชาชน 13 หลัก (ตัวเลขเท่านั้น)');
+      showToast({ type: 'error', message: 'กรุณาระบุเลขประจำตัวประชาชน 13 หลัก (ตัวเลขเท่านั้น)' });
+      setCurrentResult(null);
       return;
     }
 
@@ -195,32 +169,24 @@ const EligibilityPage: React.FC = () => {
           nationalId: formatNationalId(res.national_id),
           schemeType: (res.scheme_type as SchemeType) || 'บัตรทอง (สปสช.)',
           coverageDetails: res.coverage_details,
-          hospitalName: 'โรงพยาบาลคลินิกเวชกรรมชุมชน',
+          hospitalName: res.hospital_name || 'โรงพยาบาลคลินิกเวชกรรมชุมชน',
           verifiedAt: `${dateStr} ${timeStr}`,
           status: 'ใช้งานได้',
-          expireDate: '31/12/2026',
+          expireDate: res.expire_date || '31/12/2026',
         });
-        setIsSearching(false);
-        return;
+        showToast({ type: 'success', message: 'ตรวจสอบสิทธิ์สำเร็จ' });
       }
-    } catch {
-      // Fallback
+    } catch (err: any) {
+      console.error('Check eligibility error:', err);
+      const errMsg =
+        err?.response?.data?.error ||
+        'ไม่พบข้อมูลสิทธิ์ของผู้ป่วยรายนี้ในระบบ หรือเกิดข้อผิดพลาดในการเชื่อมต่อ';
+      setErrorMessage(errMsg);
+      showToast({ type: 'error', message: errMsg });
+      setCurrentResult(null);
+    } finally {
+      setIsSearching(false);
     }
-
-    // Fallback เมื่อค้นหาไม่พบใน DB
-    const formattedId = formatNationalId(cleanId);
-
-    setCurrentResult({
-      patientName: `ผู้รับบริการ (เลข ${cleanId.slice(0, 4)}...)`,
-      nationalId: formattedId,
-      schemeType: 'บัตรทอง (สปสช.)',
-      coverageDetails: 'ครอบคลุมการรักษาโรคทั่วไป ยกเว้นค่ายานอกบัญชี',
-      hospitalName: 'โรงพยาบาลเครือข่าย สปสช.',
-      verifiedAt: `${dateStr} ${timeStr}`,
-      status: 'ใช้งานได้',
-      expireDate: '31/12/2026',
-    });
-    setIsSearching(false);
   };
 
   // บันทึกสิทธิ์เข้าประวัติลง Backend DB จริง
@@ -251,8 +217,11 @@ const EligibilityPage: React.FC = () => {
         });
         fetchHistory();
       }
-    } catch (err) {
+      showToast({ type: 'success', message: 'บันทึกข้อมูลสิทธิ์สำเร็จ' });
+    } catch (err: any) {
       console.warn('Save eligibility error:', err);
+      const errMsg = err?.response?.data?.error || err?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูลสิทธิ์';
+      showToast({ type: 'error', message: errMsg });
     }
 
     const now = new Date();

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { queueApi, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { useToast } from '../../components/Toast/ToastProvider';
 import { formatQueueNo, formatNationalId, maskNationalId } from '../../utils/formatters';
-import { clinicMockStore } from '../../mocks/clinicMockStore';
 import { callQueueAudio, getSpokenDepartmentText } from '../../utils/audioQueue';
 import Pagination from '../../components/Pagination/Pagination';
 import './QueuePage.css';
@@ -164,6 +164,8 @@ const QueuePage: React.FC = () => {
   const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [statusNote, setStatusNote] = useState('');
 
+  const { showToast } = useToast();
+
   // State สำหรับดูข้อความเต็มของจุดบริการ & การคัดกรอง
   const [detailModalQueue, setDetailModalQueue] = useState<QueueItem | null>(null);
 
@@ -171,7 +173,7 @@ const QueuePage: React.FC = () => {
   const abortControllerRef = React.useRef<AbortController | null>(null);
   const latestRequestIdRef = React.useRef<number>(0);
 
-  // ดึงรายการคิวจริงจาก Backend DB (Server-Side Pagination & Filtered COUNT)
+  // ดึงรายการคิวจริงจาก Backend DB (Server-Side Pagination & Filtered COUNT) (Zero Mock)
   const fetchQueues = useCallback(async (targetPage?: number) => {
     const pageToFetch = targetPage !== undefined ? targetPage : currentPage;
     setIsLoading(true);
@@ -214,117 +216,24 @@ const QueuePage: React.FC = () => {
         if (pageToFetch > computedTotalPages && computedTotalPages > 0) {
           setCurrentPage((prev) => Math.max(1, Math.min(prev, computedTotalPages)));
         }
-      } else if (Array.isArray(res)) {
-        // Fallback for unpaginated raw array
-        const allItems = res.map(mapBackendQueueToUI);
-        setStats({
-          total: allItems.length,
-          active: allItems.filter((q) => !['เสร็จสิ้น', 'ยกเลิกคิว'].includes(q.status)).length,
-          waitingScreening: allItems.filter((q) => q.status === 'รอคัดกรอง').length,
-          waitingDoctor: allItems.filter((q) => q.status === 'รอพบแพทย์').length,
-          inExamination: allItems.filter((q) => q.status === 'กำลังตรวจ').length,
-          waitingTreatment: allItems.filter((q) => q.status === 'รอทำหัตถการ').length,
-          waitingBilling: allItems.filter((q) => q.status === 'รอชำระเงิน').length,
-          waitingPharmacy: allItems.filter((q) => q.status === 'รอรับยา').length,
-          completed: allItems.filter((q) => q.status === 'เสร็จสิ้น').length,
-          cancelled: allItems.filter((q) => q.status === 'ยกเลิกคิว').length,
-        });
-
-        const filtered = allItems.filter((item) => {
-          const matchSearch =
-            !searchQuery ||
-            item.queueNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.idCard.includes(searchQuery);
-
-          let matchStatus = true;
-          if (selectedCategory === 'all') {
-            matchStatus = statusFilter === 'all' ? !['เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status) : item.status === statusFilter;
-          } else if (selectedCategory === 'in_service') {
-            matchStatus = statusFilter === 'in_service_all' ? ['รอคัดกรอง', 'รอพบแพทย์', 'กำลังตรวจ', 'รอทำหัตถการ'].includes(item.status) : item.status === statusFilter;
-          } else if (selectedCategory === 'cash_pharmacy') {
-            matchStatus = statusFilter === 'cash_pharmacy_all' ? ['รอชำระเงิน', 'รอรับยา'].includes(item.status) : item.status === statusFilter;
-          } else if (selectedCategory === 'completed_cancelled') {
-            matchStatus = statusFilter === 'completed_cancelled_all' ? ['เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status) : item.status === statusFilter;
-          }
-          return matchSearch && matchStatus;
-        });
-
-        const total = filtered.length;
-        const computedPages = Math.ceil(total / itemsPerPage) || 1;
-        setTotalItems(total);
-        setTotalPages(computedPages);
-        const validPage = Math.min(Math.max(1, pageToFetch), computedPages);
-        setQueueList(filtered.slice((validPage - 1) * itemsPerPage, validPage * itemsPerPage));
-        if (pageToFetch > computedPages && computedPages > 0) {
-          setCurrentPage(computedPages);
-        }
+      } else {
+         throw new Error('Invalid data format');
       }
     } catch (err: any) {
       if (err?.name === 'AbortError') {
         return;
       }
-      console.warn('Could not fetch queue list from backend, using clinicMockStore:', err);
-      const mockQueues = clinicMockStore.getQueues();
-      const allItems = mockQueues.map((q) => ({
-        id: String(q.id),
-        queueNo: formatQueueNo(q.queueNo),
-        patientName: q.patient?.fullName || `ผู้ป่วยคิว ${q.queueNo}`,
-        idCard: formatNationalId(q.patient?.nationalId),
-        status: (q.status as QueueStatus) || 'รอคัดกรอง',
-        department: q.department || 'จุดคัดกรอง',
-        time: q.createdAt || '08:30 น.',
-        note: q.note || '',
-      }));
-
-      setStats({
-        total: allItems.length,
-        active: allItems.filter((q) => !['เสร็จสิ้น', 'ยกเลิกคิว'].includes(q.status)).length,
-        waitingScreening: allItems.filter((q) => q.status === 'รอคัดกรอง').length,
-        waitingDoctor: allItems.filter((q) => q.status === 'รอพบแพทย์').length,
-        inExamination: allItems.filter((q) => q.status === 'กำลังตรวจ').length,
-        waitingTreatment: allItems.filter((q) => q.status === 'รอทำหัตถการ').length,
-        waitingBilling: allItems.filter((q) => q.status === 'รอชำระเงิน').length,
-        waitingPharmacy: allItems.filter((q) => q.status === 'รอรับยา').length,
-        completed: allItems.filter((q) => q.status === 'เสร็จสิ้น').length,
-        cancelled: allItems.filter((q) => q.status === 'ยกเลิกคิว').length,
-      });
-
-      const filtered = allItems.filter((item) => {
-        const matchSearch =
-          !searchQuery ||
-          item.queueNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.patientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.idCard.includes(searchQuery);
-
-        let matchStatus = true;
-        if (selectedCategory === 'all') {
-          matchStatus = statusFilter === 'all' ? !['เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status) : item.status === statusFilter;
-        } else if (selectedCategory === 'in_service') {
-          matchStatus = statusFilter === 'in_service_all' ? ['รอคัดกรอง', 'รอพบแพทย์', 'กำลังตรวจ', 'รอทำหัตถการ'].includes(item.status) : item.status === statusFilter;
-        } else if (selectedCategory === 'cash_pharmacy') {
-          matchStatus = statusFilter === 'cash_pharmacy_all' ? ['รอชำระเงิน', 'รอรับยา'].includes(item.status) : item.status === statusFilter;
-        } else if (selectedCategory === 'completed_cancelled') {
-          matchStatus = statusFilter === 'completed_cancelled_all' ? ['เสร็จสิ้น', 'ยกเลิกคิว'].includes(item.status) : item.status === statusFilter;
-        }
-        return matchSearch && matchStatus;
-      });
-
-      const total = filtered.length;
-      const computedPages = Math.ceil(total / itemsPerPage) || 1;
-      setTotalItems(total);
-      setTotalPages(computedPages);
-      const validPage = Math.min(Math.max(1, pageToFetch), computedPages);
-      setQueueList(filtered.slice((validPage - 1) * itemsPerPage, validPage * itemsPerPage));
-      if (pageToFetch > computedPages && computedPages > 0) {
-        setCurrentPage(computedPages);
-      }
+      console.error('Could not fetch queue list from backend:', err);
+      setQueueList([]);
+      setTotalItems(0);
+      setTotalPages(1);
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดรายการคิวจากระบบได้' });
     } finally {
       if (requestId === latestRequestIdRef.current) {
         setIsLoading(false);
       }
     }
-  }, [currentPage, itemsPerPage, statusFilter, searchQuery, selectedCategory]);
+  }, [currentPage, itemsPerPage, statusFilter, searchQuery, selectedCategory, showToast]);
 
   useEffect(() => {
     fetchQueues(currentPage);
@@ -408,25 +317,37 @@ const QueuePage: React.FC = () => {
 
     try {
       await queueApi.updateStatus(selectedQueue.id, newStatus, selectedDepartment, statusNote.trim() || selectedQueue.note);
+      
+      // อัปเดต state เฉพาะเมื่อ API สำเร็จเท่านั้น
+      setQueueList((prev) =>
+        prev.map((item) =>
+          item.id === selectedQueue.id
+            ? {
+                ...item,
+                status: newStatus,
+                department: selectedDepartment,
+                note: statusNote.trim() || item.note,
+              }
+            : item
+        )
+      );
+
+      setIsModalOpen(false);
+      showToast({
+        type: 'success',
+        message: `เปลี่ยนสถานะคิวเป็น "${newStatus}" สำเร็จ`,
+      });
       fetchQueues();
-    } catch (err) {
-      console.warn('Update queue status error:', err);
+    } catch (err: any) {
+      console.error('Update queue status error:', err);
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'ไม่สามารถเปลี่ยนสถานะคิวได้';
+      showToast({ type: 'error', message: errMsg });
+      // ห้ามแตะ setQueueList เพื่อคง state เดิมไว้
     }
-
-    setQueueList((prev) =>
-      prev.map((item) =>
-        item.id === selectedQueue.id
-          ? {
-              ...item,
-              status: newStatus,
-              department: selectedDepartment,
-              note: statusNote.trim() || item.note,
-            }
-          : item
-      )
-    );
-
-    setIsModalOpen(false);
   };
 
   const handleCallQueue = (item: QueueItem, e?: React.MouseEvent) => {
@@ -460,8 +381,6 @@ const QueuePage: React.FC = () => {
 
   return (
     <div className="queue-page">
-      {/* Page Header */}
-
       {/* Page Header */}
       <div className="queue-page-header">
         <div className="queue-header-left">

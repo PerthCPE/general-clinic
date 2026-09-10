@@ -64,11 +64,15 @@ func ResolveOrCreateVisit(hn string, patientName string, nationalID string, visi
 
 // MarkVisitPaid updates the queue statuses to completed/เสร็จสิ้น
 func MarkVisitPaid(tx *gorm.DB, visitID uint, hn string, patientID uint) error {
+	queueUpdates := map[string]interface{}{
+		"status":     "เสร็จสิ้น",
+		"department": ResolveDepartmentForStatus(models.Queue{}, "เสร็จสิ้น"),
+	}
 	if visitID > 0 {
 		if err := tx.Model(&models.BillingQueue{}).Where("visit_id = ?", visitID).Update("status", "completed").Error; err != nil {
 			return err
 		}
-		if err := tx.Model(&models.Queue{}).Where("visit_id = ?", visitID).Update("status", "เสร็จสิ้น").Error; err != nil {
+		if err := tx.Model(&models.Queue{}).Where("visit_id = ?", visitID).Updates(queueUpdates).Error; err != nil {
 			return err
 		}
 		if err := tx.Model(&models.MedicineQueue{}).Where("visit_id = ?", visitID).Update("status", "completed").Error; err != nil {
@@ -84,7 +88,7 @@ func MarkVisitPaid(tx *gorm.DB, visitID uint, hn string, patientID uint) error {
 		}
 	}
 	if patientID > 0 {
-		if err := tx.Model(&models.Queue{}).Where("patient_id = ?", patientID).Update("status", "เสร็จสิ้น").Error; err != nil {
+		if err := tx.Model(&models.Queue{}).Where("patient_id = ?", patientID).Updates(queueUpdates).Error; err != nil {
 			return err
 		}
 	}

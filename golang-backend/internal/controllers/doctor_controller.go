@@ -305,6 +305,7 @@ func toScreeningBrief(s models.Screening) dto.ScreeningBrief {
 		DietarySupplements: s.DietarySupplements,
 		Q2Depressed:        s.Q2Depressed,
 		Q2Anhedonia:        s.Q2Anhedonia,
+		ScreeningPositive:  s.ScreeningPositive,
 
 		FoodAllergies:      s.FoodAllergies,
 		CurrentMedications: s.CurrentMedications,
@@ -440,6 +441,7 @@ func applyVisitStatusTx(tx *gorm.DB, visit *models.VisitRecord, newStatus string
 	if strings.TrimSpace(note) != "" {
 		queue.Note = note
 	}
+	queue.Department = ResolveDepartmentForStatus(queue, queue.Status)
 
 	if err := tx.Save(&queue).Error; err != nil {
 		return models.Queue{}, false, err

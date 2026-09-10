@@ -160,6 +160,7 @@ func ConnectDB() {
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS dietary_supplements text DEFAULT ''")
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS q2_depressed boolean")
 	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS q2_anhedonia boolean")
+	database.Exec("ALTER TABLE screenings ADD COLUMN IF NOT EXISTS screening_positive boolean")
 
 	// ⚡ Database Indexes สำหรับเร่งความเร็วการ Query คิว, คนไข้, ประวัติการเงิน บน Supabase
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_queues_created_at ON queues(created_at)")

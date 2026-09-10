@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ChevronDown, Search } from 'lucide-react';
 import './MedicinePage.css';
 import { useWebSocket } from '../../context/WebSocketContext';
 import CopyableText from '../../components/Common/CopyableText';
@@ -464,6 +464,149 @@ function ModernDosageInputBuilder({
           })}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Custom Modern Downward-Only Dropdown (เปิดลงล่าง 100% ไม่เด้งขึ้นบน)
+function DownwardSelectDropdown({
+  value,
+  onChange,
+  options,
+  minWidth = '180px'
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  options: { value: string; label: string }[];
+  minWidth?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen]);
+
+  const currentOption = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div ref={dropdownRef} style={{ position: 'relative', minWidth, display: 'inline-block', userSelect: 'none' }}>
+      <button
+        type="button"
+        className="downward-dropdown-btn"
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px',
+          padding: '8px 14px',
+          background: '#FFFFFF',
+          border: isOpen ? '1.5px solid #2563EB' : '1.5px solid #CBD5E1',
+          boxShadow: isOpen ? '0 0 0 3px rgba(37, 99, 235, 0.12)' : 'none',
+          borderRadius: '8px',
+          cursor: 'pointer',
+          fontSize: '13.5px',
+          fontWeight: '600',
+          color: '#0F172A',
+          transition: 'all 0.15s ease',
+          boxSizing: 'border-box'
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {currentOption ? currentOption.label : value}
+        </span>
+        <ChevronDown
+          size={16}
+          style={{
+            transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease',
+            color: '#64748B',
+            flexShrink: 0
+          }}
+        />
+      </button>
+
+      {/* Downward Dropdown Menu - ALWAYS opens downwards */}
+      {isOpen && (
+        <div
+          className="downward-dropdown-menu"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            minWidth: '100%',
+            maxWidth: '340px',
+            background: '#FFFFFF',
+            borderRadius: '8px',
+            border: '1.5px solid #CBD5E1',
+            boxShadow: '0 10px 25px -4px rgba(15, 23, 42, 0.18), 0 4px 10px rgba(15, 23, 42, 0.08)',
+            zIndex: 9999,
+            maxHeight: '260px',
+            overflowY: 'auto',
+            padding: '4px 0',
+            boxSizing: 'border-box'
+          }}
+        >
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <div
+                key={opt.value}
+                className={`downward-dropdown-item ${isSelected ? 'selected' : ''}`}
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                style={{
+                  padding: '8px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  background: isSelected ? '#EFF6FF' : '#FFFFFF',
+                  color: isSelected ? '#1D4ED8' : '#0F172A',
+                  fontWeight: isSelected ? '700' : '500',
+                  fontSize: '13.5px',
+                  transition: 'background 0.12s ease'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.background = '#F8FAFC';
+                    e.currentTarget.style.color = '#2563EB';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.background = '#FFFFFF';
+                    e.currentTarget.style.color = '#0F172A';
+                  }
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {opt.label}
+                </span>
+                {isSelected && (
+                  <span style={{ color: '#2563EB', fontWeight: 'bold', fontSize: '12px', marginLeft: '8px' }}>
+                    ✓
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1631,34 +1774,32 @@ export default function MedicinePage() {
       }, remaining);
     };
 
-    fetch('/api/pharmacy/medicines', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload)
-    })
-    .then(res => {
-      if (!res.ok) throw new Error('Primary API failed');
-      return res.json();
-    })
-    .then(() => {
-      fetchMedicines();
-      completeSubmit();
-    })
-    .catch(() => {
-      // Fallback to system endpoint
-      fetch('/api/system/medicines/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      .then(() => {
+    const createMed = async () => {
+      try {
+        let res = await fetch('/api/pharmacy/medicines', { method: 'POST', headers, body: JSON.stringify(payload) });
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => null);
+          if (errorData?.error && errorData.error.includes('Invalid or Expired token')) {
+            alert('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+            localStorage.removeItem('token');
+            localStorage.removeItem('clinic_auth_token');
+            window.location.href = '/login';
+            return;
+          }
+          res = await fetch('/api/system/medicines/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        }
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => null);
+          throw new Error(errorData?.error || 'Failed to create medicine');
+        }
         fetchMedicines();
         completeSubmit();
-      })
-      .catch(() => {
-        completeSubmit();
-      });
-    });
+      } catch (err: any) {
+        alert('ไม่สามารถเพิ่มยาได้: ' + err.message);
+        setIsSubmitting(false);
+      }
+    };
+    createMed();
   };
 
   // [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ลบยาออกจากหน้าจอทันทีใน 0 ms โดยไม่ต้องรอ Supabase
@@ -1960,64 +2101,108 @@ export default function MedicinePage() {
         </div>
       </div>
 
-      <div className="search-card card">
-        <div className="search-inputs">
-          <div className="input-group" style={{ flex: 2 }}>
-            <label>ค้นหายา (รหัสยา หรือ ชื่อยา)</label>
+      <div className="search-card card" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+        {/* แถวบน: ค้นหายาเต็มความกว้าง (จากซ้ายไปขวา) */}
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', width: '100%' }}>
+          <div style={{ position: 'relative', flex: 1 }}>
             <input
               type="text"
-              placeholder="เช่น 001, MED-0231, หรือ Paracetamol"
+              placeholder="ค้นหายาด้วยรหัสยา, ชื่อการค้า หรือชื่อสามัญทางยา..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '11px 16px 11px 40px',
+                borderRadius: '8px',
+                border: '1.5px solid #CBD5E1',
+                fontSize: '14px',
+                outline: 'none',
+                boxSizing: 'border-box'
+              }}
             />
+            <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748B', pointerEvents: 'none' }} />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: '#E2E8F0',
+                  border: 'none',
+                  borderRadius: '50%',
+                  width: '20px',
+                  height: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#475569',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontWeight: 'bold',
+                  padding: 0
+                }}
+                title="ล้างคำค้นหา"
+              >
+                ✕
+              </button>
+            )}
           </div>
-          <div className="input-group">
-            <label>ชนิด / หมวดหมู่ยา</label>
-            <select
-              className="filter-select"
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              style={{
-                padding: '10px 14px', borderRadius: '8px',
-                border: '1px solid #CBD5E1', background: 'var(--bg-card, #F8FAFC)',
-                color: 'var(--text-primary, #0F172A)', fontSize: '14px'
-              }}
-            >
-              <option value="all">ทั้งหมดทุกชนิด</option>
-              {allAvailableCategories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
-          <div className="input-group">
-            <label>การจัดเรียง (Sort)</label>
-            <select
-              className="filter-select"
-              value={sortOrder}
-              onChange={(e: any) => setSortOrder(e.target.value)}
-              style={{
-                padding: '10px 14px', borderRadius: '8px',
-                border: '1px solid #CBD5E1', background: 'var(--bg-card, #F8FAFC)',
-                color: 'var(--text-primary, #0F172A)', fontSize: '14px'
-              }}
-            >
-              <option value="latest">อัปเดตล่าสุด</option>
-              <option value="code">ตามรหัสยา</option>
-            </select>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="search-btn" type="button">ค้นหา</button>
-          {(searchQuery || stockStatusFilter !== 'all') && (
+          <button className="search-btn" type="button" style={{ height: '42px', flexShrink: 0 }}>ค้นหา</button>
+          {(searchQuery || categoryFilter !== 'all' || stockStatusFilter !== 'all') && (
             <button 
               className="search-btn" 
               type="button" 
               onClick={handleResetFilters}
-              style={{ background: 'var(--bg-card, #F1F5F9)', color: 'var(--text-primary, #475569)', border: '1px solid #CBD5E1' }}
+              style={{ height: '42px', background: 'var(--bg-card, #F1F5F9)', color: 'var(--text-primary, #475569)', border: '1.5px solid #CBD5E1', flexShrink: 0 }}
             >
               ล้างการค้นหา
             </button>
           )}
+        </div>
+
+        {/* แถวล่าง (ตัว sort และ ชนิด/หมวดหมู่ยา ย้ายลงล่าง และเปิดลงล่าง 100%) */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '24px',
+          flexWrap: 'wrap',
+          paddingTop: '14px',
+          borderTop: '1px solid #F1F5F9'
+        }}>
+          {/* ตัว sort การจัดเรียง (Sort) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#475569', whiteSpace: 'nowrap' }}>
+              การจัดเรียง (Sort):
+            </span>
+            <DownwardSelectDropdown
+              value={sortOrder}
+              onChange={(val) => setSortOrder(val as 'latest' | 'code')}
+              options={[
+                { value: 'latest', label: 'อัปเดตล่าสุด' },
+                { value: 'code', label: 'ตามรหัสยา' }
+              ]}
+              minWidth="170px"
+            />
+          </div>
+
+          {/* ชนิด / หมวดหมู่ยา (Category) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#475569', whiteSpace: 'nowrap' }}>
+              ชนิด / หมวดหมู่ยา:
+            </span>
+            <DownwardSelectDropdown
+              value={categoryFilter}
+              onChange={(val) => setCategoryFilter(val)}
+              options={[
+                { value: 'all', label: 'ทั้งหมดทุกชนิด' },
+                ...allAvailableCategories.map(cat => ({ value: cat, label: cat }))
+              ]}
+              minWidth="230px"
+            />
+          </div>
         </div>
       </div>
 
@@ -2106,7 +2291,7 @@ export default function MedicinePage() {
                 <thead>
                   <tr>
                     <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>รหัสยา</th>
-                    <th style={{ textAlign: 'center', width: '22%', padding: '12px 8px' }}>ชื่อยา</th>
+                    <th style={{ textAlign: 'center', width: '22%', padding: '12px 16px' }}>ชื่อยา</th>
                     <th style={{ textAlign: 'center', width: '16%', padding: '12px 6px' }}>ชนิด / หมวดหมู่ยา</th>
                     <th style={{ textAlign: 'center', width: '11%', padding: '12px 6px' }}>คงเหลือในคลัง</th>
                     <th style={{ textAlign: 'center', width: '11%', padding: '12px 4px' }}>สถานะคลังยา</th>
@@ -2145,38 +2330,29 @@ export default function MedicinePage() {
                         <td style={{ padding: '10px 6px', textAlign: 'center', whiteSpace: 'nowrap' }}>
                           <CopyableText value={med.id} color="#2563EB" />
                         </td>
-                        <td className="med-name-cell" style={{ textAlign: 'center', padding: '10px 8px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '3px' }}>
-                            <div 
-                              onClick={() => { setDetailModalMed(med); setIsEditingDetailMed(false); }}
-                              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '5px', whiteSpace: 'nowrap', cursor: 'pointer' }}
-                              title="คลิกเพื่อดูรายละเอียดตัวยาและสรรพคุณ"
-                            >
-                              <CopyableText value={med.name} mono={false} color="#0F172A" />
-                            </div>
-                            <span 
-                              className="med-hint-tag" 
-                              onClick={() => { setDetailModalMed(med); setIsEditingDetailMed(false); }}
-                              style={{ 
-                                cursor: 'pointer', 
-                                margin: 0, 
-                                fontSize: '11px',
-                                color: '#2563EB',
-                                background: '#EFF6FF',
-                                padding: '1px 8px',
-                                borderRadius: '4px',
-                                border: '1px solid #DBEAFE',
-                                fontWeight: '500',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                whiteSpace: 'nowrap'
-                              }}
-                              title="คลิกเพื่อดูรายละเอียดและสรรพคุณยา"
-                            >
-                              (คลิกดูสรรพคุณ)
-                            </span>
-                          </div>
+                        <td className="med-name-cell" style={{ textAlign: 'left', padding: '12px 16px' }}>
+                          <span 
+                            onClick={() => { setDetailModalMed(med); setIsEditingDetailMed(false); }}
+                            style={{ 
+                              fontWeight: '700', 
+                              color: '#2563EB', 
+                              fontSize: '14px',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.color = '#1D4ED8';
+                              e.currentTarget.style.textDecoration = 'underline';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.color = '#2563EB';
+                              e.currentTarget.style.textDecoration = 'none';
+                            }}
+                            title="คลิกเพื่อดูรายละเอียดตัวยาและสรรพคุณ"
+                          >
+                            {med.name}
+                          </span>
                         </td>
                         <td style={{ padding: '10px 6px', textAlign: 'center' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
@@ -2229,7 +2405,7 @@ export default function MedicinePage() {
                         </td>
                         <td className="stock-num-cell" style={{ textAlign: 'center', padding: '10px 6px', whiteSpace: 'nowrap', fontSize: '13.5px' }}>{med.stock} เม็ด</td>
                         <td style={{ textAlign: 'center', padding: '10px 4px' }}>
-                          <span className={`status-badge ${getStatusClass(med.status)}`} style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', minWidth: '76px', padding: '3px 8px', fontSize: '11.5px', textAlign: 'center' }}>
+                          <span className={`status-badge ${getStatusClass(med.status)}`} style={{ display: 'inline-flex', justifyContent: 'center', alignItems: 'center', width: '84px', height: '24px', fontSize: '11.5px', textAlign: 'center', boxSizing: 'border-box' }}>
                             {renderStatusText(med.status)}
                           </span>
                         </td>
@@ -2421,7 +2597,12 @@ export default function MedicinePage() {
                   <>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                       <h2 className="med-detail-name" style={{ margin: 0 }}>{detailModalMed.name}</h2>
-                      <CopyableText value={detailModalMed.name} mono={false} showIcon={true} />
+                      <CopyableText 
+                        value={detailModalMed.name} 
+                        displayValue="" 
+                        showIcon={true} 
+                        style={{ display: 'inline-flex', padding: '2px 4px' }} 
+                      />
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginTop: '6px' }}>
                       <span className="med-detail-generic">ชื่อสามัญทางยา: <strong style={{ color: '#1E293B' }}>{detailModalMed.genericName}</strong></span>
@@ -2739,33 +2920,9 @@ export default function MedicinePage() {
 
             <div className="med-detail-footer" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               {!isEditingDetailMed ? (
-                <>
-                  <button 
-                    onClick={handleOpenEditDetailMed}
-                    style={{
-                      padding: '8px 18px',
-                      background: '#EFF6FF',
-                      color: '#2563EB',
-                      border: '1.5px solid #BFDBFE',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      fontWeight: '700',
-                      fontSize: '13.5px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                    </svg>
-                    แก้ไขข้อมูลยานี้
-                  </button>
-                  <button className="primary-btn-close" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>
-                    ปิดหน้าต่าง
-                  </button>
-                </>
+                <button className="primary-btn-close" onClick={() => { setDetailModalMed(null); setIsEditingDetailMed(false); }}>
+                  ปิดหน้าต่าง
+                </button>
               ) : (
                 <>
                   <button 

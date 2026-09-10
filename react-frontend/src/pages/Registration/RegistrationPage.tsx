@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import PatientSearchCard from './components/PatientSearchCard';
 import PatientFormCard from './components/PatientFormCard';
+import { Pagination } from '../../components/Pagination/Pagination';
 import type { Patient, SchemeType } from './types';
 import { patientApi, queueApi, type BackendPatient, type BackendQueue } from '../../services/api';
 import { useWebSocket } from '../../context/WebSocketContext';
+import { useToast } from '../../components/Toast/ToastProvider';
 import { formatHN, formatQueueNo, formatNationalId, formatPhone } from '../../utils/formatters';
-import { clinicMockStore } from '../../mocks/clinicMockStore';
 import './RegistrationPage.css';
 
 export { formatHN, formatQueueNo, formatNationalId, formatPhone };
@@ -80,149 +81,62 @@ function RegistrationPage() {
   const [allPatients, setAllPatients] = useState<Patient[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(15);
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searchResult, setSearchResult] = useState<Patient | null>(null);
   const [notFoundQuery, setNotFoundQuery] = useState<string | null>(null);
   const [selectedPatientModal, setSelectedPatientModal] = useState<Patient | null>(null);
   const [regSuccessModal, setRegSuccessModal] = useState<RegSuccessResult | null>(null);
-  const [errorToast, setErrorToast] = useState<string | null>(null);
   const [isRecentOpen, setIsRecentOpen] = useState(true);
   const { subscribe } = useWebSocket();
+  const { showToast } = useToast();
 
   const formSectionRef = useRef<HTMLDivElement>(null);
 
-  // ดึงรายชื่อผู้ป่วยทั้งหมด และคิวที่กำลัง active จาก Backend DB จริง
+  // ดึงรายชื่อผู้ป่วยทั้งหมด และคิวที่กำลัง active จาก Backend DB จริง (Zero Mock)
   const fetchPatients = useCallback(async () => {
     setIsLoading(true);
+    setFetchError(null);
     try {
       const [patientsData, queuesData] = await Promise.all([
         patientApi.getAll(),
         queueApi.getList().catch(() => [] as BackendQueue[]),
       ]);
 
-      if (Array.isArray(patientsData) && patientsData.length > 0) {
+      if (Array.isArray(patientsData)) {
         const allMapped = patientsData.map(mapBackendPatientToUI);
         setAllPatients(allMapped);
 
         // หา ID ของผู้ป่วยทั้งหมดที่มีคิวแล้วในระบบ
+        const queueList = Array.isArray(queuesData)
+          ? queuesData
+          : queuesData && typeof queuesData === 'object' && Array.isArray((queuesData as any).data)
+          ? (queuesData as any).data
+          : [];
+
         const queuedPatientIds = new Set(
-          (Array.isArray(queuesData) ? queuesData : []).map((q) => q.patient_id)
+          queueList.map((q: any) => q.patient_id)
         );
 
         // กรองเอาเฉพาะผู้ป่วยที่ยังไม่ได้ออกบัตรคิวเข้าตรวจ
         const unqueued = patientsData.filter((p) => !queuedPatientIds.has(p.id));
         setPatients(unqueued.map(mapBackendPatientToUI));
-        const mockAll = clinicMockStore.getPatients().map((p) => ({
-          id: p.id,
-          hn: formatHN(p.hn),
-          fullName: p.fullName,
-          nationalId: formatNationalId(p.nationalId),
-          dob: p.dob,
-          age: p.age,
-          gender: p.gender,
-          phone: formatPhone(p.phone),
-          emergencyContact: p.emergencyContact,
-          houseNo: p.houseNo || '',
-          villageNo: p.villageNo || '',
-          villageName: p.villageName || '',
-          alley: p.alley || '',
-          road: p.road || '',
-          subDistrict: p.subDistrict || '',
-          district: p.district || '',
-          province: p.province || '',
-          postalCode: p.postalCode || '',
-          address: p.address,
-          schemeType: p.schemeType as SchemeType,
-          chronicDiseases: p.chronicDiseases,
-          allergies: p.allergies,
-          registeredAt: p.registeredAt,
-        }));
-        setAllPatients(mockAll);
-        const mockUnqueued = clinicMockStore.getUnqueuedPatients().map((p) => ({
-          id: p.id,
-          hn: formatHN(p.hn),
-          fullName: p.fullName,
-          nationalId: formatNationalId(p.nationalId),
-          dob: p.dob,
-          age: p.age,
-          gender: p.gender,
-          phone: formatPhone(p.phone),
-          emergencyContact: p.emergencyContact,
-          houseNo: p.houseNo || '',
-          villageNo: p.villageNo || '',
-          villageName: p.villageName || '',
-          alley: p.alley || '',
-          road: p.road || '',
-          subDistrict: p.subDistrict || '',
-          district: p.district || '',
-          province: p.province || '',
-          postalCode: p.postalCode || '',
-          address: p.address,
-          schemeType: p.schemeType as SchemeType,
-          chronicDiseases: p.chronicDiseases,
-          allergies: p.allergies,
-          registeredAt: p.registeredAt,
-        }));
-        setPatients(mockUnqueued);
+      } else {
+        setAllPatients([]);
+        setPatients([]);
       }
     } catch (err) {
-      console.warn('Could not fetch patients from backend, using clinicMockStore:', err);
-      const mockAll = clinicMockStore.getPatients().map((p) => ({
-        id: p.id,
-        hn: formatHN(p.hn),
-        fullName: p.fullName,
-        nationalId: formatNationalId(p.nationalId),
-        dob: p.dob,
-        age: p.age,
-        gender: p.gender,
-        phone: formatPhone(p.phone),
-        emergencyContact: p.emergencyContact,
-        houseNo: p.houseNo || '',
-        villageNo: p.villageNo || '',
-        villageName: p.villageName || '',
-        alley: p.alley || '',
-        road: p.road || '',
-        subDistrict: p.subDistrict || '',
-        district: p.district || '',
-        province: p.province || '',
-        postalCode: p.postalCode || '',
-        address: p.address,
-        schemeType: p.schemeType as SchemeType,
-        chronicDiseases: p.chronicDiseases,
-        allergies: p.allergies,
-        registeredAt: p.registeredAt,
-      }));
-      setAllPatients(mockAll);
-      const mockUnqueued = clinicMockStore.getUnqueuedPatients().map((p) => ({
-        id: p.id,
-        hn: formatHN(p.hn),
-        fullName: p.fullName,
-        nationalId: formatNationalId(p.nationalId),
-        dob: p.dob,
-        age: p.age,
-        gender: p.gender,
-        phone: formatPhone(p.phone),
-        emergencyContact: p.emergencyContact,
-        houseNo: p.houseNo || '',
-        villageNo: p.villageNo || '',
-        villageName: p.villageName || '',
-        alley: p.alley || '',
-        road: p.road || '',
-        subDistrict: p.subDistrict || '',
-        district: p.district || '',
-        province: p.province || '',
-        postalCode: p.postalCode || '',
-        address: p.address,
-        schemeType: p.schemeType as SchemeType,
-        chronicDiseases: p.chronicDiseases,
-        allergies: p.allergies,
-        registeredAt: p.registeredAt,
-      }));
-      setPatients(mockUnqueued);
+      console.error('Could not fetch patients from backend:', err);
+      setFetchError('ไม่สามารถโหลดรายชื่อผู้ป่วยจากระบบได้ กรุณากดลองใหม่อีกครั้ง');
+      showToast({ type: 'error', message: 'ไม่สามารถโหลดรายชื่อผู้ป่วยจากระบบได้' });
+      setAllPatients([]);
+      setPatients([]);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     fetchPatients();
@@ -312,37 +226,49 @@ function RegistrationPage() {
     setNotFoundQuery(null);
   };
 
-  // ส่งต่อเข้าคิวตรวจ -> ยิง Backend ออกบัตรคิวจริง และลบออกจากรายชื่อรอเข้าคิวทันที
+  // ส่งต่อเข้าคิวตรวจ -> ยิง Backend ออกบัตรคิวจริง และลบออกจากรายชื่อรอเข้าคิวทันทีเฉพาะเมื่อสำเร็จ
   const handleAssignQueue = async (patient: Patient) => {
     try {
       let patientId = patient.id;
       if (!patientId) {
-        try {
-          const res = await patientApi.search(patient.nationalId.replace(/[-\s]/g, ''));
-          if (res) {
-            patientId = Array.isArray(res) ? res[0]?.id : res.id;
-          }
-        } catch {
-          // ignore
+        const res = await patientApi.search(patient.nationalId.replace(/[-\s]/g, ''));
+        if (res) {
+          patientId = Array.isArray(res) ? res[0]?.id : res.id;
         }
       }
 
-      if (patientId) {
-        await queueApi.create(patientId, 'แผนกคัดกรอง', 'ส่งเข้าคิวจากการลงทะเบียน');
+      if (!patientId) {
+        throw new Error('ไม่พบข้อมูลรหัสผู้ป่วยในระบบ');
       }
-    } catch (err) {
-      console.warn('Queue assign error:', err);
+
+      const qRes = await queueApi.create(patientId, 'แผนกคัดกรอง', 'ส่งเข้าคิวจากการลงทะเบียน');
+
+      // เอาผู้ป่วยออกจากรายการ "ผู้ป่วยที่ยังไม่ได้เข้าคิว" เมื่อสำเร็จเท่านั้น
+      setPatients((prev) =>
+        prev.filter((p) => p.hn !== patient.hn && p.nationalId !== patient.nationalId && (!patient.id || p.id !== patient.id))
+      );
+
+      // ปิดข้อมูลผู้ป่วยที่เปิดอยู่ใน search / modal
+      setSearchResult(null);
+      setNotFoundQuery(null);
+      setSelectedPatientModal(null);
+      fetchPatients();
+
+      const qNum = qRes?.queue?.queue_number || '';
+      showToast({
+        type: 'success',
+        message: qNum ? `ส่งเข้าคิวสำเร็จ ${qNum}` : `ส่งเข้าคิวสำเร็จ ${patient.fullName}`,
+      });
+    } catch (err: any) {
+      console.error('Queue assign error:', err);
+      const errMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'เกิดข้อผิดพลาดในการส่งผู้ป่วยเข้าคิว';
+      showToast({ type: 'error', message: errMsg });
+      // ห้ามลบคนไข้ออกจาก setPatients เพื่อคงสถานะเดิมไว้
     }
-
-    // เอาผู้ป่วยออกจากรายการ "ผู้ป่วยที่ยังไม่ได้เข้าคิว" ทันที
-    setPatients((prev) =>
-      prev.filter((p) => p.hn !== patient.hn && p.nationalId !== patient.nationalId && (!patient.id || p.id !== patient.id))
-    );
-
-    // ปิดข้อมูลผู้ป่วยที่เปิดอยู่ใน search / modal
-    setSearchResult(null);
-    setNotFoundQuery(null);
-    setSelectedPatientModal(null);
   };
 
   // ส่งต่อเข้าคิวจาก Success Modal (กรณีเลือกส่งเข้าคิวทันทีหลังลงทะเบียนแบบไม่ออกคิว)
@@ -353,10 +279,8 @@ function RegistrationPage() {
 
   // ลงทะเบียนผู้ป่วยใหม่ บันทึกลง Database จริง (Sprint 3.2: รองรับ issueQueue flag)
   const handleFormSubmit = async (formData: Partial<Patient> & { issueQueue?: boolean }) => {
-    setErrorToast(null);
-
     if (!formData.dob || !formData.dob.trim()) {
-      setErrorToast('กรุณาระบุวันเกิดของผู้ป่วย');
+      showToast({ type: 'error', message: 'กรุณาระบุวันเกิดของผู้ป่วย' });
       return;
     }
 
@@ -418,6 +342,18 @@ function RegistrationPage() {
           queueIssued: res.queue_issued,
           queueNumber: res.queue_number,
         });
+
+        if (res.queue_issued && res.queue_number) {
+          showToast({
+            type: 'success',
+            message: `ลงทะเบียนสำเร็จ HN${newUI.hn.replace('HN', '')} คิว ${res.queue_number}`,
+          });
+        } else {
+          showToast({
+            type: 'success',
+            message: `ลงทะเบียนสำเร็จ HN${newUI.hn.replace('HN', '')}`,
+          });
+        }
         return;
       }
     } catch (err: any) {
@@ -426,7 +362,7 @@ function RegistrationPage() {
         err?.response?.data?.error ||
         err?.message ||
         'เกิดข้อผิดพลาดในการลงทะเบียนผู้ป่วย กรุณาตรวจสอบข้อมูลหรือการเชื่อมต่อระบบ';
-      setErrorToast(errMsg);
+      showToast({ type: 'error', message: errMsg });
     }
   };
 
@@ -450,6 +386,15 @@ function RegistrationPage() {
     gov: pool.filter((p) => p.schemeType === 'สิทธิ์ข้าราชการ').length,
   };
 
+  // Client-side pagination สำหรับตารางผู้ป่วยรอออกบัตรคิว (Unqueued Patients)
+  const totalItems = patients.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage));
+  const validCurrentPage = Math.max(1, Math.min(currentPage, totalPages));
+  const paginatedPatients = useMemo(() => {
+    const start = (validCurrentPage - 1) * itemsPerPage;
+    return patients.slice(start, start + itemsPerPage);
+  }, [patients, validCurrentPage, itemsPerPage]);
+
   return (
     <div className="registration-page">
 
@@ -460,54 +405,6 @@ function RegistrationPage() {
           ค้นหาประวัติผู้ป่วยเดิมเพื่อส่งเข้าคิว หรือลงทะเบียนออกรหัส HN ผู้ป่วยใหม่เข้าสู่ระบบคลินิก
         </p>
       </div>
-
-      {/* Error Alert Banner (Strict Error Feedback) */}
-      {errorToast && (
-        <div
-          role="alert"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '12px 16px',
-            marginBottom: '16px',
-            borderRadius: '8px',
-            backgroundColor: '#FEF2F2',
-            border: '1px solid #FECACA',
-            color: '#DC2626',
-            fontSize: '14px',
-            fontWeight: 500,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <span>{errorToast}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setErrorToast(null)}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: '#DC2626',
-              cursor: 'pointer',
-              padding: '4px',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-            aria-label="ปิดแจ้งเตือน"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-      )}
 
       {/* Stats Summary Grid */}
       <div className="reg-stats-grid">
@@ -545,7 +442,7 @@ function RegistrationPage() {
       {/* 2. New Patient Registration Form Section */}
       <PatientFormCard onSubmit={handleFormSubmit} formRef={formSectionRef} />
 
-      {/* 3. Recent Registered Patients Dropdown Accordion Card */}
+      {/* 3. Patient List & Unqueued Table Accordion Card */}
       <div className="reg-card">
         <div className="reg-card-header" onClick={() => setIsRecentOpen(!isRecentOpen)}>
           <div className="reg-header-title-wrap">
@@ -561,12 +458,14 @@ function RegistrationPage() {
               </svg>
             </div>
             <div>
-              <h2 className="reg-card-title">รายชื่อผู้ป่วยที่ลงทะเบียนล่าสุด (Recent Patients)</h2>
-              <p className="reg-card-subtitle">รายการผู้ป่วยที่บันทึกข้อมูลเข้าสู่ระบบคลินิก</p>
+              <h2 className="reg-card-title">รายชื่อผู้ป่วยรอออกบัตรคิว (Unqueued Patients)</h2>
+              <p className="reg-card-subtitle">รายการผู้ป่วยที่บันทึกข้อมูลเข้าสู่ระบบแล้ว แต่ยังไม่ได้ออกบัตรคิวเข้าห้องตรวจ</p>
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <span className="reg-count-pill">{patients.length} คนไข้</span>
+            <span className="reg-count-pill">
+              {patients.length} รอคิว
+            </span>
             <button className={`reg-card-toggle reg-recent-toggle ${isRecentOpen ? 'open' : ''}`} aria-label="Toggle Dropdown">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -575,7 +474,58 @@ function RegistrationPage() {
           </div>
         </div>
 
-        <div className={`reg-card-body reg-recent-body ${isRecentOpen ? 'expanded' : ''}`} style={{ padding: isRecentOpen ? '0' : '0' }}>
+        <div className={`reg-card-body reg-recent-body ${isRecentOpen ? 'expanded' : ''}`}>
+          {/* Table Controls Bar (Items Per Page Selector) */}
+          <div className="reg-table-controls-bar">
+            <div className="reg-table-info-wrap">
+              <span className="reg-table-desc">
+                รายชื่อผู้ป่วยรอออกบัตรคิวทั้งหมด {totalItems} คน
+              </span>
+            </div>
+            <div className="reg-items-per-page-wrap">
+              <label htmlFor="reg-items-per-page" className="reg-items-per-page-label">
+                แสดง:
+              </label>
+              <select
+                id="reg-items-per-page"
+                className="reg-items-per-page-select"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                aria-label="จำนวนแถวที่แสดงต่อหน้า"
+              >
+                <option value={10}>10 แถว</option>
+                <option value={15}>15 แถว</option>
+                <option value={25}>25 แถว</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Error Banner with Retry */}
+          {fetchError && (
+            <div style={{ padding: '12px 24px 0 24px' }}>
+              <div className="reg-fetch-error-banner">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span>{fetchError}</span>
+                </div>
+                <button
+                  type="button"
+                  className="reg-retry-btn"
+                  onClick={fetchPatients}
+                >
+                  ลองใหม่อีกครั้ง
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="table-responsive">
             <table className="reg-recent-table">
               <thead>
@@ -589,7 +539,7 @@ function RegistrationPage() {
                 </tr>
               </thead>
               <tbody>
-                {patients.length === 0 ? (
+                {paginatedPatients.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="reg-empty-table-cell">
                       <div className="reg-empty-wrap">
@@ -602,67 +552,82 @@ function RegistrationPage() {
                             strokeLinejoin="round"
                           />
                         </svg>
-                        <p>ไม่มีรายชื่อผู้ป่วยรอเข้าคิว (ผู้ป่วยทั้งหมดถูกส่งเข้าคิวตรวจแล้ว)</p>
+                        <p>
+                          {isLoading
+                            ? 'กำลังโหลดรายชื่อผู้ป่วยจากระบบ...'
+                            : 'ไม่มีรายชื่อผู้ป่วยรอออกบัตรคิว (ผู้ป่วยทั้งหมดถูกส่งเข้าห้องตรวจเรียบร้อยแล้ว)'}
+                        </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  patients.map((p) => (
-                    <tr key={p.hn} className="reg-table-row">
-                      <td className="col-reg-hn">
-                        <span className="reg-hn-tag">{p.hn}</span>
-                      </td>
-                      <td className="col-reg-patient">
-                        <div className="reg-patient-cell">
-                          <span className="patient-name-link" onClick={() => setSelectedPatientModal(p)}>
-                            {p.fullName}
+                  paginatedPatients.map((p) => {
+                    return (
+                      <tr key={p.hn} className="reg-table-row">
+                        <td className="col-reg-hn">
+                          <span className="reg-hn-tag">{p.hn}</span>
+                        </td>
+                        <td className="col-reg-patient">
+                          <div className="reg-patient-cell">
+                            <span className="patient-name-link" onClick={() => setSelectedPatientModal(p)}>
+                              {p.fullName}
+                            </span>
+                            <span className="patient-sub-meta">
+                              <span className="font-mono">{p.nationalId}</span> • เพศ {p.gender}, {p.age} ปี
+                            </span>
+                          </div>
+                        </td>
+                        <td className="col-reg-phone">
+                          <span className="font-phone">{p.phone}</span>
+                        </td>
+                        <td className="col-reg-scheme">
+                          <span className={`scheme-pill ${getSchemeClass(p.schemeType)}`}>
+                            {p.schemeType}
                           </span>
-                          <span className="patient-sub-meta">
-                            <span className="font-mono">{p.nationalId}</span> • เพศ {p.gender}, {p.age} ปี
-                          </span>
-                        </div>
-                      </td>
-                      <td className="col-reg-phone">
-                        <span className="font-phone">{p.phone}</span>
-                      </td>
-                      <td className="col-reg-scheme">
-                        <span className={`scheme-pill ${getSchemeClass(p.schemeType)}`}>
-                          {p.schemeType}
-                        </span>
-                      </td>
-                      <td className="col-reg-time">
-                        <div className="reg-time-cell">
-                          <span className="time-main-text">
-                            {p.registeredAt.includes(' ') ? p.registeredAt.split(' ')[1] : p.registeredAt}
-                          </span>
-                          {p.registeredAt.includes(' ') && (
-                            <span className="time-sub-date">{p.registeredAt.split(' ')[0]}</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="col-reg-action">
-                        <button
-                          type="button"
-                          className="btn-quick-assign-queue"
-                          title="ส่งเข้าคิวตรวจทันที"
-                          onClick={() => handleAssignQueue(p)}
-                        >
-                          <svg viewBox="0 0 20 20" fill="currentColor" className="btn-icon-svg">
-                            <path
-                              fillRule="evenodd"
-                              d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                          <span>เข้าคิว</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="col-reg-time">
+                          <div className="reg-time-cell">
+                            <span className="time-main-text">
+                              {p.registeredAt.includes(' ') ? p.registeredAt.split(' ')[1] : p.registeredAt}
+                            </span>
+                            {p.registeredAt.includes(' ') && (
+                              <span className="time-sub-date">{p.registeredAt.split(' ')[0]}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="col-reg-action">
+                          <button
+                            type="button"
+                            className="btn-quick-assign-queue"
+                            title="ส่งเข้าคิวตรวจทันที"
+                            onClick={() => handleAssignQueue(p)}
+                          >
+                            <svg viewBox="0 0 20 20" fill="currentColor" className="btn-icon-svg">
+                              <path
+                                fillRule="evenodd"
+                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                            <span>เข้าคิว</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
+
+          {/* Client-side Pagination Component */}
+          <Pagination
+            currentPage={validCurrentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={itemsPerPage}
+            onPageChange={(p) => setCurrentPage(p)}
+          />
         </div>
       </div>
 

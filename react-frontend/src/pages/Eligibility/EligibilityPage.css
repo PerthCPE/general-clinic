@@ -623,13 +623,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 4px 14px;
+  width: 140px;
+  height: 30px;
   border-radius: 9999px;
   font-family: var(--font-primary);
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 18px;
   white-space: nowrap;
+  box-sizing: border-box;
 }
 
 .badge-scheme-gold {

@@ -328,6 +328,9 @@ export const eligibilityApi = {
       national_id: string;
       scheme_type: string;
       coverage_details: string;
+      hospital_name?: string;
+      expire_date?: string;
+      status?: string;
       verified_at: string;
     }>(`/api/registrar/eligibility/check/${nationalId.replace(/[-\s]/g, '')}`),
   save: (payload: {
@@ -371,6 +374,18 @@ export interface BackendScreening {
   current_medications?: string;
   smoking_history?: string;
   alcohol_history?: string;
+  herbal_medicines?: string;
+  dietary_supplements?: string;
+  has_uri?: boolean | null;
+  has_tb?: boolean | null;
+  on_anticoagulant?: boolean | null;
+  precaution_type?: string;
+  is_pregnant?: boolean | null;
+  is_breastfeeding?: boolean | null;
+  last_menstrual_period?: string;
+  q2_depressed?: boolean | null;
+  q2_anhedonia?: boolean | null;
+  screening_positive?: boolean | null;
   created_at: string;
   updated_at: string;
   visit_record?: {
@@ -380,6 +395,7 @@ export interface BackendScreening {
     visit_date: string;
     queue_id?: number;
     queue_number?: string;
+    department?: string;
     patient?: BackendPatient;
   };
   screened_by?: {
@@ -428,6 +444,17 @@ export const vitalsApi = {
     allergies?: string;
     medical_history?: string;
     nurse_notes?: string;
+    herbal_medicines?: string;
+    dietary_supplements?: string;
+    has_uri?: boolean | null;
+    has_tb?: boolean | null;
+    on_anticoagulant?: boolean | null;
+    precaution_type?: string;
+    is_pregnant?: boolean | null;
+    is_breastfeeding?: boolean | null;
+    last_menstrual_period?: string;
+    q2_depressed?: boolean | null;
+    q2_anhedonia?: boolean | null;
     assigned_doctor_id?: number;
     triage_level?: number | string;
   }) =>

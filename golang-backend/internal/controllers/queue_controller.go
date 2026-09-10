@@ -297,6 +297,119 @@ func CreateQueue(c *gin.Context) {
 	})
 }
 
+// ResolveDepartmentForStatus คืนค่าชื่อจุดบริการ/แผนกที่สอดคล้องกับสถานะคิว
+func ResolveDepartmentForStatus(queue models.Queue, targetStatus string) string {
+	targetStatus = strings.TrimSpace(targetStatus)
+	switch targetStatus {
+	case "รอคัดกรอง":
+		dept := strings.TrimSpace(queue.Department)
+		if strings.Contains(dept, "คัดกรอง") {
+			return dept
+		}
+		return "จุดคัดกรอง"
+
+	case "รอพบแพทย์", "กำลังตรวจ":
+		dept := strings.TrimSpace(queue.Department)
+		if strings.HasPrefix(dept, "ห้องตรวจ") {
+			return dept
+		}
+
+		var doctorID uint
+		if queue.AssignedDoctorID != nil && *queue.AssignedDoctorID > 0 {
+			doctorID = *queue.AssignedDoctorID
+		} else if queue.VisitID != nil && *queue.VisitID > 0 {
+			var visit models.VisitRecord
+			if err := config.DB.Select("doctor_id").First(&visit, *queue.VisitID).Error; err == nil && visit.DoctorID > 0 {
+				doctorID = visit.DoctorID
+			}
+		}
+
+		if doctorID > 0 {
+			var docProfile models.Doctor
+			// 1. ดึงข้อมูลจากตาราง doctors ผ่าน user_id (Source of Truth)
+			if err := config.DB.Where("user_id = ?", doctorID).First(&docProfile).Error; err == nil && strings.TrimSpace(docProfile.Room) != "" {
+				roomName := strings.TrimSpace(docProfile.Room)
+				shortDocName := ""
+				if strings.Contains(docProfile.FullName, "สุดา") {
+					shortDocName = "พญ.สุดา"
+				} else if strings.Contains(docProfile.FullName, "วิชัย") {
+					shortDocName = "นพ.วิชัย"
+				} else if strings.Contains(docProfile.FullName, "เกศรา") {
+					shortDocName = "พญ.เกศรา"
+				} else {
+					parts := strings.Split(docProfile.FullName, " ")
+					if len(parts) > 0 {
+						shortDocName = parts[0]
+					}
+				}
+				if shortDocName != "" {
+					return fmt.Sprintf("%s (%s)", roomName, shortDocName)
+				}
+				return roomName
+			}
+
+			// 2. ดึงจากตาราง doctors ผ่าน doctor.id
+			if err := config.DB.First(&docProfile, doctorID).Error; err == nil && strings.TrimSpace(docProfile.Room) != "" {
+				roomName := strings.TrimSpace(docProfile.Room)
+				shortDocName := ""
+				if strings.Contains(docProfile.FullName, "สุดา") {
+					shortDocName = "พญ.สุดา"
+				} else if strings.Contains(docProfile.FullName, "วิชัย") {
+					shortDocName = "นพ.วิชัย"
+				} else if strings.Contains(docProfile.FullName, "เกศรา") {
+					shortDocName = "พญ.เกศรา"
+				} else {
+					parts := strings.Split(docProfile.FullName, " ")
+					if len(parts) > 0 {
+						shortDocName = parts[0]
+					}
+				}
+				if shortDocName != "" {
+					return fmt.Sprintf("%s (%s)", roomName, shortDocName)
+				}
+				return roomName
+			}
+
+			// 3. Fallback: ตรวจสอบจากชื่อแพทย์ในตาราง users
+			var doc models.User
+			if err := config.DB.First(&doc, doctorID).Error; err == nil {
+				if strings.Contains(doc.FullName, "สุดา") {
+					return "ห้องตรวจ 1 (พญ.สุดา)"
+				} else if strings.Contains(doc.FullName, "วิชัย") {
+					return "ห้องตรวจ 2 (นพ.วิชัย)"
+				} else if strings.Contains(doc.FullName, "เกศรา") {
+					return "ห้องตรวจ 3 (พญ.เกศรา)"
+				}
+			}
+		}
+		return "ห้องตรวจ 1 (พญ.สุดา)"
+
+	case "รอทำหัตถการ":
+		return "ห้องหัตถการ (ทำแผล/ฉีดยา)"
+
+	case "รอชำระเงิน":
+		return "ห้องการเงิน (แคชเชียร์)"
+
+	case "รอรับยา":
+		return "ห้องจ่ายยาและเภสัชกรรม"
+
+	case "เสร็จสิ้น":
+		return "เสร็จสิ้นขั้นตอนการรักษา"
+
+	case "ยกเลิกคิว", "ยกเลิก":
+		if strings.TrimSpace(queue.Department) != "" {
+			return queue.Department
+		}
+		return "จุดคัดกรอง"
+
+	default:
+		if strings.TrimSpace(queue.Department) != "" {
+			return queue.Department
+		}
+		return "จุดคัดกรอง"
+	}
+}
+
 // UpdateQueueStatus - อัปเดตสถานะคิว หรือส่งต่อแผนก
 func UpdateQueueStatus(c *gin.Context) {
 	queueID := c.Param("id")
@@ -355,8 +468,11 @@ func UpdateQueueStatus(c *gin.Context) {
 
 	queue.Status = req.Status
 	if strings.TrimSpace(req.Department) != "" {
-		queue.Department = req.Department
+		queue.Department = strings.TrimSpace(req.Department)
+	} else {
+		queue.Department = ResolveDepartmentForStatus(queue, req.Status)
 	}
+
 	if strings.TrimSpace(req.Note) != "" {
 		queue.Note = req.Note
 	}
