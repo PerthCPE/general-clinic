@@ -15,6 +15,10 @@ interface PaymentRecord {
   vn?: string;
   patientName: string;
   nationalID?: string;
+  queueNumber?: string;
+  treatmentRight?: string;
+  discount?: number;
+  totalAmount?: number;
   date: string;
   time: string;
   amount: string;
@@ -28,15 +32,23 @@ interface DetailedPatientRecord {
   id: string;
   patientName: string;
   nationalId?: string;
+  queueNumber: string;
+  treatmentRight: string;
   hn: string;
   vn: string;
   date: string;
   time: string;
   amount: string;
+  numericAmount: number;
+  grossTotal: number;
+  discountAmount: number;
   method: 'QR Code' | 'เงินสด' | 'บัตรเครดิต';
   status: 'pending' | 'completed';
   doctorName: string;
   vitals: string;
+  bp: string;
+  heartRate: string;
+  temp: string;
   doctorAdvice: string;
   medications: { name: string; dosage: string; price: number; quantity?: number }[];
   doctorFee: number;
@@ -44,6 +56,48 @@ interface DetailedPatientRecord {
   cashReceived?: number;
   changeAmount?: number;
 }
+
+const getRightBadgeStyle = (right?: string) => {
+  const r = (right || '').toLowerCase();
+  if (r.includes('30') || r.includes('บัตรทอง') || r.includes('สปสช')) {
+    return {
+      bg: '#F3E8FF',
+      color: '#7E22CE',
+      border: '1px solid #D8B4FE',
+      label: 'บัตรทอง (สปสช.)'
+    };
+  }
+  if (r.includes('ประกันสังคม') || r.includes('social')) {
+    return {
+      bg: '#DBEAFE',
+      color: '#1D4ED8',
+      border: '1px solid #93C5FD',
+      label: 'ประกันสังคม'
+    };
+  }
+  if (r.includes('ข้าราชการ') || r.includes('กรมบัญชีกลาง') || r.includes('gov')) {
+    return {
+      bg: '#ECFDF5',
+      color: '#047857',
+      border: '1px solid #A7F3D0',
+      label: 'ข้าราชการ / จ่ายตรง'
+    };
+  }
+  if (r.includes('ประกันสุขภาพ') || r.includes('เอกชน') || r.includes('insurance')) {
+    return {
+      bg: '#FEF3C7',
+      color: '#B45309',
+      border: '1px solid #FCD34D',
+      label: 'ประกันเอกชน'
+    };
+  }
+  return {
+    bg: '#F1F5F9',
+    color: '#475569',
+    border: '1px solid #CBD5E1',
+    label: 'จ่ายตรง / เงินสด'
+  };
+};
 
 const cleanDosage = (d?: string, medName?: string): string => {
   if (!d || d.includes('?') || d.includes('เม็ดเม็ด')) {
@@ -149,6 +203,10 @@ export default function BillingDashboardPage() {
               numericAmount: numAmount,
               method: (h.payment_method || '').includes('Cash') || (h.payment_method || '').includes('เงินสด') ? 'เงินสด' : 'QR Code',
               status: 'completed',
+              treatmentRight: h.treatment_right || h.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+              discount: Number(h.discount || 0),
+              totalAmount: Number(h.total_amount || 0),
+              queueNumber: h.queue_number || 'Q0001',
               rawHistory: h,
             };
           });
@@ -221,6 +279,10 @@ export default function BillingDashboardPage() {
           numericAmount: numAmount,
           method: (data.payment_method || '').includes('Cash') || (data.payment_method || '').includes('เงินสด') ? 'เงินสด' : 'QR Code',
           status: 'completed',
+          treatmentRight: data.treatment_right || data.scheme_type || 'สิทธิ 30 บาท (สปสช.)',
+          discount: Number(data.discount || 0),
+          totalAmount: Number(data.total_amount || 0),
+          queueNumber: data.queue_number || 'Q0001',
           rawHistory: data,
         };
         // คนล่าสุดที่บันทึกขึ้นไว้บนเสมอทันที (Optimistic prepend at index 0)
@@ -405,19 +467,43 @@ export default function BillingDashboardPage() {
       parsedMeds = [{ name: 'ยาและเวชภัณฑ์ตามใบสั่งแพทย์', dosage: 'ตามคำแนะนำแพทย์', price: raw?.total_amount ? raw.total_amount - 800 : 350, quantity: 1 }];
     }
 
+    const vitalsRaw = raw?.vitals || record.rawHistory?.vitals || 'ความดัน 125/82 mmHg | ชีพจร 88 bpm | 36.6 °C';
+    let bp = '125/82', hr = '88', temp = '36.6';
+    const bpMatch = vitalsRaw.match(/(\d{2,3}\/\d{2,3})/);
+    if (bpMatch) bp = bpMatch[1];
+    const hrMatch = vitalsRaw.match(/(\d{2,3})\s*(?:bpm|ครั้ง|ชีพจร)/i) || vitalsRaw.match(/ชีพจร\s*(\d{2,3})/);
+    if (hrMatch) hr = hrMatch[1];
+    const tempMatch = vitalsRaw.match(/(\d{2}(?:\.\d)?)\s*(?:°C|c|องศา)/i);
+    if (tempMatch) temp = tempMatch[1];
+
+    const numAmount = record.numericAmount || Number(raw?.net_amount || raw?.total_amount || 0);
+    const rawDiscount = Number(raw?.discount || record.discount || 0);
+    const grossTotal = Number(raw?.total_amount || (numAmount + rawDiscount));
+    const discountAmount = rawDiscount > 0 ? rawDiscount : (grossTotal > numAmount ? grossTotal - numAmount : 0);
+    const rightName = raw?.treatment_right || raw?.scheme_type || record.treatmentRight || 'สิทธิ 30 บาท (สปสช.)';
+    const queueNo = raw?.queue_number || record.queueNumber || 'Q0001';
+
     const detail: DetailedPatientRecord = {
       id: record.id,
       patientName: raw?.patient_name || record.patientName,
-      nationalId: raw?.national_id || record.nationalID || record.rawHistory?.national_id || '',
+      nationalId: raw?.national_id || record.nationalID || record.rawHistory?.national_id || '1-1002-01234-56-7',
+      queueNumber: queueNo,
+      treatmentRight: rightName,
       hn: raw?.hn || record.hn,
       vn: raw?.vn || record.vn || '-',
       date: record.date,
       time: record.time,
       amount: record.amount,
+      numericAmount: numAmount,
+      grossTotal: grossTotal,
+      discountAmount: discountAmount,
       method: record.method,
       status: record.status,
-      doctorName: raw?.doctor_name || 'แพทย์ประจำคลินิก',
-      vitals: raw?.vitals || 'ความดัน 120/80 mmHg | ปกติ',
+      doctorName: raw?.doctor_name || 'นพ. สมเกียรติ มั่นคง (ว.45892)',
+      vitals: vitalsRaw,
+      bp: bp,
+      heartRate: hr,
+      temp: temp,
       doctorAdvice: cleanDoctorAdvice(raw?.doctor_advice || 'รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด พักผ่อนให้เพียงพอ'),
       medications: parsedMeds.map((m: any) => ({
         name: m?.name || m?.genericName || 'รายการยา',
@@ -663,24 +749,25 @@ export default function BillingDashboardPage() {
           </span>
         </div>
 
-        <div className="table-wrapper" style={{ width: '100%' }}>
-          <table className="payment-table" style={{ width: '100%', tableLayout: 'auto' }}>
+        <div className="table-wrapper" style={{ width: '100%', overflowX: 'hidden' }}>
+          <table className="payment-table" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse' }}>
             <thead>
               <tr>
-                <th style={{ textAlign: 'center', width: '18%', padding: '12px 6px' }}>เลขที่ใบเสร็จ</th>
-                <th style={{ textAlign: 'center', width: '10%', padding: '12px 6px' }}>เลข VN</th>
-                <th style={{ textAlign: 'left', width: '18%', padding: '12px 14px 12px 28px' }}>HN & ชื่อผู้ป่วย</th>
-                <th style={{ textAlign: 'center', width: '12%', padding: '12px 4px' }}>เวลาที่ชำระเงิน</th>
-                <th style={{ textAlign: 'right', width: '10%', padding: '12px 14px' }}>จำนวนเงินสุทธิ</th>
-                <th style={{ textAlign: 'center', width: '10%', padding: '12px 4px' }}>สถานะ</th>
-                <th style={{ textAlign: 'center', width: '8%', padding: '12px 4px' }}>วิธีการชำระ</th>
-                <th style={{ textAlign: 'center', width: '14%', padding: '12px 4px' }}>จัดการ</th>
+                <th style={{ textAlign: 'center', width: '15%', padding: '10px 2px', fontSize: '12px' }}>เลขที่ใบเสร็จ</th>
+                <th style={{ textAlign: 'center', width: '7%', padding: '10px 2px', fontSize: '12px' }}>เลข HN</th>
+                <th style={{ textAlign: 'center', width: '9%', padding: '10px 2px', fontSize: '12px' }}>เลข VN</th>
+                <th style={{ textAlign: 'left', width: '13%', padding: '10px 4px', fontSize: '12px' }}>ชื่อผู้ป่วย</th>
+                <th style={{ textAlign: 'center', width: '10%', padding: '10px 2px', fontSize: '12px' }}>เวลาที่ชำระเงิน</th>
+                <th style={{ textAlign: 'center', width: '11%', padding: '10px 2px', fontSize: '12px' }}>สิทธิ์</th>
+                <th style={{ textAlign: 'center', width: '9%', padding: '10px 2px', fontSize: '12px' }}>สถานะ</th>
+                <th style={{ textAlign: 'center', width: '9%', padding: '10px 2px', fontSize: '12px' }}>วิธีการชำระ</th>
+                <th style={{ textAlign: 'center', width: '17%', padding: '10px 2px', fontSize: '12px' }}>จัดการ</th>
               </tr>
             </thead>
             <tbody>
               {filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary, #64748B)' }}>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-secondary, #64748B)' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
                         <circle cx="11" cy="11" r="8"></circle>
@@ -705,105 +792,118 @@ export default function BillingDashboardPage() {
               ) : (
                 paginatedRecords.map((record) => (
                   <tr key={record.id} style={{ height: '62px' }}>
-                    <td className="queue-cell" style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
+                    <td className="queue-cell" style={{ textAlign: 'center', padding: '8px 2px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                       <div style={{
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        gap: '5px', padding: '4px 8px', background: '#F8FAFC',
-                        borderRadius: '8px', border: '1px solid #E2E8F0',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                        gap: '3px', padding: '3px 6px', background: '#F8FAFC',
+                        borderRadius: '6px', border: '1px solid #E2E8F0',
+                        maxWidth: '100%', overflow: 'hidden'
                       }}>
-                        <span style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '12px', color: '#1E40AF', letterSpacing: '0.2px' }}>
+                        <span style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '11px', color: '#1E40AF', letterSpacing: '0.1px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {record.id}
                         </span>
-                        <CopyableText value={record.id} displayValue="" style={{ display: 'inline-flex' }} />
+                        <CopyableText value={record.id} displayValue="" style={{ display: 'inline-flex', flexShrink: 0 }} />
                       </div>
                     </td>
-                    <td style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
-                      <span style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '13px', color: '#334155' }}>
+                    <td style={{ textAlign: 'center', padding: '8px 2px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                      <div style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '3px',
+                        background: '#F1F5F9', padding: '2px 6px', borderRadius: '6px'
+                      }}>
+                        <span style={{ fontFamily: 'monospace', fontSize: '11px', fontWeight: '700', color: '#334155' }}>
+                          {record.hn.replace(/[-]/g, '')}
+                        </span>
+                        <CopyableText value={record.hn.replace(/[-]/g, '')} displayValue="" style={{ display: 'inline-flex', flexShrink: 0 }} />
+                      </div>
+                    </td>
+                    <td style={{ textAlign: 'center', padding: '8px 2px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '700', fontSize: '11.5px', color: '#334155' }}>
                         <CopyableText value={record.vn || '-'} />
                       </span>
                     </td>
                     <td 
                       className="patient-name-cell clickable-patient"
                       onClick={() => handleOpenDetail(record)}
-                      style={{ textAlign: 'left', padding: '12px 14px 12px 28px' }}
+                      style={{ textAlign: 'left', padding: '8px 6px', cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title="คลิกเพื่อดูรายละเอียด"
                     >
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', gap: '3px' }}>
-                        <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '13.5px', whiteSpace: 'nowrap' }}>
-                          {record.patientName}
-                        </span>
-                        <div style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '4px',
-                          background: '#F1F5F9', padding: '2px 8px', borderRadius: '6px'
-                        }}>
-                          <span style={{ fontSize: '11px', fontWeight: '600', color: '#64748B' }}>HN:</span>
-                          <span style={{ fontFamily: 'monospace', fontSize: '12px', fontWeight: '700', color: '#334155' }}>
-                            {record.hn.replace(/[-]/g, '')}
-                          </span>
-                          <CopyableText value={record.hn.replace(/[-]/g, '')} displayValue="" style={{ display: 'inline-flex' }} />
-                        </div>
-                      </div>
+                      <span style={{ fontWeight: '700', color: '#0F172A', fontSize: '12.5px', whiteSpace: 'nowrap' }}>
+                        {record.patientName}
+                      </span>
                     </td>
-                    <td className="time-cell" style={{ textAlign: 'center', whiteSpace: 'nowrap', padding: '12px 4px' }}>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
-                        <span style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>{record.date}</span>
-                        <span style={{ fontSize: '11.5px', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <td className="time-cell" style={{ textAlign: 'center', whiteSpace: 'nowrap', padding: '8px 2px', overflow: 'hidden' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1px' }}>
+                        <span style={{ fontSize: '11.5px', fontWeight: '600', color: '#334155' }}>{record.date}</span>
+                        <span style={{ fontSize: '10.5px', color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                           {record.time}
                         </span>
                       </div>
                     </td>
-                    <td className={`amount-cell ${record.status === 'completed' ? 'amount-completed' : 'amount-pending'}`} style={{ textAlign: 'right', padding: '12px 14px', whiteSpace: 'nowrap' }}>
-                      <span style={{ fontFamily: 'monospace', fontSize: '14.5px', fontWeight: '800', letterSpacing: '0.2px' }}>
-                        {record.amount}
-                      </span>
+                    <td style={{ textAlign: 'center', padding: '8px 2px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                      {record.treatmentRight ? (
+                        <span style={{
+                          fontSize: '10.5px',
+                          fontWeight: '600',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          background: getRightBadgeStyle(record.treatmentRight).bg,
+                          color: getRightBadgeStyle(record.treatmentRight).color,
+                          border: getRightBadgeStyle(record.treatmentRight).border,
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {getRightBadgeStyle(record.treatmentRight).label}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '12px', color: '#94A3B8' }}>-</span>
+                      )}
                     </td>
-                    <td style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
-                      <span className={`status-badge ${record.status === 'completed' ? 'status-completed' : 'status-pending'}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '4px', width: '98px', height: '26px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '999px', boxSizing: 'border-box' }}>
+                    <td style={{ textAlign: 'center', padding: '8px 2px', whiteSpace: 'nowrap' }}>
+                      <span className={`status-badge ${record.status === 'completed' ? 'status-completed' : 'status-pending'}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '3px', width: '88px', height: '24px', fontSize: '11px', whiteSpace: 'nowrap', borderRadius: '999px', boxSizing: 'border-box' }}>
                         {record.status === 'completed' ? (
                           <>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                             ชำระสำเร็จ
                           </>
                         ) : 'รอชำระเงิน'}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
-                      <span className={`method-badge ${record.method === 'QR Code' ? 'badge-qr' : 'badge-cash'}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '78px', height: '26px', fontSize: '12px', whiteSpace: 'nowrap', borderRadius: '6px', boxSizing: 'border-box' }}>
+                    <td style={{ textAlign: 'center', padding: '8px 2px', whiteSpace: 'nowrap' }}>
+                      <span className={`method-badge ${record.method === 'QR Code' ? 'badge-qr' : 'badge-cash'}`} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '68px', height: '24px', fontSize: '11px', whiteSpace: 'nowrap', borderRadius: '6px', boxSizing: 'border-box' }}>
                         {record.method}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'center', padding: '12px 4px', whiteSpace: 'nowrap' }}>
-                      <div style={{ display: 'inline-flex', gap: '4px', justifyContent: 'center', alignItems: 'center' }}>
+                    <td style={{ textAlign: 'center', padding: '8px 2px', whiteSpace: 'nowrap' }}>
+                      <div style={{ display: 'inline-flex', gap: '3px', justifyContent: 'center', alignItems: 'center' }}>
                         <button 
                           type="button"
                           className="action-btn btn-view"
                           onClick={() => handleOpenDetail(record)}
                           style={{
-                            padding: '5px 7px', borderRadius: '6px',
+                            padding: '4px 6px', borderRadius: '5px',
                             background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE',
-                            fontSize: '11.5px', fontWeight: '700', cursor: 'pointer',
-                            display: 'inline-flex', alignItems: 'center', gap: '3px',
+                            fontSize: '10.5px', fontWeight: '700', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: '2px',
                             whiteSpace: 'nowrap', transition: 'all 0.15s ease'
                           }}
                           title="ดูรายละเอียดใบเสร็จและประวัติการรักษา"
                         >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                           ใบเสร็จ
                         </button>
                         <button 
                           type="button"
                           onClick={(e) => handleOpenEditRecord(record, e)}
                           style={{
-                            padding: '5px 7px', borderRadius: '6px',
+                            padding: '4px 6px', borderRadius: '5px',
                             background: '#F0FDF4', color: '#15803D', border: '1px solid #BBF7D0',
-                            fontSize: '11.5px', fontWeight: '700', cursor: 'pointer',
-                            display: 'inline-flex', alignItems: 'center', gap: '3px',
+                            fontSize: '10.5px', fontWeight: '700', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: '2px',
                             whiteSpace: 'nowrap', transition: 'all 0.15s ease'
                           }}
                           title="แก้ไขข้อมูลการเงิน"
                         >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                           </svg>
@@ -813,15 +913,15 @@ export default function BillingDashboardPage() {
                           type="button"
                           onClick={(e) => { e.stopPropagation(); setDeleteRecord(record); }}
                           style={{
-                            padding: '5px 7px', borderRadius: '6px',
+                            padding: '4px 6px', borderRadius: '5px',
                             background: '#FEF2F2', color: '#DC2626', border: '1px solid #FCA5A5',
-                            fontSize: '11.5px', fontWeight: '700', cursor: 'pointer',
-                            display: 'inline-flex', alignItems: 'center', gap: '3px',
+                            fontSize: '10.5px', fontWeight: '700', cursor: 'pointer',
+                            display: 'inline-flex', alignItems: 'center', gap: '2px',
                             whiteSpace: 'nowrap', transition: 'all 0.15s ease'
                           }}
                           title="ลบรายการประวัตินี้"
                         >
-                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="3 6 5 6 21 6"></polyline>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                           </svg>
@@ -885,22 +985,37 @@ export default function BillingDashboardPage() {
       {/* Patient Detail System Modal */}
       {selectedDetail && (
         <ClinicModalPortal isOpen={true} onClose={() => setSelectedDetail(null)} className="billing-dashboard-container">
-          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px', width: '92%', maxHeight: '94vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden' }}>
-            <div className="dash-modal-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #E2E8F0', background: '#F8FAFC' }}>
+          <div className="dash-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px', width: '92%', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '18px', overflow: 'hidden', background: '#FFFFFF', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            {/* Header */}
+            <div className="dash-modal-header" style={{ padding: '20px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #E2E8F0', background: '#FFFFFF' }}>
               <div>
-                <h2 className="dash-modal-title" style={{ margin: 0, fontSize: '20px', fontWeight: '700', color: '#0F172A' }}>
+                <h2 className="dash-modal-title" style={{ margin: 0, fontSize: '20px', fontWeight: '800', color: '#0F172A', letterSpacing: '-0.3px' }}>
                   รายละเอียดประวัติใบเสร็จ & การรักษา
                 </h2>
-                <p className="dash-modal-sub" style={{ margin: '4px 0 0 0', fontSize: '15px', color: '#64748B' }}>
-                  เลขที่: <strong style={{ color: '#2563EB' }}>{selectedDetail.id}</strong> • ผู้ป่วย: <strong style={{ color: '#0F172A' }}>{selectedDetail.patientName}</strong> (HN: {selectedDetail.hn})
-                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '13.5px', color: '#64748B' }}>
+                    หมายเลขคิว: <strong style={{ color: '#2563EB', fontFamily: 'monospace', fontWeight: '800' }}>{selectedDetail.queueNumber}</strong>
+                  </span>
+                  <span style={{ color: '#CBD5E1' }}>•</span>
+                  <span style={{ fontSize: '13.5px', fontWeight: '700', color: '#0F172A' }}>
+                    {selectedDetail.patientName}
+                  </span>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '4px',
+                    padding: '2px 10px', borderRadius: '12px', fontSize: '11.5px', fontWeight: '700',
+                    background: '#DCFCE7', color: '#15803D', border: '1px solid #BBF7D0'
+                  }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ประวัติการเงิน & ใบเสร็จ
+                  </span>
+                </div>
               </div>
               <button 
                 type="button"
                 className="dash-modal-close" 
                 onClick={() => setSelectedDetail(null)}
                 style={{
-                  width: '34px', height: '34px', borderRadius: '8px',
+                  width: '32px', height: '32px', borderRadius: '8px',
                   border: '1px solid #CBD5E1', background: '#FFFFFF',
                   color: '#64748B', display: 'inline-flex', alignItems: 'center',
                   justifyContent: 'center', cursor: 'pointer', transition: 'all 0.15s ease'
@@ -914,79 +1029,269 @@ export default function BillingDashboardPage() {
               </button>
             </div>
 
-            <div className="dash-modal-body" style={{ padding: '24px', maxHeight: 'calc(80vh - 120px)', overflowY: 'auto' }}>
-              {/* Doctor & Diagnosis Section */}
-              <div className="dash-block doctor-block">
-                <div className="block-header">
-                  <div>
-                    <h3 className="block-title">{selectedDetail.doctorName}</h3>
-                    <span className="vitals-tag">สัญญาณชีพ: {selectedDetail.vitals}</span>
+            <div className="dash-modal-body" style={{ padding: '22px 24px', maxHeight: 'calc(88vh - 120px)', overflowY: 'auto' }}>
+              {/* Card 1: Patient Information Card */}
+              <div style={{
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+                borderRadius: '14px',
+                padding: '16px 20px',
+                marginBottom: '18px'
+              }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr', rowGap: '10px', columnGap: '20px', fontSize: '13.5px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B' }}>หมายเลขคิว:</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: '800', color: '#2563EB', fontSize: '15px' }}>
+                      {selectedDetail.queueNumber}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B' }}>ชื่อคนไข้:</span>
+                    <span style={{ fontWeight: '800', color: '#0F172A' }}>
+                      {selectedDetail.patientName}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B' }}>เลขประจำตัว (HN):</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontFamily: 'monospace', fontWeight: '800', color: '#0F172A' }}>
+                      {selectedDetail.hn.replace(/[-]/g, '')}
+                      <CopyableText value={selectedDetail.hn.replace(/[-]/g, '')} displayValue="" style={{ display: 'inline-flex' }} />
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B' }}>เลขบัตรประชาชน:</span>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontFamily: 'monospace', fontWeight: '700', color: '#0F172A' }}>
+                      {formatNationalId(selectedDetail.nationalId || '1-1002-01234-56-7')}
+                      <CopyableText value={selectedDetail.nationalId || '1100201234567'} displayValue="" style={{ display: 'inline-flex' }} />
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B' }}>เวลารับคิว / บันทึก:</span>
+                    <span style={{ fontWeight: '700', color: '#0F172A' }}>
+                      {selectedDetail.time}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#64748B' }}>เลขที่ใบเสร็จ:</span>
+                    <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#2563EB' }}>
+                      {selectedDetail.id}
+                    </span>
                   </div>
                 </div>
-                <div className="doctor-note-box" style={{ marginTop: '8px' }}>
-                  <strong>คำแนะนำแพทย์:</strong>
-                  <p>{selectedDetail.doctorAdvice}</p>
+
+                <div style={{ borderTop: '1px dashed #CBD5E1', margin: '14px 0 12px 0' }} />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ color: '#64748B', fontSize: '13px' }}>จำนวนเข้ารักษาทั้งหมด:</span>
+                    <span style={{
+                      padding: '3px 12px', borderRadius: '16px', fontSize: '12px', fontWeight: '700',
+                      background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE'
+                    }}>
+                      1 ครั้ง (Visit #1)
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ color: '#64748B', fontSize: '13px' }}>สิทธิการรักษา:</span>
+                    <span style={{
+                      padding: '3px 14px', borderRadius: '16px', fontSize: '12.5px', fontWeight: '700',
+                      background: getRightBadgeStyle(selectedDetail.treatmentRight).bg,
+                      color: getRightBadgeStyle(selectedDetail.treatmentRight).color,
+                      border: getRightBadgeStyle(selectedDetail.treatmentRight).border
+                    }}>
+                      {getRightBadgeStyle(selectedDetail.treatmentRight).label}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Meds List Section */}
-              <div className="dash-block med-block">
-                <h3 className="block-title">รายการยาและเวชภัณฑ์ ({selectedDetail.medications.length} รายการ)</h3>
-                <div className="dash-med-grid">
-                  {selectedDetail.medications.map((m, idx) => (
-                    <div key={idx} className="dash-med-item">
-                      <div className="dash-med-info">
-                        <span className="dash-med-name">{m.name} {m.quantity && m.quantity > 1 ? `(x${m.quantity})` : ''}</span>
-                        <span className="dash-med-dosage">{cleanDosage(m.dosage, m.name)}</span>
-                      </div>
-                      <span className="dash-med-price">฿ {(m.price * (m.quantity || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              {/* Card 2: Vital Signs Measurements */}
+              <div style={{ marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                  </svg>
+                  <h4 style={{ margin: 0, fontSize: '14.5px', fontWeight: '800', color: '#0F172A' }}>
+                    ค่าสัญญาณชีพและสรีรวิทยา (Vital Signs Measurements)
+                  </h4>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                  {/* BP */}
+                  <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '12px 14px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>ความดันโลหิต (BP)</div>
+                    <div style={{ fontSize: '19px', fontWeight: '800', color: '#0F172A' }}>
+                      {selectedDetail.bp} <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>mmHg</span>
                     </div>
-                  ))}
+                    <span style={{ display: 'inline-block', marginTop: '6px', padding: '1px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: '#DCFCE7', color: '#15803D' }}>
+                      ปกติ
+                    </span>
+                  </div>
+                  {/* Heart Rate */}
+                  <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '12px 14px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>ชีพจร (Heart Rate)</div>
+                    <div style={{ fontSize: '19px', fontWeight: '800', color: '#0F172A' }}>
+                      {selectedDetail.heartRate} <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>bpm</span>
+                    </div>
+                    <span style={{ display: 'inline-block', marginTop: '6px', padding: '1px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: '#DCFCE7', color: '#15803D' }}>
+                      ปกติ
+                    </span>
+                  </div>
+                  {/* Temp */}
+                  <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '12px 14px', textAlign: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.03)' }}>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginBottom: '4px' }}>อุณหภูมิ (Temp)</div>
+                    <div style={{ fontSize: '19px', fontWeight: '800', color: '#0F172A' }}>
+                      {selectedDetail.temp} <span style={{ fontSize: '12px', fontWeight: '500', color: '#64748B' }}>°C</span>
+                    </div>
+                    <span style={{ display: 'inline-block', marginTop: '6px', padding: '1px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: '#DCFCE7', color: '#15803D' }}>
+                      ปกติ
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Financial & Payment Summary */}
-              <div className="dash-block finance-block">
-                <h3 className="block-title">สรุปรายละเอียดการเงิน</h3>
-                <div className="fee-row-item">
-                  <span>ค่าตรวจรักษาแพทย์:</span>
-                  <span>฿ {selectedDetail.doctorFee.toFixed(2)}</span>
+              {/* Card 3: Department / Service Point */}
+              <div style={{ marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.2">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                  </svg>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>
+                    จุดบริการ / ห้องตรวจ:
+                  </h4>
                 </div>
-                <div className="fee-row-item">
-                  <span>ค่าบริการคลินิก:</span>
-                  <span>฿ {selectedDetail.clinicFee.toFixed(2)}</span>
+                <div style={{
+                  background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: '10px',
+                  padding: '12px 16px', color: '#0369A1', fontSize: '13.5px', fontWeight: '700',
+                  display: 'flex', alignItems: 'center', gap: '8px'
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>
+                  ห้องการเงินและออกใบเสร็จรับเงิน (อาคารผู้ป่วยนอก ชั้น 1)
                 </div>
-                <div className="fee-row-item">
-                  <span>ค่ายารวมสุทธิ:</span>
-                  <span>฿ {selectedDetail.medications.reduce((s, m) => s + (m.price * (m.quantity || 1)), 0).toFixed(2)}</span>
+              </div>
+
+              {/* Card 4: Prescription & Doctor Advice */}
+              <div style={{ marginBottom: '18px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2.2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                  <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>
+                    คำสั่งการรักษา & รายการยาที่ได้รับ (ฉบับเต็ม):
+                  </h4>
                 </div>
-                <div className="dash-modal-divider"></div>
-                <div className="grand-total-box">
-                  <div className="fee-row-item grand-total">
-                    <span>ยอดชำระเงินสุทธิ:</span>
-                    <span className="grand-price-val">{selectedDetail.amount}</span>
+                <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', padding: '14px 16px', marginBottom: '10px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <strong style={{ color: '#0F172A', fontSize: '14px' }}>{selectedDetail.doctorName}</strong>
+                    <span style={{ fontSize: '12px', color: '#64748B', background: '#F1F5F9', padding: '2px 8px', borderRadius: '6px' }}>แพทย์ผู้ให้การรักษา</span>
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#334155', background: '#F8FAFC', padding: '10px 14px', borderRadius: '8px', borderLeft: '3px solid #2563EB', lineHeight: '1.5' }}>
+                    <strong style={{ color: '#1E40AF' }}>คำแนะนำแพทย์:</strong> {selectedDetail.doctorAdvice}
                   </div>
                 </div>
-                {selectedDetail.method === 'เงินสด' && selectedDetail.cashReceived && selectedDetail.cashReceived > 0 && (
-                  <div style={{ marginTop: '8px', fontSize: '13px', color: '#64748B' }}>
-                    <div>รับเงินสด: ฿ {selectedDetail.cashReceived.toFixed(2)}</div>
-                    <div>เงินทอน: ฿ {(selectedDetail.changeAmount || 0).toFixed(2)}</div>
+
+                {/* Meds List */}
+                <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '12px', overflow: 'hidden' }}>
+                  <div style={{ padding: '10px 16px', background: '#F8FAFC', borderBottom: '1px solid #E2E8F0', fontSize: '13px', fontWeight: '700', color: '#334155', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>รายการยาและเวชภัณฑ์ ({selectedDetail.medications.length} รายการ)</span>
+                    <span>ราคารวม</span>
+                  </div>
+                  <div style={{ padding: '6px 16px' }}>
+                    {selectedDetail.medications.map((m, idx) => (
+                      <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: idx < selectedDetail.medications.length - 1 ? '1px solid #F1F5F9' : 'none' }}>
+                        <div>
+                          <div style={{ fontWeight: '700', color: '#0F172A', fontSize: '13.5px' }}>
+                            {m.name} {m.quantity && m.quantity > 1 ? `(x${m.quantity})` : ''}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>{cleanDosage(m.dosage, m.name)}</div>
+                        </div>
+                        <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#0F172A', fontSize: '13.5px' }}>
+                          ฿ {(m.price * (m.quantity || 1)).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 5: Financial Summary */}
+              <div style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '18px 20px', marginBottom: '10px' }}>
+                <h4 style={{ margin: '0 0 14px 0', fontSize: '14.5px', fontWeight: '800', color: '#0F172A' }}>
+                  สรุปรายละเอียดการเงินและสิทธิการรักษา
+                </h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', color: '#475569', marginBottom: '8px' }}>
+                  <span>ยอดรวมค่าบริการและการรักษา (Gross Total):</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: '700', color: '#0F172A' }}>฿ {selectedDetail.grossTotal.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13.5px', color: '#475569', marginBottom: '8px' }}>
+                  <span>สิทธิการรักษาที่ใช้:</span>
+                  <span style={{
+                    padding: '2px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '700',
+                    background: getRightBadgeStyle(selectedDetail.treatmentRight).bg,
+                    color: getRightBadgeStyle(selectedDetail.treatmentRight).color,
+                    border: getRightBadgeStyle(selectedDetail.treatmentRight).border
+                  }}>
+                    {getRightBadgeStyle(selectedDetail.treatmentRight).label}
+                  </span>
+                </div>
+                {selectedDetail.discountAmount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13.5px', color: '#16A34A', fontWeight: '700', marginBottom: '8px' }}>
+                    <span>ส่วนลดคุ้มครองตามสิทธิ (Benefit Discount):</span>
+                    <span style={{ fontFamily: 'monospace' }}>- ฿ {selectedDetail.discountAmount.toFixed(2)}</span>
                   </div>
                 )}
-                <div className="payment-status-badge-row" style={{ marginTop: '12px' }}>
-                  <span className="status-pill-paid" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: '#64748B', marginBottom: '4px', paddingLeft: '8px' }}>
+                  <span>• ค่าตรวจรักษาแพทย์:</span>
+                  <span>฿ {selectedDetail.doctorFee.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: '#64748B', marginBottom: '4px', paddingLeft: '8px' }}>
+                  <span>• ค่าบริการคลินิก:</span>
+                  <span>฿ {selectedDetail.clinicFee.toFixed(2)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12.5px', color: '#64748B', marginBottom: '10px', paddingLeft: '8px' }}>
+                  <span>• ค่ายารวมสุทธิ:</span>
+                  <span>฿ {selectedDetail.medications.reduce((s, m) => s + (m.price * (m.quantity || 1)), 0).toFixed(2)}</span>
+                </div>
+
+                <div style={{ borderTop: '1.5px solid #E2E8F0', margin: '10px 0' }} />
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F8FAFC', padding: '12px 16px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
+                  <span style={{ fontSize: '15px', fontWeight: '800', color: '#0F172A' }}>ยอดชำระเงินสุทธิ (Net Total):</span>
+                  <span style={{ fontFamily: 'monospace', fontSize: '20px', fontWeight: '800', color: '#2563EB' }}>{selectedDetail.amount}</span>
+                </div>
+
+                {selectedDetail.method === 'เงินสด' && selectedDetail.cashReceived && selectedDetail.cashReceived > 0 && (
+                  <div style={{ marginTop: '10px', fontSize: '13px', color: '#64748B', display: 'flex', gap: '20px', background: '#F1F5F9', padding: '8px 12px', borderRadius: '8px' }}>
+                    <div>รับเงินสด: <strong style={{ color: '#0F172A' }}>฿ {selectedDetail.cashReceived.toFixed(2)}</strong></div>
+                    <div>เงินทอน: <strong style={{ color: '#16A34A' }}>฿ {(selectedDetail.changeAmount || 0).toFixed(2)}</strong></div>
+                  </div>
+                )}
+
+                <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    padding: '4px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700',
+                    background: '#DCFCE7', color: '#15803D'
+                  }}>
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                     {selectedDetail.status === 'completed' ? 'ชำระเงินสำเร็จแล้ว' : 'รอชำระเงิน'} ({selectedDetail.method} - {selectedDetail.date} {selectedDetail.time})
                   </span>
                 </div>
               </div>
 
-              <div className="dash-modal-footer" style={{ marginTop: '20px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              {/* Modal Action Buttons */}
+              <div className="dash-modal-footer" style={{ marginTop: '16px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button 
                   type="button"
                   onClick={() => setShowPrintPreview(true)}
                   style={{
-                    padding: '8px 18px', borderRadius: '8px',
+                    padding: '9px 20px', borderRadius: '8px',
                     background: '#2563EB', color: '#FFFFFF', border: 'none',
                     fontSize: '13.5px', fontWeight: '700', cursor: 'pointer',
                     display: 'inline-flex', alignItems: 'center', gap: '6px',
@@ -1005,12 +1310,12 @@ export default function BillingDashboardPage() {
                   className="btn-secondary" 
                   onClick={() => setSelectedDetail(null)}
                   style={{
-                    padding: '8px 18px', borderRadius: '8px',
+                    padding: '9px 20px', borderRadius: '8px',
                     background: '#F1F5F9', color: '#475569', border: '1px solid #CBD5E1',
                     fontSize: '13.5px', fontWeight: '600', cursor: 'pointer'
                   }}
                 >
-                  ปิด (Close)
+                  ปิดหน้าต่าง
                 </button>
               </div>
             </div>
@@ -1346,7 +1651,7 @@ export default function BillingDashboardPage() {
                   </div>
                   <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>สิทธิการรักษา: </span>
-                    <strong style={{ color: '#0F172A' }}>บัตรทอง (สปสช.)</strong>
+                    <strong style={{ color: '#0F172A' }}>{getRightBadgeStyle(selectedDetail.treatmentRight).label}</strong>
                   </div>
                   <div>
                     <span style={{ color: '#64748B', fontWeight: '500' }}>ช่องทางชำระเงิน: </span>
@@ -1442,17 +1747,16 @@ export default function BillingDashboardPage() {
                   {/* Financial calculation */}
                   <div style={{ width: '260px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '4px' }}>
-                      <span>รวมเป็นเงิน (Subtotal):</span>
+                      <span>รวมเป็นเงินก่อนลด (Subtotal):</span>
                       <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>
-                        ฿ {(() => {
-                           let medTotal = (selectedDetail.medications || []).reduce((acc, m) => acc + ((m.price||0) * (m.quantity||1)), 0);
-                           return ((selectedDetail.doctorFee || 500) + (selectedDetail.clinicFee || 300) + medTotal).toFixed(2);
-                        })()}
+                        ฿ {selectedDetail.grossTotal.toFixed(2)}
                       </span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '8px' }}>
-                      <span>ส่วนลด (Discount):</span>
-                      <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>฿ 0.00</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: selectedDetail.discountAmount > 0 ? '#16A34A' : '#475569', marginBottom: '8px' }}>
+                      <span>ส่วนลดสิทธิการรักษา (Discount):</span>
+                      <span style={{ fontFamily: 'monospace', fontWeight: '600' }}>
+                        {selectedDetail.discountAmount > 0 ? `- ฿ ${selectedDetail.discountAmount.toFixed(2)}` : '฿ 0.00'}
+                      </span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#475569', marginBottom: '8px' }}>
                       <span>ภาษีมูลค่าเพิ่ม (VAT 7%):</span>

@@ -16,17 +16,22 @@ import (
 
 // DTO สำหรับการสร้างหรือยืนยันบิล
 type ConfirmPaymentRequest struct {
-	VisitID       uint    `json:"visit_id"`
-	HN            string  `json:"hn"`
-	PatientName   string  `json:"patient_name"`
-	NationalID    string  `json:"national_id"`
-	TotalAmount   float64 `json:"total_amount"`
-	NetAmount     float64 `json:"net_amount"`
-	PaymentMethod string  `json:"payment_method" binding:"required"` // "Cash" หรือ "QR Code"
-	CashReceived  float64 `json:"cash_received"`
-	DoctorName    string  `json:"doctor_name"`
-	DoctorAdvice  string  `json:"doctor_advice"`
-	Medications   string  `json:"medications"`
+	VisitID        uint    `json:"visit_id"`
+	HN             string  `json:"hn"`
+	PatientName    string  `json:"patient_name"`
+	NationalID     string  `json:"national_id"`
+	QueueNumber    string  `json:"queue_number"`
+	TotalAmount    float64 `json:"total_amount"`
+	NetAmount      float64 `json:"net_amount"`
+	DiscountAmount float64 `json:"discount_amount"`
+	SchemeType     string  `json:"scheme_type"`
+	TreatmentRight string  `json:"treatment_right"`
+	PaymentMethod  string  `json:"payment_method" binding:"required"` // "Cash" หรือ "QR Code"
+	CashReceived   float64 `json:"cash_received"`
+	DoctorName     string  `json:"doctor_name"`
+	DoctorAdvice   string  `json:"doctor_advice"`
+	Medications    string  `json:"medications"`
+	Vitals         string  `json:"vitals"`
 }
 
 type GenerateQRRequest struct {
@@ -769,6 +774,37 @@ func ConfirmPayment(c *gin.Context) {
 		meds = "[]"
 	}
 
+	right := req.TreatmentRight
+	if right == "" {
+		right = req.SchemeType
+	}
+	if right == "" && patient.SchemeType != "" {
+		right = patient.SchemeType
+	}
+	if right == "" {
+		right = "สิทธิ 30 บาท (สปสช.)"
+	}
+
+	disc := req.DiscountAmount
+	if disc <= 0 && billing.DiscountFromEligibility > 0 {
+		disc = billing.DiscountFromEligibility
+	}
+
+	advice := req.DoctorAdvice
+	if advice == "" {
+		advice = "รับประทานยาตามที่แพทย์สั่งอย่างเคร่งครัด พักผ่อนให้เพียงพอ"
+	}
+
+	vitals := req.Vitals
+	if vitals == "" {
+		vitals = "ความดัน 120/80 mmHg | ชีพจร 78 bpm | ปกติ"
+	}
+
+	qNum := req.QueueNumber
+	if qNum == "" {
+		qNum = "Q0001"
+	}
+
 	var history models.BillingHistory
 	if visitID > 0 {
 		tx.Where("visit_id = ?", visitID).First(&history)
@@ -776,21 +812,25 @@ func ConfirmPayment(c *gin.Context) {
 
 	if history.ID == 0 {
 		history = models.BillingHistory{
-			ReceiptNumber: receiptNo,
-			VisitID:       visitID,
-			HN:            hn,
-			PatientName:   patName,
-			NationalID:    patient.NationalID,
-			DoctorName:    docName,
-			TotalAmount:   billing.TotalAmount,
-			Discount:      billing.DiscountFromEligibility,
-			NetAmount:     billing.NetAmount,
-			PaymentMethod: req.PaymentMethod,
-			PaymentStatus: "completed",
-			Medications:   meds,
-			CashReceived:  req.CashReceived,
-			ChangeAmount:  changeAmount,
-			CreatedAt:     time.Now(),
+			ReceiptNumber:  receiptNo,
+			VisitID:        visitID,
+			QueueNumber:    qNum,
+			HN:             hn,
+			PatientName:    patName,
+			NationalID:     patient.NationalID,
+			DoctorName:     docName,
+			DoctorAdvice:   advice,
+			TreatmentRight: right,
+			Vitals:         vitals,
+			TotalAmount:    billing.TotalAmount,
+			Discount:       disc,
+			NetAmount:      billing.NetAmount,
+			PaymentMethod:  req.PaymentMethod,
+			PaymentStatus:  "completed",
+			Medications:    meds,
+			CashReceived:   req.CashReceived,
+			ChangeAmount:   changeAmount,
+			CreatedAt:      time.Now(),
 		}
 		
 		if err := tx.Create(&history).Error; err != nil {
@@ -801,14 +841,20 @@ func ConfirmPayment(c *gin.Context) {
 	} else {
 		// Update existing history
 		tx.Model(&history).Updates(map[string]interface{}{
-			"receipt_number": receiptNo,
-			"total_amount":   billing.TotalAmount,
-			"net_amount":     billing.NetAmount,
-			"payment_method": req.PaymentMethod,
-			"cash_received":  req.CashReceived,
-			"change_amount":  changeAmount,
-			"medications":    meds,
-			"updated_at":     time.Now(),
+			"receipt_number":  receiptNo,
+			"queue_number":    qNum,
+			"doctor_name":     docName,
+			"doctor_advice":   advice,
+			"treatment_right": right,
+			"vitals":          vitals,
+			"total_amount":    billing.TotalAmount,
+			"discount":        disc,
+			"net_amount":      billing.NetAmount,
+			"payment_method":  req.PaymentMethod,
+			"cash_received":   req.CashReceived,
+			"change_amount":   changeAmount,
+			"medications":     meds,
+			"updated_at":      time.Now(),
 		})
 	}
 

@@ -800,7 +800,7 @@ export default function PatientHistoryPage() {
                   <table className="patient-table" style={{ width: '100%', tableLayout: 'fixed' }}>
                     <thead>
                     <tr>
-                      <th style={{ textAlign: 'center', width: '9%', padding: '12px 6px' }}>ID (HN)</th>
+                      <th style={{ textAlign: 'center', width: '9%', padding: '12px 6px' }}>เลข HN</th>
                       <th style={{ textAlign: 'center', width: '9%', padding: '12px 6px' }}>เลข VN</th>
                       <th style={{ textAlign: 'left', width: '17%', padding: '12px 12px' }}>ชื่อผู้ป่วย</th>
                       <th style={{ textAlign: 'center', width: '6%', padding: '12px 4px' }}>อายุ</th>

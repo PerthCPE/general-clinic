@@ -759,17 +759,23 @@ export default function BillingDispensePage({
   const currentRegisteredKey = normalizeScheme(currentRegisteredRights);
   const currentSelectedKey = normalizeScheme(currentSelectedRights);
   const isRightsMismatch = currentRegisteredKey !== currentSelectedKey;
+  const isGovRight = currentSelectedRights.includes('ข้าราชการ') || currentSelectedRights.includes('กรมบัญชีกลาง') || currentSelectedKey === 'gov';
+  const isSelfPay = !isGovRight && (currentSelectedKey === 'cash' || currentSelectedRights.includes('เงินสด') || currentSelectedRights.includes('Self Pay') || currentSelectedRights.includes('ชำระเงินเอง') || (currentSelectedRights.includes('จ่ายตรง') && !currentSelectedRights.includes('กรมบัญชีกลาง')));
+  const isSubmitBlocked = isRightsMismatch && !isSelfPay;
   const benefitResult = calculateBenefitAmounts(rawMedTotal, currentSelectedKey);
   const medTotal = benefitResult.netTotal;
 
   const handleProceedToInvoice = () => {
     if (!activePatient) return;
 
-    if (isRightsMismatch) {
-      const confirmProceed = window.confirm(
-        `สิทธิ์ที่เลือกไม่ตรงกับสิทธิ์ที่บันทึกในระบบ: ระบบแสดงคำเตือนให้ตรวจสอบสิทธิ์อีกครั้ง\n\n• สิทธิ์ที่บันทึกในระบบ: ${currentRegisteredRights}\n• สิทธิ์ที่เลือกใช้: ${currentSelectedRights}\n\nคุณต้องการดำเนินการต่อไปยังหน้าออกใบเสร็จหรือไม่?`
+    if (isSubmitBlocked) {
+      alert(
+        `สิทธิ์ที่เลือกไม่ตรงกับสิทธิ์ที่บันทึกในระบบ: ไม่อนุญาตให้ดำเนินการต่อ\n\n` +
+        `• สิทธิ์ที่บันทึกในระบบ: ${currentRegisteredRights}\n` +
+        `• สิทธิ์ที่เลือกใช้: ${currentSelectedRights}\n\n` +
+        `ระบบอนุญาตเฉพาะกรณีเลือกสิทธิ์ที่ตรงกับข้อมูลของผู้ป่วย หรือเลือก 'จ่ายตรง / เงินสด' เท่านั้น`
       );
-      if (!confirmProceed) return;
+      return;
     }
 
     if (onSelectPatientId) {
@@ -1642,7 +1648,7 @@ export default function BillingDispensePage({
                   if (r.includes('ประกันสังคม')) return 'สิทธิประกันสังคม (Social Security)';
                   if (r.includes('ข้าราชการ') || r.includes('กรมบัญชีกลาง')) return 'สิทธิข้าราชการ / จ่ายตรงกรมบัญชีกลาง';
                   if (r.includes('ประกันสุขภาพ') || r.includes('เอกชน')) return 'ประกันสุขภาพเอกชน (Private Insurance)';
-                  if (r.includes('ชำระเงินเอง') || r.includes('เงินสด') || r.includes('จ่ายตรง')) return 'จ่ายตรง / เงินสด (Self Pay / Cash)';
+                  if (r.includes('ชำระเงินเอง') || r.includes('เงินสด') || (r.includes('จ่ายตรง') && !r.includes('กรมบัญชีกลาง') && !r.includes('ข้าราชการ'))) return 'จ่ายตรง / เงินสด (Self Pay / Cash)';
                   return r || 'สิทธิ 30 บาท (บัตรทอง / สปสช.)';
                 })()}
                 onChange={(e) => {
@@ -1665,58 +1671,103 @@ export default function BillingDispensePage({
 
               {/* Warning box when selected rights do not match registered rights */}
               {isRightsMismatch && (
-                <div style={{
-                  marginTop: '12px',
-                  padding: '12px 14px',
-                  background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.7) 0%, rgba(254, 249, 195, 0.4) 100%)',
-                  border: '1px solid rgba(245, 158, 11, 0.45)',
-                  borderRadius: '10px',
-                  color: '#92400E',
-                  fontSize: '12px',
-                  lineHeight: '1.45',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px',
-                  textAlign: 'left',
-                  boxShadow: '0 2px 8px -2px rgba(245, 158, 11, 0.15)'
-                }}>
+                isSubmitBlocked ? (
                   <div style={{
+                    marginTop: '12px',
+                    padding: '12px 14px',
+                    background: '#FEF2F2',
+                    border: '1.5px solid #F87171',
+                    borderRadius: '10px',
+                    color: '#991B1B',
+                    fontSize: '12px',
+                    lineHeight: '1.45',
                     display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '28px',
-                    height: '28px',
-                    borderRadius: '8px',
-                    backgroundColor: '#FEF3C7',
-                    color: '#D97706',
-                    flexShrink: 0,
-                    marginTop: '2px'
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    textAlign: 'left',
+                    boxShadow: '0 2px 8px -2px rgba(239, 68, 68, 0.15)'
                   }}>
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                      <line x1="12" y1="9" x2="12" y2="13"/>
-                      <line x1="12" y1="17" x2="12.01" y2="17"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: '700', color: '#B45309', fontSize: '12.5px' }}>
-                      สิทธิ์ที่เลือกไม่ตรงกับสิทธิ์ที่บันทึกในระบบ: ระบบแสดงคำเตือนให้ตรวจสอบสิทธิ์อีกครั้ง
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px', fontSize: '11px' }}>
-                      <span style={{ color: '#78350F' }}>สิทธิ์ในระบบ:</span>
-                      <span style={{ padding: '1px 6px', borderRadius: '4px', backgroundColor: '#EDE9FE', color: '#6D28D9', fontWeight: '600' }}>
-                        {currentRegisteredRights}
-                      </span>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '8px',
+                      backgroundColor: '#FEE2E2',
+                      color: '#DC2626',
+                      flexShrink: 0,
+                      marginTop: '2px'
+                    }}>
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                        <line x1="9" y1="9" x2="15" y2="15"></line>
                       </svg>
-                      <span style={{ color: '#78350F' }}>สิทธิ์ที่เลือก:</span>
-                      <span style={{ padding: '1px 6px', borderRadius: '4px', backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: '600' }}>
-                        {currentSelectedRights}
-                      </span>
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: '800', color: '#991B1B', fontSize: '12.5px' }}>
+                        สิทธิ์ที่เลือกไม่ตรงกับสิทธิ์ที่บันทึกในระบบ: ไม่อนุญาตให้ดำเนินการต่อ
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#B91C1C', marginTop: '2px' }}>
+                        (ระบบอนุญาตเฉพาะสิทธิ์ที่บันทึกในระบบ หรือเลือก "จ่ายตรง / เงินสด" เท่านั้น)
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginTop: '6px', fontSize: '11px' }}>
+                        <span style={{ color: '#7F1D1D' }}>สิทธิ์ในระบบ:</span>
+                        <span style={{ padding: '1px 6px', borderRadius: '4px', backgroundColor: '#EDE9FE', color: '#6D28D9', fontWeight: '600' }}>
+                          {currentRegisteredRights}
+                        </span>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                        </svg>
+                        <span style={{ color: '#7F1D1D' }}>สิทธิ์ที่เลือก:</span>
+                        <span style={{ padding: '1px 6px', borderRadius: '4px', backgroundColor: '#FEE2E2', color: '#991B1B', fontWeight: '600' }}>
+                          {currentSelectedRights}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div style={{
+                    marginTop: '12px',
+                    padding: '12px 14px',
+                    background: '#F0FDF4',
+                    border: '1.5px solid #86EFAC',
+                    borderRadius: '10px',
+                    color: '#166534',
+                    fontSize: '12px',
+                    lineHeight: '1.45',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '10px',
+                    textAlign: 'left'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '8px',
+                      backgroundColor: '#DCFCE7',
+                      color: '#16A34A',
+                      flexShrink: 0,
+                      marginTop: '2px'
+                    }}>
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: '800', color: '#166534', fontSize: '12.5px' }}>
+                        สิทธิ์ที่เลือกเป็น "จ่ายตรง / เงินสด" (คนไข้มีสิทธิ์: {currentRegisteredRights})
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#15803D', marginTop: '2px' }}>
+                        อนุญาตให้ดำเนินการต่อได้เนื่องจากเป็นการชำระเงินสดด้วยตนเอง
+                      </div>
+                    </div>
+                  </div>
+                )
               )}
             </div>
 
@@ -1778,7 +1829,18 @@ export default function BillingDispensePage({
                 </div>
               </button>
             ) : (
-              <button className="submit-billing-btn" onClick={handleProceedToInvoice}>
+              <button 
+                className="submit-billing-btn" 
+                onClick={handleProceedToInvoice}
+                disabled={isSubmitBlocked}
+                style={{
+                  opacity: isSubmitBlocked ? 0.45 : 1,
+                  cursor: isSubmitBlocked ? 'not-allowed' : 'pointer',
+                  filter: isSubmitBlocked ? 'grayscale(0.6)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}
+                title={isSubmitBlocked ? "ไม่สามารถดำเนินการต่อได้เนื่องจากสิทธิไม่ตรงกับในระบบ" : "ออกใบแจ้งหนี้ & สร้าง QR Code ชำระเงิน"}
+              >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ flexShrink: 0 }}>
                   <rect x="2" y="5" width="20" height="14" rx="2"/>
                   <line x1="2" y1="10" x2="22" y2="10"/>
@@ -1790,6 +1852,26 @@ export default function BillingDispensePage({
                   </span>
                 </div>
               </button>
+            )}
+            {isSubmitBlocked && (
+              <div style={{
+                marginTop: '10px',
+                textAlign: 'center',
+                fontSize: '12px',
+                color: '#DC2626',
+                fontWeight: '600',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px'
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>ปุ่มถูกระงับ: กรุณาเลือกสิทธิ์ให้ตรงกับระบบ ({currentRegisteredRights}) หรือเลือก "จ่ายตรง / เงินสด"</span>
+              </div>
             )}
           </div>
         </div>
