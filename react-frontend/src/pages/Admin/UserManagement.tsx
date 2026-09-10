@@ -214,6 +214,7 @@ const UserManagement: React.FC = () => {
           fullname: formData.name,
           employee_id: formData.id,
           phone: formData.phone,
+          department: formData.department,
         });
         alert('สร้างบัญชีสำเร็จ');
         fetchUsers();

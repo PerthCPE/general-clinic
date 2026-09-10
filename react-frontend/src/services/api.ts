@@ -1066,7 +1066,7 @@ export const examinationApi = {
 };
 export const adminApi = {
     getAccounts: () => request<BackendUser[]>('/api/admin/users'),
-    createAccount: (payload: { username: string; password?: string; role: string; fullname: string; employee_id: string; phone: string; }) =>
+    createAccount: (payload: { username: string; password?: string; role: string; fullname: string; employee_id: string; phone: string; department?: string; }) =>
       request<BackendUser>('/api/admin/users', {
         method: 'POST',
         body: JSON.stringify(payload),
