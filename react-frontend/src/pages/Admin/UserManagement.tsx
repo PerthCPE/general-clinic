@@ -248,6 +248,22 @@ const UserManagement: React.FC = () => {
     setIsModalOpen(false);
   };
 
+  // รีเซ็ตรหัสผ่านแบบ admin-assisted — ไม่มีระบบส่งอีเมล จึงสุ่มรหัสผ่านชั่วคราวที่ backend
+  // แล้วโชว์ให้ admin เห็นตรงนี้ครั้งเดียวเพื่อนำไปแจ้งพนักงานเอง (ทางวาจา/แชท) พร้อมบังคับ
+  // ให้เปลี่ยนรหัสผ่านตอน login ครั้งถัดไปผ่าน RequiresPasswordChange flow ที่มีอยู่แล้ว
+  // (เหมือนตอนสร้างบัญชีใหม่ / เหมือน ChangePassword หลัง login ครั้งแรก)
+  const handleResetPassword = async (userName: string, internalId: number) => {
+    if (!window.confirm(`ต้องการรีเซ็ตรหัสผ่านของ "${userName}" ใช่หรือไม่? รหัสผ่านเดิมจะใช้ล็อกอินไม่ได้ทันที`)) {
+      return;
+    }
+    try {
+      const res = await adminApi.resetPassword(internalId);
+      alert(`รีเซ็ตรหัสผ่านสำเร็จ\n\nรหัสผ่านชั่วคราวของ "${userName}":\n${res.temporary_password}\n\nกรุณาแจ้งรหัสนี้ให้พนักงานเอง ระบบจะบังคับให้เปลี่ยนรหัสผ่านใหม่ทันทีที่ล็อกอินครั้งถัดไป`);
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
+    }
+  };
+
   const handleDeleteUser = async (userId: string, userName: string, internalId: number) => {
     if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการระงับบัญชีของ "${userName}"?`)) {
       try {
@@ -384,6 +400,9 @@ const UserManagement: React.FC = () => {
                       <div className="action-buttons">
                         <button className="btn-edit" onClick={() => openEditModal(user)} title="แก้ไขข้อมูล">
                           <Edit2 size={16} strokeWidth={2} />
+                        </button>
+                        <button className="btn-reset" onClick={() => handleResetPassword(user.name, user.internalId)} title="รีเซ็ตรหัสผ่าน">
+                          <RotateCcw size={16} strokeWidth={2} />
                         </button>
                         <button className="btn-delete" onClick={() => handleDeleteUser(user.id, user.name, user.internalId)} title="ระงับบัญชี">
                           <Trash2 size={16} strokeWidth={2} />

@@ -1081,6 +1081,10 @@ export const adminApi = {
         method: 'PUT',
         body: JSON.stringify(payload),
       }),
+    resetPassword: (id: number | string) =>
+      request<{ message: string; temporary_password: string; requires_password_change: boolean }>('/api/admin/users/' + id + '/reset-password', {
+        method: 'PUT',
+      }),
     createSystemAccess: (payload: { user_id: number; access_level: number; module_name: string; }) =>
       request<any>('/api/admin/system-access', {
         method: 'POST',

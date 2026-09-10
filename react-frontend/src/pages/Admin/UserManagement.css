@@ -122,10 +122,11 @@ body.dark-mode .admin-page-container .status-suspended {
 
 /* Actions */
 .admin-page-container .action-buttons { display: flex; gap: 12px; }
-.admin-page-container .btn-edit, .admin-page-container .btn-delete { background: none; border: none; cursor: pointer; font-size: 18px; transition: transform 0.1s; padding: 4px; border-radius: 4px;}
+.admin-page-container .btn-edit, .admin-page-container .btn-delete, .admin-page-container .btn-reset { background: none; border: none; cursor: pointer; font-size: 18px; transition: transform 0.1s; padding: 4px; border-radius: 4px;}
 .admin-page-container .btn-edit:hover { transform: scale(1.1); background-color: rgba(37, 99, 235, 0.1); }
 .admin-page-container .btn-delete:hover { transform: scale(1.1); background-color: rgba(239, 68, 68, 0.1); }
-.admin-page-container .btn-edit { color: #2563eb; } .admin-page-container .btn-delete { color: #ef4444; }
+.admin-page-container .btn-reset:hover { transform: scale(1.1); background-color: rgba(245, 158, 11, 0.1); }
+.admin-page-container .btn-edit { color: #2563eb; } .admin-page-container .btn-delete { color: #ef4444; } .admin-page-container .btn-reset { color: #f59e0b; }
 
 /* === Advanced Modal === */
 .modal-overlay {

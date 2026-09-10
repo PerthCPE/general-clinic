@@ -3,7 +3,9 @@ package controllers
 import (
 	"clinic-backend/internal/dto"
 	"clinic-backend/internal/models"
+	crand "crypto/rand"
 	"fmt"
+	"math/big"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -144,6 +146,61 @@ func (ctrl *AdminController) UpdateAccount(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Account updated successfully", "user": user})
+}
+
+// ResetPassword ตั้งรหัสผ่านชั่วคราวใหม่ให้บัญชี (admin-assisted, ไม่มีระบบส่งอีเมล)
+// สุ่มรหัสผ่านใหม่, บังคับ RequiresPasswordChange=true (ใช้ flow เดิมที่มีอยู่แล้ว
+// ตอน login ครั้งถัดไปผู้ใช้จะถูกบังคับให้ตั้งรหัสผ่านของตัวเองใหม่ทันที — ดู ChangePassword)
+// แล้วส่งรหัสผ่านชั่วคราวนี้กลับไปให้ admin นำไปแจ้งพนักงานเอง (ทางวาจา/แชท ฯลฯ)
+func (ctrl *AdminController) ResetPassword(c *gin.Context) {
+	id := c.Param("id")
+
+	var user models.User
+	if err := ctrl.DB.First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	tempPassword, err := generateTempPassword(10)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate temporary password"})
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(tempPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to hash password"})
+		return
+	}
+
+	if err := ctrl.DB.Model(&models.User{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"password":                 string(hashed),
+		"requires_password_change": true,
+	}).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":             "Password reset successfully",
+		"temporary_password":  tempPassword,
+		"requires_password_change": true,
+	})
+}
+
+// generateTempPassword สุ่มรหัสผ่านชั่วคราวจาก charset ที่ตัดตัวอักษรที่สับสนง่ายออก
+// (ไม่มี 0/O, 1/l/I) เพราะ admin ต้องอ่านออกเสียง/พิมพ์บอกพนักงานเอง
+func generateTempPassword(length int) (string, error) {
+	const charset = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
+	result := make([]byte, length)
+	for i := range result {
+		n, err := crand.Int(crand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			return "", err
+		}
+		result[i] = charset[n.Int64()]
+	}
+	return string(result), nil
 }
 
 // --- System Access ---
