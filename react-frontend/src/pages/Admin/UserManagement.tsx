@@ -210,7 +210,13 @@ const UserManagement: React.FC = () => {
     const roleEn = englishToRole[roleTh] ? roleTh : (roleToEnglish[roleTh] || 'officer');
     let prefix = 'EMP';
     if (roleEn === 'doctor' || roleTh === 'แพทย์') prefix = 'DOC';
-    else if (roleEn === 'nurse' || roleTh === 'พยาบาล' || roleTh === 'ผู้ช่วยพยาบาล') prefix = 'NUR';
+    // แยก prefix ของ nurse_assistant ออกจาก nurse ให้เป็นคนละแบบ (เดิมใช้ 'NUR' ร่วมกัน จน
+    // เลขรันชนกันเห็นได้จาก seed เอง: nurse1=NUR001, assistant1=NUR002) — เปลี่ยนเฉพาะบัญชีใหม่ที่
+    // จะสร้างต่อจากนี้เท่านั้น ไม่แตะ employee_id ของบัญชีเดิม (assistant1 ยังเป็น NUR002 เหมือนเดิม
+    // เพราะการเปลี่ยนของเดิมกระทบ seed script/QuickLogin/AuthContext.tsx ที่ hardcode ค่านี้ไว้
+    // หลายจุด — ดู PLAN.md ส่วนที่ 2)
+    else if (roleEn === 'nurse_assistant' || roleTh === 'ผู้ช่วยพยาบาล') prefix = 'NAS';
+    else if (roleEn === 'nurse' || roleTh === 'พยาบาล') prefix = 'NUR';
     else if (roleEn === 'pharmacist' || roleTh === 'เภสัชกร') prefix = 'PHA';
     else if (roleEn === 'cashier' || roleTh === 'เจ้าหน้าที่การเงิน') prefix = 'CAS';
     else if (roleEn === 'registrar' || roleTh === 'เจ้าหน้าที่เวชระเบียน' || roleTh === 'เจ้าหน้าที่ประชาสัมพันธ์') prefix = 'REC';
