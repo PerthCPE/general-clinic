@@ -68,21 +68,36 @@ func main() {
 
 	log.Println("All transactional test data cleaned and sequences reset! Now seeding fresh clean records...")
 
-	// 2. Seed All Required Users with default password "password"
-	hashPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), 10)
-	passStr := string(hashPassword)
+	// 2. Seed All Required Users — รหัสผ่านเริ่มต้นของแต่ละคน = employee_id ของตัวเอง (ตรงกับ
+	// seedDatabase() ใน internal/config/db.go) ไม่ใช่ "password" ที่ใช้ร่วมกันทุกคนแบบเดิม
+	// ต้อง hash แยกรายคนเพราะรหัสผ่านไม่เหมือนกันแล้ว
+	type seedDef struct {
+		Username, FullName, Role, Phone, EmployeeID string
+	}
+	seedDefs := []seedDef{
+		{"officer1", "คุณสมจิต ดีใจ", "officer", "081-555-0001", "OFF001"},
+		{"registrar1", "คุณสุภาพร เวชระเบียน", "registrar", "081-111-0001", "REC001"},
+		{"nurse1", "พว. กานดา คัดกรอง", "nurse", "081-111-0002", "NUR001"},
+		{"assistant1", "นายสมคิด ช่วยเหลือดี", "nurse_assistant", "081-111-0003", "NUR002"},
+		{"pharmacist1", "ดร.บุญ สั่งยา", "pharmacist", "081-333-0001", "PHA001"},
+		{"cashier1", "นส.รวย การเงิน", "cashier", "081-444-0001", "CAS001"},
+		{"doctor1", "พญ.สุดา สุขสมบูรณ์", "doctor", "081-222-0001", "DOC001"},
+		{"doctor2", "นพ.วิชัย ชาญการแพทย์", "doctor", "081-222-0002", "DOC002"},
+		{"doctor3", "พญ.เกศรา รักษาดี", "doctor", "081-222-0003", "DOC003"},
+		{"admin1", "ผู้ดูแลระบบ คลินิก", "admin", "081-999-0001", "ADM001"},
+	}
 
-	seedUsers := []models.User{
-		{Username: "officer1", Password: passStr, Role: "officer", FullName: "คุณสมจิต ดีใจ", Phone: "081-555-0001"},
-		{Username: "registrar1", Password: passStr, Role: "registrar", FullName: "คุณสุภาพร เวชระเบียน", Phone: "081-111-0001"},
-		{Username: "nurse1", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
-		{Username: "assistant1", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
-		{Username: "pharmacist1", Password: passStr, Role: "pharmacist", FullName: "ดร.บุญ สั่งยา", Phone: "081-333-0001"},
-		{Username: "cashier1", Password: passStr, Role: "cashier", FullName: "นส.รวย การเงิน", Phone: "081-444-0001"},
-		{Username: "doctor1", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
-		{Username: "doctor2", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
-		{Username: "doctor3", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
-		{Username: "admin1", Password: passStr, Role: "admin", FullName: "ผู้ดูแลระบบ คลินิก", Phone: "081-999-0001"},
+	seedUsers := make([]models.User, len(seedDefs))
+	for i, sd := range seedDefs {
+		hashPassword, _ := bcrypt.GenerateFromPassword([]byte(sd.EmployeeID), 10)
+		seedUsers[i] = models.User{
+			Username:   sd.Username,
+			Password:   string(hashPassword),
+			Role:       sd.Role,
+			FullName:   sd.FullName,
+			Phone:      sd.Phone,
+			EmployeeID: sd.EmployeeID,
+		}
 	}
 
 	for i := range seedUsers {
@@ -92,10 +107,11 @@ func main() {
 			log.Printf("Created user: %s (%s)", seedUsers[i].Username, seedUsers[i].Role)
 		} else {
 			db.Model(&existing).Updates(map[string]interface{}{
-				"full_name": seedUsers[i].FullName,
-				"role":      seedUsers[i].Role,
-				"phone":     seedUsers[i].Phone,
-				"password":  passStr,
+				"full_name":   seedUsers[i].FullName,
+				"role":        seedUsers[i].Role,
+				"phone":       seedUsers[i].Phone,
+				"employee_id": seedUsers[i].EmployeeID,
+				"password":    seedUsers[i].Password,
 			})
 			seedUsers[i] = existing
 			log.Printf("Updated user: %s (%s)", seedUsers[i].Username, seedUsers[i].Role)

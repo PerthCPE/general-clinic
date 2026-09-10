@@ -1,17 +1,16 @@
-/* Layout & Container */
+/* Layout & Container
+   --bg-color / --text-color / --card-bg map ไปยังตัวแปรสีกลางของทีม (--bg-canvas /
+   --text-primary / --bg-card ใน index.css:root) โดยตรง ไม่ต้องมี body.dark-mode block
+   แยกอีกชุดที่นี่ — --bg-canvas เองสลับค่าตาม body.dark-mode อยู่แล้วจากส่วนกลาง */
 .admin-page-container {
+  --bg-color: var(--bg-canvas);
+  --text-color: var(--text-primary);
+  --card-bg: var(--bg-card);
   padding: 24px;
-  background-color: var(--bg-color, #f3f4f6);
+  background-color: var(--bg-color);
   min-height: 100vh;
-  color: var(--text-color, #1f2937);
-  font-family: 'Prompt', sans-serif;
-}
-
-body.dark-mode .admin-page-container {
-  --bg-color: #111827;
-  --text-color: #f9fafb;
-  --card-bg: #1f2937;
-  --border-color: #374151;
+  color: var(--text-color);
+  font-family: var(--font-primary);
 }
 
 /* Header */
@@ -77,6 +76,25 @@ body.dark-mode .admin-page-container .bg-red-light { background-color: rgba(239,
 .admin-page-container .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 .admin-page-container .table-header h3 { margin: 0; font-size: 16px; }
 
+/* Pagination — เดิมมีแค่ dropdown เลือกจำนวนต่อหน้า แต่ไม่มีปุ่มไปหน้าถัดไปเลย
+   บัญชีที่เกินหน้าแรกจึงเข้าถึงไม่ได้เสมอไม่ว่า backend จะเรียงลำดับมาแบบไหน */
+.admin-page-container .um-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 4px 4px;
+  margin-top: 8px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.admin-page-container .um-pagination-info { font-size: 13px; color: #6b7280; }
+body.dark-mode .admin-page-container .um-pagination-info { color: #9ca3af; }
+.admin-page-container .um-pagination-buttons { display: flex; gap: 8px; }
+.admin-page-container .um-pagination-buttons .btn-primary:disabled {
+  opacity: 0.5; cursor: not-allowed;
+}
+
 /* === เพิ่ม CSS สำหรับ Dropdown แสดงจำนวนหน้า === */
 .admin-page-container .table-actions { display: flex; align-items: center; gap: 16px; }
 .admin-page-container .rows-per-page { font-size: 13px; color: #6b7280; display: flex; align-items: center; gap: 8px;}
@@ -109,16 +127,25 @@ body.dark-mode .admin-page-container .bg-red-light { background-color: rgba(239,
 .admin-page-container .status-pending { background-color: #fef3c7; color: #92400e; border: 1px solid #fbbf24; }
 .admin-page-container .status-suspended { background-color: #fee2e2; color: #991b1b; border: 1px solid #f87171; }
 
-body.dark-mode .admin-page-container .status-active { background-color: rgba(16,185,129,0.1); color: #34d399; }
-body.dark-mode .admin-page-container .status-pending { background-color: rgba(245,158,11,0.1); color: #fbbf24; }
-body.dark-mode .admin-page-container .status-suspended { background-color: rgba(239,68,68,0.1); color: #f87171; }
+/* Glowing Status Badges ตามมาตรฐานทีม (TEAM_RULES.md ข้อ 2) — พื้นหลังโปร่งแสง +
+   ขอบสว่างชัดเจน แทนสีพื้นหลังพาสเทลแบบ Light Mode ที่กลืนกับพื้นมืด */
+body.dark-mode .admin-page-container .status-active {
+  background: rgba(22, 163, 74, 0.3); color: #86EFAC; border: 1.5px solid #4ADE80;
+}
+body.dark-mode .admin-page-container .status-pending {
+  background: rgba(217, 119, 6, 0.3); color: #FBBF24; border: 1.5px solid #F59E0B;
+}
+body.dark-mode .admin-page-container .status-suspended {
+  background: rgba(220, 38, 38, 0.3); color: #FCA5A5; border: 1.5px solid #F87171;
+}
 
 /* Actions */
 .admin-page-container .action-buttons { display: flex; gap: 12px; }
-.admin-page-container .btn-edit, .admin-page-container .btn-delete { background: none; border: none; cursor: pointer; font-size: 18px; transition: transform 0.1s; padding: 4px; border-radius: 4px;}
+.admin-page-container .btn-edit, .admin-page-container .btn-delete, .admin-page-container .btn-reset { background: none; border: none; cursor: pointer; font-size: 18px; transition: transform 0.1s; padding: 4px; border-radius: 4px;}
 .admin-page-container .btn-edit:hover { transform: scale(1.1); background-color: rgba(37, 99, 235, 0.1); }
 .admin-page-container .btn-delete:hover { transform: scale(1.1); background-color: rgba(239, 68, 68, 0.1); }
-.admin-page-container .btn-edit { color: #2563eb; } .admin-page-container .btn-delete { color: #ef4444; }
+.admin-page-container .btn-reset:hover { transform: scale(1.1); background-color: rgba(245, 158, 11, 0.1); }
+.admin-page-container .btn-edit { color: #2563eb; } .admin-page-container .btn-delete { color: #ef4444; } .admin-page-container .btn-reset { color: #f59e0b; }
 
 /* === Advanced Modal === */
 .modal-overlay {
@@ -171,6 +198,42 @@ body.dark-mode .admin-page-container .input-disabled { background-color: #374151
 
 .admin-page-container .status-select-input { font-weight: 500; }
 
+/* กล่องแสดงรหัสผ่านชั่วคราวหลังรีเซ็ต + ปุ่มคัดลอก (แทน alert() เดิมที่คัดลอกไม่ได้) */
+.admin-page-container .reset-password-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--bg-color, #f3f4f6);
+  border: 1px solid var(--border-color, #e5e7eb);
+}
+.admin-page-container .reset-password-box code {
+  font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-color, #111827);
+  word-break: break-all;
+}
+.admin-page-container .btn-copy-password {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #2563eb;
+  background: #2563eb;
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.admin-page-container .btn-copy-password:hover { background-color: #1d4ed8; }
+
 .admin-page-container .modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 32px; grid-column: span 2; }
 .admin-page-container .btn-cancel {
   padding: 10px 20px; border: 1px solid var(--border-color, #d1d5db);
@@ -211,6 +274,31 @@ body.dark-mode .admin-page-container .card-active-red { background-color: rgba(2
 }
 body.dark-mode .admin-page-container .filter-badge { background: #374151; color: #d1d5db; }
 
+/* Search box (ค้นหาชื่อ / รหัสพนักงาน) */
+.admin-page-container .um-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background-color: var(--card-bg, white);
+  color: var(--text-color, #6b7280);
+}
+.admin-page-container .um-search-box input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-color, #111827);
+  font-family: inherit;
+  font-size: 14px;
+  width: 200px;
+}
+.admin-page-container .um-search-box input::placeholder { color: #9ca3af; }
+body.dark-mode .admin-page-container .um-search-box {
+  background-color: #1f2937; border-color: #4b5563; color: #9ca3af;
+}
+
 /* Department Filter Dropdown */
 .admin-page-container .dept-filter {
   padding: 8px 12px; border-radius: 6px;
@@ -226,3 +314,46 @@ body.dark-mode .admin-page-container .dept-filter {
 .admin-page-container .text-gray-500 { color: #6b7280; }
 .admin-page-container .text-sm { font-size: 12px; }
 body.dark-mode .admin-page-container .text-gray-500 { color: #9ca3af; }
+
+/* Loading / Error states */
+.admin-page-container .um-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FEE2E2;
+  color: #DC2626;
+  border-left: 4px solid #DC2626;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+body.dark-mode .admin-page-container .um-error-banner {
+  background: rgba(220, 38, 38, 0.15);
+  color: #FCA5A5;
+}
+
+.admin-page-container .um-loading-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  color: var(--text-color);
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+.admin-page-container .um-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2.5px solid var(--border-color, #e5e7eb);
+  border-top-color: #2563eb;
+  animation: um-spin 0.8s linear infinite;
+}
+
+@keyframes um-spin {
+  to { transform: rotate(360deg); }
+}

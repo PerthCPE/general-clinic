@@ -26,3 +26,10 @@ type ChangePasswordRequest struct {
 	NewPassword string `json:"new_password" binding:"required"`
 }
 
+// QuickLoginRequest ใช้กับปุ่ม "Quick Test Login" (dev only) เท่านั้น — ไม่มีฟิลด์ password
+// เพราะจุดประสงค์คือข้ามการเช็ค credential ไปเลย รับแค่ role แล้ว backend หาบัญชี seed ที่ตายตัว
+// ของ role นั้นให้เอง (ดู QuickLogin ใน auth.go)
+type QuickLoginRequest struct {
+	Role string `json:"role" binding:"required"`
+}
+

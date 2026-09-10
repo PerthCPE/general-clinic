@@ -202,6 +202,21 @@
   /* ฟอนต์ตัวเลข / รหัส (Monospace / Identifiers): JetBrains Mono — เหมาะกับ HN, เลขบัตร ปชช., เลขคิว, สัญญาณชีพ */
   --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
 
+  /* Color Palette Tokens — ตาม frontend.md ตารางสีสากล (หมวด 3)
+     หลายหน้า (UserManagement, GrantAccess, AppointmentForm ฯลฯ) อ้างถึงตัวแปรเหล่านี้
+     ผ่าน var(--bg-canvas) เป็นต้นอยู่แล้ว แต่ไม่เคยถูกประกาศไว้ที่ไหนเลยจริงๆ มาก่อน
+     จึง resolve เป็นค่าว่างเสมอ — ประกาศให้ตรงตามเอกสารมาตรฐานของทีม */
+  --bg-canvas: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --bg-header: #FFFFFF;
+  --border-color: #E2E8F0;
+  --border-focus: #2563EB;
+  --brand-primary: #2563EB;
+  --brand-primary-hover: #1D4ED8;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+
   font-family: var(--font-primary);
   font-size: 14px;
   line-height: 1.5;
@@ -272,6 +287,19 @@ h3 {
 body.dark-mode {
   background-color: #0F172A !important;
   color: #FFFFFF !important;
+
+  /* Color Palette Tokens (Dark) — ตาม frontend.md ตารางสีสากล (หมวด 3), Elevated Dark Slate
+     ห้ามใช้สีดำสนิท #000000 หรือเทาแบนที่กลืนกัน ตามกฎเหล็กข้อ 2 ของ TEAM_RULES.md */
+  --bg-canvas: #0F172A;
+  --bg-card: #212836;
+  --bg-header: #1C2230;
+  --border-color: #333F53;
+  --border-focus: #60A5FA;
+  --brand-primary: #3B82F6;
+  --brand-primary-hover: #2563EB;
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
 }
 
 body.dark-mode h1,

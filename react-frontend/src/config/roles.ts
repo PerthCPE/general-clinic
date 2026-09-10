@@ -85,6 +85,15 @@ export const DEMO_USERS: Record<UserRole, User> = {
   },
 };
 
+// รายชื่อแผนกการรักษาจริงของคลินิก — single source of truth ให้ทั้งระบบใช้ร่วมกัน
+// อ้างอิงตรงจากค่า doctors.specialty จริงในฐานข้อมูล (ดู golang-backend/internal/config/db.go
+// seedDoctorProfiles) ห้ามเพิ่มชื่อแผนกใหม่ที่นี่โดยไม่มี specialty จริงในตาราง doctors รองรับ
+// ไม่งั้นจะย้อนกลับไปเป็นปัญหาเดิม (แต่ละหน้าคิดชื่อแผนกขึ้นเองไม่ตรงกัน)
+//
+// ใช้ร่วมกันใน: หน้าจัดการบัญชี (UserManagement.tsx, ตำแหน่ง "แพทย์"),
+// ฟอร์มนัดหมาย (AppointmentForm.tsx), และแดชบอร์ดนัดหมาย (AppointmentDashboard.tsx)
+export const TREATMENT_DEPARTMENTS = ['อายุรกรรมทั่วไป', 'เวชศาสตร์ครอบครัว', 'กุมารเวชกรรม'];
+
 // เมนูใน Sidebar สำหรับแต่ละ Role
 export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
   registrar: [
@@ -96,11 +105,13 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
     { id: 'vitals', title: 'บันทึกสัญญาณชีพ', iconType: 'vitals', path: '/vitals' },
     { id: 'vitals-history', title: 'ประวัติการคัดกรอง', iconType: 'history', path: '/vitals-history' },
+    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย (ดูอย่างเดียว)', iconType: 'dashboard', path: '/appointment-dashboard' },
   ],
   nurse_assistant: [
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
     { id: 'vitals', title: 'บันทึกสัญญาณชีพ', iconType: 'vitals', path: '/vitals' },
     { id: 'vitals-history', title: 'ประวัติการคัดกรอง', iconType: 'history', path: '/vitals-history' },
+    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' },
   ],
   pharmacist: [
     { id: 'pharmacy-dispense', title: 'บันทึกและจ่ายยา', iconType: 'dispense', path: '/pharmacy-dispense' },
@@ -160,7 +171,7 @@ export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'billing-invoice': ['cashier'],
   'billing-dashboard': ['cashier'],
   'appointment-form': ['doctor'],
-  'appointment-dashboard': ['doctor'],
+  'appointment-dashboard': ['doctor', 'nurse_assistant', 'nurse'],
   'admin-users': ['admin'],
   'admin-access': ['admin'],
   'doctor-dashboard': ['doctor'],
@@ -169,6 +180,31 @@ export const PAGE_PERMISSIONS: Record<string, UserRole[]> = {
   'doctor-schedule': ['doctor'],
   'doctor-records': ['doctor'],
 };
+
+// สร้างจาก PAGE_PERMISSIONS อัตโนมัติ (reverse index: role -> รายชื่อหน้าที่เข้าถึงได้)
+// ไม่ต้อง maintain แยกอีกชุด — ใช้ใน GrantAccess.tsx เพื่อแสดงสิทธิ์จริงตาม role แบบอ่านอย่างเดียว
+// สะท้อนสิ่งที่ hasAccess()/PAGE_PERMISSIONS บังคับใช้จริงในแอปโดยตรง จึงไม่มีทางเพี้ยนไปจากของจริง
+export const ROLE_PAGE_ACCESS: Record<UserRole, string[]> = (() => {
+  const result: Record<UserRole, string[]> = {
+    registrar: [], nurse: [], nurse_assistant: [], pharmacist: [],
+    cashier: [], doctor: [], admin: [], officer: [],
+  };
+  for (const [pageId, roles] of Object.entries(PAGE_PERMISSIONS)) {
+    roles.forEach((role) => {
+      result[role].push(pageId);
+    });
+  }
+  return result;
+})();
+
+// ชื่อหน้าที่อ่านง่ายสำหรับแสดงผล — ดึงจาก title ที่ประกาศไว้แล้วใน ROLE_MENUS ทุก role มารวมกัน
+// (pageId ไหนไม่มีอยู่ใน ROLE_MENUS เลย เช่น 'doctor-dashboard' ที่ไม่มีลิงก์ sidebar จะ fallback เป็น pageId ตรงๆ)
+export const PAGE_TITLES: Record<string, string> = Object.values(ROLE_MENUS)
+  .flat()
+  .reduce((acc, item) => {
+    acc[item.id] = item.title;
+    return acc;
+  }, {} as Record<string, string>);
 
 // ตารางกำหนดสิทธิ์ระดับ API Endpoints (Backend Middleware Alignment & Parity)
 // หมายเหตุ: พยาบาลและผู้ช่วยพยาบาลได้รับสิทธิ์ API-only ในการค้นหา/ดูข้อมูลผู้ป่วย (GET /api/registrar/*)

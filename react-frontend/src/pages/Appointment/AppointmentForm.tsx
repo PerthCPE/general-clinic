@@ -1,26 +1,17 @@
-import React, { useState } from 'react';
-import { Autocomplete, TextField, Snackbar, Alert } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Autocomplete, TextField, Snackbar, Alert, CircularProgress } from '@mui/material';
+import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { patientApi, appointmentApi, type BackendPatient } from '../../services/api';
+import { TREATMENT_DEPARTMENTS } from '../../config/roles';
 import './AppointmentForm.css';
 
 interface PatientOption {
   label: string;
-  id: string;
+  id: number;
+  hn: string;
   name: string;
 }
-
-const mockPatients: PatientOption[] = [
-  { label: 'HN-10001 : อนันต์ สุขสวัสดิ์', id: 'HN-10001', name: 'อนันต์ สุขสวัสดิ์' },
-  { label: 'HN-10002 : วิมล มั่นคง', id: 'HN-10002', name: 'วิมล มั่นคง' },
-  { label: 'HN-10003 : เกียรติศักดิ์ ศรีสุข', id: 'HN-10003', name: 'เกียรติศักดิ์ ศรีสุข' },
-  { label: 'HN-10004 : พงษ์ศักดิ์ แสนดี', id: 'HN-10004', name: 'พงษ์ศักดิ์ แสนดี' },
-  { label: 'HN-10005 : สมชาย ใจดี', id: 'HN-10005', name: 'สมชาย ใจดี' },
-  { label: 'HN-10006 : นภา งามตา', id: 'HN-10006', name: 'นภา งามตา' },
-  { label: 'HN-10007 : ประเสริฐ เลิศพงษ์', id: 'HN-10007', name: 'ประเสริฐ เลิศพงษ์' },
-  { label: 'HN-10008 : วรรณา รักไทย', id: 'HN-10008', name: 'วรรณา รักไทย' },
-  { label: 'HN-10009 : กนกวรรณ มีสุข', id: 'HN-10009', name: 'กนกวรรณ มีสุข' },
-  { label: 'HN-10010 : ชูใจ มั่นคอย', id: 'HN-10010', name: 'ชูใจ มั่นคอย' },
-];
 
 const timeSlots: string[] = [
   '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
@@ -28,58 +19,92 @@ const timeSlots: string[] = [
 ];
 
 export default function AppointmentForm() {
-  const { addAppointment } = useAuth();
+  const { currentUser } = useAuth();
 
-  const [selectedPatient, setSelectedPatient] = useState<string>('');
+  const [patientOptions, setPatientOptions] = useState<PatientOption[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [selectedPatient, setSelectedPatient] = useState<PatientOption | null>(null);
   const [date, setDate] = useState<string>('');
   const [time, setTime] = useState<string>('');
   const [department, setDepartment] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
-  
-  // ใช้สำหรับบังคับ Reset ค่าใน Autocomplete ของ MUI
-  const [autocompleteKey, setAutocompleteKey] = useState<number>(0);
-  const [openAlert, setOpenAlert] = useState<boolean>(false);
 
-  const handleSave = () => {
+  const [autocompletePatientKey, setAutocompletePatientKey] = useState<number>(0);
+  const [openAlert, setOpenAlert] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // Load patients from DB
+        const pData: BackendPatient[] = await patientApi.getAll();
+        const opts: PatientOption[] = pData.map(p => ({
+          label: `${p.hn} : ${p.fullname}`,
+          id: p.id,
+          hn: p.hn,
+          name: p.fullname,
+        }));
+        setPatientOptions(opts);
+
+      } catch (err) {
+        console.error('Failed to load appointment form data', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, [currentUser]);
+
+  const handleSave = async () => {
     if (!selectedPatient || !date || !time || !department) {
       alert('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');
       return;
     }
 
-    let deptName = 'โรคทั่วไป';
-    let deptColor = 'primary';
-    if (department === 'medicine') { deptName = 'อายุรกรรม'; deptColor = 'warning'; }
-    else if (department === 'psychology') { deptName = 'จิตวิทยา'; deptColor = 'secondary'; }
-    else if (department === 'physical') { deptName = 'กายภาพบำบัด'; deptColor = 'success'; }
+    // หน้านี้เข้าได้เฉพาะ role doctor อยู่แล้ว (PAGE_PERMISSIONS['appointment-form'])
+    // จึงล็อกแพทย์ผู้นัดเป็นผู้ที่ล็อกอินอยู่เสมอ ไม่ต้องเลือกเอง
+    const doctorId = currentUser?.id ? Number(currentUser.id) : NaN;
+    if (!currentUser || Number.isNaN(doctorId)) {
+      alert('ไม่พบข้อมูลแพทย์ผู้ล็อกอิน กรุณาล็อกอินใหม่อีกครั้ง');
+      return;
+    }
 
-    const initialText = selectedPatient.length >= 2 ? selectedPatient.substring(0, 2) : 'คน';
-    const randomPhone = `08${Math.floor(Math.random() * 9)} - ${Math.floor(100 + Math.random() * 900)} - ${Math.floor(1000 + Math.random() * 9000)}`;
+    setIsSubmitting(true);
+    setErrorMsg(null);
+    try {
+      await appointmentApi.create({
+        patient_id: selectedPatient.id,
+        doctor_id: doctorId,
+        register_id: 0,
+        appointment_date: date,
+        appointment_time: time + ':00',
+        department,
+        clinical_note: notes,
+      });
 
-    const newAppointment = {
-      id: Date.now(),
-      name: selectedPatient,
-      initial: initialText,
-      dept: deptName,
-      date: date,
-      time: time,
-      phone: randomPhone,
-      status: '-', 
-      statusColor: 'default',
-      deptColor: deptColor,
-      notes: notes,
-    };
+      setOpenAlert(true);
 
-    // ส่งข้อมูลเข้าสู่ระบบกลาง
-    addAppointment(newAppointment);
-    setOpenAlert(true);
+      // Clear form
+      setSelectedPatient(null);
+      setDate('');
+      setTime('');
+      setDepartment('');
+      setNotes('');
+      setAutocompletePatientKey(prev => prev + 1);
 
-    // ทำการ Clear ค่าในฟอร์มทั้งหมดทันทีหลังบันทึกสำเร็จ
-    setSelectedPatient('');
-    setDate('');
-    setTime('');
-    setDepartment('');
-    setNotes('');
-    setAutocompleteKey(prev => prev + 1); // สั่งรีเซ็ตช่อง Autocomplete ค้นหาผู้ป่วยให้ว่างเปล่า
+      // Navigate to dashboard after success
+      setTimeout(() => {
+        window.localStorage.setItem('activePage', 'appointment-dashboard');
+        window.location.reload();
+      }, 1500);
+    } catch (err: any) {
+      setErrorMsg(err?.message || 'เกิดข้อผิดพลาดในการบันทึกนัดหมาย');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleCloseAlert = (_event?: React.SyntheticEvent | Event, reason?: string) => {
@@ -101,99 +126,136 @@ export default function AppointmentForm() {
           <span className="badge-staff">MEDICAL STAFF ONLY</span>
         </div>
 
-        <div className="form-grid">
-          
-          <div className="input-group">
-            <label>ค้นหาผู้ป่วย <span className="required">*</span></label>
-            <Autocomplete<PatientOption>
-              key={autocompleteKey} // ใช้ key นี้บังคับล้างค่าช่องค้นหา
-              disablePortal
-              options={mockPatients}
-              getOptionLabel={(option: PatientOption) => option.label}
-              onChange={(_event: unknown, newValue: PatientOption | null) => {
-                setSelectedPatient(newValue ? newValue.name : '');
-              }}
-              renderInput={(params) => (
-                <TextField 
-                  {...params} 
-                  size="small" 
-                  placeholder="พิมพ์รหัส HN หรือ ชื่อผู้ป่วย..." 
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: 'var(--input-bg)',
-                      borderRadius: '8px',
-                      '& fieldset': { borderColor: 'var(--input-border)' },
-                      '&:hover fieldset': { borderColor: '#94A3B8' },
-                      '&.Mui-focused fieldset': { borderColor: '#2563EB', borderWidth: '1px' },
-                    },
-                    '& .MuiInputBase-input': {
-                      color: 'var(--input-text)'
-                    }
-                  }}
-                />
-              )}
-            />
+        {isLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '40px' }}>
+            <CircularProgress size={28} />
+            <span style={{ marginLeft: 12, alignSelf: 'center', color: 'var(--text-muted)' }}>กำลังโหลดข้อมูลผู้ป่วยและแพทย์...</span>
           </div>
+        ) : (
+          <div className="form-grid">
+            
+            {/* ค้นหาผู้ป่วย */}
+            <div className="input-group">
+              <label>ค้นหาผู้ป่วย <span className="required">*</span></label>
+              <Autocomplete<PatientOption>
+                key={autocompletePatientKey}
+                disablePortal
+                options={patientOptions}
+                getOptionLabel={(option: PatientOption) => option.label}
+                value={selectedPatient}
+                onChange={(_event: unknown, newValue: PatientOption | null) => {
+                  setSelectedPatient(newValue);
+                }}
+                renderInput={(params) => (
+                  <TextField 
+                    {...params} 
+                    size="small" 
+                    placeholder="พิมพ์รหัส HN หรือ ชื่อผู้ป่วย..." 
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: 'var(--input-bg)',
+                        borderRadius: '8px',
+                        '& fieldset': { borderColor: 'var(--input-border)' },
+                        '&:hover fieldset': { borderColor: '#94A3B8' },
+                        '&.Mui-focused fieldset': { borderColor: '#2563EB', borderWidth: '1px' },
+                      },
+                      '& .MuiInputBase-input': {
+                        color: 'var(--input-text)'
+                      }
+                    }}
+                  />
+                )}
+              />
+            </div>
 
-          <div className="input-group">
-            <label>ชื่อผู้ป่วย (อัตโนมัติ)</label>
-            <input 
-              type="text" 
-              readOnly 
-              value={selectedPatient} 
-              placeholder="แสดงชื่อเมื่อเลือกผู้ป่วย" 
-              className="read-only-input"
-            />
+            {/* ชื่อผู้ป่วย (อัตโนมัติ) */}
+            <div className="input-group">
+              <label>ชื่อผู้ป่วย (อัตโนมัติ)</label>
+              <input 
+                type="text" 
+                readOnly 
+                value={selectedPatient?.name || ''} 
+                placeholder="แสดงชื่อเมื่อเลือกผู้ป่วย" 
+                className="read-only-input"
+              />
+            </div>
+
+            {/* แพทย์ผู้นัด — ล็อกเป็นผู้ที่ล็อกอินอยู่เสมอ (หน้านี้เข้าได้เฉพาะ role doctor) */}
+            <div className="input-group">
+              <label>แพทย์ผู้นัด</label>
+              <input
+                type="text"
+                readOnly
+                value={currentUser?.fullName || ''}
+                className="read-only-input"
+              />
+            </div>
+
+            {/* วันที่นัดหมาย */}
+            <div className="input-group">
+              <label>วันที่นัดหมาย <span className="required">*</span></label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+
+            {/* เวลานัดหมาย */}
+            <div className="input-group">
+              <label>เวลานัดหมาย <span className="required">*</span></label>
+              <select value={time} onChange={(e) => setTime(e.target.value)}>
+                <option value="" disabled>เลือกเวลา...</option>
+                {timeSlots.map((slot) => (
+                  <option key={slot} value={slot}>{slot} น.</option>
+                ))}
+              </select>
+            </div>
+
+            {/* หมวดการรักษา */}
+            <div className="input-group full-width">
+              <label>หมวดการรักษา <span className="required">*</span></label>
+              <select value={department} onChange={(e) => setDepartment(e.target.value)}>
+                <option value="" disabled>เลือกหมวดการรักษา...</option>
+                {TREATMENT_DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* หมายเหตุ */}
+            <div className="input-group full-width">
+              <label>รายละเอียดเพิ่มเติม / คำสั่งแพทย์ (Clinical Notes)</label>
+              <textarea 
+                rows={3} 
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="กรอกอาการเบื้องต้น หรือคำแนะนำพิเศษจากแพทย์..."
+              ></textarea>
+            </div>
+
+            {errorMsg && (
+              <div className="input-group full-width form-error-banner">
+                <AlertCircle size={18} strokeWidth={2} />
+                <span>{errorMsg}</span>
+              </div>
+            )}
+
           </div>
-
-          <div className="input-group">
-            <label>วันที่นัดหมาย <span className="required">*</span></label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-          </div>
-
-          <div className="input-group">
-            <label>เวลานัดหมาย <span className="required">*</span></label>
-            <select value={time} onChange={(e) => setTime(e.target.value)}>
-              <option value="" disabled>เลือกเวลา...</option>
-              {timeSlots.map((slot) => (
-                <option key={slot} value={slot}>{slot} น.</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="input-group full-width">
-            <label>หมวดการรักษา <span className="required">*</span></label>
-            <select value={department} onChange={(e) => setDepartment(e.target.value)}>
-              <option value="" disabled>เลือกหมวดการรักษา...</option>
-              <option value="general">ตรวจโรคทั่วไป (General Practice)</option>
-              <option value="medicine">อายุรกรรม (Internal Medicine)</option>
-              <option value="psychology">จิตวิทยา (Psychology)</option>
-              <option value="physical">กายภาพบำบัด (Physical Therapy)</option>
-            </select>
-          </div>
-
-          <div className="input-group full-width">
-            <label>รายละเอียดเพิ่มเติม / คำสั่งแพทย์ (Clinical Notes)</label>
-            <textarea 
-              rows={3} 
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="กรอกอาการเบื้องต้น หรือคำแนะนำพิเศษจากแพทย์..."
-            ></textarea>
-          </div>
-
-        </div>
+        )}
 
         <div className="form-actions">
           <button className="btn-secondary" onClick={() => window.history.back()}>ยกเลิก</button>
-          <button className="btn-primary" onClick={handleSave}>บันทึกนัดหมาย</button>
+          <button 
+            className="btn-primary" 
+            onClick={handleSave} 
+            disabled={isLoading || isSubmitting}
+          >
+            {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกนัดหมาย'}
+          </button>
         </div>
 
       </div>
 
       <Snackbar open={openAlert} autoHideDuration={3000} onClose={handleCloseAlert} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
         <Alert onClose={handleCloseAlert} severity="success" sx={{ width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
-          บันทึกข้อมูลการนัดหมายสำเร็จ! ข้อมูลถูกเคลียร์และส่งไปยังแดชบอร์ดแล้ว
+          บันทึกข้อมูลการนัดหมายสำเร็จ! กำลังไปยังแดชบอร์ด...
         </Alert>
       </Snackbar>
 

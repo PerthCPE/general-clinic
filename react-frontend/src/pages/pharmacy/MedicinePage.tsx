@@ -1240,7 +1240,7 @@ function MedicineSelectorDropdown({
           <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
             {filtered.length === 0 ? (
               <div style={{ padding: '16px', textAlign: 'center', color: '#64748B', fontSize: '13px' }}>
-                ไม่พบรายการยาที่ตรงกับ "{search}"
+                ไม่พบรายการยาที่ค้นหา
               </div>
             ) : (
               filtered.map((med) => {
@@ -1834,7 +1834,7 @@ export default function MedicinePage() {
     setTimeout(() => setShowSuccessBadge(false), 3000);
   };
   
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     if (!selectedMedicine || quantity === '' || quantity <= 0) return;
     
     if (updateMode === 'reduce' && quantity > selectedMedicine.stock) {
@@ -1848,31 +1848,69 @@ export default function MedicinePage() {
     setIsSubmitting(true);
     const start = Date.now();
     
+    const targetCode = selectedMedicine.medicine_code || selectedMedicine.id;
+    let newStock = selectedMedicine.stock;
+    if (updateMode === 'add') newStock += qty;
+    else if (updateMode === 'reduce') newStock -= qty;
+    
+    let newStatus: 'In Stock' | 'Low Stock' | 'Out of Stock' = 'In Stock';
+    if (newStock === 0) newStatus = 'Out of Stock';
+    else if (newStock < 50) newStatus = 'Low Stock';
+
     setMedicines(prev => prev.map(med => {
-      if (med.id === selectedMedicine.id) {
-        let newStock = med.stock;
-        if (updateMode === 'add') newStock += qty;
-        else if (updateMode === 'reduce') newStock -= qty;
-        
-        let newStatus: 'In Stock' | 'Low Stock' | 'Out of Stock' = 'In Stock';
-        if (newStock === 0) newStatus = 'Out of Stock';
-        else if (newStock < 50) newStatus = 'Low Stock';
-        
-        return { ...med, stock: newStock, status: newStatus };
+      if (med.id === selectedMedicine.id || med.medicine_code === targetCode) {
+        return { ...med, stock: newStock, stock_quantity: newStock, status: newStatus };
       }
       return med;
     }));
     
-    // Sync update to backend API if needed
-    fetch('/api/pharmacy/medicines/stock', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        medicine_code: selectedMedicine.medicine_code || selectedMedicine.id,
+    // Sync update to backend API with token & robust fallback
+    try {
+      const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const payload = {
+        medicine_code: targetCode,
         action: updateMode,
         quantity: qty
-      })
-    }).catch(() => {});
+      };
+
+      let res = await fetch('/api/pharmacy/medicines/stock', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        res = await fetch('/api/system/medicines/stock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      if (!res.ok) {
+        res = await fetch(`/api/pharmacy/medicines/${encodeURIComponent(targetCode)}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ stock_quantity: newStock })
+        });
+      }
+
+      if (!res.ok) {
+        await fetch(`/api/system/medicines/${encodeURIComponent(targetCode)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stock_quantity: newStock })
+        });
+      }
+
+      // Re-fetch to sync fresh stock from database
+      fetchMedicines();
+    } catch (err) {
+      console.error('Failed to sync stock update:', err);
+    }
 
     const elapsed = Date.now() - start;
     const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
@@ -2308,19 +2346,8 @@ export default function MedicinePage() {
                             <circle cx="11" cy="11" r="8"></circle>
                             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                           </svg>
-                          <span style={{ fontSize: '16px', fontWeight: '600' }}>ไม่พบข้อมูลยาที่ตรงกับการค้นหา</span>
+                          <span style={{ fontSize: '16px', fontWeight: '600' }}>ไม่พบรายการยาที่ค้นหา</span>
                           <span style={{ fontSize: '13.5px', opacity: 0.8 }}>ลองเปลี่ยนคำค้นหา หรือกดปุ่มล้างการค้นหาด้านบน</span>
-                          <button 
-                            type="button" 
-                            onClick={handleResetFilters}
-                            style={{
-                              marginTop: '8px', padding: '8px 16px', borderRadius: '8px',
-                              background: '#2563EB', color: '#FFFFFF', border: 'none',
-                              fontWeight: '600', cursor: 'pointer'
-                            }}
-                          >
-                            ล้างการค้นหาทั้งหมด
-                          </button>
                         </div>
                       </td>
                     </tr>
