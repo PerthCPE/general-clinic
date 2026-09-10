@@ -159,7 +159,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       else if (roleOrUsername === 'pharmacist') usernameToSend = 'pharmacist1';
       else if (roleOrUsername === 'cashier') usernameToSend = 'cashier1';
 
-      const res = await authApi.login(usernameToSend, password || 'password');
+      // ไม่มี default password ที่ใช้ได้กับทุกบัญชีอีกต่อไป — แต่ละบัญชีมี employee_id ของ
+      // ตัวเองเป็นรหัสผ่านเริ่มต้น ถ้าไม่ได้ส่ง password มาจริงๆ (ไม่ควรเกิดจากฟอร์ม login ปกติ
+      // ที่บังคับกรอกทั้งสองช่องอยู่แล้ว) ปล่อยว่างให้ backend ตอบ 401 ตามจริงดีกว่าเดา
+      const res = await authApi.login(usernameToSend, password ?? '');
       if (res && res.user) {
         const userRole = res.user.role as UserRole;
         const fallback = DEMO_USERS[userRole] || DEMO_USERS['registrar'];
@@ -227,16 +230,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const switchRole = async (role: UserRole) => {
-    let username = 'cashier1';
-    if (role === 'registrar') username = 'registrar1';
-    else if (role === 'nurse') username = 'nurse1';
-    else if (role === 'nurse_assistant') username = 'assistant1';
-    else if (role === 'doctor') username = 'doctor1';
-    else if (role === 'pharmacist') username = 'pharmacist1';
-    else if (role === 'cashier') username = 'cashier1';
+    // แต่ละบัญชี seed มี employee_id เป็นรหัสผ่านของตัวเอง ไม่มี 'password' กลางที่ใช้ร่วมกัน
+    // ได้อีกต่อไป ต้อง map username -> password ให้ตรงกันเป็นคู่ๆ
+    const credentials: Partial<Record<UserRole, { username: string; password: string }>> = {
+      registrar: { username: 'registrar1', password: 'REC001' },
+      nurse: { username: 'nurse1', password: 'NUR001' },
+      nurse_assistant: { username: 'assistant1', password: 'NUR002' },
+      doctor: { username: 'doctor1', password: 'DOC001' },
+      pharmacist: { username: 'pharmacist1', password: 'PHA001' },
+      cashier: { username: 'cashier1', password: 'CAS001' },
+      admin: { username: 'admin1', password: 'ADM001' },
+      officer: { username: 'officer1', password: 'OFF001' },
+    };
+    const cred = credentials[role];
 
     try {
-      await authApi.login(username, 'password');
+      if (cred) {
+        await authApi.login(cred.username, cred.password);
+      }
     } catch {
       // ignore
     }

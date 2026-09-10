@@ -41,48 +41,34 @@ export const tokenStorage = {
   },
 };
 
-// Helper to ensure valid token from server
-async function ensureToken(): Promise<string | null> {
-  let token = tokenStorage.get();
-  if (!token) {
-    try {
-      const savedUserStr = localStorage.getItem('clinic_auth_user');
-      let username = 'cashier1';
-      if (savedUserStr) {
-        try {
-          const savedUser = JSON.parse(savedUserStr);
-          if (savedUser.role === 'nurse') username = 'nurse1';
-          else if (savedUser.role === 'nurse_assistant') username = 'assistant1';
-          else if (savedUser.role === 'doctor') username = 'doctor1';
-          else if (savedUser.role === 'pharmacist') username = 'pharmacist1';
-          else if (savedUser.role === 'cashier') username = 'cashier1';
-          else if (savedUser.username) username = savedUser.username;
-        } catch {
-          // ignore
-        }
-      }
-      const res = await fetch(`${API_BASE_URL}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password: 'password' }),
-      });
-      const data = await res.json().catch(() => null);
-      if (data && data.token) {
-        token = data.token;
-        tokenStorage.set(data.token);
-      }
-    } catch {
-      // ignore
-    }
+// เดิมจุดนี้เคยมี ensureToken() ที่ "เดา" username ตาม role ที่แคชไว้แล้วยิง login เงียบๆ
+// ด้วย password: 'password' ทุกครั้งที่ไม่มี token หรือเจอ 401 — ใช้ได้เฉพาะตอนทุกบัญชี seed
+// ใช้รหัสผ่านร่วมกันเป็น "password" เท่านั้น พอเปลี่ยนไปใช้ employee_id เป็นรหัสผ่านเริ่มต้น
+// (คนละค่ากันทุกบัญชี) การเดาแบบนี้ผิดเสมอ แล้ว error 401 จริงจะถูกกลบด้วย error อื่นที่งงกว่าเดิม
+// (เช่น "ไม่สามารถโหลดรายชื่อบุคลากรได้" ทั้งที่จริงคือ token หมดอายุ) แก้เป็นเคลียร์ session แล้ว
+// ส่งกลับไปหน้า login ตรงๆ แทน ไม่เดา credential อีกต่อไป
+let isRedirectingToLogin = false;
+function forceReLogin() {
+  if (isRedirectingToLogin) return;
+  isRedirectingToLogin = true;
+  tokenStorage.remove();
+  // เคลียร์ user ที่แคชไว้ด้วย ไม่งั้น AuthContext จะโหลด currentUser จาก localStorage
+  // กลับมาอีกหลัง reload ทั้งที่ token หายไปแล้ว ทำให้ดูเหมือน login ค้างอยู่แต่เรียก API ไม่ได้เลย
+  localStorage.removeItem('clinic_auth_user');
+  if (typeof window !== 'undefined') {
+    window.location.reload();
   }
-  return token;
 }
 
 // Generic HTTP Request Handler
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  let token = tokenStorage.get();
+  const token = tokenStorage.get();
+
   if (!token && endpoint !== '/api/login') {
-    token = await ensureToken();
+    // ไม่มี token เลย (ยังไม่เคย login หรือ session หมดไปแล้ว) และนี่ไม่ใช่การเรียก login เอง
+    // ส่งกลับไปหน้า login ทันที ไม่เดา credential มาลองยิงเงียบๆ แบบเดิม
+    forceReLogin();
+    throw new Error('ไม่พบ session กำลังพากลับไปหน้าเข้าสู่ระบบ');
   }
 
   const headers: Record<string, string> = {
@@ -95,22 +81,16 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
-  let response = await fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers,
   });
 
-  // If 401 Unauthorized, try refreshing token once
   if (response.status === 401 && endpoint !== '/api/login') {
-    tokenStorage.remove();
-    token = await ensureToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      response = await fetch(url, {
-        ...options,
-        headers,
-      });
-    }
+    // Token หมดอายุ/ไม่ถูกต้อง — เคลียร์แล้วส่งกลับไปหน้า login ทันที (ไม่เดา credential
+    // มาลองใหม่เงียบๆ อีกต่อไป — ดูคอมเมนต์ข้างบน forceReLogin)
+    forceReLogin();
+    throw new Error('เซสชันหมดอายุ กำลังพากลับไปหน้าเข้าสู่ระบบ');
   }
 
   const data = await response.json().catch(() => null);
@@ -139,7 +119,10 @@ export const authApi = {
       };
     }>('/api/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password: password || 'password' }),
+      // ไม่มี default password ที่ใช้ได้กับทุกบัญชีอีกต่อไป (แต่ละบัญชีมี employee_id ของตัวเอง
+      // เป็นรหัสผ่านเริ่มต้น) — ถ้าไม่ส่ง password มาก็ปล่อยว่าง ให้ backend ตอบ 401 ตามจริง
+      // แทนที่จะเดาด้วย 'password' แล้วอาจบังเอิญ login ผิดคน/พังเงียบๆ
+      body: JSON.stringify({ username, password: password ?? '' }),
     });
 
     if (res.token) {
