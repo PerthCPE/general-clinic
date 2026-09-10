@@ -35,27 +35,18 @@ body.dark-mode .appointment-form-container {
 .appointment-form-container .form-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #0F172A;
+  color: var(--text-primary);
   margin: 0;
 }
 
-body.dark-mode .appointment-form-container .form-title {
-  color: #F8FAFC;
-}
-
 .appointment-form-container .card {
-  background: #FFFFFF;
+  background: var(--bg-card);
   border-radius: 12px;
   padding: 24px 32px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   margin-bottom: 24px;
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--border-color);
   transition: background-color 0.5s ease, border-color 0.5s ease;
-}
-
-body.dark-mode .appointment-form-container .card {
-  background: #1E1E1E;
-  border-color: #2D2D2D;
 }
 
 .appointment-form-container .card-header {
@@ -64,22 +55,14 @@ body.dark-mode .appointment-form-container .card {
   gap: 12px;
   margin-bottom: 24px;
   padding-bottom: 16px;
-  border-bottom: 1px solid #E2E8F0;
-}
-
-body.dark-mode .appointment-form-container .card-header {
-  border-bottom-color: #334155;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .appointment-form-container .section-title {
   font-size: 1.15rem;
   font-weight: 700;
-  color: #0F172A;
+  color: var(--text-primary);
   margin: 0;
-}
-
-body.dark-mode .appointment-form-container .section-title {
-  color: #F8FAFC;
 }
 
 .appointment-form-container .badge-staff {
@@ -124,11 +107,7 @@ body.dark-mode .appointment-form-container .badge-staff {
 .appointment-form-container .input-group label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #475569;
-}
-
-body.dark-mode .appointment-form-container .input-group label {
-  color: #94A3B8;
+  color: var(--text-secondary);
 }
 
 .appointment-form-container .required {
@@ -165,6 +144,24 @@ body.dark-mode .appointment-form-container .input-group textarea {
   border-color: #2563EB;
 }
 
+.appointment-form-container .form-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FEE2E2;
+  color: #DC2626;
+  border-left: 4px solid #DC2626;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+body.dark-mode .appointment-form-container .form-error-banner {
+  background: rgba(220, 38, 38, 0.15);
+  color: #FCA5A5;
+}
+
 .appointment-form-container .read-only-input {
   background: #F1F5F9 !important;
   color: #64748B !important;
@@ -172,9 +169,9 @@ body.dark-mode .appointment-form-container .input-group textarea {
 }
 
 body.dark-mode .appointment-form-container .read-only-input {
-  background: #1E1E1E !important;
-  color: #94A3B8 !important;
-  border-color: #334155 !important;
+  background: var(--bg-header) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--border-color) !important;
 }
 
 .appointment-form-container .form-actions {
@@ -183,15 +180,11 @@ body.dark-mode .appointment-form-container .read-only-input {
   gap: 12px;
   margin-top: 32px;
   padding-top: 20px;
-  border-top: 1px solid #E2E8F0;
-}
-
-body.dark-mode .appointment-form-container .form-actions {
-  border-top-color: #334155;
+  border-top: 1px solid var(--border-color);
 }
 
 .appointment-form-container .btn-primary {
-  background: #2563EB;
+  background: var(--brand-primary);
   color: #FFFFFF;
   border: none;
   padding: 10px 32px;
@@ -203,13 +196,19 @@ body.dark-mode .appointment-form-container .form-actions {
 }
 
 .appointment-form-container .btn-primary:hover {
-  background: #1D4ED8;
+  background: var(--brand-primary-hover);
+}
+
+.appointment-form-container .btn-primary:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .appointment-form-container .btn-secondary {
-  background: #FFFFFF;
-  color: #475569;
-  border: 1px solid #CBD5E1;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
   padding: 10px 24px;
   border-radius: 8px;
   font-weight: 600;
@@ -220,8 +219,6 @@ body.dark-mode .appointment-form-container .form-actions {
 
 body.dark-mode .appointment-form-container .btn-secondary {
   background: transparent;
-  color: #CBD5E1;
-  border-color: #475569;
 }
 
 .appointment-form-container .btn-secondary:hover {

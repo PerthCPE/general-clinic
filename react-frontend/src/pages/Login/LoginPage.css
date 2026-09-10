@@ -1,7 +1,10 @@
-/* ===== Login Page ===== */
+/* ===== Login Page =====
+   ใช้ตัวแปรสี/ฟอนต์ตามมาตรฐานทีม (frontend.md หมวด 2-3) ผ่าน CSS custom properties
+   ที่ประกาศไว้ที่ index.css:root — --bg-canvas / --bg-card / --border-color / --text-* */
 .login-container {
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 24px;
@@ -10,30 +13,31 @@
 }
 
 .login-box {
-  max-width: 540px;
+  max-width: 440px; /* narrowed down to make it look professional */
   width: 100%;
-  background: #FFFFFF;
+  background: var(--bg-card);
   border-radius: 20px;
   padding: 40px 36px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--border-color);
   transition: background-color 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
 }
 
 /* Header & Logo */
 .login-header {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 32px;
 }
 
 .login-logo-icon {
-  width: 195px;
-  height: 195px;
+  width: 160px;
+  height: 160px;
   border-radius: 24px;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 8px;
+  margin: 0 auto 16px;
   overflow: hidden;
 }
 
@@ -44,263 +48,224 @@
   object-fit: contain;
 }
 
-.login-clinic-name {
-  display: none;
-}
-
 .login-tagline {
-  font-family: 'Inter', 'Prompt', sans-serif;
-  font-size: 13.5px;
+  font-family: var(--font-heading);
+  font-size: 16px;
   font-weight: 500;
-  color: #64748B;
+  color: var(--text-secondary);
   margin: 0;
-  transition: color 0.5s ease;
-}
-
-/* Quick Roles */
-.login-quick-section {
-  margin-bottom: 24px;
-}
-
-.login-section-label {
-  display: block;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 600;
-  color: #475569;
-  margin-bottom: 12px;
-  text-align: center;
-  transition: color 0.5s ease;
-}
-
-.quick-roles-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.quick-role-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  background: #F8FAFC;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 12px;
-  cursor: pointer;
-  text-align: left;
-  transition: transform 0.15s ease, border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.quick-role-card:hover {
-  transform: translateY(-2px);
-  border-color: #3B82F6;
-  background: #FFFFFF;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.12);
-}
-
-.quick-role-card:active {
-  transform: scale(0.98);
-}
-
-.role-avatar-badge {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #FFFFFF;
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.role-card-info {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.role-card-name {
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: #1E293B;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  transition: color 0.5s ease;
-}
-
-.role-card-role {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  color: #64748B;
-  transition: color 0.5s ease;
-}
-
-.role-card-code {
-  font-family: monospace;
-  font-size: 10px;
-  color: #2563EB;
-  font-weight: 600;
-}
-
-/* Divider */
-.login-divider {
-  display: flex;
-  align-items: center;
-  margin: 20px 0;
-  color: #94A3B8;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
-}
-
-.login-divider::before,
-.login-divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #E2E8F0;
-  transition: border-color 0.5s ease;
-}
-
-.login-divider span {
-  padding: 0 12px;
 }
 
 /* Form */
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .login-error-msg {
   background: #FEE2E2;
   color: #DC2626;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border-radius: 8px;
-  font-family: 'Inter', sans-serif;
-  font-size: 12px;
+  font-family: var(--font-primary);
+  font-size: 13px;
   font-weight: 500;
-  border-left: 3px solid #DC2626;
+  border-left: 4px solid #DC2626;
 }
 
-.login-form-group {
+.login-form-group, .login-input-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
-.login-form-label {
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
+.login-form-label, .login-input-group label {
+  font-family: var(--font-primary);
+  font-size: 14px;
   font-weight: 600;
-  color: #475569;
-  transition: color 0.5s ease;
+  color: var(--text-secondary);
+}
+
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .login-form-input {
-  height: 44px;
+  width: 100%;
+  height: 48px;
   padding: 0 14px;
-  border: 1.5px solid #E2E8F0;
+  border: 1.5px solid var(--border-color);
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
-  font-size: 14px;
-  color: #1E293B;
-  background: #FFFFFF;
+  font-family: var(--font-primary);
+  font-size: 15px;
+  color: var(--text-primary);
+  /* ใช้ bg-canvas (ไม่ใช่ bg-card) ให้ช่องกรอกดู "จมลง" กว่าพื้นการ์ด สร้างมิติความลึกแบบ
+     Elevated Dark Slate ตามกฎข้อ 2 ของ TEAM_RULES.md */
+  background: var(--bg-canvas);
   outline: none;
   box-sizing: border-box;
-  transition: border-color 0.2s ease, background-color 0.5s ease, color 0.5s ease, box-shadow 0.2s ease;
+  transition: all 0.2s ease;
+}
+
+.password-input-wrapper .login-form-input {
+  padding-right: 44px; /* Space for the eye icon */
 }
 
 .login-form-input:focus {
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+.login-form-input:disabled {
+  background-color: #F1F5F9;
+  color: #94A3B8;
+  cursor: not-allowed;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 12px;
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+}
+
+.password-toggle-btn:hover {
+  color: #475569;
+  background: #F1F5F9;
 }
 
 .login-submit-btn {
-  height: 46px;
-  margin-top: 6px;
+  height: 48px;
+  margin-top: 10px;
   background: linear-gradient(135deg, #2563EB, #1D4ED8);
   color: #FFFFFF;
   border: none;
   border-radius: 10px;
-  font-family: 'Inter', sans-serif;
-  font-size: 15px;
+  font-family: var(--font-primary);
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  transition: all 0.2s ease;
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
-.login-submit-btn:hover {
+.login-submit-btn:hover:not(:disabled) {
   opacity: 0.94;
   box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
 }
 
-.login-submit-btn:active {
-  transform: scale(0.98);
+.login-submit-btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
-/* ===== Dark Mode ===== */
+.login-submit-btn:disabled {
+  background: #94A3B8;
+  box-shadow: none;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ===== Dark Mode =====
+   .login-box / .login-tagline / .login-form-label / .login-form-input ไม่ต้อง override ซ้ำ
+   ที่นี่แล้ว — ใช้ var(--bg-card) / var(--border-color) / var(--text-*) ที่ประกาศไว้แล้วด้านบน
+   ซึ่งสลับค่าตาม body.dark-mode อัตโนมัติจาก index.css:root */
 body.dark-mode .login-container {
-  background: linear-gradient(135deg, #0B0F19 0%, #121212 100%);
+  background: linear-gradient(135deg, #0B0F19 0%, #0F172A 100%);
 }
 
-body.dark-mode .login-box {
-  background: #1E1E1E;
-  border-color: #2D2D2D;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+body.dark-mode .login-form-input:disabled {
+  background: #1A2233;
+  color: var(--text-muted);
 }
 
-body.dark-mode .login-clinic-name {
-  color: #FFFFFF;
-}
-
-body.dark-mode .login-tagline {
-  color: #A0A0A0;
-}
-
-body.dark-mode .login-section-label {
-  color: #A0A0A0;
-}
-
-body.dark-mode .quick-role-card {
-  background: #272727;
-  border-color: #333333;
-}
-
-body.dark-mode .quick-role-card:hover {
-  background: #2D2D2D;
-  border-color: #3B82F6;
-}
-
-body.dark-mode .role-card-name {
-  color: #F1F5F9;
-}
-
-body.dark-mode .role-card-role {
-  color: #A0A0A0;
-}
-
-body.dark-mode .login-divider {
+body.dark-mode .password-toggle-btn {
   color: #64748B;
 }
 
-body.dark-mode .login-divider::before,
-body.dark-mode .login-divider::after {
-  border-bottom-color: #2D2D2D;
+body.dark-mode .password-toggle-btn:hover {
+  color: #CBD5E1;
+  background: #333333;
 }
 
-body.dark-mode .login-form-label {
-  color: #A0A0A0;
+/* ===== Test Login Box ===== */
+.test-login-box {
+  margin-top: 24px;
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(4px);
+  border: 1px dashed #CBD5E1;
+  padding: 16px;
+  border-radius: 12px;
+  text-align: center;
+  max-width: 440px;
+  width: 100%;
 }
 
-body.dark-mode .login-form-input {
+.test-login-btn {
+  background: #F1F5F9;
+  border: 1px solid #E2E8F0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: var(--font-primary);
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.test-login-btn:hover {
+  background: #E2E8F0;
+  color: #1E293B;
+}
+
+body.dark-mode .test-login-box {
+  background: rgba(30, 30, 30, 0.6);
+  border-color: #334155;
+}
+
+body.dark-mode .test-login-btn {
   background: #272727;
   border-color: #3A3A3A;
-  color: #E2E8F0;
+  color: #CBD5E1;
 }
+
+body.dark-mode .test-login-btn:hover {
+  background: #333333;
+  color: #F8FAFC;
+}
+
+/* หัวข้อ "เปลี่ยนรหัสผ่านครั้งแรก" (change-password-box) */
+body.dark-mode .login-header h2 {
+  color: var(--text-primary);
+}
+

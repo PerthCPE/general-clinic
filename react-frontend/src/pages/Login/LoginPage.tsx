@@ -1,65 +1,82 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { DEMO_USERS } from '../../config/roles';
 import type { UserRole } from '../../types/auth';
-import clinicLogo from '../../assets/logo.png';
 import './LoginPage.css';
+import clinicLogo from '../../assets/logo.png';
+import { Eye, EyeOff, Loader2 } from 'lucide-react'; // Make sure lucide-react is available
 
-interface LoginPageProps {
-  onLoginSuccess: () => void;
-}
-
-const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
-  const { login, logout } = useAuth();
+const LoginPage: React.FC = () => {
+  const { login, quickDevLogin, logout } = useAuth();
+  
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const changePassword = async (oldP: string, newP: string) => {
+    try {
+      const { authApi } = await import('../../services/api');
+      await authApi.changePassword({ old_password: oldP, new_password: newP });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
 
   const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) {
-      setError('โปรดกรอกชื่อผู้ใช้งาน');
+    setError(null);
+    if (!username.trim() || !password) {
+      setError('กรุณากรอกรหัสพนักงาน/อีเมล และรหัสผ่าน');
       return;
     }
-
+    
     setIsLoading(true);
-    setError('');
     try {
-      const res = await login(username.trim(), password);
-      if (res.success) {
-        if (res.requiresPasswordChange) {
+      const result = await login(username, password);
+      if (result && result.success) {
+        if (result.requiresPasswordChange) {
           setShowChangePassword(true);
         } else {
-          onLoginSuccess();
+          window.location.reload();
         }
       } else {
-        setError('ไม่พบชื่อผู้ใช้งานนี้ในระบบ (เช่น registrar1, nurse1 หรือ assistant1)');
+        // ใช้ error message จริงจาก backend ถ้ามี (เช่น "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อ
+        // ผู้ดูแลระบบ") แทนข้อความทั่วไป — ผู้ใช้จะได้รู้เหตุผลจริงแทนที่จะเดาว่าพิมพ์ผิด
+        setError(result?.error || 'ไม่สามารถเข้าสู่ระบบได้ กรุณาตรวจสอบข้อมูลเข้าสู่ระบบอีกครั้ง');
       }
-    } catch {
-      setError('เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
+    } catch (err) {
+      setError('ไม่สามารถเข้าสู่ระบบได้ กรุณาตรวจสอบข้อมูลเข้าสู่ระบบอีกครั้ง');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleQuickLogin = async (role: UserRole) => {
+  // ปุ่ม "Quick Test Login" — ทางลัด dev/test เท่านั้น เรียก backend endpoint พิเศษที่ reset
+  // status บัญชี seed กลับเป็น active ให้ก่อน login เสมอ ไม่ว่าบัญชีนั้นจะถูกตั้ง suspended
+  // ไว้ก่อนหน้าหรือไม่ก็ตาม (ต่างจาก handleManualLogin ด้านบนที่ยังเช็ค password/status ตามจริง
+  // ทุกประการ ไม่ถูกแตะเลย) ถ้า backend ปิด dev mode ไว้ (production) จะเห็น error message จริง
+  // ไม่ใช่ fake success
+  const handleQuickTestLogin = async (role: UserRole) => {
+    setError(null);
     setIsLoading(true);
-    setError('');
     try {
-      const res = await login(role);
-      if (res.success) {
-        if (res.requiresPasswordChange) {
+      const result = await quickDevLogin(role);
+      if (result && result.success) {
+        if (result.requiresPasswordChange) {
           setShowChangePassword(true);
         } else {
-          onLoginSuccess();
+          window.location.reload();
         }
+      } else {
+        setError(result?.error || 'Quick Test Login ใช้งานไม่ได้ในขณะนี้');
       }
-    } catch {
-      setError('เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
+    } catch (err) {
+      setError('Quick Test Login ใช้งานไม่ได้ในขณะนี้');
     } finally {
       setIsLoading(false);
     }
@@ -71,22 +88,17 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
       setError('รหัสผ่านใหม่ไม่ตรงกัน');
       return;
     }
-    if (newPassword.length < 6) {
-      setError('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
-      return;
-    }
+    
     setIsLoading(true);
     try {
-      const { authApi } = await import('../../services/api');
-      await authApi.changePassword({ old_password: password, new_password: newPassword });
-      alert('เปลี่ยนรหัสผ่านสำเร็จ กรุณาเข้าสู่ระบบอีกครั้ง');
-      setShowChangePassword(false);
-      setPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      logout();
-    } catch {
-      setError('เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน');
+      const ok = await changePassword(password, newPassword);
+      if (ok) {
+        window.location.reload();
+      } else {
+        setError('ไม่สามารถเปลี่ยนรหัสผ่านได้ กรุณาลองใหม่อีกครั้ง');
+      }
+    } catch (err) {
+      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     } finally {
       setIsLoading(false);
     }
@@ -95,39 +107,46 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   if (showChangePassword) {
     return (
       <div className="login-container">
-        <div className="login-box">
+        <div className="login-box change-password-box">
           <div className="login-header">
-            <div className="login-logo-icon">
-              <img src={clinicLogo} alt="General Clinic Logo" className="login-logo-img" />
-            </div>
-            <p className="login-tagline">เปลี่ยนรหัสผ่าน (บังคับเปลี่ยนเมื่อเข้าสู่ระบบครั้งแรก)</p>
+            <h2 style={{marginTop: 0, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)'}}>เปลี่ยนรหัสผ่านครั้งแรก</h2>
+            <p className="login-tagline">เนื่องจากคุณเข้าใช้งานระบบเป็นครั้งแรก กรุณาตั้งรหัสผ่านใหม่เพื่อความปลอดภัยของข้อมูล</p>
           </div>
           <form className="login-form" onSubmit={handleChangePassword}>
             {error && <div className="login-error-msg">{error}</div>}
             <div className="login-input-group">
               <label>รหัสผ่านใหม่</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="กรอกรหัสผ่านใหม่"
-                required
-              />
+              <div className="password-input-wrapper">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="รหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร"
+                  required
+                  className="login-form-input"
+                />
+                <button type="button" className="password-toggle-btn" onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </div>
             <div className="login-input-group">
               <label>ยืนยันรหัสผ่านใหม่</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="ยืนยันรหัสผ่านใหม่อีกครั้ง"
-                required
-              />
+              <div className="password-input-wrapper">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง"
+                  required
+                  className="login-form-input"
+                />
+              </div>
             </div>
             <button type="submit" className="login-submit-btn" disabled={isLoading}>
-              {isLoading ? 'กำลังเปลี่ยนรหัสผ่าน...' : 'เปลี่ยนรหัสผ่าน'}
+              {isLoading ? <span className="flex-center"><Loader2 className="spinner" size={18} /> กำลังบันทึก...</span> : 'บันทึกรหัสผ่านใหม่'}
             </button>
-            <button type="button" className="login-submit-btn" style={{marginTop: '10px', backgroundColor: '#94a3b8'}} onClick={() => { setShowChangePassword(false); logout(); }}>
+            <button type="button" className="login-submit-btn" style={{marginTop: '10px', backgroundColor: '#94a3b8', boxShadow: 'none'}} onClick={() => { setShowChangePassword(false); logout(); }}>
               ยกเลิก
             </button>
           </form>
@@ -144,89 +163,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           <div className="login-logo-icon">
             <img src={clinicLogo} alt="General Clinic Logo" className="login-logo-img" />
           </div>
-          <p className="login-tagline">ระบบบริหารจัดการคลินิกเวชกรรมทั่วไป</p>
-        </div>
-
-        {/* Quick Role Selection */}
-        <div className="login-quick-section">
-          <span className="login-section-label">เข้าสู่ระบบด่วนตามบทบาท (Quick Role Login):</span>
-          <div className="quick-roles-grid">
-            {Object.values(DEMO_USERS).map((user) => (
-              <button
-                key={user.role}
-                type="button"
-                className="quick-role-card"
-                onClick={() => handleQuickLogin(user.role)}
-              >
-                <div className="role-avatar-badge" style={{ backgroundColor: user.avatarColor }}>
-                  {user.avatarText}
-                </div>
-                <div className="role-card-info">
-                  <span className="role-card-name">{user.fullName}</span>
-                  <span className="role-card-role">{user.roleTitleTh}</span>
-                  <span className="role-card-code">role: {user.role}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          {/* Quick Doctor Accounts to test individual doctor schedules */}
-          <div style={{ marginTop: '12px', padding: '10px 12px', background: '#FEF2F2', borderRadius: '12px', border: '1px solid #FECACA' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: '#991B1B', display: 'block', marginBottom: '6px' }}>
-              🩺 เลือกแพทย์ในระบบเข้าสู่ระบบโดยตรง (ทดสอบตารางงานเฉพาะบุคคล):
-            </span>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={async () => {
-                  setIsLoading(true);
-                  try {
-                    const ok = await login('doctor1');
-                    if (ok) onLoginSuccess();
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, background: '#FFFFFF', color: '#B91C1C', border: '1px solid #FCA5A5', borderRadius: '8px', cursor: 'pointer' }}
-              >
-                พญ.สุดา (doctor1 - สูติ)
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  setIsLoading(true);
-                  try {
-                    const ok = await login('doctor2');
-                    if (ok) onLoginSuccess();
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, background: '#FFFFFF', color: '#B91C1C', border: '1px solid #FCA5A5', borderRadius: '8px', cursor: 'pointer' }}
-              >
-                นพ.วิชัย (doctor2 - อายุรกรรม)
-              </button>
-              <button
-                type="button"
-                onClick={async () => {
-                  setIsLoading(true);
-                  try {
-                    const ok = await login('doctor3');
-                    if (ok) onLoginSuccess();
-                  } finally {
-                    setIsLoading(false);
-                  }
-                }}
-                style={{ padding: '5px 10px', fontSize: '11px', fontWeight: 700, background: '#FFFFFF', color: '#B91C1C', border: '1px solid #FCA5A5', borderRadius: '8px', cursor: 'pointer' }}
-              >
-                พญ.เกศรา (doctor3 - กุมาร)
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="login-divider">
-          <span>หรือเข้าสู่ระบบด้วยบัญชี</span>
+          <p className="login-tagline">ระบบบริหารจัดการคลินิกเวชกรรม</p>
         </div>
 
         {/* Standard Form */}
@@ -234,31 +171,53 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
           {error && <div className="login-error-msg">{error}</div>}
 
           <div className="login-form-group">
-            <label className="login-form-label">อีเมล หรือ ชื่อผู้ใช้งาน (Email / Username)</label>
+            <label className="login-form-label">รหัสพนักงาน / อีเมล</label>
             <input
               type="text"
               className="login-form-input"
-              placeholder="เช่น registrar1@clinic.com หรือ registrar1"
+              placeholder="กรอกรหัสพนักงาน หรือ อีเมล"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              disabled={isLoading}
+              autoFocus
             />
           </div>
 
           <div className="login-form-group">
-            <label className="login-form-label">รหัสผ่าน (Password)</label>
-            <input
-              type="password"
-              className="login-form-input"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <label className="login-form-label">รหัสผ่าน</label>
+            <div className="password-input-wrapper">
+              <input
+                type={showPassword ? "text" : "password"}
+                className="login-form-input"
+                placeholder="กรอกรหัสผ่าน"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+              />
+              <button type="button" className="password-toggle-btn" onClick={() => setShowPassword(!showPassword)}>
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
-          <button type="submit" className="login-submit-btn">
-            เข้าสู่ระบบ
+          <button type="submit" className="login-submit-btn" disabled={isLoading || !username || !password}>
+            {isLoading ? <span className="flex-center"><Loader2 className="spinner" size={18} /> กำลังเข้าสู่ระบบ...</span> : 'เข้าสู่ระบบ'}
           </button>
         </form>
+      </div>
+
+      <div className="test-login-box">
+        <h4 style={{margin: '0 0 10px 0', fontSize: '13px', color: '#64748B'}}>Quick Test Login</h4>
+        <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center'}}>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('doctor')}>Doctor</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('nurse')}>Nurse</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('nurse_assistant')}>Nurse Assistant</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('registrar')}>Reception / Admin</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('pharmacist')}>Pharmacist</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('cashier')}>Cashier</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('officer')}>Officer</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('admin')}>IT-admin</button>
+        </div>
       </div>
     </div>
   );

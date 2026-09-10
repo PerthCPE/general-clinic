@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus } from 'lucide-react';
+import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus, Copy, Check, Search } from 'lucide-react';
 import { adminApi, type BackendUser } from '../../services/api';
+import { TREATMENT_DEPARTMENTS } from '../../config/roles';
 import './UserManagement.css';
 
 interface SystemUser {
@@ -20,8 +21,10 @@ interface SystemUser {
 }
 
 // === สร้าง Mapping ตำแหน่งงาน ➡️ แผนกที่สอดคล้องกัน (สำหรับคลินิกขนาดกลาง) ===
+// รายชื่อแผนกของ "แพทย์" ใช้ TREATMENT_DEPARTMENTS จาก config/roles.ts เพื่อให้ตรงกับ
+// doctors.specialty จริง และตรงกับแผนกที่เลือกได้ในฟอร์มนัดหมาย/แดชบอร์ดนัดหมาย (single source)
 const ROLE_DEPARTMENTS: Record<string, string[]> = {
-  'แพทย์': ['ห้องตรวจโรคทั่วไป (OPD)', 'แผนกอุบัติเหตุและฉุกเฉิน (ER)', 'ห้องตรวจอายุรกรรม', 'ห้องตรวจศัลยกรรม', 'ห้องตรวจกุมารเวชกรรม'],
+  'แพทย์': TREATMENT_DEPARTMENTS,
   'พยาบาลและผู้ช่วยพยาบาล': ['จุดคัดกรองผู้ป่วย (Triage)', 'แผนกอุบัติเหตุและฉุกเฉิน (ER)', 'ห้องตรวจโรคทั่วไป (OPD)'],
   'พนักงานเวชระเบียน': ['จุดคัดกรองผู้ป่วย (Triage)', 'ห้องตรวจโรคทั่วไป (OPD)'],
   'เภสัชกร': ['แผนกเภสัชกรรมห้องยา (Pharmacy)'],
@@ -70,13 +73,18 @@ const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
 const UserManagement: React.FC = () => {
   const [users, setUsers] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [resetResult, setResetResult] = useState<{ userName: string; tempPassword: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
   const [itemsPerPage, setItemsPerPage] = useState<number>(10);
-  
+  const [currentPage, setCurrentPage] = useState<number>(1);
+
   const [activeFilter, setActiveFilter] = useState<'ทั้งหมด' | 'กำลังใช้งาน' | 'รอการยืนยัน' | 'ระงับใช้งาน'>('ทั้งหมด');
   const [deptFilter, setDeptFilter] = useState<string>('ทั้งหมด');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const [formData, setFormData] = useState<SystemUser>({
     internalId: 0, id: '', name: '', email: '', phone: '', role: 'แพทย์', department: ROLE_DEPARTMENTS['แพทย์'][0], licenseId: '', status: 'รอการยืนยัน', avatar: '', createdAt: '', password: '', username: ''
@@ -88,9 +96,11 @@ const UserManagement: React.FC = () => {
       const data = await adminApi.getAccounts();
       if (data) {
         setUsers(data.map(mapBackendToSystemUser));
+        setErrorMsg(null);
       }
     } catch (err) {
       console.error("Failed to fetch accounts", err);
+      setErrorMsg('ไม่สามารถโหลดรายชื่อบุคลากรได้ กรุณาลองรีเฟรชหน้านี้ใหม่อีกครั้ง');
     } finally {
       setLoading(false);
     }
@@ -124,12 +134,32 @@ const UserManagement: React.FC = () => {
   }, [users]);
 
   const filteredUsers = useMemo(() => {
-    return users.filter(user => {
-      const matchStatus = activeFilter === 'ทั้งหมด' || user.status === activeFilter;
-      const matchDept = deptFilter === 'ทั้งหมด' || user.department === deptFilter;
-      return matchStatus && matchDept;
-    });
-  }, [users, activeFilter, deptFilter]);
+    const term = searchTerm.trim().toLowerCase();
+    return users
+      .filter(user => {
+        const matchStatus = activeFilter === 'ทั้งหมด' || user.status === activeFilter;
+        const matchDept = deptFilter === 'ทั้งหมด' || user.department === deptFilter;
+        const matchSearch = term === '' ||
+          user.name.toLowerCase().includes(term) ||
+          user.id.toLowerCase().includes(term);
+        return matchStatus && matchDept && matchSearch;
+      })
+      // เรียงตามรหัสพนักงาน (employee_id) — ใช้ localeCompare พร้อม numeric:true ให้ "DOC002"
+      // มาก่อน "DOC010" ตามลำดับตัวเลขจริง ไม่ใช่เรียงตามตัวอักษร ('1' < '2' แต่ "10" < "2" ถ้าเรียง lexical)
+      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [users, activeFilter, deptFilter, searchTerm]);
+
+  // เดิมตารางตัดแสดงแค่ filteredUsers.slice(0, itemsPerPage) แถวแรกเสมอ โดยไม่มีปุ่มไปหน้าถัดไป
+  // เลย — บัญชีที่อยู่เกินแถวที่ itemsPerPage กำหนด (เช่นตอนนี้มี 19+ บัญชี แต่ itemsPerPage
+  // default = 10) จึงมองไม่เห็นเลยไม่ว่า backend จะเรียงลำดับมาแบบไหนก็ตาม เพิ่ม pagination จริง
+  // ให้เข้าถึงได้ครบทุกบัญชี และรีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/itemsPerPage เปลี่ยน
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeFilter, deptFilter, searchTerm, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
+  const pageStartIndex = (currentPage - 1) * itemsPerPage;
+  const currentTableData = filteredUsers.slice(pageStartIndex, pageStartIndex + itemsPerPage);
 
   const departmentsInUse = useMemo(() => {
     const depts = new Set(users.map(u => u.department));
@@ -214,6 +244,7 @@ const UserManagement: React.FC = () => {
           fullname: formData.name,
           employee_id: formData.id,
           phone: formData.phone,
+          department: formData.department,
         });
         alert('สร้างบัญชีสำเร็จ');
         fetchUsers();
@@ -221,10 +252,17 @@ const UserManagement: React.FC = () => {
         alert('เกิดข้อผิดพลาด: ' + err.message);
       }
     } else {
-      // In edit mode, maybe just update status for now
+      // แก้ไขบัญชีทั้งใบ (ชื่อ/อีเมล/เบอร์โทร/ตำแหน่ง/แผนก/สถานะ) ผ่าน endpoint เดียว
       try {
-        let backendStatus = formData.status === 'กำลังใช้งาน' ? 'active' : (formData.status === 'ระงับใช้งาน' ? 'suspended' : 'pending');
-        await adminApi.updateAccountStatus(formData.internalId, backendStatus);
+        const backendStatus = formData.status === 'กำลังใช้งาน' ? 'active' : (formData.status === 'ระงับใช้งาน' ? 'suspended' : 'pending');
+        await adminApi.updateAccount(formData.internalId, {
+          fullname: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          role: roleToEnglish[formData.role] || 'officer',
+          department: formData.department,
+          status: backendStatus,
+        });
         alert('อัปเดตข้อมูลสำเร็จ');
         fetchUsers();
       } catch (err: any) {
@@ -234,8 +272,54 @@ const UserManagement: React.FC = () => {
     setIsModalOpen(false);
   };
 
+  // รีเซ็ตรหัสผ่านแบบ admin-assisted — ไม่มีระบบส่งอีเมล จึงสุ่มรหัสผ่านชั่วคราวที่ backend
+  // แล้วโชว์ให้ admin เห็นตรงนี้ครั้งเดียวเพื่อนำไปแจ้งพนักงานเอง (ทางวาจา/แชท) พร้อมบังคับ
+  // ให้เปลี่ยนรหัสผ่านตอน login ครั้งถัดไปผ่าน RequiresPasswordChange flow ที่มีอยู่แล้ว
+  // (เหมือนตอนสร้างบัญชีใหม่ / เหมือน ChangePassword หลัง login ครั้งแรก)
+  const handleResetPassword = async (userName: string, internalId: number) => {
+    if (!window.confirm(`ต้องการรีเซ็ตรหัสผ่านของ "${userName}" ใช่หรือไม่? รหัสผ่านเดิมจะใช้ล็อกอินไม่ได้ทันที`)) {
+      return;
+    }
+    try {
+      const res = await adminApi.resetPassword(internalId);
+      // แสดงรหัสผ่านผ่าน modal ที่ render เองแทน alert() ของเบราว์เซอร์ — alert() แบบเดิม
+      // กดคัดลอกไม่ได้ และในบางเครื่องข้อความภาษาไทยขึ้นเป็น ???? (native dialog แปลง
+      // encoding ตาม system codepage ไม่ใช่ UTF-8 เหมือน HTML/React render ปกติ)
+      setResetResult({ userName, tempPassword: res.temporary_password });
+      setCopied(false);
+    } catch (err: any) {
+      alert('เกิดข้อผิดพลาด: ' + err.message);
+    }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!resetResult) return;
+    const text = resetResult.tempPassword;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        // Fallback สำหรับ context ที่ไม่ secure (http ธรรมดา) ซึ่ง navigator.clipboard ใช้ไม่ได้
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Copy to clipboard failed', err);
+      alert('คัดลอกไม่สำเร็จ กรุณาคัดลอกด้วยตนเอง');
+    }
+  };
+
   const handleDeleteUser = async (userId: string, userName: string, internalId: number) => {
-    if (window.confirm(`⚠️ คุณแน่ใจหรือไม่ว่าต้องการระงับบัญชีของ "${userName}"?`)) {
+    if (window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการระงับบัญชีของ "${userName}"?`)) {
       try {
         await adminApi.updateAccountStatus(internalId, 'suspended');
         fetchUsers();
@@ -253,6 +337,15 @@ const UserManagement: React.FC = () => {
           <p>บริหารจัดการข้อมูลบุคลากรและการเข้าใช้งานระบบ</p>
         </div>
         <div className="header-actions">
+          <div className="um-search-box">
+            <Search size={15} strokeWidth={2} />
+            <input
+              type="text"
+              placeholder="ค้นหาชื่อ หรือ รหัสพนักงาน..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
           <select className="dept-filter" value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
             {departmentsInUse.map(dept => (
               <option key={dept} value={dept}>{dept === 'ทั้งหมด' ? 'ทุกแผนก' : dept}</option>
@@ -261,6 +354,12 @@ const UserManagement: React.FC = () => {
           <button className="btn-primary" onClick={openAddModal}>+ เพิ่มบัญชีใหม่</button>
         </div>
       </div>
+
+      {errorMsg && (
+        <div className="um-error-banner">
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
       <div className="stats-container">
         <div className={`stat-card clickable ${activeFilter === 'ทั้งหมด' ? 'card-active-blue' : ''}`} onClick={() => setActiveFilter('ทั้งหมด')}>
@@ -301,7 +400,7 @@ const UserManagement: React.FC = () => {
               </select>
                รายการต่อหน้า
             </span>
-            <button className="icon-btn" onClick={() => { setActiveFilter('ทั้งหมด'); setDeptFilter('ทั้งหมด'); }} title="ล้างตัวกรองทั้งหมด">↻</button>
+            <button className="icon-btn" onClick={() => { setActiveFilter('ทั้งหมด'); setDeptFilter('ทั้งหมด'); setSearchTerm(''); }} title="ล้างตัวกรองทั้งหมด">↻</button>
           </div>
         </div>
         
@@ -318,10 +417,17 @@ const UserManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.length === 0 ? (
+              {loading ? (
+                <tr><td colSpan={6}>
+                  <div className="um-loading-row">
+                    <span className="um-spinner" />
+                    <span>กำลังโหลดรายชื่อบุคลากร...</span>
+                  </div>
+                </td></tr>
+              ) : filteredUsers.length === 0 ? (
                 <tr><td colSpan={6} style={{textAlign: 'center', padding: '24px', color: '#62748E'}}>ไม่มีข้อมูลผู้ใช้งานที่ตรงตามเงื่อนไข</td></tr>
               ) : (
-                filteredUsers.slice(0, itemsPerPage).map((user) => (
+                currentTableData.map((user) => (
                   <tr key={user.id}>
                     <td>
                       <div className="user-info">
@@ -358,6 +464,9 @@ const UserManagement: React.FC = () => {
                         <button className="btn-edit" onClick={() => openEditModal(user)} title="แก้ไขข้อมูล">
                           <Edit2 size={16} strokeWidth={2} />
                         </button>
+                        <button className="btn-reset" onClick={() => handleResetPassword(user.name, user.internalId)} title="รีเซ็ตรหัสผ่าน">
+                          <RotateCcw size={16} strokeWidth={2} />
+                        </button>
                         <button className="btn-delete" onClick={() => handleDeleteUser(user.id, user.name, user.internalId)} title="ระงับบัญชี">
                           <Trash2 size={16} strokeWidth={2} />
                         </button>
@@ -369,6 +478,32 @@ const UserManagement: React.FC = () => {
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="um-pagination">
+            <span className="um-pagination-info">
+              แสดงหน้า {currentPage} จาก {totalPages} (ทั้งหมด {filteredUsers.length} รายการ)
+            </span>
+            <div className="um-pagination-buttons">
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              >
+                หน้าก่อนหน้า
+              </button>
+              <button
+                type="button"
+                className="btn-primary"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              >
+                หน้าถัดไป
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {isModalOpen && (
@@ -484,6 +619,31 @@ const UserManagement: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {resetResult && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: 420 }}>
+            <div className="modal-header">
+              <h3>รีเซ็ตรหัสผ่านสำเร็จ</h3>
+              <button className="btn-close" onClick={() => setResetResult(null)}>×</button>
+            </div>
+            <p style={{ fontSize: 14, color: 'var(--text-color)', lineHeight: 1.6, marginBottom: 16 }}>
+              รหัสผ่านชั่วคราวของ <strong>{resetResult.userName}</strong> — กรุณาแจ้งรหัสนี้ให้พนักงานเอง
+              ระบบจะบังคับให้เปลี่ยนรหัสผ่านใหม่ทันทีที่ล็อกอินครั้งถัดไป รหัสนี้จะไม่แสดงซ้ำอีก
+            </p>
+            <div className="reset-password-box">
+              <code>{resetResult.tempPassword}</code>
+              <button type="button" className="btn-copy-password" onClick={handleCopyPassword}>
+                {copied ? <Check size={15} strokeWidth={2.5} /> : <Copy size={15} strokeWidth={2} />}
+                {copied ? 'คัดลอกแล้ว' : 'คัดลอก'}
+              </button>
+            </div>
+            <div className="modal-actions" style={{ gridColumn: 'auto' }}>
+              <button type="button" className="btn-primary" onClick={() => setResetResult(null)}>ปิด</button>
+            </div>
           </div>
         </div>
       )}

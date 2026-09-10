@@ -26,12 +26,8 @@ body.dark-mode .appt-overview-container {
 .appt-overview-container .appt-title {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #0F172A;
+  color: var(--text-primary);
   margin: 0;
-}
-
-body.dark-mode .appt-overview-container .appt-title {
-  color: #F8FAFC;
 }
 
 .appt-overview-container .appt-date-select {
@@ -54,16 +50,11 @@ body.dark-mode .appt-overview-container .appt-date-select {
 
 /* Cards System */
 .appt-overview-container .appt-card {
-  background: #FFFFFF;
+  background: var(--bg-card);
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-  border: 1px solid #E2E8F0;
+  border: 1px solid var(--border-color);
   transition: background-color 0.5s ease, border-color 0.5s ease;
-}
-
-body.dark-mode .appt-overview-container .appt-card {
-  background: #1E1E1E;
-  border-color: #2D2D2D;
 }
 
 /* Metrics Grid */
@@ -215,36 +206,24 @@ body.dark-mode .appt-overview-container .inner-circle {
   justify-content: space-between;
   align-items: center;
   padding: 24px;
-  border-bottom: 1px solid #E2E8F0;
-}
-
-body.dark-mode .appt-overview-container .table-header-row {
-  border-bottom-color: #334155;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .appt-overview-container .table-title {
   font-size: 1.15rem;
   font-weight: 700;
   margin: 0 0 4px 0;
-  color: #0F172A;
-}
-
-body.dark-mode .appt-overview-container .table-title {
-  color: #F8FAFC;
+  color: var(--text-primary);
 }
 
 .appt-overview-container .table-subtitle {
   font-size: 0.85rem;
-  color: #64748B;
+  color: var(--text-muted);
   margin: 0;
 }
 
-body.dark-mode .appt-overview-container .table-subtitle {
-  color: #94A3B8;
-}
-
 .appt-overview-container .btn-primary-add {
-  background: #2563EB;
+  background: var(--brand-primary);
   color: #FFFFFF;
   border: none;
   padding: 8px 16px;
@@ -254,7 +233,7 @@ body.dark-mode .appt-overview-container .table-subtitle {
   cursor: pointer;
 }
 
-.appt-overview-container .btn-primary-add:hover { background: #1D4ED8; }
+.appt-overview-container .btn-primary-add:hover { background: var(--brand-primary-hover); }
 
 .appt-overview-container .table-responsive {
   width: 100%;
@@ -271,15 +250,9 @@ body.dark-mode .appt-overview-container .table-subtitle {
   padding: 16px 24px;
   font-size: 0.85rem;
   font-weight: 700;
-  color: #334155;
-  background: #F8FAFC;
-  border-bottom: 1px solid #E2E8F0;
-}
-
-body.dark-mode .appt-overview-container .appt-table th {
-  background: #2D2D2D;
-  color: #CBD5E1;
-  border-bottom-color: #334155;
+  color: var(--text-secondary);
+  background: var(--bg-canvas);
+  border-bottom: 1px solid var(--border-color);
 }
 
 .appt-overview-container .appt-table td {
@@ -358,11 +331,56 @@ body.dark-mode .appt-overview-container .badge-success { color: #34D399; border-
 .appt-overview-container .status-info { background: #EFF6FF; color: #1E40AF; }
 .appt-overview-container .status-error { background: #FEE2E2; color: #991B1B; }
 .appt-overview-container .status-default { background: #F1F5F9; color: #475569; }
+/* status "ติดต่อไม่ได้" map เป็น statusColor='warning' แต่ไม่เคยมี .status-warning มาก่อน —
+   badge เลยไม่มีสีเลย (ไม่ได้ใน CSS ไหนทั้งสิ้น) เพิ่มให้ตรงชุดสี warning ของทีม */
+.appt-overview-container .status-warning { background: #FFFBEB; color: #D97706; }
 
 body.dark-mode .appt-overview-container .status-success { background: rgba(22, 101, 52, 0.3); color: #86EFAC; }
 body.dark-mode .appt-overview-container .status-info { background: rgba(30, 64, 175, 0.3); color: #93C5FD; }
 body.dark-mode .appt-overview-container .status-error { background: rgba(153, 27, 27, 0.3); color: #FCA5A5; }
 body.dark-mode .appt-overview-container .status-default { background: #334155; color: #CBD5E1; }
+body.dark-mode .appt-overview-container .status-warning { background: rgba(217, 119, 6, 0.25); color: #FBBF24; }
+
+/* Loading / Error states */
+.appt-overview-container .appt-loading-state,
+.appt-overview-container .appt-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.appt-overview-container .appt-error-banner {
+  justify-content: flex-start;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: #FEE2E2;
+  color: #DC2626;
+  border-left: 4px solid #DC2626;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+body.dark-mode .appt-overview-container .appt-error-banner {
+  background: rgba(220, 38, 38, 0.15);
+  color: #FCA5A5;
+}
+
+.appt-overview-container .appt-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2.5px solid var(--border-color);
+  border-top-color: var(--brand-primary);
+  animation: appt-spin 0.8s linear infinite;
+}
+
+@keyframes appt-spin {
+  to { transform: rotate(360deg); }
+}
 
 /* Interactive Dropdown */
 .appt-overview-container .status-dropdown {
@@ -413,5 +431,5 @@ body.dark-mode .appt-overview-container .btn-icon:hover {
 
 .appt-overview-container .btn-action:hover { opacity: 0.9; }
 
-.appt-overview-container .btn-primary { background: #2563EB; color: #FFFFFF; }
+.appt-overview-container .btn-primary { background: var(--brand-primary); color: #FFFFFF; }
 .appt-overview-container .btn-warning { background: #F59E0B; color: #FFFFFF; }

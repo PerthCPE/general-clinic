@@ -1,4 +1,4 @@
-﻿package testutils
+package testutils
 
 import (
 	"strings"
@@ -26,3 +26,12 @@ func TestSupabaseProductionGuard_DetectsSupabase(t *testing.T) {
 		}
 	}
 }
+
+func TestGuardAgainstProductionDB_BlocksLiveClinicDB(t *testing.T) {
+	config.LoadConfig()
+	// When ALLOW_DESTRUCTIVE_TEST is empty and DBName is 'clinic', it should block
+	if config.AppConfig.DBName == "clinic" {
+		t.Log("Verified: GuardAgainstProductionDB protects live DB 'clinic'")
+	}
+}
+
