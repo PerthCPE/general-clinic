@@ -1,39 +1,53 @@
 import React, { useState, useEffect } from 'react';
-import { Info } from 'lucide-react';
+import { Info, Search } from 'lucide-react';
 import { adminApi, type BackendUser } from '../../services/api';
-import { DEMO_USERS, ROLE_PAGE_ACCESS, PAGE_TITLES } from '../../config/roles';
+import { PAGE_PERMISSIONS, ROLE_PAGE_ACCESS, PAGE_TITLES } from '../../config/roles';
 import type { UserRole } from '../../types/auth';
 import './GrantAccess.css';
 
-// สิทธิ์จริงในระบบนี้เป็น role-based ล้วนๆ — บังคับใช้ผ่าน PAGE_PERMISSIONS (frontend routing)
-// และ RoleRequired middleware (backend) โดยอ้างอิง role ของ JWT เท่านั้น ไม่เคยมีจุดไหนอ่านค่า
-// system_accesses.access_level มาใช้ตัดสินใจเปิด/ปิดสิทธิ์เลยสักที่ (grep ยืนยันแล้ว)
-//
-// หน้านี้เคยเป็น grid ให้ติ๊กสิทธิ์ระดับ user รายคน 18 ช่อง ซึ่งไม่เคยถูกบันทึกจริง (ก.5 ในรายงาน
-// สำรวจก่อนหน้า) เปลี่ยนมาเป็นหน้าแสดงสิทธิ์ระดับ "ตำแหน่งงาน" (role) แบบอ่านอย่างเดียวแทน โดยดึง
-// ข้อมูลตรงจาก PAGE_PERMISSIONS ที่มีอยู่แล้ว (single source of truth เดียวกับที่แอปใช้จริง)
-// จึงไม่มีทางเพี้ยนไปจากสิทธิ์จริง และไม่ต้องสร้าง backend ใหม่
+// ⚠️ ข้อจำกัดสำคัญ — อ่านก่อนแก้ต่อ:
+// หน้านี้ติ๊กสิทธิ์ "รายเมนู" ต่อ "รายบุคคล" แล้วบันทึกลง system_accesses จริงผ่าน
+// bulkUpdateSystemAccess (endpoint เดิมที่มีอยู่แล้ว ไม่ได้สร้างใหม่) แต่ค่าที่บันทึกไว้นี้
+// "ยังไม่ถูกนำไปบังคับใช้จริงที่ไหนเลย" — สิทธิ์การเข้าถึงหน้าจริงของระบบยังคงอ้างอิงจาก
+// PAGE_PERMISSIONS (role ของ JWT) เหมือนเดิมทั้ง frontend routing และ backend RoleRequired
+// middleware ทุกจุด การติ๊ก/บันทึกในหน้านี้จึงเป็นการ "เตรียมข้อมูลไว้ล่วงหน้า" สำหรับวันที่ระบบ
+// จะเปลี่ยนไปใช้สิทธิ์ระดับ user จริง ไม่ใช่การเปิด/ปิดสิทธิ์การเข้าถึงจริง ณ ตอนนี้
+// (เจตนา — ไม่ไปแตะ middleware/route เพราะเสี่ยงเกินไปที่จะแก้ระบบตรวจสอบสิทธิ์ทั้งหมดตอนนี้)
 
 interface SystemUser {
   internalId: number;
-  id: string;
+  id: string; // employee_id
   name: string;
   role: string;
+  department: string;
   status: 'รอการยืนยัน' | 'กำลังใช้งาน' | 'ระงับใช้งาน' | string;
   avatar: string;
+  grantedPages: string[]; // จาก system_accesses ที่ access_level > 0 อยู่แล้วตอนนี้
 }
 
-const ROLE_ORDER: UserRole[] = ['doctor', 'nurse', 'nurse_assistant', 'pharmacist', 'cashier', 'registrar', 'officer', 'admin'];
+const ALL_PAGE_IDS = Object.keys(PAGE_PERMISSIONS);
+
+const englishToRole: Record<string, string> = {
+  'doctor': 'แพทย์', 'nurse': 'พยาบาลและผู้ช่วยพยาบาล', 'nurse_assistant': 'พยาบาลและผู้ช่วยพยาบาล',
+  'pharmacist': 'เภสัชกร', 'registrar': 'พนักงานเวชระเบียน', 'cashier': 'พนักงานธุรการการเงิน',
+  'admin': 'ผู้ดูแลระบบ', 'officer': 'พนักงานธุรการ',
+};
 
 const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
   const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'];
+  const grantedPages = (u.system_accesses || [])
+    .filter((sa) => Number(sa.access_level) > 0)
+    .map((sa) => String(sa.module_name ?? ''))
+    .filter(Boolean);
   return {
     internalId: u.id,
     id: u.employee_id || `EMP-${u.id}`,
     name: u.fullname || u.full_name || u.username || '',
     role: u.role,
+    department: u.department || '',
     status: u.status === 'active' ? 'กำลังใช้งาน' : (u.status === 'suspended' ? 'ระงับใช้งาน' : 'รอการยืนยัน'),
     avatar: colors[u.id % colors.length],
+    grantedPages,
   };
 };
 
@@ -41,7 +55,11 @@ const GrantAccess: React.FC = () => {
   const [personnel, setPersonnel] = useState<SystemUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<UserRole>('doctor');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeUserId, setActiveUserId] = useState<string>('');
+  const [checkedPages, setCheckedPages] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const fetchUsers = async () => {
     try {
@@ -63,18 +81,72 @@ const GrantAccess: React.FC = () => {
     fetchUsers();
   }, []);
 
-  const usersInRole = personnel.filter((p) => p.role === selectedRole);
-  const pagesForRole = ROLE_PAGE_ACCESS[selectedRole] || [];
-  const roleInfo = DEMO_USERS[selectedRole];
+  // เลือกคนแรกเป็นค่าเริ่มต้นเมื่อโหลดข้อมูลเสร็จ
+  useEffect(() => {
+    if (personnel.length > 0 && !activeUserId) {
+      setActiveUserId(personnel[0].id);
+    }
+  }, [personnel, activeUserId]);
+
+  const activeUser = personnel.find((p) => p.id === activeUserId) || personnel[0] || null;
+
+  // สลับคนที่เลือก -> โหลดสิทธิ์ที่บันทึกไว้จริงของคนนั้นมาติ๊กให้ (ไม่ใช่เริ่มจากว่างเปล่าเสมอ)
+  useEffect(() => {
+    if (activeUser) {
+      setCheckedPages(new Set(activeUser.grantedPages));
+      setSaveMsg(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUserId, personnel.length]);
+
+  const filteredPersonnel = personnel.filter((p) => {
+    const term = searchTerm.trim().toLowerCase();
+    return term === '' || p.name.toLowerCase().includes(term) || p.id.toLowerCase().includes(term);
+  });
+
+  const applyRoleDefaults = () => {
+    if (!activeUser) return;
+    setCheckedPages(new Set(ROLE_PAGE_ACCESS[activeUser.role as UserRole] || []));
+  };
+
+  const togglePage = (pageId: string) => {
+    setCheckedPages((prev) => {
+      const next = new Set(prev);
+      if (next.has(pageId)) next.delete(pageId);
+      else next.add(pageId);
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!activeUser) return;
+    setSaving(true);
+    setSaveMsg(null);
+    try {
+      await adminApi.bulkUpdateSystemAccess({
+        user_id: activeUser.internalId,
+        accesses: ALL_PAGE_IDS.map((pageId) => ({
+          module_name: pageId,
+          access_level: checkedPages.has(pageId) ? 1 : 0,
+        })),
+      });
+      setSaveMsg({ type: 'success', text: `บันทึกสิทธิ์ของ "${activeUser.name}" สำเร็จ (${checkedPages.size} เมนู)` });
+      fetchUsers();
+    } catch (err: any) {
+      setSaveMsg({ type: 'error', text: 'เกิดข้อผิดพลาด: ' + err.message });
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="access-page-container">
       <div className="access-layout">
 
-        {/* === Left Sidebar: รายชื่อตำแหน่งงาน === */}
+        {/* === Left Sidebar: รายชื่อบุคลากร === */}
         <div className="access-sidebar">
-          <h3>ตำแหน่งงานในระบบ</h3>
-          <p className="sidebar-sub">เลือกตำแหน่งเพื่อดูว่าเข้าถึงเมนู/โมดูลอะไรได้บ้าง</p>
+          <h3>รายชื่อบุคลากร</h3>
+          <p className="sidebar-sub">เลือกบุคลากรเพื่อกำหนดสิทธิ์การเข้าถึงเมนูเป็นรายบุคคล</p>
 
           {errorMsg && (
             <div className="ga-error-banner">
@@ -82,101 +154,111 @@ const GrantAccess: React.FC = () => {
             </div>
           )}
 
+          <div className="search-box">
+            <Search size={14} strokeWidth={2} />
+            <input
+              type="text"
+              placeholder="ค้นหาชื่อ หรือ รหัสพนักงาน..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
           <div className="personnel-list">
-            {ROLE_ORDER.map((role) => {
-              const info = DEMO_USERS[role];
-              const count = personnel.filter((p) => p.role === role).length;
-              return (
-                <div
-                  key={role}
-                  onClick={() => setSelectedRole(role)}
-                  className={`personnel-item ${role === selectedRole ? 'active' : ''}`}
-                >
-                  <div className="avatar" style={{ backgroundColor: info?.avatarColor || '#94A3B8' }}>
-                    {info?.avatarText || role.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="info">
-                    <div className="name">{info?.roleTitleTh || role}</div>
-                    <div className="role">{loading ? 'กำลังโหลด...' : `${count} บัญชี`}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* === Right Content === */}
-        <div className="access-content">
-          <div className="content-header">
-            <div className="user-title">
-              <div className="avatar-large" style={{ backgroundColor: roleInfo?.avatarColor || '#94A3B8' }}>
-                {roleInfo?.avatarText || selectedRole.slice(0, 2).toUpperCase()}
-              </div>
-              <div>
-                <h2>สิทธิ์การเข้าถึงของตำแหน่ง: {roleInfo?.roleTitleTh || selectedRole}</h2>
-                <p>{roleInfo?.roleTitleEn} &bull; {pagesForRole.length} เมนูที่เข้าถึงได้ &bull; {usersInRole.length} บัญชีที่ใช้ตำแหน่งนี้</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="perm-card">
-            <div className="data-header">
-              <h4>เมนู/โมดูลที่เข้าถึงได้</h4>
-              <span className="info-text">
-                <Info size={13} strokeWidth={2} />
-                อ่านอย่างเดียว — ดึงตรงจาก PAGE_PERMISSIONS ในโค้ด ซึ่งเป็นจุดเดียวที่ระบบใช้จริงในการ
-                เปิด/ปิดสิทธิ์เข้าหน้าต่างๆ (ทั้งฝั่งเมนูและฝั่งกันเส้นทาง) จึงตรงกับสิทธิ์จริงเสมอ ไม่มีทางเพี้ยน
-              </span>
-            </div>
-            {pagesForRole.length === 0 ? (
-              <p style={{ color: 'var(--text-color)', opacity: 0.6, fontSize: 13 }}>ตำแหน่งนี้ยังไม่มีเมนูที่กำหนดสิทธิ์ไว้</p>
-            ) : (
-              <div className="page-access-grid">
-                {pagesForRole.map((pageId) => (
-                  <div key={pageId} className="page-access-chip">
-                    {PAGE_TITLES[pageId] || pageId}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="perm-card">
-            <div className="data-header">
-              <h4>บัญชีที่ใช้ตำแหน่งนี้ ({usersInRole.length})</h4>
-            </div>
             {loading ? (
               <div className="ga-loading-state">
                 <span className="ga-spinner" />
                 <span>กำลังโหลดรายชื่อบุคลากร...</span>
               </div>
-            ) : usersInRole.length === 0 ? (
-              <p style={{ color: 'var(--text-color)', opacity: 0.6, fontSize: 13 }}>ยังไม่มีบัญชีที่ใช้ตำแหน่งนี้</p>
+            ) : filteredPersonnel.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '12px', fontSize: '12px', color: '#62748E' }}>ไม่พบบัญชีที่ตรงกับเงื่อนไข</div>
             ) : (
-              <div className="personnel-list" style={{ marginBottom: 0 }}>
-                {usersInRole.map((u) => (
-                  <div key={u.internalId} className="personnel-item" style={{ cursor: 'default' }}>
-                    <div className="avatar" style={{ backgroundColor: u.avatar }}>
-                      {u.name.split(' ')[1]?.charAt(0) || u.name.charAt(0)}
-                    </div>
-                    <div className="info">
-                      <div className="name">
-                        {u.name}
-                        {u.status === 'กำลังใช้งาน' ? (
-                          <span className="status-dot green" title="กำลังใช้งาน" />
-                        ) : u.status === 'ระงับใช้งาน' ? (
-                          <span className="status-dot red" title="ระงับใช้งาน" />
-                        ) : (
-                          <span className="status-dot orange" title="รอการยืนยันสิทธิ์" />
-                        )}
-                      </div>
-                      <div className="role">{u.id}</div>
-                    </div>
+              filteredPersonnel.map((p) => (
+                <div
+                  key={p.internalId}
+                  onClick={() => setActiveUserId(p.id)}
+                  className={`personnel-item ${p.id === activeUserId ? 'active' : ''}`}
+                >
+                  <div className="avatar" style={{ backgroundColor: p.avatar }}>
+                    {p.name.split(' ')[1]?.charAt(0) || p.name.charAt(0)}
                   </div>
-                ))}
-              </div>
+                  <div className="info">
+                    <div className="name">
+                      {p.name}
+                      {p.status === 'กำลังใช้งาน' ? (
+                        <span className="status-dot green" title="กำลังใช้งาน" />
+                      ) : p.status === 'ระงับใช้งาน' ? (
+                        <span className="status-dot red" title="ระงับใช้งาน" />
+                      ) : (
+                        <span className="status-dot orange" title="รอการยืนยันสิทธิ์" />
+                      )}
+                    </div>
+                    <div className="role">{englishToRole[p.role] || p.role} &bull; {p.grantedPages.length} เมนู</div>
+                  </div>
+                </div>
+              ))
             )}
           </div>
+        </div>
+
+        {/* === Right Content === */}
+        <div className="access-content">
+          {activeUser && (
+            <>
+              <div className="content-header">
+                <div className="user-title">
+                  <div className="avatar-large" style={{ backgroundColor: activeUser.avatar }}>
+                    {activeUser.name.split(' ')[1]?.charAt(0) || activeUser.name.charAt(0)}
+                  </div>
+                  <div>
+                    <h2>สิทธิ์เข้าถึงของ: {activeUser.name}</h2>
+                    <p>
+                      {englishToRole[activeUser.role] || activeUser.role}
+                      {activeUser.department ? <> &bull; {activeUser.department}</> : null}
+                      {' '}&bull; รหัสพนักงาน {activeUser.id}
+                    </p>
+                  </div>
+                </div>
+                <div className="header-actions">
+                  <button type="button" className="btn-cancel" onClick={applyRoleDefaults}>
+                    ตั้งค่าตามค่าเริ่มต้นของตำแหน่ง
+                  </button>
+                  <button type="button" className="btn-save" onClick={handleSave} disabled={saving}>
+                    {saving ? 'กำลังบันทึก...' : 'บันทึกการเปลี่ยนแปลง'}
+                  </button>
+                </div>
+              </div>
+
+              {saveMsg && (
+                <div className={saveMsg.type === 'success' ? 'ga-success-banner' : 'ga-error-banner'}>
+                  <span>{saveMsg.text}</span>
+                </div>
+              )}
+
+              <div className="perm-card">
+                <div className="data-header">
+                  <h4>เมนู/โมดูลที่เข้าถึงได้</h4>
+                  <span className="info-text">
+                    <Info size={13} strokeWidth={2} />
+                    ติ๊กเลือกเมนูที่ต้องการให้สิทธิ์ กด "ตั้งค่าตามค่าเริ่มต้นของตำแหน่ง" เพื่อเติมอัตโนมัติตาม
+                    PAGE_PERMISSIONS ของตำแหน่งงานนี้ แล้วปรับเพิ่ม/ลดเองได้อิสระก่อนบันทึก — ค่าที่บันทึกยังไม่
+                    ถูกนำไปบังคับใช้จริง (ดูหมายเหตุในโค้ด/สรุปท้ายบทสนทนา) ระบบยังคงเช็คสิทธิ์จาก role เหมือนเดิม
+                  </span>
+                </div>
+                <div className="page-access-grid checkable">
+                  {ALL_PAGE_IDS.map((pageId) => {
+                    const checked = checkedPages.has(pageId);
+                    return (
+                      <label key={pageId} className={`page-access-chip checkable ${checked ? 'checked' : ''}`}>
+                        <input type="checkbox" checked={checked} onChange={() => togglePage(pageId)} />
+                        {PAGE_TITLES[pageId] || pageId}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

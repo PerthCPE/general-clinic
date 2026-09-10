@@ -514,6 +514,7 @@ export interface BackendUser {
   phone?: string;
   email?: string;
   employee_id?: string;
+  department?: string;
   status?: string;
   system_accesses?: Array<{ access_level?: number | string; [key: string]: any }>;
   created_at?: string;
