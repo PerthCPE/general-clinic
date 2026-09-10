@@ -170,6 +170,14 @@ export default function DetailPage({
 
   // สถานะกำลังส่งข้อมูลไปยังห้องการเงิน (แสดงอนิเมะชันบันทึกลงฐานข้อมูล)
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Modal แจ้งเตือนข้อผิดพลาดแบบทันสมัย (แทน window.alert)
+  const [errorModal, setErrorModal] = useState<{
+    tone: 'warning' | 'error';
+    title: string;
+    lines: string[];
+    hint?: string;
+  } | null>(null);
   
   // Current active patient object
   const activePatient: PatientConfig | undefined = queueList.find(p => p.id === localPatientId) || queueList[0];
@@ -307,7 +315,7 @@ export default function DetailPage({
                   instructions: cleanInstructions(m.instructions, m.name),
                   stock: currentStock,
                   stockStatus: currentStock <= 0 ? ('out-stock' as const) : (currentStock <= 10 ? ('low-stock' as const) : ('in-stock' as const)),
-                  quantity: m.quantity && m.quantity > 0 ? m.quantity : 10,
+                  quantity: m.quantity && m.quantity > 0 ? m.quantity : 1,
                   price: m.price && m.price > 0 ? m.price : (m.unit_price || 15),
                   unit_price: m.unit_price && m.unit_price > 0 ? m.unit_price : (m.price || 15),
                   properties: m.properties || 'บรรเทาอาการตามแพทย์สั่ง'
@@ -579,7 +587,7 @@ export default function DetailPage({
                     instructions: cleanInstructions(item.instructions, medName),
                     price: m.unit_price || m.price || 10,
                     unit_price: m.unit_price || m.price || 10,
-                    quantity: item.quantity || 10,
+                    quantity: item.quantity || 1,
                     stock: currentStock,
                     stockStatus: (currentStock <= 0 ? 'out-stock' : (currentStock <= 10 ? 'low-stock' : 'in-stock')) as 'in-stock' | 'low-stock' | 'out-stock'
                   };
@@ -616,7 +624,7 @@ export default function DetailPage({
                       instructions: cleanInstructions(item.instructions, medName),
                       price: item.unit_price || item.price || 10,
                       unit_price: item.unit_price || item.price || 10,
-                      quantity: item.quantity || 10,
+                      quantity: item.quantity || 1,
                       stock: currentStock,
                       stockStatus: (currentStock <= 0 ? 'out-stock' : (currentStock <= 10 ? 'low-stock' : 'in-stock')) as 'in-stock' | 'low-stock' | 'out-stock'
                     };
@@ -654,7 +662,7 @@ export default function DetailPage({
                     instructions: cleanInstructions(item.instructions, medName),
                     price: m.unit_price || m.price || 10,
                     unit_price: m.unit_price || m.price || 10,
-                    quantity: item.quantity || 10,
+                    quantity: item.quantity || 1,
                     stock: currentStock,
                     stockStatus: (currentStock <= 0 ? 'out-stock' : (currentStock <= 10 ? 'low-stock' : 'in-stock')) as 'in-stock' | 'low-stock' | 'out-stock'
                   };
@@ -704,12 +712,15 @@ export default function DetailPage({
       });
 
       if (deficientMeds.length > 0) {
-        let warnMessage = 'ไม่สามารถจ่ายยาและส่งข้อมูลไปยังระบบการเงินได้ เนื่องจากยาในคลังไม่เพียงพอ\n\nรายการยาที่ขาด:\n';
-        deficientMeds.forEach((item, idx) => {
-          warnMessage += `${idx + 1}. ${item.name} (${item.medId}): สั่งจ่าย ${item.requested} เม็ด | มีในคลังเพียง ${item.available} เม็ด (ขาด ${item.requested - item.available} เม็ด)\n`;
+        setErrorModal({
+          tone: 'warning',
+          title: 'ยาในคลังไม่เพียงพอ',
+          lines: deficientMeds.map(
+            (item) =>
+              `${item.name} (${item.medId}) — สั่งจ่าย ${item.requested} | คงคลัง ${item.available} (ขาด ${item.requested - item.available})`
+          ),
+          hint: 'กรุณาปรับลดจำนวนยาที่จะจ่าย หรือเติมยาเข้าคลังก่อนดำเนินการ',
         });
-        warnMessage += '\nกรุณาปรับลดจำนวนยาที่จะจ่าย หรือเติมยาเข้าคลังยาก่อนดำเนินการ';
-        alert(warnMessage);
         return;
       }
     }
@@ -788,16 +799,33 @@ export default function DetailPage({
         // ซิงค์จำนวนสต็อกยาจริงจากฐานข้อมูลคลังยาหลังตัดจ่ายสำเร็จ
         await fetchWarehouseStock();
         if (data.warnings && data.warnings.length > 0) {
-           let msg = 'มียาบางรายการจ่ายได้ไม่ครบตามจำนวน:\n';
-           data.warnings.forEach((w: any) => {
-             msg += `- ${w.name}: สั่ง ${w.requested} จ่ายจริง ${w.dispensed}\n`;
-           });
-           alert(msg);
+          setErrorModal({
+            tone: 'warning',
+            title: 'จ่ายยาได้ไม่ครบตามจำนวน',
+            lines: data.warnings.map((w: any) => `${w.name} — สั่ง ${w.requested} | จ่ายจริง ${w.dispensed}`),
+            hint: 'สต็อกในคลังไม่พอสำหรับบางรายการ ระบบจ่ายเท่าที่มีและตัดยอดให้แล้ว',
+          });
         }
       }
     } catch (err) {
-       console.error('Dispense failed:', err);
-       if ((err as Error).message.includes('Invalid or Expired token')) { alert('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่'); localStorage.removeItem('token'); localStorage.removeItem('clinic_auth_token'); window.location.href = '/login'; } else { alert('ไม่สามารถยืนยันการจ่ายยาได้: ' + (err as Error).message); }
+      console.error('Dispense failed:', err);
+      const msg = (err as Error).message || '';
+      if (msg.includes('Invalid or Expired token')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('clinic_auth_token');
+        setErrorModal({
+          tone: 'error',
+          title: 'เซสชันหมดอายุ',
+          lines: ['กรุณาเข้าสู่ระบบใหม่อีกครั้ง'],
+        });
+        setTimeout(() => { window.location.href = '/login'; }, 1500);
+      } else {
+        setErrorModal({
+          tone: 'error',
+          title: 'ยืนยันการจ่ายยาไม่สำเร็จ',
+          lines: [msg || 'เกิดข้อผิดพลาดในการเชื่อมต่อระบบ กรุณาลองใหม่อีกครั้ง'],
+        });
+      }
     } finally {
       // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;
@@ -1570,7 +1598,7 @@ export default function DetailPage({
                         ) : (
                         activePatient.medications.map((med, index) => {
                           const unitPrice = (med as any).unit_price || med.price || 15;
-                          const qty = med.quantity || 10;
+                          const qty = med.quantity || 1;
                           return (
                             <tr key={index} style={{ borderBottom: '1px solid #F1F5F9' }}>
                               <td style={{ padding: '12px', textAlign: 'center' }}>
@@ -1911,6 +1939,61 @@ export default function DetailPage({
                 ปิดหน้าต่าง
               </button>
             </div>
+          </div>
+        </ClinicModalPortal>
+      )}
+
+      {/* Modal แจ้งเตือนข้อผิดพลาด / คำเตือน แบบทันสมัย (แทน window.alert) */}
+      {errorModal && (
+        <ClinicModalPortal isOpen={true} onClose={() => setErrorModal(null)} className="detail-page-container">
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: '18px',
+              maxWidth: '460px',
+              width: '92%',
+              padding: '26px 26px 22px',
+              boxShadow: '0 25px 50px -12px rgba(0,0,0,0.28)',
+              border: '1px solid #E2E8F0',
+              animation: 'clinicScaleInGPU 0.22s cubic-bezier(0.16,1,0.3,1) forwards',
+              boxSizing: 'border-box',
+              textAlign: 'center',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                width: 52, height: 52, borderRadius: '50%', margin: '0 auto 14px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
+                background: errorModal.tone === 'error' ? '#FEF2F2' : '#FFFBEB',
+                color: errorModal.tone === 'error' ? '#DC2626' : '#D97706',
+              }}
+            >
+              {errorModal.tone === 'error' ? '✕' : '!'}
+            </div>
+            <h3 style={{ margin: '0 0 12px', fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', fontFamily: "var(--font-heading, 'Kanit', sans-serif)" }}>
+              {errorModal.title}
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: errorModal.hint ? 14 : 20 }}>
+              {errorModal.lines.map((ln, i) => (
+                <div key={i} style={{ fontSize: 14, lineHeight: 1.55, color: '#334155', background: '#F8FAFC', border: '1px solid #E2E8F0', borderRadius: 10, padding: '9px 12px', textAlign: 'left' }}>
+                  {ln}
+                </div>
+              ))}
+            </div>
+            {errorModal.hint && (
+              <p style={{ margin: '0 0 20px', fontSize: 13, color: '#64748B', lineHeight: 1.5 }}>{errorModal.hint}</p>
+            )}
+            <button
+              onClick={() => setErrorModal(null)}
+              style={{
+                width: '100%', padding: '11px 0', border: 'none', borderRadius: 10, cursor: 'pointer',
+                fontWeight: 700, fontSize: 14, color: '#FFFFFF',
+                background: errorModal.tone === 'error' ? '#DC2626' : '#2563EB',
+              }}
+            >
+              รับทราบ
+            </button>
           </div>
         </ClinicModalPortal>
       )}

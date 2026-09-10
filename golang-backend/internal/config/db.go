@@ -154,6 +154,13 @@ func ConnectDB() {
 	database.Exec("DROP INDEX IF EXISTS idx_billings_receipt_number")
 	database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_billings_receipt_number_partial ON billings (receipt_number) WHERE receipt_number IS NOT NULL AND receipt_number <> ''")
 
+	// คอลัมน์ใหม่ของตาราง billing_histories ที่ AutoMigrate ข้าม (tableCount >= 8)
+	// ถ้าไม่มีคอลัมน์เหล่านี้ ConfirmPayment จะ insert ไม่ผ่าน -> rollback -> ชำระเงินไม่บันทึก
+	database.Exec("ALTER TABLE billing_histories ADD COLUMN IF NOT EXISTS queue_number text DEFAULT ''")
+	database.Exec("ALTER TABLE billing_histories ADD COLUMN IF NOT EXISTS doctor_advice text DEFAULT ''")
+	database.Exec("ALTER TABLE billing_histories ADD COLUMN IF NOT EXISTS treatment_right text DEFAULT 'สิทธิ 30 บาท (สปสช.)'")
+	database.Exec("ALTER TABLE billing_histories ADD COLUMN IF NOT EXISTS vitals text DEFAULT ''")
+
 	// เอกสารที่แพทย์ออกให้ผู้ป่วย (ใบรับรองแพทย์ / ใบรับรองยานอกบัญชี) เก็บเป็น JSON
 	database.Exec("ALTER TABLE examinations ADD COLUMN IF NOT EXISTS issued_documents text DEFAULT ''")
 

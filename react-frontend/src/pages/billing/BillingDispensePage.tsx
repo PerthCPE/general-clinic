@@ -219,7 +219,7 @@ export default function BillingDispensePage({
     let category = m.category || 'ยาสามัญ';
     let properties = m.properties || 'ยาตามแพทย์สั่งจ่าย';
     let unitPrice = Number(m.unit_price ?? m.price ?? item.unit_price ?? item.price ?? 0);
-    const qty = Number(item.quantity ?? item.qty ?? m.quantity ?? 10) || 10;
+    const qty = Number(item.quantity ?? item.qty ?? m.quantity ?? 1) || 1;
     const dosage = item.dosage || m.dosage || '1 เม็ด วันละ 3 ครั้ง หลังอาหาร';
     const instructions = item.instructions || m.instructions || 'รับประทานหลังอาหาร เช้า กลางวัน เย็น';
 
@@ -1610,7 +1610,7 @@ export default function BillingDispensePage({
                 {(activePatient?.medications && activePatient.medications.length > 0) ? (
                   activePatient.medications.map((med, idx) => {
                     const uPrice = Number((med as any).price || (med as any).unit_price) || 0;
-                    const qty = Number((med as any).quantity) || 10;
+                    const qty = Number((med as any).quantity) || 1;
                     const lineTotal = uPrice * qty;
                     return (
                       <tr key={idx}>

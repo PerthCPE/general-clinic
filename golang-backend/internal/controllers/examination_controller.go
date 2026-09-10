@@ -439,7 +439,7 @@ func SaveExamination(c *gin.Context) {
 		}
 		qty := p.Quantity
 		if qty <= 0 {
-			qty = 10
+			qty = 1
 		}
 
 		// เขียนทับด้วยค่าที่ตรวจสอบกับคลังยาแล้ว ไม่ใช้ค่าที่หน้าจอส่งมาดิบๆ
@@ -664,7 +664,7 @@ func SaveExamination(c *gin.Context) {
 			}
 			qty := p.Quantity
 			if qty <= 0 {
-				qty = 10
+				qty = 1
 			}
 			disp := models.Dispensing{
 				VisitID:      visit.ID,

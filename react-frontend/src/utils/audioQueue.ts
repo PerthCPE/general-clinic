@@ -1,79 +1,110 @@
-/**
+﻿/**
  * Smart Audio Queue Calling with 100% Genuine Studio Google Thai Female Voice Pack
  * Plays gentle 3-tone hospital melodic chime + Studio Thai Female voice audio clips (.mp3)
  */
 
-import { getSharedAudioContext } from './audioContext';
+import { getSharedAudioContext, resumeSharedAudioContext } from './audioContext';
 
 // Global audio element reference to prevent overlapping voices
 let currentAudioElement: HTMLAudioElement | null = null;
 let isAudioSequencePlaying = false;
 
 // =========================================================================
-// 1. ระบบเสียงแจ้งเตือนสำหรับ "ห้องยา" (Pharmacy)
+// สวิตช์เลือกรูปแบบเสียงแจ้งเตือน "คิวเข้าใหม่" (แก้ตรงนี้ที่เดียว มีผลทั้ง 3 ระบบ: หมอ / ห้องยา / การเงิน)
+//   true  = เล่นไฟล์ MP3 (/audio/pin_a1.mp3) — เสียงดึงๆ  ← ค่าเริ่มต้น
+//   false = เล่นเสียงสังเคราะห์ 2 tone ผ่าน Web Audio API
+// อีกฝั่งจะถูกใช้เป็น fallback อัตโนมัติถ้าทางหลักเล่นไม่ได้
+//
+// เปลี่ยนชั่วคราวตอน runtime ได้ด้วย: localStorage.setItem('notifySoundMode','mp3' | 'synth')
 // =========================================================================
+const USE_MP3 = false;
+
+const NOTIFY_MP3 = '/audio/pin_a1.mp3';
+const NOTIFY_PLAY_MS = 1800; // เล่นแค่ช่วงต้นของไฟล์แล้วหยุด
+const NOTIFY_TONE_1 = 659.25; // E5
+const NOTIFY_TONE_2 = 523.25; // C5
+
+// อ่านโหมดปัจจุบัน: localStorage ทับค่า USE_MP3 ได้ (ไว้สลับทดสอบโดยไม่ต้อง build)
+function useMp3Sound(): boolean {
+  try {
+    const m = localStorage.getItem('notifySoundMode');
+    if (m === 'mp3') return true;
+    if (m === 'synth') return false;
+  } catch { /* ignore */ }
+  return USE_MP3;
+}
+
+function playDingMp3(): boolean {
+  try {
+    if (currentAudioElement) {
+      try { currentAudioElement.pause(); } catch { /* ignore */ }
+    }
+    const audio = new Audio(NOTIFY_MP3);
+    audio.volume = 0.9;
+    currentAudioElement = audio;
+    audio.play()
+      .then(() => {
+        setTimeout(() => {
+          if (currentAudioElement === audio) {
+            audio.pause();
+            audio.currentTime = 0;
+          }
+        }, NOTIFY_PLAY_MS);
+      })
+      .catch(() => { void playSynthNotification(NOTIFY_TONE_1, NOTIFY_TONE_2); });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function playDing(): Promise<void> {
+  if (localStorage.getItem('notificationSoundEnabled') === 'false') return;
+
+  if (useMp3Sound()) {
+    // ทางหลัก = MP3 (<audio> element ทำงานได้แม้แท็บอยู่ background), fallback = synth
+    if (!playDingMp3()) await playSynthNotification(NOTIFY_TONE_1, NOTIFY_TONE_2);
+    return;
+  }
+
+  // ทางหลัก = เสียงสังเคราะห์ — ต้อง await resume ก่อน schedule เสมอ
+  // (ไม่งั้นตอนแท็บ background / ยังไม่ปลุก context เสียงจะไม่ติดแบบสุ่ม ๆ)
+  const ctx = await resumeSharedAudioContext();
+  if (ctx) {
+    await playSynthNotification(NOTIFY_TONE_1, NOTIFY_TONE_2);
+  } else {
+    // context ยังปลุกไม่ขึ้น (ผู้ใช้ยังไม่เคยคลิกหน้าจอ) -> ลองไฟล์ MP3 แทน
+    playDingMp3();
+  }
+}
+
+// 1. ห้องยา (Pharmacy)
 export function playPharmacyNotification(_message?: string): Promise<void> {
-  return new Promise((resolve) => {
-    try {
-      if (localStorage.getItem('notificationSoundEnabled') === 'false') {
-        resolve();
-        return;
-      }
-      playSynthNotification(659.25, 523.25);
-      resolve();
-    } catch (e) {
-      console.error('Pharmacy audio play failed', e);
-      resolve();
-    }
-  });
+  return playDing().catch((e) => { console.error('Pharmacy audio play failed', e); });
 }
 
-// =========================================================================
-// 2. ระบบเสียงแจ้งเตือนสำหรับ "ห้องการเงิน" (Billing)
-// =========================================================================
+// 2. ห้องการเงิน (Billing)
 export function playBillingNotification(_message?: string): Promise<void> {
-  return new Promise((resolve) => {
-    try {
-      if (localStorage.getItem('notificationSoundEnabled') === 'false') {
-        resolve();
-        return;
-      }
-      playSynthNotification(659.25, 523.25);
-      resolve();
-    } catch (e) {
-      console.error('Billing audio play failed', e);
-      resolve();
-    }
-  });
+  return playDing().catch((e) => { console.error('Billing audio play failed', e); });
 }
 
-// Helper alias สำหรับเสียงแจ้งเตือนแบบ ding-dong (เสียงสังเคราะห์ 2-tone มาตรฐาน)
+// 3. ห้องตรวจแพทย์ (Doctor) — คิวจากพยาบาลคัดกรอง
+export function playDoctorNotification(_message?: string): Promise<void> {
+  return playDing().catch((e) => { console.error('Doctor audio play failed', e); });
+}
+
+// Helper alias
 export function playNotificationDingDong(_message?: string): Promise<void> {
-  return new Promise((resolve) => {
-    try {
-      if (localStorage.getItem('notificationSoundEnabled') === 'false') {
-        resolve();
-        return;
-      }
-      playSynthNotification(659.25, 523.25);
-      resolve();
-    } catch (e) {
-      console.error('Notification audio play failed', e);
-      resolve();
-    }
-  });
+  return playDing().catch((e) => { console.error('Notification audio play failed', e); });
 }
 
 // =========================================================================
 // Core Logic สำหรับเล่นเสียงแจ้งเตือนสังเคราะห์ 2 tone ผ่าน Web Audio API
 // =========================================================================
-function playSynthNotification(tone1Freq: number = 659.25, tone2Freq: number = 523.25) {
-  const ctx = getSharedAudioContext();
+async function playSynthNotification(tone1Freq: number = 659.25, tone2Freq: number = 523.25) {
+  // await resume ก่อนเสมอ แล้วค่อยอ่าน currentTime + schedule
+  const ctx = await resumeSharedAudioContext();
   if (!ctx) return;
-
-  if (ctx.state === 'suspended') {
-    ctx.resume().catch(() => {});
-  }
 
   const now = ctx.currentTime;
   const osc1 = ctx.createOscillator();
@@ -106,64 +137,51 @@ function playSynthNotification(tone1Freq: number = 659.25, tone2Freq: number = 5
  */
 export function playHospitalChime(): Promise<void> {
   return new Promise((resolve) => {
-    try {
-      // ใช้ AudioContext กลาง ห้ามสร้างใหม่/ปิด เพื่อไม่ให้ชนลิมิต ~6 context ต่อแท็บ
-      const ctx = getSharedAudioContext();
+    // ใช้ AudioContext กลาง ห้ามสร้างใหม่/ปิด เพื่อไม่ให้ชนลิมิต ~6 context ต่อแท็บ
+    // await resume ก่อน schedule เสมอ (ไม่งั้นเสียงไม่ติดแบบสุ่มตอนแท็บ background)
+    void resumeSharedAudioContext().then((ctx) => {
       if (!ctx) {
         setTimeout(resolve, 800);
         return;
       }
+      try {
+        const now = ctx.currentTime;
 
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
+        const playBellNote = (freq: number, startTime: number, duration: number, gainLevel: number) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, startTime);
+          gain.gain.setValueAtTime(0.0001, startTime);
+          gain.gain.exponentialRampToValueAtTime(gainLevel, startTime + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(startTime);
+          osc.stop(startTime + duration);
+
+          const overtone = ctx.createOscillator();
+          const overtoneGain = ctx.createGain();
+          overtone.type = 'sine';
+          overtone.frequency.setValueAtTime(freq * 2, startTime);
+          overtoneGain.gain.setValueAtTime(0.0001, startTime);
+          overtoneGain.gain.exponentialRampToValueAtTime(gainLevel * 0.25, startTime + 0.03);
+          overtoneGain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration * 0.7);
+          overtone.connect(overtoneGain);
+          overtoneGain.connect(ctx.destination);
+          overtone.start(startTime);
+          overtone.stop(startTime + duration * 0.7);
+        };
+
+        playBellNote(739.99, now, 0.55, 0.16);         // F#5
+        playBellNote(932.33, now + 0.28, 0.55, 0.18);  // A#5
+        playBellNote(1108.73, now + 0.56, 0.95, 0.22); // C#6
+
+        setTimeout(resolve, 1400);
+      } catch {
+        resolve();
       }
-
-      const now = ctx.currentTime;
-
-      // Helper to create a bell note with fundamental frequency and warm overtone
-      const playBellNote = (freq: number, startTime: number, duration: number, gainLevel: number) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, startTime);
-
-        gain.gain.setValueAtTime(0.0001, startTime);
-        gain.gain.exponentialRampToValueAtTime(gainLevel, startTime + 0.04);
-        gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(startTime);
-        osc.stop(startTime + duration);
-
-        const overtone = ctx.createOscillator();
-        const overtoneGain = ctx.createGain();
-        overtone.type = 'sine';
-        overtone.frequency.setValueAtTime(freq * 2, startTime);
-
-        overtoneGain.gain.setValueAtTime(0.0001, startTime);
-        overtoneGain.gain.exponentialRampToValueAtTime(gainLevel * 0.25, startTime + 0.03);
-        overtoneGain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration * 0.7);
-
-        overtone.connect(overtoneGain);
-        overtoneGain.connect(ctx.destination);
-        overtone.start(startTime);
-        overtone.stop(startTime + duration * 0.7);
-      };
-
-      // Note 1: F#5 (739.99 Hz)
-      playBellNote(739.99, now, 0.55, 0.16);
-
-      // Note 2: A#5 (932.33 Hz)
-      playBellNote(932.33, now + 0.28, 0.55, 0.18);
-
-      // Note 3: C#6 (1108.73 Hz)
-      playBellNote(1108.73, now + 0.56, 0.95, 0.22);
-
-      setTimeout(resolve, 1400);
-    } catch {
-      resolve();
-    }
+    });
   });
 }
 

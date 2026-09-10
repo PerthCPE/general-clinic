@@ -317,7 +317,7 @@ func GetBillingQueues(c *gin.Context) {
 					}
 					q := d.Quantity
 					if q <= 0 {
-						q = 10
+						q = 1
 					}
 					tot += p * float64(q)
 					medList = append(medList, gin.H{
@@ -369,7 +369,7 @@ func GetBillingQueues(c *gin.Context) {
 						unitPrice = 10.0
 					}
 
-					qty := 10
+					qty := 1
 					if qVal, ok := mObj["quantity"]; ok {
 						if qNum, ok := qVal.(float64); ok && qNum > 0 {
 							qty = int(qNum)

@@ -176,7 +176,7 @@ func GetDispensingByVisit(c *gin.Context) {
 					}
 					dosage, _ := mObj["dosage"].(string)
 					inst, _ := mObj["instructions"].(string)
-					qty := 10
+					qty := 1
 					if qVal, ok := mObj["quantity"]; ok {
 						if qNum, ok := qVal.(float64); ok && qNum > 0 {
 							qty = int(qNum)
@@ -210,7 +210,7 @@ func GetDispensingByVisit(c *gin.Context) {
 					}
 					dosage, _ := mObj["dosage"].(string)
 					inst, _ := mObj["instructions"].(string)
-					qty := 10
+					qty := 1
 					if qVal, ok := mObj["quantity"]; ok {
 						if qNum, ok := qVal.(float64); ok && qNum > 0 {
 							qty = int(qNum)
@@ -259,7 +259,7 @@ func GetDispensingByVisit(c *gin.Context) {
 						med := FindMedicineByNameOrCode(mCode, mName)
 						qty := p.Quantity
 						if qty <= 0 {
-							qty = 10
+							qty = 1
 						}
 						items = append(items, models.Dispensing{
 							VisitID:      exam.VisitID,
@@ -422,7 +422,7 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 			if inst == "" {
 				inst = dosage
 			}
-			qty := 10
+			qty := 1
 			if qVal, ok := mObj["quantity"]; ok {
 				if qNum, ok := qVal.(float64); ok && qNum > 0 {
 					qty = int(qNum)
@@ -563,7 +563,7 @@ func ConfirmDispenseAndBill(c *gin.Context) {
 					mCode, _ := mObj["medId"].(string)
 					dosage, _ := mObj["dosage"].(string)
 					inst, _ := mObj["instructions"].(string)
-					qty := 10
+					qty := 1
 					if qVal, ok := mObj["quantity"]; ok {
 						if qNum, ok := qVal.(float64); ok && qNum > 0 {
 							qty = int(qNum)
@@ -1597,7 +1597,7 @@ func GetPharmacyQueues(c *gin.Context) {
 							}
 							qty := p.Quantity
 							if qty <= 0 {
-								qty = 10
+								qty = 1
 							}
 							medList = append(medList, gin.H{
 								"medId":        mCode,

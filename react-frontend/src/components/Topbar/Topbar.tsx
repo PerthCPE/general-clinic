@@ -60,8 +60,23 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   useEffect(() => {
     // WebSocket ยิงหา client ทุกตัว จึงต้องกรองตาม role ไม่งั้นกระดิ่งของทุก role จะเด้งพร้อมกัน
     const role = currentUser?.role;
+    const isDoctorRole = role === 'doctor' || role === 'admin';
     const isPharmacy = role === 'pharmacist' || role === 'admin';
     const isCashier = role === 'cashier' || role === 'admin';
+
+    // คิวจากพยาบาลคัดกรอง เข้าห้องตรวจแพทย์
+    const pushDoctorQueueNotice = (data: any) => {
+      if (!isDoctorRole) return;
+      setNotifications(prev => [{
+        id: Date.now().toString() + Math.random(),
+        category: 'ห้องตรวจแพทย์',
+        message: `พยาบาลส่งผู้ป่วยเข้าห้องตรวจ — ${data?.patient_name || data?.patient?.fullname || 'ผู้ป่วย'}`,
+        time: 'เมื่อสักครู่',
+        isUnread: true,
+      }, ...prev]);
+    };
+    const unsubVitals = subscribe('VITALS_RECORDED', pushDoctorQueueNotice);
+    const unsubScreening = subscribe('SCREENING_RECORDED', pushDoctorQueueNotice);
 
     const unsubMedQ = subscribe('MEDICINE_QUEUE_CREATED', (data: any) => {
       if (!isPharmacy) return;
@@ -97,6 +112,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     });
 
     return () => {
+      unsubVitals();
+      unsubScreening();
       unsubMedQ();
       unsubBill();
       unsubPay();
