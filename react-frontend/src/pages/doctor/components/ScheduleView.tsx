@@ -9,6 +9,12 @@ import {
   getStoredDoctorShifts,
   saveStoredDoctorShifts,
   findDoctorProfile,
+  getStoredLeaveRequests,
+  saveStoredLeaveRequests,
+  getStoredSwapRequests,
+  saveStoredSwapRequests,
+  type LeaveRequest,
+  type ShiftSwapRequest
 } from '../../../services/scheduleStorage';
 import {
   Calendar as CalendarIcon,
@@ -70,10 +76,19 @@ export const ScheduleView: React.FC = () => {
 
   // 2. Load and synchronize shifts from scheduleStorage
   const [shifts, setShifts] = useState<DoctorShift[]>(() => getStoredDoctorShifts());
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => getStoredLeaveRequests());
+  const [swapRequests, setSwapRequests] = useState<ShiftSwapRequest[]>(() => getStoredSwapRequests());
+  
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [isIncomingSwapsModalOpen, setIsIncomingSwapsModalOpen] = useState(false);
+  const [leaveReason, setLeaveReason] = useState('');
+  const [leaveDate, setLeaveDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     const handleSync = () => {
       setShifts(getStoredDoctorShifts());
+      setLeaveRequests(getStoredLeaveRequests());
+      setSwapRequests(getStoredSwapRequests());
     };
     window.addEventListener('clinic_schedule_updated', handleSync);
     window.addEventListener('storage', handleSync);
@@ -96,6 +111,7 @@ export const ScheduleView: React.FC = () => {
 
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const myIncomingSwaps = swapRequests.filter(s => s.receiverId === loggedInDoctor.id && s.status === 'pending_peer');
   const [editingShift, setEditingShift] = useState<DoctorShift | null>(null);
   const [readOnlyShiftModal, setReadOnlyShiftModal] = useState<DoctorShift | null>(null);
 
@@ -426,7 +442,27 @@ export const ScheduleView: React.FC = () => {
           </p>
         </div>
 
-        
+        <div className="flex items-center gap-3 flex-wrap">
+          {myIncomingSwaps.length > 0 && (
+            <button
+              onClick={() => setIsIncomingSwapsModalOpen(true)}
+              style={{ padding: '0 18px', height: '42px', backgroundColor: '#F59E0B', color: '#fff', borderRadius: '10px', fontSize: '14px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none', position: 'relative' }}
+            >
+              <Users className="w-4 h-4" />
+              <span>คำขอแลกเวรเข้า</span>
+              <span style={{ position: 'absolute', top: '-6px', right: '-6px', background: '#EF4444', color: 'white', borderRadius: '50%', width: '22px', height: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 'bold' }}>
+                {myIncomingSwaps.length}
+              </span>
+            </button>
+          )}
+          <button
+            onClick={() => setIsLeaveModalOpen(true)}
+            style={{ padding: '0 18px', height: '42px', backgroundColor: '#EF4444', color: '#fff', borderRadius: '10px', fontSize: '14px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '8px', cursor: 'pointer', border: 'none' }}
+          >
+            <CalendarIcon className="w-4 h-4" />
+            <span>แจ้งวันลา/ติดภารกิจ</span>
+          </button>
+        </div>
       </div>
 
       {/* Control Filter Bar */}
@@ -967,7 +1003,35 @@ export const ScheduleView: React.FC = () => {
             </div>
 
             {/* ===== Swap Request Form ===== */}
-            <form onSubmit={(e) => { e.preventDefault(); setToastMessage('ส่งคำขอแลกเวรเรียบร้อยแล้ว ระบบจะแจ้งเตือนเมื่อได้รับการพิจารณาอนุมัติ'); setTimeout(() => setToastMessage(null), 3000); setIsModalOpen(false); }} className="flex flex-col flex-1 min-h-0">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target);
+              const receiverShiftId = formData.get('swapDoctor');
+              const reason = formData.get('swapReason');
+              
+              if (!receiverShiftId || !reason) return;
+              
+              const receiverShift = shifts.find(s => s.id === receiverShiftId);
+              if (!receiverShift || !editingShift) return;
+
+              const newSwap = {
+                id: `SWP-${Date.now()}`,
+                requesterId: loggedInDoctor.id,
+                requesterName: loggedInDoctor.name,
+                requesterShiftDisplay: `${editingShift.shiftType} (${editingShift.startTime} - ${editingShift.endTime})`,
+                receiverId: receiverShift.doctorId,
+                receiverName: receiverShift.doctorName,
+                receiverShiftDisplay: `${receiverShift.shiftType} (${receiverShift.startTime} - ${receiverShift.endTime})`,
+                date: editingShift.date,
+                reason: reason as string,
+                status: 'pending_peer' as const
+              };
+              
+              saveStoredSwapRequests([...swapRequests, newSwap]);
+              setToastMessage('ส่งคำขอแลกเวรไปหาแพทย์ท่านนั้นแล้ว รอการยินยอมก่อนส่งให้ธุรการ');
+              setTimeout(() => setToastMessage(null), 3000);
+              setIsModalOpen(false);
+            }} className="flex flex-col flex-1 min-h-0">
               <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
 
                 <div className="text-xs font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2">
@@ -1007,6 +1071,7 @@ export const ScheduleView: React.FC = () => {
                     เหตุผลในการแลกเวร <span className="text-red-500">*</span>
                   </label>
                   <textarea
+                    name="swapReason"
                     rows={2}
                     required
                     placeholder="ระบุเหตุผลในการขอแลกเปลี่ยนเวร (เช่น ติดธุระด่วน, ป่วย ฯลฯ)"
@@ -1109,6 +1174,130 @@ export const ScheduleView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* MODAL: แจ้งวันลา/ติดภารกิจ */}
+      {isLeaveModalOpen && (
+        <div className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 bg-[#EF4444] text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white">
+                  <CalendarIcon className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm leading-tight">แจ้งวันหยุด/ติดภารกิจ</h3>
+                  <p className="text-[11px] text-white/80 mt-0.5">ระบบจะแจ้งเตือนธุรการไม่ให้จัดเวรในวันดังกล่าว</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setIsLeaveModalOpen(false)} className="p-1.5 rounded-lg text-white/80 hover:bg-white/20 transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const newLeave = {
+                id: `LV-${Date.now()}`,
+                doctorId: loggedInDoctor.id,
+                doctorName: loggedInDoctor.name,
+                startDate: leaveDate,
+                endDate: leaveDate,
+                reason: leaveReason,
+                status: 'pending' as const
+              };
+              saveStoredLeaveRequests([...leaveRequests, newLeave]);
+              setToastMessage('บันทึกการแจ้งวันลาเรียบร้อยแล้ว');
+              setTimeout(() => setToastMessage(null), 3000);
+              setIsLeaveModalOpen(false);
+            }} className="flex flex-col flex-1 min-h-0">
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1.5">วันที่ต้องการลา <span className="text-red-500">*</span></label>
+                  <input type="date" required value={leaveDate} onChange={e => setLeaveDate(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-600 block mb-1.5">เหตุผลการลา <span className="text-red-500">*</span></label>
+                  <textarea rows={3} required value={leaveReason} onChange={e => setLeaveReason(e.target.value)} placeholder="เช่น ลาพักร้อน, ไปสัมมนาต่างจังหวัด" className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/15 resize-none" />
+                </div>
+              </div>
+              <div className="shrink-0 px-6 py-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+                <button type="button" onClick={() => setIsLeaveModalOpen(false)} className="px-5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition-colors cursor-pointer">ยกเลิก</button>
+                <button type="submit" className="px-5 py-2.5 bg-[#EF4444] hover:bg-red-600 text-white rounded-xl text-xs font-bold shadow-xs cursor-pointer inline-flex items-center gap-2">
+                  <Check className="w-4 h-4 shrink-0" /><span>ยืนยันการแจ้งลา</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Incoming Swaps */}
+      {isIncomingSwapsModalOpen && (
+        <div className="fixed inset-0 z-[1200] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-2xl max-w-lg w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 bg-[#F59E0B] text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center text-white">
+                  <Users className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm leading-tight">คำขอแลกเวรเข้า (รอคุณอนุมัติ)</h3>
+                  <p className="text-[11px] text-white/80 mt-0.5">กดยอมรับเพื่อให้ธุรการตรวจสอบเป็นขั้นตอนสุดท้าย</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setIsIncomingSwapsModalOpen(false)} className="p-1.5 rounded-lg text-white/80 hover:bg-white/20 transition-colors cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+              {myIncomingSwaps.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-xs">ไม่มีคำขอแลกเวรเข้า</div>
+              ) : (
+                myIncomingSwaps.map(swap => (
+                  <div key={swap.id} className="p-4 bg-amber-50/50 border border-amber-200 rounded-xl">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-[10px] font-bold text-slate-600">{swap.requesterName.slice(0, 2)}</div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">{swap.requesterName}</div>
+                        <div className="text-[10px] text-slate-500">ขอแลกเวรวันที่ {swap.date}</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2 mb-4 bg-white p-3 rounded-lg border border-slate-200">
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-500">เวรของเขา:</span>
+                        <span className="font-bold text-slate-800">{swap.requesterShiftDisplay}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-500">มาเข้าเวรคุณ:</span>
+                        <span className="font-bold text-blue-600">{swap.receiverShiftDisplay}</span>
+                      </div>
+                      <div className="mt-2 text-[11px] text-slate-600 border-t border-slate-100 pt-2">
+                        <span className="font-bold">เหตุผล:</span> {swap.reason}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => {
+                        const updated = swapRequests.map(s => s.id === swap.id ? { ...s, status: 'rejected' as const } : s);
+                        saveStoredSwapRequests(updated);
+                      }} className="flex-1 py-2 bg-white text-slate-700 border border-slate-300 rounded-lg text-xs font-bold hover:bg-slate-100 cursor-pointer">
+                        ปฏิเสธ
+                      </button>
+                      <button onClick={() => {
+                        const updated = swapRequests.map(s => s.id === swap.id ? { ...s, status: 'pending_admin' as const } : s);
+                        saveStoredSwapRequests(updated);
+                        setToastMessage('ยินยอมรับการแลกเวรแล้ว (รอธุรการอนุมัติ)');
+                        setTimeout(() => setToastMessage(null), 3000);
+                      }} className="flex-1 py-2 bg-[#2563eb] text-white border border-transparent rounded-lg text-xs font-bold hover:bg-blue-700 cursor-pointer">
+                        ยอมรับการแลกเวร
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

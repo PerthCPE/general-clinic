@@ -104,7 +104,93 @@ export interface OfficerShiftSchedule {
   };
 }
 
+
+export interface LeaveRequest {
+  id: string;
+  doctorId: string;
+  doctorName: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface ShiftSwapRequest {
+  id: string;
+  requesterId: string;
+  requesterName: string;
+  requesterShiftDisplay: string;
+  receiverId: string;
+  receiverName: string;
+  receiverShiftDisplay: string;
+  date: string;
+  reason: string;
+  status: 'pending_peer' | 'pending_admin' | 'approved' | 'rejected';
+}
+
+const STORAGE_KEY_LEAVES = 'clinic_leave_requests_v4';
+const STORAGE_KEY_SWAPS = 'clinic_swap_requests_v4';
+
+export function getStoredLeaveRequests(): LeaveRequest[] {
+  const raw = localStorage.getItem(STORAGE_KEY_LEAVES);
+  if (raw) {
+    try {
+      return JSON.parse(raw);
+    } catch { return []; }
+  }
+  return [];
+}
+
+export function saveStoredLeaveRequests(requests: LeaveRequest[]) {
+  localStorage.setItem(STORAGE_KEY_LEAVES, JSON.stringify(requests));
+  notifyScheduleUpdate();
+}
+
+export function getStoredSwapRequests(): ShiftSwapRequest[] {
+  const raw = localStorage.getItem(STORAGE_KEY_SWAPS);
+  if (raw) {
+    try {
+      return JSON.parse(raw);
+    } catch { return []; }
+  }
+  // Provide initial mock swaps for demonstration
+  const initial: ShiftSwapRequest[] = [
+    {
+      id: 'SWP-2569-01',
+      requesterId: 'DOC-1',
+      requesterName: 'พญ.สุดา สุขสมบูรณ์',
+      requesterShiftDisplay: 'เวรเช้า (07:00 - 12:00)',
+      receiverId: 'DOC-2',
+      receiverName: 'นพ.วิชัย ชาญการแพทย์',
+      receiverShiftDisplay: 'เวรบ่าย (13:00 - 18:00)',
+      date: '15 ก.ย. 2569',
+      reason: 'ติดประชุมวิชาการแพทย์',
+      status: 'pending_admin'
+    },
+    {
+      id: 'SWP-2569-02',
+      requesterId: 'DOC-2',
+      requesterName: 'นพ.วิชัย ชาญการแพทย์',
+      requesterShiftDisplay: 'เวรบ่าย (13:00 - 18:00)',
+      receiverId: 'DOC-3',
+      receiverName: 'พญ.เกศรา รักษาดี',
+      receiverShiftDisplay: 'เวรเช้า (07:00 - 12:00)',
+      date: '18 ก.ย. 2569',
+      reason: 'ติดภารกิจครอบครัวต่างจังหวัด',
+      status: 'pending_peer'
+    }
+  ];
+  localStorage.setItem(STORAGE_KEY_SWAPS, JSON.stringify(initial));
+  return initial;
+}
+
+export function saveStoredSwapRequests(swaps: ShiftSwapRequest[]) {
+  localStorage.setItem(STORAGE_KEY_SWAPS, JSON.stringify(swaps));
+  notifyScheduleUpdate();
+}
+
 const STORAGE_KEY_SHIFTS = 'clinic_doctor_shifts_v4';
+
 const STORAGE_KEY_OVERRIDES = 'clinic_calendar_overrides_v4';
 const STORAGE_KEY_OFFICER_SCHEDULES = 'clinic_officer_schedules_v4';
 

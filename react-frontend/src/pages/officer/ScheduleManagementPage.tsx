@@ -23,17 +23,6 @@ interface ShiftSchedule {
   };
 }
 
-interface ShiftSwapItem {
-  id: string;
-  requesterName: string;
-  requesterShift: string;
-  receiverName: string;
-  receiverShift: string;
-  date: string;
-  reason: string;
-  status: 'pending' | 'approved' | 'rejected';
-}
-
 import { vitalsApi, type BackendDoctor } from '../../services/api';
 import {
   SYSTEM_DOCTORS,
@@ -43,17 +32,18 @@ import {
   saveStoredOfficerSchedules,
   applyOfficerBatchSchedule,
   applyOfficerDayEdit,
+  getStoredLeaveRequests,
+  getStoredSwapRequests,
+  saveStoredSwapRequests,
+  type LeaveRequest,
+  type ShiftSwapRequest
 } from '../../services/scheduleStorage';
-
-const initialSwapRequests: ShiftSwapItem[] = [
-  { id: 'SWP-2569-01', requesterName: 'พญ.สุดา สุขสมบูรณ์', requesterShift: 'เวรเช้า (07:00 - 12:00)', receiverName: 'นพ.วิชัย ชาญการแพทย์', receiverShift: 'เวรบ่าย (13:00 - 18:00)', date: '15 ก.ย. 2569', reason: 'ติดประชุมวิชาการแพทย์', status: 'pending' },
-  { id: 'SWP-2569-02', requesterName: 'นพ.วิชัย ชาญการแพทย์', requesterShift: 'เวรบ่าย (13:00 - 18:00)', receiverName: 'พญ.เกศรา รักษาดี', receiverShift: 'เวรเช้า (07:00 - 12:00)', date: '18 ก.ย. 2569', reason: 'ติดภารกิจครอบครัวต่างจังหวัด', status: 'pending' },
-];
 
 export const ScheduleManagementPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'calendar' | 'weekly' | 'employees'>('calendar');
   const [schedules, setSchedules] = useState<ShiftSchedule[]>(() => getStoredOfficerSchedules());
-  const [swapRequests, setSwapRequests] = useState<ShiftSwapItem[]>(initialSwapRequests);
+  const [swapRequests, setSwapRequests] = useState<ShiftSwapRequest[]>(() => getStoredSwapRequests());
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(() => getStoredLeaveRequests());
   
   const [viewMode, setViewMode] = useState<'monthly' | 'weekly' | 'daily'>('monthly');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -74,7 +64,7 @@ export const ScheduleManagementPage: React.FC = () => {
   const totalDoctors = schedules.length;
   const morningShifts = schedules.reduce((acc, s) => acc + Object.values(s.shifts).filter(v => v === 'morning').length, 0);
   const afternoonShifts = schedules.reduce((acc, s) => acc + Object.values(s.shifts).filter(v => v === 'afternoon').length, 0);
-  const pendingSwaps = swapRequests.filter(s => s.status === 'pending').length;
+  const pendingSwaps = swapRequests.filter(s => s.status === 'pending_admin').length;
 
   // Batch Assignment State (Use Case U2)
   const [batchForm, setBatchForm] = useState({
@@ -251,12 +241,12 @@ export const ScheduleManagementPage: React.FC = () => {
   };
 
   const handleApproveSwap = (id: string) => {
-    setSwapRequests(prev => prev.map(req => req.id === id ? { ...req, status: 'approved' } : req));
+    setSwapRequests(prev => prev.map(req => req.id === id ? { ...req, status: 'approved' as const } : req));
     toast.success('อนุมัติคำขอแลกเวรเรียบร้อยแล้ว');
   };
 
   const handleRejectSwap = (id: string) => {
-    setSwapRequests(prev => prev.map(req => req.id === id ? { ...req, status: 'rejected' } : req));
+    setSwapRequests(prev => prev.map(req => req.id === id ? { ...req, status: 'rejected' as const } : req));
     toast.error('ปฏิเสธคำขอแลกเวรแล้ว');
   };
 
@@ -342,7 +332,7 @@ export const ScheduleManagementPage: React.FC = () => {
               <polyline points="7 23 3 19 7 15"/>
               <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
             </svg>
-            <span>คำขอแลกเวร ({swapRequests.filter(r => r.status === 'pending').length})</span>
+            <span>คำขอแลกเวร ({swapRequests.filter(r => r.status === 'pending_admin').length})</span>
           </button>
           <button className="dms-btn-primary" onClick={() => { setActiveModal('addBatchSchedule'); setHasPreviewed(false); }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
@@ -392,7 +382,7 @@ export const ScheduleManagementPage: React.FC = () => {
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
             </div>
           </div>
-          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{swapRequests.filter(r => r.status === 'pending').length} <span style={{ fontSize: '16px', fontWeight: '500', color: '#64748B' }}>รายการ</span></div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{swapRequests.filter(r => r.status === 'pending_admin').length} <span style={{ fontSize: '16px', fontWeight: '500', color: '#64748B' }}>รายการ</span></div>
           <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>คลิกเพื่อพิจารณาคำขอแลกเวร</div>
         </div>
 
@@ -546,8 +536,17 @@ export const ScheduleManagementPage: React.FC = () => {
                       )}
                     </div>
 
-                    {cell.isCurrentMonth && (
+                    {cell.isCurrentMonth && (() => {
+                      const leavesOnDay = leaveRequests.filter(lr => lr.startDate === cell.dateStr);
+                      return (
                       <div className="cell-shifts-list">
+                        {leavesOnDay.map(lv => (
+                          <div key={lv.id} className="cell-doctor-pill" style={{ background: '#FEE2E2', color: '#EF4444', border: '1px solid #FCA5A5' }}>
+                            <span className="pill-dot" style={{ background: '#EF4444' }}></span>
+                            <span className="pill-doc-name">{lv.doctorName.replace('พญ. ', '').replace('นพ. ', '')}</span>
+                            <span className="pill-shift-tag" style={{ background: 'transparent' }}>ลา/ติดธุระ</span>
+                          </div>
+                        ))}
                         {filteredDoctors.slice(0, 3).map(doc => {
                           const shift = dayOverrides[doc.id] || (idx % 3 === 0 ? 'morning' : (idx % 2 === 0 ? 'afternoon' : 'off'));
                           if (shift === 'off') return null;
@@ -563,7 +562,8 @@ export const ScheduleManagementPage: React.FC = () => {
                           <div className="cell-more-badge">+{filteredDoctors.length - 3} ท่าน</div>
                         )}
                       </div>
-                    )}
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -895,7 +895,7 @@ export const ScheduleManagementPage: React.FC = () => {
                       <div className="swap-party requester">
                         <span className="party-role">ผู้ขอแลก:</span>
                         <span className="party-name">{req.requesterName}</span>
-                        <span className="party-shift">{req.requesterShift}</span>
+                        <span className="party-shift">{req.requesterShiftDisplay}</span>
                       </div>
                       <div className="swap-arrow-icon">
                         <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="22" height="22">
@@ -908,7 +908,7 @@ export const ScheduleManagementPage: React.FC = () => {
                       <div className="swap-party receiver">
                         <span className="party-role">ผู้รับแลก:</span>
                         <span className="party-name">{req.receiverName}</span>
-                        <span className="party-shift">{req.receiverShift}</span>
+                        <span className="party-shift">{req.receiverShiftDisplay}</span>
                       </div>
                     </div>
                     <div className="swap-reason-box">
@@ -916,7 +916,7 @@ export const ScheduleManagementPage: React.FC = () => {
                       <span className="reason-text">{req.reason}</span>
                     </div>
                     <div className="swap-card-actions">
-                      {req.status === 'pending' ? (
+                      {req.status === 'pending_admin' ? (
                         <>
                           <button className="dms-btn-primary swap-approve-btn" onClick={() => handleApproveSwap(req.id)}>
                             อนุมัติคำขอ
