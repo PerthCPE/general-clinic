@@ -1101,6 +1101,7 @@ export interface BackendAppointment {
   appointment_date: string;
   appointment_time: string;
   status: string;
+  department: string;
   clinical_note: string;
   doctor?: BackendUser;
   patient?: BackendPatient;
@@ -1109,7 +1110,7 @@ export interface BackendAppointment {
 
 export const appointmentApi = {
   getList: () => request<BackendAppointment[]>('/api/appointments'),
-  create: (payload: { doctor_id: number; patient_id: number; register_id: number; appointment_date: string; appointment_time: string; clinical_note: string; }) =>
+  create: (payload: { doctor_id: number; patient_id: number; register_id: number; appointment_date: string; appointment_time: string; department: string; clinical_note: string; }) =>
     request<BackendAppointment>('/api/appointments', {
       method: 'POST',
       body: JSON.stringify(payload),

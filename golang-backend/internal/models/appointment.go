@@ -11,6 +11,8 @@ type Appointment struct {
 	AppointmentDate string    `gorm:"type:date;not null" json:"appointment_date"`
 	AppointmentTime string    `gorm:"type:time;not null" json:"appointment_time"`
 	Status          string    `gorm:"default:'scheduled'" json:"status"`
+	// แผนกการรักษา — ค่าเทียบได้ตรงๆ (ตรงกับ doctors.specialty) ไม่ใช่ข้อความฝังใน ClinicalNote แบบเดิม
+	Department      string    `gorm:"default:''" json:"department"`
 	ClinicalNote    string    `json:"clinical_note"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`

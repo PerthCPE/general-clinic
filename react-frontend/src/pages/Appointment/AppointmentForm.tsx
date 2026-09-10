@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Autocomplete, TextField, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { useAuth } from '../../context/AuthContext';
 import { patientApi, vitalsApi, appointmentApi, type BackendPatient, type BackendDoctor } from '../../services/api';
+import { TREATMENT_DEPARTMENTS } from '../../config/roles';
 import './AppointmentForm.css';
 
 interface PatientOption {
@@ -91,13 +92,6 @@ export default function AppointmentForm() {
       return;
     }
 
-    let deptName = 'ตรวจโรคทั่วไป (General Practice)';
-    if (department === 'medicine') deptName = 'อายุรกรรม (Internal Medicine)';
-    else if (department === 'psychology') deptName = 'จิตวิทยา (Psychology)';
-    else if (department === 'physical') deptName = 'กายภาพบำบัด (Physical Therapy)';
-
-    const clinicalNote = `หมวด: ${deptName}${notes ? '\nหมายเหตุ: ' + notes : ''}`;
-
     setIsSubmitting(true);
     setErrorMsg(null);
     try {
@@ -107,7 +101,8 @@ export default function AppointmentForm() {
         register_id: 0,
         appointment_date: date,
         appointment_time: time + ':00',
-        clinical_note: clinicalNote,
+        department,
+        clinical_note: notes,
       });
 
       setOpenAlert(true);
@@ -260,10 +255,9 @@ export default function AppointmentForm() {
               <label>หมวดการรักษา <span className="required">*</span></label>
               <select value={department} onChange={(e) => setDepartment(e.target.value)}>
                 <option value="" disabled>เลือกหมวดการรักษา...</option>
-                <option value="general">ตรวจโรคทั่วไป (General Practice)</option>
-                <option value="medicine">อายุรกรรม (Internal Medicine)</option>
-                <option value="psychology">จิตวิทยา (Psychology)</option>
-                <option value="physical">กายภาพบำบัด (Physical Therapy)</option>
+                {TREATMENT_DEPARTMENTS.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
               </select>
             </div>
 

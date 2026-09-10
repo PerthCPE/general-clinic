@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus } from 'lucide-react';
 import { adminApi, type BackendUser } from '../../services/api';
+import { TREATMENT_DEPARTMENTS } from '../../config/roles';
 import './UserManagement.css';
 
 interface SystemUser {
@@ -20,8 +21,10 @@ interface SystemUser {
 }
 
 // === สร้าง Mapping ตำแหน่งงาน ➡️ แผนกที่สอดคล้องกัน (สำหรับคลินิกขนาดกลาง) ===
+// รายชื่อแผนกของ "แพทย์" ใช้ TREATMENT_DEPARTMENTS จาก config/roles.ts เพื่อให้ตรงกับ
+// doctors.specialty จริง และตรงกับแผนกที่เลือกได้ในฟอร์มนัดหมาย/แดชบอร์ดนัดหมาย (single source)
 const ROLE_DEPARTMENTS: Record<string, string[]> = {
-  'แพทย์': ['ห้องตรวจโรคทั่วไป (OPD)', 'แผนกอุบัติเหตุและฉุกเฉิน (ER)', 'ห้องตรวจอายุรกรรม', 'ห้องตรวจศัลยกรรม', 'ห้องตรวจกุมารเวชกรรม'],
+  'แพทย์': TREATMENT_DEPARTMENTS,
   'พยาบาลและผู้ช่วยพยาบาล': ['จุดคัดกรองผู้ป่วย (Triage)', 'แผนกอุบัติเหตุและฉุกเฉิน (ER)', 'ห้องตรวจโรคทั่วไป (OPD)'],
   'พนักงานเวชระเบียน': ['จุดคัดกรองผู้ป่วย (Triage)', 'ห้องตรวจโรคทั่วไป (OPD)'],
   'เภสัชกร': ['แผนกเภสัชกรรมห้องยา (Pharmacy)'],

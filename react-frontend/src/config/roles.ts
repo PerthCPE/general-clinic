@@ -85,6 +85,15 @@ export const DEMO_USERS: Record<UserRole, User> = {
   },
 };
 
+// รายชื่อแผนกการรักษาจริงของคลินิก — single source of truth ให้ทั้งระบบใช้ร่วมกัน
+// อ้างอิงตรงจากค่า doctors.specialty จริงในฐานข้อมูล (ดู golang-backend/internal/config/db.go
+// seedDoctorProfiles) ห้ามเพิ่มชื่อแผนกใหม่ที่นี่โดยไม่มี specialty จริงในตาราง doctors รองรับ
+// ไม่งั้นจะย้อนกลับไปเป็นปัญหาเดิม (แต่ละหน้าคิดชื่อแผนกขึ้นเองไม่ตรงกัน)
+//
+// ใช้ร่วมกันใน: หน้าจัดการบัญชี (UserManagement.tsx, ตำแหน่ง "แพทย์"),
+// ฟอร์มนัดหมาย (AppointmentForm.tsx), และแดชบอร์ดนัดหมาย (AppointmentDashboard.tsx)
+export const TREATMENT_DEPARTMENTS = ['อายุรกรรมทั่วไป', 'เวชศาสตร์ครอบครัว', 'กุมารเวชกรรม'];
+
 // เมนูใน Sidebar สำหรับแต่ละ Role
 export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
   registrar: [

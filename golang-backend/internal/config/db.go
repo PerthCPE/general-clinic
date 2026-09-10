@@ -245,6 +245,41 @@ func ConnectDB() {
 	database.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_visit_queue_unique ON visit_records (queue_id) WHERE queue_id IS NOT NULL")
 	database.Exec("CREATE INDEX IF NOT EXISTS idx_visit_records_queue_number ON visit_records (queue_number)")
 
+	// ⚡ แผนกการรักษาของนัดหมาย: เก็บเป็นคอลัมน์ตรงๆ แทนการฝังไว้ใน clinical_note
+	//
+	// เดิมฟอร์มนัดหมายเก็บชื่อแผนกเป็นข้อความนำหน้าใน clinical_note แบบ
+	// "หมวด: <ชื่อแผนก>\nหมายเหตุ: ..." ทำให้เทียบค่าแผนกตรงๆ ไม่ได้เลย (การ์ดสถิติแยกตาม
+	// แผนกในแดชบอร์ดนัดหมายจึงเป็น 0 คนเสมอ ไม่ว่าจะมีนัดหมายกี่รายการก็ตาม)
+	// ย้ายมาเก็บเป็นคอลัมน์ department ตรงๆ ค่าต้องตรงกับ doctors.specialty จริง
+	// (ดู TREATMENT_DEPARTMENTS ใน react-frontend/src/config/roles.ts — single source of truth)
+	database.Exec("ALTER TABLE appointments ADD COLUMN IF NOT EXISTS department text DEFAULT ''")
+
+	// Backfill แถวเก่าที่เคยฝังชื่อแผนกไว้ใน clinical_note แบบ "หมวด: <ชื่อแผนกเก่า>"
+	// map เฉพาะชื่อที่พอแปลตรงกับแผนกจริงได้เท่านั้น (อายุรกรรม / ตรวจโรคทั่วไป≈เวชศาสตร์ครอบครัว)
+	// "จิตวิทยา" กับ "กายภาพบำบัด" ไม่มี specialty จริงรองรับในตาราง doctors เลย จึงเจตนาไม่ map
+	// ให้ปล่อย department ว่างไว้ ดีกว่าเดาให้ผิดแผนก — ข้อความเดิมยังอยู่ครบใน clinical_note
+	database.Exec(`
+		UPDATE appointments
+		SET department = CASE
+			WHEN clinical_note ~ 'หมวด: อายุรกรรม' THEN 'อายุรกรรมทั่วไป'
+			WHEN clinical_note ~ 'หมวด: ตรวจโรคทั่วไป' THEN 'เวชศาสตร์ครอบครัว'
+			ELSE ''
+		END
+		WHERE (department IS NULL OR department = '')
+		  AND clinical_note ~ '^หมวด: '
+	`)
+
+	// ตัด prefix "หมวด: ...\n" ที่ backfill ไปแล้วออกจาก clinical_note เหลือแต่เนื้อหาหมายเหตุจริง
+	database.Exec(`
+		UPDATE appointments
+		SET clinical_note = regexp_replace(clinical_note, '^หมวด: [^\n]*\n?(หมายเหตุ: )?', '')
+		WHERE clinical_note ~ '^หมวด: '
+	`)
+
+	// Normalize ค่า department ของบัญชีผู้ใช้เดิมที่สะกดไม่ตรงชุดแผนกใหม่
+	// (สำรวจพบ 1 บัญชี: "อายุรกรรม" -> ชื่อแผนกจริงคือ "อายุรกรรมทั่วไป")
+	database.Exec("UPDATE users SET department = 'อายุรกรรมทั่วไป' WHERE department = 'อายุรกรรม'")
+
 	DB = database
 
 	seedDoctorProfiles()

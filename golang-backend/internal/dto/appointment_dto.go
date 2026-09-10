@@ -7,6 +7,7 @@ type CreateAppointmentRequest struct {
 	RegisterID      uint   `json:"register_id"` // พนักงานรับนัด
 	AppointmentDate string `json:"appointment_date" binding:"required"`
 	AppointmentTime string `json:"appointment_time" binding:"required"`
+	Department      string `json:"department"`
 	ClinicalNote    string `json:"clinical_note"`
 }
 

@@ -42,6 +42,7 @@ func (ctrl *AppointmentController) CreateAppointment(c *gin.Context) {
 		PatientID:       req.PatientID,
 		AppointmentDate: req.AppointmentDate,
 		AppointmentTime: req.AppointmentTime,
+		Department:      req.Department,
 		ClinicalNote:    req.ClinicalNote,
 		Status:          "scheduled",
 	}
