@@ -69,21 +69,9 @@ export const QueueTable: React.FC<QueueTableProps> = ({
   onExamine,
   onUpdateStatus,
   statusFilter = 'All',
-  setStatusFilter,
-  statusCounts
 }) => {
   const { language, t } = useLanguage();
   const [queueSearch, setQueueSearch] = useState('');
-
-  const getFilterLabel = (st: string) => {
-    switch (st) {
-      case 'All': return t('filterAll');
-      case 'Waiting': return t('filterWaiting');
-      case 'Examining': return t('filterExamining');
-      case 'Completed': return t('filterCompleted');
-      default: return st;
-    }
-  };
 
   /**
    * ตัวกรองระดับความรุนแรง (Triage Filter)
@@ -126,6 +114,14 @@ export const QueueTable: React.FC<QueueTableProps> = ({
       value: lv,
       label: (language === 'th' ? TRIAGE_SHORT_LABELS[lv]?.th : TRIAGE_SHORT_LABELS[lv]?.en) || lv,
       count: triageCounts[lv] || 0,
+      activeStyle: {
+        backgroundColor: triageTone(lv).dot,
+        color: lv === 'Level 3: Urgent' ? '#422006' : '#FFFFFF',
+      },
+      activeCountStyle: {
+        backgroundColor: 'rgba(15, 23, 42, 0.16)',
+        color: lv === 'Level 3: Urgent' ? '#422006' : '#FFFFFF',
+      },
     })),
   ];
 
@@ -187,12 +183,12 @@ export const QueueTable: React.FC<QueueTableProps> = ({
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
       {/* แถวบน: หัวข้อชิดซ้าย แถบกรองสถานะชิดขวา */}
-      <div className="p-6 pb-4 flex flex-col md:flex-row md:items-start gap-4 border-b border-slate-100">
-        <div className="flex-1 min-w-0">
+      <div className="p-6 pb-2 flex flex-col md:flex-row md:items-start gap-4">
+        <div className="flex-1 min-w-0 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2 className="text-xl font-bold text-slate-800 tracking-tight">
             {t('todaysQueue')}
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500">
             {/* ไม่ต้องขึ้นคำค้นซ้ำตรงนี้ เพราะผู้ใช้เห็นสิ่งที่ตัวเองพิมพ์ในช่องค้นหาอยู่แล้ว
                 และข้อความยาวไม่เท่ากันจะทำให้ความกว้างขยับ */}
             {language === 'th'
@@ -201,19 +197,6 @@ export const QueueTable: React.FC<QueueTableProps> = ({
           </p>
         </div>
 
-        {/* Status Quick Filters */}
-        {setStatusFilter && (
-          <StatusFilterTabs
-            className="md:ml-auto"
-            value={statusFilter}
-            onChange={setStatusFilter}
-            options={['All', 'Waiting', 'Examining', 'Completed'].map((st) => ({
-              value: st,
-              label: getFilterLabel(st),
-              count: statusCounts?.[st],
-            }))}
-          />
-        )}
       </div>
 
       {/* แถวล่าง: ช่องค้นหาชิดซ้าย ตัวกรองระดับความรุนแรงชิดขวา
@@ -221,14 +204,14 @@ export const QueueTable: React.FC<QueueTableProps> = ({
           ตัวกรองระดับไม่ยอมให้หด (shrink-0) ถ้าจอแคบจะตัดลงบรรทัดใหม่แทน
           เพราะถ้าปล่อยให้หด ปุ่มจะถูกบีบจนต้องมีแถบเลื่อนซึ่งผู้ใช้มักมองไม่เห็น */}
       <div className="px-6 py-3 flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/40">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <div className="relative w-full lg:w-[40%] lg:max-w-[560px] lg:flex-none min-w-[200px]">
+          <Search className="w-4.5 h-4.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={queueSearch}
             onChange={(e) => setQueueSearch(e.target.value)}
             placeholder={language === 'th' ? 'ค้นหาชื่อผู้ป่วย, เลข HN, เลข VN, เลขบัตรประชาชน, ลำดับคิว...' : 'Search Patient Name, HN, VN, National ID, Queue...'}
-            className="w-full pl-10 pr-8 py-2 bg-white hover:bg-slate-50 focus:bg-white text-slate-800 text-xs rounded-xl border border-slate-200 focus:outline-hidden transition-all shadow-2xs font-sans placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
+            className="w-full pl-10 pr-9 py-2.5 bg-white hover:bg-slate-50 focus:bg-white text-slate-800 text-sm rounded-xl border border-slate-200 focus:outline-hidden transition-all shadow-2xs font-sans placeholder:text-slate-400 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15"
           />
           {queueSearch && (
             <button
@@ -244,6 +227,7 @@ export const QueueTable: React.FC<QueueTableProps> = ({
 
         <StatusFilterTabs
           className="ml-auto"
+          equalWidth
           value={triageFilter}
           onChange={setTriageFilter}
           options={triageFilterOptions}
@@ -252,7 +236,7 @@ export const QueueTable: React.FC<QueueTableProps> = ({
 
       {/* Patients Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
+        <table className="w-full table-fixed text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-200/80 text-xs font-semibold text-slate-500 tracking-wider">
               <th className="py-5 px-6 w-28 text-center">{t('colQueueNo')}</th>
@@ -305,12 +289,12 @@ export const QueueTable: React.FC<QueueTableProps> = ({
 
                   {/* Patient Name */}
                   <td className="py-5 px-6 font-medium text-slate-900">
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-slate-900">
+                    <div className="flex h-10 min-w-0 flex-col justify-center">
+                      <span className="block h-5 shrink-0 truncate leading-5 font-semibold text-slate-900" title={patient.name}>
                         {patient.name}
                       </span>
                       {patient.chiefComplaint && (
-                        <span className="text-[12px] text-slate-400 font-normal truncate max-w-xs">
+                        <span className="block h-5 shrink-0 leading-5 text-[12px] text-slate-400 font-normal truncate max-w-xs">
                           {translateClinicalText(patient.chiefComplaint, language)}
                         </span>
                       )}
@@ -324,14 +308,17 @@ export const QueueTable: React.FC<QueueTableProps> = ({
 
                   {/* Status */}
                   <td className="py-5 px-6 text-center">
-                    <StatusBadge status={patient.status} />
+                    <span className="inline-flex w-[104px] [&>span]:w-full">
+                      <StatusBadge status={patient.status} />
+                    </span>
                   </td>
 
                   {/* Waiting Time */}
                   <td className="py-5 px-6 text-slate-600 font-medium">
-                    <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                    <div className="grid w-fit mx-auto grid-cols-[14px_auto_auto] items-center gap-x-1.5 whitespace-nowrap">
                       <Clock className="w-3.5 h-3.5 shrink-0 text-slate-400" />
-                      <span>{patient.waitingTimeMinutes} {language === 'th' ? 'นาที' : 'min'}</span>
+                      <span className="min-w-[3ch] text-right tabular-nums">{patient.waitingTimeMinutes}</span>
+                      <span>{language === 'th' ? 'นาที' : 'min'}</span>
                     </div>
                   </td>
 
@@ -339,7 +326,11 @@ export const QueueTable: React.FC<QueueTableProps> = ({
                   <td className="py-5 px-6 text-center">
                     <button
                       onClick={() => onExamine(patient)}
-                      className="px-4 py-1.5 bg-[#2563eb] hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-2xs hover:shadow-xs active:scale-95 transition-all inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                      className={`w-[116px] px-3 py-1.5 rounded-lg text-xs font-semibold shadow-2xs hover:shadow-xs active:scale-95 transition-all inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                        patient.status === 'Completed'
+                          ? 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                          : 'bg-[#2563eb] hover:bg-blue-700 text-white'
+                      }`}
                     >
                       {patient.status === 'Completed' ? (
                         <Edit3 className="w-3.5 h-3.5 shrink-0" />

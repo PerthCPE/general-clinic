@@ -7,6 +7,7 @@ import { displayVN } from '../utils/vnGenerator';
 import { formatNationalId, rawNationalId } from '../utils/nationalId';
 import { findAllergyConflicts, describeConflict } from '../utils/allergyCheck';
 import { fmtVital } from '../utils/vitals';
+import { triageShortLabel, triageTone } from '../utils/triage';
 import {
   Stethoscope,
   HeartPulse,
@@ -132,6 +133,24 @@ const NoData: React.FC<{ lang: string }> = ({ lang }) => (
     {lang === 'th' ? 'ไม่มีข้อมูล' : 'No data'}
   </span>
 );
+
+/** ป้ายระดับความรุนแรง ใช้สีและชื่อชุดเดียวกับหน้าคิวผู้ป่วย */
+const TriageLevelBadge: React.FC<{ level?: string; language: string }> = ({ level, language }) => {
+  const label = triageShortLabel(level, language);
+  if (!label) return null;
+
+  const tone = triageTone(level);
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap"
+      style={{ backgroundColor: tone.bg, borderColor: tone.border, color: tone.text }}
+      title={level}
+    >
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tone.dot }} />
+      {label}
+    </span>
+  );
+};
 
 /**
  * ==============================================================================
@@ -807,20 +826,24 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
    * ถ้าเปลี่ยนเนื้อหาเฉยๆ จอจะค้างอยู่ตรงกลางแท็บใหม่ ไม่เห็นหัวข้อว่าอยู่แท็บอะไร
    * เลื่อนกลับไปที่แถบแท็บให้ ทำให้เริ่มอ่านแท็บใหม่จากบนสุดเสมอ
    */
+  const topNavigationRef = React.useRef<HTMLDivElement>(null);
   const tabCardRef = React.useRef<HTMLDivElement>(null);
 
-  const goToTab = (id: ExamTabId) => {
+  const goToTab = React.useCallback((id: ExamTabId) => {
     setActiveTab(id);
 
-    // หัก 90px เผื่อ Topbar ที่ตรึงอยู่ด้านบน (สูง 74px) ไม่งั้นแถบแท็บจะไปอยู่ใต้ Topbar
-    // ใช้ requestAnimationFrame เพื่อให้ React วาดแท็บใหม่เสร็จก่อนค่อยวัดตำแหน่ง
+    // เว้นพื้นที่ตามความสูงจริงของ Topbar + แถบคำสั่งที่ติดอยู่ด้านบน
+    // ถ้าใช้ค่าคงที่ เนื้อหาบรรทัดแรกจะถูกแถบแท็บบังเมื่อความสูงแถบคำสั่งเปลี่ยนตามขนาดจอ
     requestAnimationFrame(() => {
       const el = tabCardRef.current;
       if (!el) return;
-      const top = el.getBoundingClientRect().top + window.scrollY - 90;
+      const topbarHeight = 74;
+      const navigationHeight = topNavigationRef.current?.offsetHeight ?? 77;
+      const stickyOffset = topbarHeight + navigationHeight + 8;
+      const top = el.getBoundingClientRect().top + window.scrollY - stickyOffset;
       window.scrollTo({ top, behavior: 'smooth' });
     });
-  };
+  }, []);
 
   const activeTabIndex = EXAM_TABS.findIndex((tab) => tab.id === activeTab);
   const prevTab = activeTabIndex > 0 ? EXAM_TABS[activeTabIndex - 1] : null;
@@ -828,6 +851,54 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
     activeTabIndex >= 0 && activeTabIndex < EXAM_TABS.length - 1
       ? EXAM_TABS[activeTabIndex + 1]
       : null;
+
+  // ลูกศรซ้าย/ขวาเปลี่ยนแท็บตามลำดับ โดยไม่แย่งปุ่มลูกศรจากช่องกรอกข้อมูล
+  // หรือคอมโพเนนต์เลือกค่าที่ต้องใช้ลูกศรควบคุมภายในอยู่แล้ว
+  useEffect(() => {
+    const handleTabArrowNavigation = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.repeat ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')
+      ) return;
+
+      const target = event.target;
+      if (target instanceof HTMLElement && (
+        target.isContentEditable ||
+        target.closest('input, textarea, select, [role="textbox"], [role="combobox"], [role="listbox"], [role="slider"], [role="dialog"], dialog')
+      )) return;
+
+      const currentIndex = EXAM_TABS.findIndex((tab) => tab.id === activeTab);
+      if (currentIndex < 0) return;
+
+      const nextIndex = Math.max(
+        0,
+        Math.min(
+          EXAM_TABS.length - 1,
+          currentIndex + (event.key === 'ArrowRight' ? 1 : -1)
+        )
+      );
+      if (nextIndex === currentIndex) return;
+
+      event.preventDefault();
+      const nextId = EXAM_TABS[nextIndex].id;
+      goToTab(nextId);
+
+      requestAnimationFrame(() => {
+        tabCardRef.current
+          ?.querySelector<HTMLButtonElement>(`[data-exam-tab="${nextId}"]`)
+          ?.focus({ preventScroll: true });
+      });
+    };
+
+    window.addEventListener('keydown', handleTabArrowNavigation);
+    return () => window.removeEventListener('keydown', handleTabArrowNavigation);
+  }, [activeTab, goToTab]);
 
   // Status State
   const [status, setStatus] = useState<QueueStatus>(patient.status === 'Waiting' ? 'Examining' : patient.status);
@@ -930,7 +1001,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
   // Assessment & Diagnosis State
   const [primaryDiag, setPrimaryDiag] = useState<DiagnosisItem | null>(
-    patient.primaryDiagnosis || { code: 'J02.9', name: 'Acute pharyngitis, unspecified (คออักเสบเฉียบพลัน)' }
+    patient.primaryDiagnosis || null
   );
   const [secondaryDiags, setSecondaryDiags] = useState<DiagnosisItem[]>(patient.secondaryDiagnoses || []);
   const [diagSearch, setDiagSearch] = useState('');
@@ -2359,16 +2430,16 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-16">
       {/* Top Navigation & Status Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+      <div ref={topNavigationRef} className="sticky top-[74px] z-40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
           {/* ปุ่มลูกศรกลับด้านบน ต้องคืนคิวเหมือนปุ่ม "ออกจากหน้าตรวจ" ด้านล่าง
               ไม่งั้นแพทย์ที่กดปุ่มนี้แทนจะทิ้งผู้ป่วยค้างสถานะ "กำลังตรวจ" ไว้
               ผ่านกล่องยืนยันเดียวกัน เพื่อกันการกดพลาดแล้วข้อมูลที่กรอกหาย */}
           <button
             onClick={handleExitExamination}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors flex items-center gap-1 text-xs font-semibold cursor-pointer"
+            className="flex items-center gap-2 text-xs font-bold text-slate-700 hover:text-blue-600 bg-slate-100 hover:bg-blue-50 px-3.5 py-2 rounded-xl transition-all border border-slate-200 hover:border-blue-200 cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 text-blue-600" />
             <span>{t('backToQueue')}</span>
           </button>
           <div className="h-5 w-px bg-slate-200" />
@@ -2388,6 +2459,16 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
         {/* Action Buttons Header */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
+            type="button"
+            onClick={handleCancelVisit}
+            className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <XCircle className="w-3.5 h-3.5" />
+            <span>{language === 'th' ? 'ยกเลิกการรับบริการ' : 'Cancel Visit'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleSaveDraft}
             className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
           >
@@ -2396,6 +2477,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={() => handleCompleteVisit()}
             className="px-4 py-1.5 bg-[#2563eb] hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer"
           >
@@ -2436,124 +2518,76 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
       {/* PATIENT INFORMATION BANNER - Modern High-Legibility Light Layout */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
-        <div className="p-6 sm:p-7 space-y-6">
+        <div className="p-5 sm:p-7 space-y-5">
           {/* Main Patient Header Row */}
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[#2563eb] text-white flex items-center justify-center font-bold text-xl shrink-0 shadow-xs">
+          <div className="flex items-center gap-4 border-b border-slate-100 pb-5">
+              <div className="w-16 h-16 rounded-2xl bg-[#2563eb] text-white flex items-center justify-center font-bold text-2xl shrink-0 shadow-sm">
                 {patient.name.charAt(0)}
               </div>
 
-              <div className="space-y-1">
+              <div className="min-w-0 space-y-1">
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <h2 className="text-xl font-bold text-slate-900 tracking-tight">{patient.name}</h2>
-                  {/* เลขคิวใช้รูปแบบเดียวกับ HN / VN / เลขบัตร คือ "ป้าย: ค่า"
-                      เดิมเขียนเป็น "คิว #Q0001" ซึ่งเป็นรูปแบบเดียวในแถวนี้ที่ไม่เหมือนใคร
-                      ทำให้ตากวาดหาเลขไม่เจอในจังหวะเดียวกับป้ายอื่น
-                      และคัดลอกไม่ได้ทั้งที่เป็นเลขอ้างอิงที่ต้องพิมพ์ต่อบ่อยพอกัน */}
-                  <CopyableText label={language === 'th' ? 'คิว' : 'Queue'} value={patient.queueNo} className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
-                  <CopyableText label="HN" value={patient.hn} className="bg-blue-50 text-blue-700 border border-blue-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
-                  <CopyableText label="VN" value={displayVN(patient.vn)} className="bg-purple-50 text-purple-700 border border-purple-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
-                  {/* แสดงแบบมีขีดคั่นให้อ่านง่าย แต่คัดลอกได้เป็นตัวเลขล้วน
-                      เพราะระบบอื่นที่เอาไปวางต่อรับเฉพาะตัวเลข */}
-                  <CopyableText label={language === 'th' ? 'เลขบัตร' : 'ID'} value={formatNationalId(nationalId)} copyValue={rawNationalId(nationalId)} className="bg-amber-50 text-amber-800 border border-amber-200 text-xs font-mono font-bold px-2.5 py-0.5 rounded-full" />
-                  <span className="bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                    {language === 'th'
-                      ? status === 'Waiting' ? 'รอตรวจ'
-                        : status === 'Examining' ? 'กำลังตรวจ'
-                        : (status as string) === 'Lab' || (status as string) === 'Pending Laboratory' ? 'รอผลแล็บ'
-                        : status === 'Pending Pharmacy' ? 'รอรับยา'
-                        : status === 'Completed' ? 'ตรวจเสร็จแล้ว'
-                        : status
-                      : status}
-                  </span>
+                  <TriageLevelBadge level={patient.triage?.level} language={language} />
                 </div>
-                <p className="text-xs text-slate-500 font-medium">
-                  {language === 'th'
-                    ? 'ประวัติข้อมูลส่วนตัวผู้ป่วย • ระบบเวชระเบียนผู้ป่วยนอก (OPD EMR)'
-                    : "Patient's Profile • OPD Electronic Medical Record"}
-                </p>
+
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                  <CopyableText label={language === 'th' ? 'คิว' : 'Queue'} value={patient.queueNo} />
+                  <CopyableText label="HN" value={patient.hn} />
+                  <CopyableText label="VN" value={displayVN(patient.vn)} />
+                  <CopyableText
+                    label={language === 'th' ? 'เลขบัตร' : 'ID'}
+                    value={formatNationalId(nationalId)}
+                    copyValue={rawNationalId(nationalId)}
+                  />
+                </div>
               </div>
-            </div>
-
-
           </div>
 
-          {/* Single Unified Profile Card: Demographics + Insurance + Visit */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3 shadow-xs">
-            <div className="flex items-center gap-2 border-b border-slate-200 pb-2.5 text-sm font-bold text-slate-900">
-              <div className="p-1.5 rounded-lg bg-blue-100/80 text-blue-700">
+          {/* ข้อมูลที่ใช้ประกอบการตรวจ ไม่แสดงชื่อและเลขบัตรซ้ำจากด้านบน */}
+          <section className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+              <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700">
                 <User className="w-4 h-4" />
               </div>
-              <span>{language === 'th' ? 'ข้อมูลพื้นฐาน' : 'Demographics'}</span>
+              <span>{language === 'th' ? 'ข้อมูลพื้นฐาน' : 'Basic information'}</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
-              {/* Box 1: Full Name */}
-              <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'ชื่อ - นามสกุล :' : 'Full Name :'}</span>
-                <span className="font-bold text-slate-900 text-xs">{patient.name}</span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-xs">
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <span className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'th' ? 'อายุ' : 'Age'}</span>
+                <span className="font-bold text-slate-900">{patient.age} {language === 'th' ? 'ปี' : 'yrs'}</span>
               </div>
-
-              {/* Box 2: Age & Gender */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                  <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'อายุ :' : 'Age :'}</span>
-                  <span className="font-bold text-slate-900 text-xs">{patient.age} {language === 'th' ? 'ปี' : 'yrs'}</span>
-                </div>
-                <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                  <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เพศ :' : 'Gender :'}</span>
-                  <span className="font-bold text-slate-900 text-xs">
-                    {patient.gender === 'Male'
-                      ? (language === 'th' ? 'ชาย' : 'Male')
-                      : patient.gender === 'Female'
-                      ? (language === 'th' ? 'หญิง' : 'Female')
-                      : patient.gender}
-                  </span>
-                </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <span className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'th' ? 'เพศ' : 'Gender'}</span>
+                <span className="font-bold text-slate-900">
+                  {patient.gender === 'Male' ? (language === 'th' ? 'ชาย' : 'Male') : patient.gender === 'Female' ? (language === 'th' ? 'หญิง' : 'Female') : patient.gender}
+                </span>
               </div>
-
-              {/* Box 3: Blood Group & DOB */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                  <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'หมู่โลหิต :' : 'Blood Group :'}</span>
-                  <span className="font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-100 inline-block text-[11px]">
-                    {patient.bloodGroup || <NoData lang={language} />}
-                  </span>
-                </div>
-                <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                  <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'วันเกิด :' : 'Date of Birth :'}</span>
-                  <span className="font-semibold text-slate-800 text-xs">{patient.dob || <NoData lang={language} />}</span>
-                </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <span className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'th' ? 'วันเกิด' : 'Date of birth'}</span>
+                <span className="font-bold text-slate-900">{patient.dob || <NoData lang={language} />}</span>
               </div>
-
-              {/* Box 4: National ID */}
-              <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เลขบัตรประชาชน :' : 'National ID :'}</span>
-                <CopyableText value={formatNationalId(nationalId)} copyValue={rawNationalId(nationalId)} />
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <span className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'th' ? 'หมู่โลหิต' : 'Blood group'}</span>
+                <span className="font-bold text-slate-900">{patient.bloodGroup || <NoData lang={language} />}</span>
               </div>
-
-              {/* Box 5: Insurance Scheme */}
-              <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'สิทธิการรักษา :' : 'Insurance Scheme :'}</span>
-                <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/60 inline-block text-xs">
+              <div className="col-span-2 rounded-xl border border-slate-200 bg-white p-3">
+                <span className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'th' ? 'สิทธิการรักษา' : 'Insurance scheme'}</span>
+                <span className="font-bold text-slate-900">
                   {patient.insuranceType || <NoData lang={language} />}
                 </span>
               </div>
-
-              {/* Box 6: Visit Date & Visit Time */}
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                  <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'วันที่รับบริการ :' : 'Visit Date :'}</span>
-                  <span className="font-bold text-slate-900 text-xs">{patient.visitDate || <NoData lang={language} />}</span>
-                </div>
-                <div className="bg-slate-50/70 p-2.5 rounded-xl border border-slate-200/80">
-                  <span className="text-slate-500 font-bold block text-[11px] mb-0.5">{language === 'th' ? 'เวลา :' : 'Visit Time :'}</span>
-                  <span className="font-bold text-slate-900 text-xs">{patient.visitTime || <NoData lang={language} />}</span>
-                </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <span className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'th' ? 'วันที่รับบริการ' : 'Visit date'}</span>
+                <span className="font-bold text-slate-900">{patient.visitDate || <NoData lang={language} />}</span>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <span className="block text-[11px] font-semibold text-slate-500 mb-1">{language === 'th' ? 'เวลา' : 'Visit time'}</span>
+                <span className="font-bold text-slate-900">{patient.visitTime || <NoData lang={language} />}</span>
               </div>
             </div>
-          </div>
+          </section>
         </div>
       </div>
 
@@ -2564,11 +2598,15 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
           แถบจึงไม่มีวันติดขอบจอ (ไม่มี error อะไรฟ้อง มันแค่เงียบๆ ไม่ทำงาน)
           มุมโค้งย้ายไปทำที่แถบแท็บ (rounded-t-2xl) กับแถบปุ่มท้าย (rounded-b-2xl) แทน */}
       <div ref={tabCardRef} className="bg-white rounded-2xl border border-slate-200 shadow-sm">
-        {/* แถบแท็บติดหนึบใต้ Topbar
-            top-[74px] = ความสูง Topbar ที่ตรึงอยู่ ถ้าใส่ top-0 แถบจะไปซ่อนอยู่ใต้ Topbar
+        {/* แถบแท็บติดหนึบใต้แถบปุ่มย้อนกลับ
+            แถบด้านบนสูงกว่าบนจอมือถือเพราะปุ่มคำสั่งเรียงลงมา จึงแยกระยะตาม breakpoint
             z-30 อยู่เหนือเนื้อหาแท็บ แต่ต่ำกว่ากล่องยืนยัน (z-1200) จึงไม่โผล่ทับโมดัล
             bg-white ทึบ ห้ามโปร่งใส ไม่งั้นเนื้อหาที่เลื่อนผ่านด้านหลังจะทะลุขึ้นมา */}
-        <div className="sticky top-[74px] z-30 flex border-b border-slate-200 overflow-x-auto scrollbar-none px-2 pt-1.5 w-full bg-white rounded-t-2xl">
+        <div
+          role="tablist"
+          aria-label={language === 'th' ? 'ขั้นตอนบันทึกการตรวจ' : 'Examination steps'}
+          className="sticky top-[196px] sm:top-[151px] z-30 flex border-b border-slate-200 overflow-x-auto scrollbar-none px-2 pt-1.5 w-full bg-white rounded-t-2xl"
+        >
           {EXAM_TABS.map((tab) => {
             const isActive = activeTab === tab.id;
             const Icon = tab.icon;
@@ -2577,8 +2615,13 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             return (
               <button
                 key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                data-exam-tab={tab.id}
                 onClick={() => goToTab(tab.id)}
-                className={`flex-1 min-w-[140px] py-3.5 px-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap flex items-center justify-center gap-2 cursor-pointer ${
+                className={`flex-1 min-w-[140px] py-3.5 px-3 text-sm font-semibold transition-all border-b-2 whitespace-nowrap flex items-center justify-center gap-2 cursor-pointer focus:outline-hidden ${
                   isActive
                     ? 'border-[#2563eb] text-[#2563eb] font-bold bg-blue-50/40'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
@@ -2598,16 +2641,52 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
         {/* TAB 1: CLINICAL NOTES & VITAL SIGNS & MEDICAL HISTORY */}
         {activeTab === 'notes' && (
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-5 bg-slate-50/60">
+            {/* แถบสรุปช่วยบอกบริบทก่อนอ่านว่าข้อมูลทั้งแท็บเป็นข้อมูล read-only จากจุดคัดกรอง */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50/70 px-5 py-4">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <ClipboardCheck className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    {language === 'th' ? 'ข้อมูลจากจุดคัดกรอง' : 'Triage summary'}
+                  </h2>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
+                    {language === 'th'
+                      ? 'ข้อมูลสำหรับประกอบการตรวจ โปรดทบทวนอาการสำคัญ สัญญาณชีพ และข้อควรระวังก่อนสั่งยา'
+                      : 'Review the chief complaint, vital signs, and prescribing cautions before treatment.'}
+                  </p>
+                </div>
+              </div>
+
+              {(patient.screenedBy || patient.screenedAt) && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-blue-200 bg-white px-3 py-2 text-xs shrink-0">
+                  {patient.screenedBy && (
+                    <span className="inline-flex items-center gap-1.5 text-slate-700 font-semibold">
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                      {patient.screenedBy}
+                    </span>
+                  )}
+                  {patient.screenedAt && (
+                    <span className="inline-flex items-center gap-1.5 font-mono font-semibold text-slate-600">
+                      <Clock className="w-3.5 h-3.5 text-blue-500" />
+                      {formatScreenedAt(patient.screenedAt)}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Chief Complaint (CC) - Sent from Triage (Read-only for doctor) */}
-            <div id={EXAM_ANCHOR.chiefComplaint} className="space-y-3 scroll-mt-28">
+            <div id={EXAM_ANCHOR.chiefComplaint} className="space-y-3 scroll-mt-28 rounded-2xl border border-blue-200 bg-white p-5 shadow-2xs">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 {/* ยกเป็นหัวข้อใหญ่เท่ากับ "สัญญาณชีพ" และหัวข้ออื่นในแท็บ
                     เดิมเป็นป้ายกำกับช่องตัวเล็ก ทั้งที่เป็นข้อมูลสำคัญที่สุดในหน้า
                     คือเหตุผลที่ผู้ป่วยมาหาหมอ ควรเด่นกว่าหรืออย่างน้อยเท่ากับหัวข้ออื่น */}
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{language === 'th' ? 'อาการสำคัญ' : 'Chief Complaint (CC)'}</span>
-                  <Stethoscope className="w-4 h-4 text-blue-600 shrink-0" />
+                  <Stethoscope className="order-first w-8 h-8 p-1.5 rounded-lg bg-blue-100 text-blue-700 shrink-0" />
                 </h3>
 
                 {/* ใครคัดกรอง และคัดกรองไว้ตอนไหน
@@ -2616,35 +2695,8 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     ที่ส่งมาจากจุดคัดกรอง ทั้งอาการสำคัญ สัญญาณชีพ และประวัติ
                     จำเป็นมาก เพราะค่าที่วัดไว้หลายชั่วโมงก่อนใช้ตัดสินใจตอนนี้ไม่ได้ ต้องวัดซ้ำ
                     ถ้ายังไม่มีผลคัดกรอง จะไม่ขึ้นแถบนี้เลย ไม่ใช่ขึ้นค่าว่าง */}
-                {(patient.screenedBy || patient.screenedAt) && (
-                  <span className="inline-flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-lg border border-slate-200 bg-slate-50 text-xs">
-                    <span className="inline-flex items-center gap-1.5 min-w-0">
-                      <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      {/* คำว่า "คัดกรองโดย" ซ่อนบนจอแคบ เหลือแค่ไอคอนกับชื่อ
-                          ความหมายยังชัดจากไอคอน และไม่ดันให้ป้ายยาวจนตกบรรทัด */}
-                      <span className="text-slate-400 font-medium hidden md:inline">
-                        {language === 'th' ? 'คัดกรองโดย' : 'Screened by'}
-                      </span>
-                      <span className="text-slate-700 font-semibold truncate">
-                        {patient.screenedBy || (language === 'th' ? 'ไม่ระบุผู้คัดกรอง' : 'Unknown')}
-                      </span>
-                    </span>
-
-                    {patient.screenedAt && (
-                      <>
-                        <span className="w-px h-3.5 bg-slate-200 shrink-0"></span>
-                        <span className="inline-flex items-center gap-1 shrink-0">
-                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="font-mono font-semibold text-slate-700">
-                            {formatScreenedAt(patient.screenedAt)}
-                          </span>
-                        </span>
-                      </>
-                    )}
-                  </span>
-                )}
               </div>
-              <div className="w-full min-h-[44px] px-3.5 py-2.5 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm text-slate-800 font-normal flex items-center">
+              <div className="w-full min-h-[52px] px-4 py-3 bg-blue-50/40 border border-blue-100 rounded-xl text-[15px] leading-relaxed text-slate-900 font-medium flex items-center">
                 {translateClinicalText(chiefComplaint, language) || <span className="text-slate-400 font-normal">- ไม่พบข้อมูลอาการสำคัญจากจุดคัดกรอง -</span>}
               </div>
             </div>
@@ -2670,17 +2722,17 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                  เพื่อส่งค่าเดิมกลับตอนบันทึก ข้อมูลของพยาบาลจะได้ไม่ถูกล้าง */}
 
             {/* VITAL SIGNS (Data Display Container) */}
-            <div id={EXAM_ANCHOR.vitals} className="space-y-3 pt-2 border-t border-slate-100 scroll-mt-28">
+            <div id={EXAM_ANCHOR.vitals} className="space-y-4 scroll-mt-28 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
               {/* ไอคอนอยู่ "หลัง" ข้อความ ตัวอักษรจึงเริ่มชิดขอบซ้ายตรงแนวเดียว
                   กับป้ายกำกับช่องข้อมูลที่อยู่ใต้ลงไป อ่านไล่ลงมาแล้วไม่สะดุด
                   แถบ "คัดกรองโดย ... • เวลา" ย้ายไปอยู่บรรทัดหัวข้ออาการสำคัญด้านบนแล้ว
                   เพราะกำกับข้อมูลทุกอย่างที่มาจากจุดคัดกรอง ไม่ใช่แค่สัญญาณชีพ */}
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>{language === 'th' ? 'สัญญาณชีพ' : 'Vital Signs'}</span>
-                <Activity className="w-4 h-4 text-blue-600" />
+                <Activity className="order-first w-8 h-8 p-1.5 rounded-lg bg-blue-100 text-blue-700" />
               </h3>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3.5">
+              <div className="grid grid-cols-1 min-[460px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 [&>div]:space-y-1 [&>div]:rounded-xl [&>div]:border [&>div]:border-slate-200 [&>div]:bg-slate-50/80 [&>div]:p-3 [&>div>div]:h-auto [&>div>div]:min-h-7 [&>div>div]:border-0 [&>div>div]:bg-transparent [&>div>div]:p-0">
                 <div className="space-y-1.5">
                   <label className="text-[13px] font-bold text-slate-800 block">
                     {language === 'th' ? 'ความดันโลหิต' : 'BP (mmHg)'}
@@ -2789,15 +2841,15 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   3. ใช้ยา/สมุนไพรอะไรอยู่            -> รู้ตอนเลือกยาว่าตีกันไหม
                   4. พฤติกรรมสุขภาพ                  -> ใช้ตอนให้คำแนะนำ ไม่เร่งด่วน
                 ============================================================ */}
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* --- 1. ความเสี่ยงติดเชื้อและการป้องกัน --------------------
                   สามข้อนี้ต้องอยู่ด้วยกัน เพราะ URI/TB เป็น "เหตุ"
                   และ Precaution เป็น "สิ่งที่ต้องทำ" ที่ตามมาจากสองข้อนั้น
                   เช่น TB = มี ควรมาคู่กับ Airborne เสมอ ถ้าไม่ตรงกันแปลว่ามีอะไรผิด */}
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <div className="space-y-4 rounded-2xl border border-sky-200/80 bg-white p-5 shadow-2xs">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{language === 'th' ? 'ความเสี่ยงติดเชื้อและการป้องกัน' : 'Infection Risk & Precautions'}</span>
-                  <Shield className="w-4 h-4 text-sky-600" />
+                  <Shield className="order-first w-8 h-8 p-1.5 rounded-lg bg-sky-100 text-sky-700" />
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -2821,10 +2873,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   สองเรื่องนี้อยู่ด้วยกันเพราะเป็น "สิ่งที่ผู้ป่วยเป็น" ซึ่งคงที่
                   ไม่เปลี่ยนตามการมาตรวจแต่ละครั้ง ต่างจากยาที่ใช้อยู่ซึ่งเปลี่ยนได้ตลอด
                   และเป็นข้อมูลที่ต้องอ่านให้จบก่อนเริ่มคิดเรื่องยา */}
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <div className="space-y-4 rounded-2xl border border-rose-200/80 bg-white p-5 shadow-2xs">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{language === 'th' ? 'การแพ้และโรคประจำตัว' : 'Allergies & Underlying Conditions'}</span>
-                  <AlertTriangle className="w-4 h-4 text-rose-500" />
+                  <AlertTriangle className="order-first w-8 h-8 p-1.5 rounded-lg bg-rose-100 text-rose-600" />
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -2857,10 +2909,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   ยาละลายลิ่มเลือดย้ายมาจากกลุ่มคัดกรองด้านบน เพราะมันคือ "ยา"
                   ควรอยู่ข้างๆ ยาประจำและสมุนไพรที่เสริมฤทธิ์กันได้
                   การตั้งครรภ์/ให้นมบุตรก็อยู่กลุ่มนี้ด้วยเหตุผลเดียวกัน */}
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <div className="space-y-4 rounded-2xl border border-indigo-200/80 bg-white p-5 shadow-2xs">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{language === 'th' ? 'ยาที่ใช้อยู่ และข้อควรระวังก่อนสั่งยา' : 'Current Medications & Prescribing Cautions'}</span>
-                  <Pill className="w-4 h-4 text-indigo-600" />
+                  <Pill className="order-first w-8 h-8 p-1.5 rounded-lg bg-indigo-100 text-indigo-700" />
                 </h3>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
@@ -2913,10 +2965,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               {/* --- 4. พฤติกรรมสุขภาพ -------------------------------------
                   อยู่ท้ายสุดเพราะไม่ได้ใช้ตัดสินใจเร่งด่วนในห้องตรวจ
                   แต่ใช้ตอนให้คำแนะนำและวางแผนติดตามอาการ */}
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <div className="space-y-4 rounded-2xl border border-teal-200/80 bg-white p-5 shadow-2xs">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{language === 'th' ? 'พฤติกรรมสุขภาพ' : 'Social & Lifestyle History'}</span>
-                  <Heart className="w-4 h-4 text-teal-600" />
+                  <Heart className="order-first w-8 h-8 p-1.5 rounded-lg bg-teal-100 text-teal-700" />
                 </h3>
 
                 {/* กลุ่มนี้มีแค่ 2 ช่อง จึงใช้ 2 คอลัมน์ ไม่ใช่ 3
@@ -2947,10 +2999,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   แยกเป็นหัวข้อใหญ่ของตัวเอง ไม่ยัดรวมกับกลุ่มประวัติด้านบน
                   เพราะเป็นแบบคัดกรองที่มีเกณฑ์แปลผลชัดเจน ไม่ใช่ข้อมูลประวัติทั่วไป
                   และผลบวกมีสิ่งที่แพทย์ต้องทำต่อทันที */}
-              <div className="space-y-3 pt-4 border-t border-slate-100">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <div className="space-y-4 rounded-2xl border border-violet-200/80 bg-white p-5 shadow-2xs">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{language === 'th' ? '2Q (2 สัปดาห์)' : '2Q Depression Screening (2 weeks)'}</span>
-                  <HeartPulse className="w-4 h-4 text-rose-500" />
+                  <HeartPulse className="order-first w-8 h-8 p-1.5 rounded-lg bg-violet-100 text-violet-700" />
                 </h3>
 
                 <p className="text-xs text-slate-500 -mt-1">
@@ -2984,7 +3036,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               </div>
 
               {/* ADDITIONAL NOTES & DOCTOR HANDOVER */}
-              <div className="pt-4 border-t border-slate-100">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
                 {/* เหลือช่องเดียวแล้ว (กล่อง "ข้อมูลสำคัญแจ้งแพทย์" ถูกถอดออกไป)
                     จึงเลิกใช้ตาราง 2 คอลัมน์ ให้ยาวเต็มความกว้าง
                     เหมาะกับเนื้อหาด้วย เพราะเป็นข้อความยาวที่พยาบาลพิมพ์มา
@@ -2993,9 +3045,9 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   {/* Nurse Notes Display */}
                   <div className="space-y-1.5">
                     {/* ไอคอนอยู่ "หลัง" ข้อความ เหมือนหัวข้อสัญญาณชีพและประวัติทางการแพทย์ */}
-                    <label className="text-[13px] font-bold text-slate-800 flex items-center gap-1.5 block">
+                    <label className="text-base font-bold text-slate-900 flex items-center gap-2">
                       <span>{language === 'th' ? 'บันทึกการคัดกรองเบื้องต้น' : 'Initial Triage Notes'}</span>
-                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      <FileText className="order-first w-8 h-8 p-1.5 rounded-lg bg-slate-100 text-blue-600" />
                     </label>
                     <div className="w-full min-h-[48px] p-3 bg-[#f8fafc] border border-slate-200 rounded-xl text-sm text-slate-800 leading-relaxed font-normal flex items-center">
                       {(nurseNotes || triageNotes || patient.triage?.notes) ? (
@@ -3025,16 +3077,52 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
         {/* TAB 2: DIAGNOSIS & ASSESSMENT */}
         {activeTab === 'diagnosis' && (
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-5 bg-slate-50/60">
+            {/* ลำดับการทำงานช่วยให้แพทย์เห็นภาพรวมของฟอร์มยาวก่อนเริ่มกรอก */}
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/70 px-5 py-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <Stethoscope className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    {language === 'th' ? 'บันทึกผลตรวจและการวินิจฉัย' : 'Examination and diagnosis'}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-slate-600">
+                    {language === 'th' ? 'กรอกตามลำดับจากซ้ายไปขวา แล้วตรวจสอบโรคหลักก่อนดำเนินการต่อ' : 'Complete each section in order and verify the primary diagnosis.'}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                {[
+                  language === 'th' ? 'ตรวจร่างกาย' : 'Physical exam',
+                  language === 'th' ? 'สรุปผลตรวจ' : 'Conclusion',
+                  language === 'th' ? 'เลือกรหัส ICD-10' : 'Select ICD-10',
+                  language === 'th' ? 'ตรวจรายการโรค' : 'Review diagnoses',
+                ].map((label, index) => (
+                  <div key={label} className="flex items-center gap-2 rounded-xl border border-blue-100 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+                    <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-mono text-[11px] font-bold shrink-0">
+                      {index + 1}
+                    </span>
+                    <span>{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
             
             {/* PHYSICAL EXAMINATION SYSTEM FINDINGS */}
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>{language === 'th' ? 'การตรวจร่างกาย' : 'Physical Examination'}</span>
-                <Stethoscope className="w-4 h-4 text-blue-600 shrink-0" />
+                <Stethoscope className="order-first w-8 h-8 p-1.5 rounded-lg bg-blue-100 text-blue-700 shrink-0" />
               </h3>
+                <span className="text-xs text-slate-500">
+                  {language === 'th' ? 'บันทึกเฉพาะระบบที่ได้ตรวจ' : 'Document examined systems'}
+                </span>
+              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 [&>div]:rounded-xl [&>div]:border [&>div]:border-slate-200 [&>div]:bg-slate-50/70 [&>div]:p-3 [&>div>textarea]:bg-white">
                 <div>
                   <label className="text-[13px] font-bold text-slate-800 block mb-1">
                     {language === 'th' ? 'สภาพทั่วไป' : 'General Appearance'}
@@ -3182,16 +3270,20 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             {/* Assessment Notes & Treatment Plan Textareas
                 วางต่อจาก "การตรวจร่างกาย" เพราะเป็นบทสรุปของสิ่งที่เพิ่งตรวจ
                 แล้วค่อยไปเลือกรหัส ICD-10 ด้านล่าง */}
-            <div id={EXAM_ANCHOR.assessment} className="space-y-3 pt-3 border-t border-slate-100 scroll-mt-28">
-              <div className="pb-2 border-b border-slate-200/80">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <div id={EXAM_ANCHOR.assessment} className="space-y-4 rounded-2xl border border-indigo-200/80 bg-white p-5 shadow-2xs scroll-mt-28">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{language === 'th' ? 'สรุปผลการตรวจ' : 'Visit Conclusion'}</span>
-                  <ClipboardCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                  <ClipboardCheck className="order-first w-8 h-8 p-1.5 rounded-lg bg-indigo-100 text-indigo-700 shrink-0" />
                 </h3>
+                <span className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-700">
+                  <span className="text-red-600">*</span>
+                  {language === 'th' ? 'จำเป็นทั้ง 2 ช่อง' : 'Both fields required'}
+                </span>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
                   <label className="text-[13px] font-bold text-slate-800 block mb-1">
                     {language === 'th' ? 'การประเมินและวินิจฉัยเบื้องต้น' : 'Assessment Notes'}
                     <span className="text-red-600"> *</span>
@@ -3201,11 +3293,11 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     value={assessmentNotes}
                     onChange={(e) => setAssessmentNotes(e.target.value)}
                     placeholder={language === 'th' ? 'ระบุเหตุผลทางการแพทย์ ข้อควรพิจารณา การประเมินความรุนแรง...' : 'Enter clinical reasoning, severity assessment, and considerations...'}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all resize-none leading-relaxed"
                   />
                 </div>
 
-                <div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
                   <label className="text-[13px] font-bold text-slate-800 block mb-1">
                     {language === 'th' ? 'แผนการรักษาและหัตถการ' : 'Treatment Plan & Procedures'}
                     <span className="text-red-600"> *</span>
@@ -3215,17 +3307,17 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     value={treatmentPlan}
                     onChange={(e) => setTreatmentPlan(e.target.value)}
                     placeholder={language === 'th' ? 'ระบุแผนการดูแล คำแนะนำที่ไม่ใช้ยา หัตถการที่ทำ...' : 'Enter care plan, non-pharmacological advice, procedures performed...'}
-                    className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+                    className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all resize-none leading-relaxed"
                   />
                 </div>
               </div>
             </div>
             {/* 1. ICD-10 SEARCH & AUTOCOMPLETE */}
-            <div id={EXAM_ANCHOR.diagnosis} className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200 relative scroll-mt-28">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-200/80">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <div id={EXAM_ANCHOR.diagnosis} className="space-y-4 bg-white p-5 rounded-2xl border border-emerald-200/80 shadow-2xs relative scroll-mt-28">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{language === 'th' ? 'ค้นหารหัสโรค ICD-10' : 'Search ICD-10 Diagnosis'}</span>
-                  <Search className="w-4 h-4 text-blue-600 shrink-0" />
+                  <Search className="order-first w-8 h-8 p-1.5 rounded-lg bg-emerald-100 text-emerald-700 shrink-0" />
                 </h3>
                 <span className="text-xs font-medium text-slate-500">
                   {language === 'th' ? 'ค้นหาจากรหัสโรค ชื่อภาษาไทย หรือภาษาอังกฤษ' : 'Search by Code, English or Thai name'}
@@ -3342,7 +3434,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
                   ใช้ป้ายกำกับตัวเล็กแทนหัวข้อใหญ่ เพราะเป็นทางลัดของช่องค้นหาด้านบน
                   ไม่ใช่หัวข้อระดับเดียวกัน */}
-              <div className="pt-1">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 mb-2">
                   <span className="text-[13px] font-bold text-slate-800">
                     {language === 'th' ? 'โรคที่วินิจฉัยบ่อย' : 'Recent Diagnoses'}
@@ -3384,16 +3476,16 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
             </div>
 
             {/* 2. SELECTED DIAGNOSIS LIST */}
-            <div className="space-y-4 bg-white p-5 rounded-2xl border border-slate-200">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-2 border-b border-slate-200/80">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <div className="space-y-4 bg-white p-5 rounded-2xl border border-blue-200 shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>
                     {language === 'th' ? 'รายการโรคที่วินิจฉัยแล้ว' : 'Selected Diagnoses List'}
                     <span className="text-red-600"> *</span>
                   </span>
-                  <ClipboardCheck className="w-4 h-4 text-blue-600 shrink-0" />
+                  <ClipboardCheck className="order-first w-8 h-8 p-1.5 rounded-lg bg-blue-100 text-blue-700 shrink-0" />
                 </h3>
-                <span className="text-xs font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg">
+                <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg">
                   {language === 'th'
                     ? `รวมทั้งหมด: ${(primaryDiag ? 1 : 0) + secondaryDiags.length} รายการ`
                     : `Total: ${(primaryDiag ? 1 : 0) + secondaryDiags.length} items`}
@@ -3402,16 +3494,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
               {/* No Diagnosis Selected Validation Card */}
               {!primaryDiag && secondaryDiags.length === 0 && (
-                <div className="p-4 bg-amber-50/80 border border-amber-200 rounded-2xl text-amber-900 space-y-1">
-                  <div className="flex items-center gap-2 font-bold text-xs">
-                    <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span>{language === 'th' ? 'ยังไม่ได้ระบุการวินิจฉัยโรค' : 'No Diagnosis Selected'}</span>
-                  </div>
-                  <p className="text-xs text-amber-800">
-                    {language === 'th'
-                      ? '* จำเป็นต้องระบุการวินิจฉัยหลักอย่างน้อย 1 รายการก่อนเสร็จสิ้นการตรวจ'
-                      : "* Required: At least one Primary Diagnosis is required before completing the patient's visit."}
-                  </p>
+                <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs">
+                  {language === 'th'
+                    ? 'ยังไม่มีรายการโรคที่วินิจฉัย จำเป็นต้องระบุการวินิจฉัยหลักอย่างน้อย 1 รายการ'
+                    : 'No diagnoses added. At least one primary diagnosis is required.'}
                 </div>
               )}
 
@@ -3427,8 +3513,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   ตำแหน่งตรงกันทุกแถว กวาดตาลงมาอ่านได้ทีเดียว
                   โรคหลักใช้พื้นสีฟ้ากับดาว แทนการตีกรอบหนาทั้งใบ
                   ============================================================ */}
-              {/* ยังไม่มีโรคเลย ไม่ต้องขึ้นกรอบเปล่า เพราะการ์ดเตือนสีเหลืองด้านบน
-                  บอกอยู่แล้วว่ายังไม่ได้ระบุการวินิจฉัย กรอบว่างเปล่าไม่ได้เพิ่มอะไร */}
+              {/* เมื่อยังไม่มีโรค จะแสดงกรอบว่างแบบเดียวกับรายการยาแทนตาราง */}
               {/* จำกัดความสูงไว้ประมาณ 5 แถว เกินกว่านั้นให้เลื่อนดูข้างใน
                   แถวหนึ่งสูงราว 66px (py-3 + ชื่อโรค 1 บรรทัด + ป้ายกำกับตัวเล็ก)
                   5 แถว = ~330px เผื่อไว้ 336px
@@ -3622,23 +3707,46 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
         {/* TAB 3: PRESCRIPTION (PHARMACY ORDERS) */}
         {activeTab === 'prescription' && (
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-5 bg-slate-50/60">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <Pill className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    {language === 'th' ? 'การสั่งยาสำหรับการตรวจครั้งนี้' : 'Prescription for this visit'}
+                  </h2>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
+                    {language === 'th'
+                      ? 'เลือกยาจากคลัง กำหนดวิธีใช้ให้ครบ แล้วเพิ่มลงในรายการสั่งยา'
+                      : 'Select a stock medicine, complete the directions, then add it to the prescription.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Add New Medicine Form */}
-            <div id={EXAM_ANCHOR.prescription} className="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 scroll-mt-28">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <div id={EXAM_ANCHOR.prescription} className="bg-white p-5 rounded-2xl border border-emerald-200/80 shadow-2xs space-y-5 scroll-mt-28">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>{language === 'th' ? 'ค้นหาและสั่งจ่ายยา' : 'Search & Prescribe Medicine'}</span>
 
                 {/* ไอคอนอยู่หลังข้อความ เหมือนหัวข้ออื่นในหน้านี้
                     วงกลมสีเขียวรองหลังเครื่องหมายบวก เพราะ + ลอยๆ
                     ดูเหมือนสัญลักษณ์ที่ค้างมาจากที่อื่น พอมีวงกลมรอง
                     จะอ่านออกทันทีว่าเป็นไอคอน "เพิ่มรายการ" */}
-                <span className="w-5 h-5 shrink-0 rounded-full bg-emerald-500 flex items-center justify-center">
-                  <Plus className="w-3 h-3 text-white" strokeWidth={3.5} />
+                <span className="order-first w-8 h-8 shrink-0 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                  <Search className="w-4 h-4" />
                 </span>
               </h3>
+                <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                  {language === 'th' ? 'ขั้นที่ 1 จาก 2' : 'Step 1 of 2'}
+                </span>
+              </div>
 
               {/* Medicine Selector & Search */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
                 <div className="md:col-span-2 relative" ref={medDropdownRef}>
                   <label className="text-[13px] font-bold text-slate-700 block mb-1">
                     {language === 'th' ? 'เลือก / ค้นหารายการยา * (พิมพ์ค้นหา หรือ เลือกจากรายการ)' : 'Select / Search Medicine *'}
@@ -3817,7 +3925,21 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               </div>
 
               {/* Dosage Details Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <FileText className="w-4 h-4" />
+                  </span>
+                  <h4 className="text-sm font-bold text-slate-900">
+                    {language === 'th' ? 'วิธีใช้และจำนวนยา' : 'Directions and quantity'}
+                  </h4>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">
+                  {language === 'th' ? 'ขั้นที่ 2 จาก 2' : 'Step 2 of 2'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 [&>div>select]:bg-white">
                 <div>
                   <label className="text-xs font-semibold text-slate-600 block mb-1">
                     {language === 'th' ? 'ความถี่' : 'Frequency'}
@@ -3982,7 +4104,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               </div>
 
               {/* Special Instructions */}
-              <div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
                 <label className="text-xs font-semibold text-slate-600 block mb-1">
                   {language === 'th' ? 'คำแนะนำพิเศษ / ฉลากยา (อัตโนมัติตามมาตรฐาน รพ.)' : 'Special Instructions / Label Note'}
                 </label>
@@ -3991,16 +4113,24 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   value={newMedInstructions}
                   onChange={(e) => setNewMedInstructions(e.target.value)}
                   placeholder={language === 'th' ? 'คำแนะนำพิเศษเพิ่มเติม...' : 'Special instructions for pharmacy label...'}
-                  className="w-full p-2 bg-white border border-slate-200 rounded-xl text-xs focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:border-blue-600 focus:ring-4 focus:ring-blue-500/15 focus:outline-hidden transition-all"
                 />
               </div>
             </div>
 
             {/* Prescribed Medicines List Table */}
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-slate-900">
-                {language === 'th' ? 'รายการสั่งยาปัจจุบัน' : 'Active Prescriptions List'}
-              </h3>
+            <div className="space-y-4 rounded-2xl border border-blue-200 bg-white p-5 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
+                    <ClipboardCheck className="w-4 h-4" />
+                  </span>
+                  {language === 'th' ? 'รายการสั่งยาปัจจุบัน' : 'Active Prescriptions List'}
+                </h3>
+                <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-lg">
+                  {language === 'th' ? `รวมทั้งหมด: ${prescriptions.length} รายการ` : `Total: ${prescriptions.length} items`}
+                </span>
+              </div>
 
               {prescriptions.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs">
@@ -4089,7 +4219,25 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
         {/* TAB 4: DOCUMENTS & REFERRAL */}
         {activeTab === 'referral' && (
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-5 bg-slate-50/60">
+            <div className="rounded-2xl border border-sky-200 bg-sky-50/60 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <FileText className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    {language === 'th' ? 'เอกสารประกอบการรักษา' : 'Treatment documents'}
+                  </h2>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
+                    {language === 'th'
+                      ? 'เลือกเอกสารที่ต้องการออกให้ผู้ป่วย เอกสารที่มีแบบฟอร์มสามารถระบุจำนวนและพิมพ์ได้ทันที'
+                      : 'Select documents to issue. Printable forms can be assigned a quantity and printed immediately.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* ============================================================
                 เอกสารทั่วไป
                 ============================================================
@@ -4101,10 +4249,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 แต่ตัวแปร refDept / refReason / counselMed / counselLifestyle
                 ยังคงไว้ เพื่อส่งค่าเดิมกลับตอนบันทึก ข้อมูลเก่าจะได้ไม่ถูกล้าง
                 ============================================================ */}
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <div className="space-y-4 rounded-2xl border border-blue-200 bg-white p-5 shadow-2xs">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>{language === 'th' ? 'เอกสารทั่วไป' : 'General Documents'}</span>
-                <FileText className="w-4 h-4 text-blue-600" />
+                <Printer className="order-first w-8 h-8 p-1.5 rounded-lg bg-blue-100 text-blue-700" />
               </h3>
 
               <p className="text-xs text-slate-500 -mt-1">
@@ -4146,10 +4294,10 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 การติ๊กคือการบันทึกลงเวชระเบียนว่าออกเอกสารอะไรให้ผู้ป่วยไปบ้าง
                 ซึ่งจำเป็นเวลาผู้ป่วยกลับมาถามภายหลังว่าเคยได้ใบอะไรไปแล้ว
                 ============================================================ */}
-            <div className="space-y-3 pt-4 border-t border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+            <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>{language === 'th' ? 'เอกสารอื่นๆ' : 'Other Documents'}</span>
-                <FileSpreadsheet className="w-4 h-4 text-slate-600" />
+                <FileSpreadsheet className="order-first w-8 h-8 p-1.5 rounded-lg bg-slate-100 text-slate-700" />
               </h3>
 
               <p className="text-xs text-slate-500 -mt-1">
@@ -4158,7 +4306,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                   : 'Tick to record that this document was issued (no printable form in the system yet).'}
               </p>
 
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+              <div className="bg-slate-50/70 rounded-2xl border border-slate-200 p-4 space-y-3">
                 <DocumentCheckRow
                   label={language === 'th' ? 'ใบเคลมประกัน' : 'Insurance Claim Form'}
                   checked={wantInsuranceClaim}
@@ -4215,17 +4363,35 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
 
         {/* TAB 6: FOLLOW-UP & VISIT ACTIONS */}
         {activeTab === 'followup' && (
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-5 bg-slate-50/60">
+            <div className="rounded-2xl border border-violet-200 bg-violet-50/60 px-5 py-4">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-xl bg-violet-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <Calendar className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    {language === 'th' ? 'แผนหลังการตรวจ' : 'Post-visit plan'}
+                  </h2>
+                  <p className="mt-0.5 text-xs leading-relaxed text-slate-600">
+                    {language === 'th'
+                      ? 'ระบุการนัดติดตามอาการและสถานะผู้ป่วยหลังจบการตรวจ'
+                      : 'Set the follow-up appointment and patient disposition after the visit.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Follow-up Scheduler
                 เอากรอบการ์ดออก และย้ายไอคอนไปหลังข้อความ
                 ให้หน้าตาตรงกับหัวข้ออื่นในหน้านี้ (สัญญาณชีพ / เอกสารทั่วไป / สถานะ) */}
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-2xl border border-blue-200 bg-white p-5 shadow-2xs">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>{language === 'th' ? 'การนัดหมายติดตามอาการครั้งถัดไป' : 'Schedule Next Follow-Up Visit'}</span>
-                  <Calendar className="w-4 h-4 text-blue-600" />
+                  <Calendar className="order-first w-8 h-8 p-1.5 rounded-lg bg-blue-100 text-blue-700" />
                 </h3>
-                <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-100 self-start sm:self-auto shadow-2xs">
+                <label className={`flex items-center gap-2 text-xs font-bold cursor-pointer px-3 py-2 rounded-xl border self-start sm:self-auto transition-colors ${hasFollowUp ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'}`}>
                   <input
                     type="checkbox"
                     checked={hasFollowUp}
@@ -4245,12 +4411,12 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               </div>
 
               {!hasFollowUp ? (
-                <div className="p-4 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs text-center font-medium">
+                <div className="p-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs text-center font-medium">
                   {language === 'th' ? 'ไม่มีการนัดหมายติดตามอาการสำหรับเคสนี้ (หากต้องการนัดหมาย ให้ทำเครื่องหมายเลือก "ต้องการนัดหมายติดตามอาการ")' : 'No follow-up appointment scheduled for this visit. Check "Schedule a follow-up appointment" if required.'}
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-600 block mb-1">
                       {language === 'th' ? 'วันนัดติดตามอาการ' : 'Follow-Up Date'}
                     </label>
@@ -4262,7 +4428,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     />
                   </div>
 
-                  <div>
+                  <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-600 block mb-1">
                       {language === 'th' ? 'เหตุผลในการนัดหมาย' : 'Reason for Follow-Up'}
                     </label>
@@ -4275,7 +4441,7 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                     />
                   </div>
 
-                  <div>
+                  <div className="space-y-1">
                     <label className="text-xs font-semibold text-slate-600 block mb-1">
                       {language === 'th' ? 'คำแนะนำเพิ่มเติมสำหรับผู้ป่วย' : 'Patient Instructions'}
                     </label>
@@ -4300,17 +4466,17 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
                 วางไว้ก่อนปุ่มบันทึก เพราะเป็นสิ่งสุดท้ายที่แพทย์ตัดสินใจ
                 ก่อนปิดการตรวจ และเป็นข้อมูลที่ห้องยา/การเงินต้องรู้ต่อ
                 ============================================================ */}
-            <div className="space-y-3 pt-2">
+            <div className="space-y-4 rounded-2xl border border-indigo-200 bg-white p-5 shadow-2xs">
               {/* หัวข้อขึ้นบรรทัดของตัวเอง ตัวเลือกอยู่บรรทัดล่าง
                   ให้โครงเหมือนหัวข้ออื่นในหน้านี้ ไม่ใช่หัวข้อเดียวที่วางเรียงแนวนอน */}
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <span>{language === 'th' ? 'สถานะ' : 'Disposition'}</span>
-                <Send className="w-4 h-4 text-blue-600" />
+                <Send className="order-first w-8 h-8 p-1.5 rounded-lg bg-indigo-100 text-indigo-700" />
               </h3>
 
               {/* กรอบและการเรียงลงล่าง ทำให้เหมือนกลุ่ม "เอกสารอื่นๆ" ในแท็บก่อนหน้า
                   ผู้ใช้จะได้ไม่ต้องเรียนรู้รูปแบบใหม่ในแต่ละหน้า */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
+              <div className="bg-slate-50/70 rounded-2xl border border-slate-200 p-4 space-y-3">
                 {/* ใช้ช่องติ๊กหน้าตาเหมือนกลุ่มเอกสาร แต่เลือกได้ทีละอัน
                     ติ๊กอันหนึ่งแล้วอีกอันจะถูกปลดให้เอง
                     เพราะการมาตรวจหนึ่งครั้งจบได้ทางเดียว จะกลับบ้าน
@@ -4332,62 +4498,6 @@ export const ExaminationView: React.FC<ExaminationViewProps> = ({
               </div>
             </div>
 
-            {/* Visit Action Center Buttons */}
-            <div className="space-y-3 pt-2">
-              <div className="border-b border-slate-100 pb-2">
-                {/* จัดกึ่งกลาง เพราะเป็นหัวข้อปิดท้ายของทั้งหน้า
-                    ไม่ใช่หัวข้อของช่องกรอกข้อมูลที่ต้องเรียงชิดซ้ายให้อ่านไล่ลงมา */}
-                <h3 className="text-lg font-bold text-slate-900 text-center">
-                  {/* เดิมชื่อ "สรุปการตรวจและเอกสารออกบริการ" แต่ปุ่มออกเอกสาร
-                      ถูกย้ายไปแท็บ "เอกสาร & การส่งต่อ" หมดแล้ว เหลือแต่ปุ่มปิดการตรวจ
-                      ชื่อเดิมจึงไม่ตรงกับสิ่งที่อยู่ข้างล่างอีกต่อไป */}
-                  {language === 'th' ? 'สรุปการตรวจ' : 'Visit Summary'}
-                </h3>
-              </div>
-
-              {/* แถวนี้มีแต่ปุ่ม "ยกเลิกการรับบริการ" ไม่มีปุ่มออกเฉยๆ
-                  เพราะปุ่ม "กลับสู่หน้าคิวผู้ป่วย" ด้านบนสุดทำหน้าที่นั้นอยู่แล้ว
-                  (เรียก handleExitExamination เหมือนกัน คืนคิวเป็น "รอตรวจ")
-                  มีสองปุ่มที่ทำงานเหมือนกันคนละที่ ทำให้สับสนโดยไม่ได้อะไรเพิ่ม */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {/* สีแดงสงวนไว้ให้การกระทำที่เอาผู้ป่วยออกจากคิวจริงเท่านั้น */}
-                <button
-                  type="button"
-                  onClick={handleCancelVisit}
-                  className="p-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
-                >
-                  <XCircle className="w-4 h-4 text-white" />
-                  <span>{language === 'th' ? 'ยกเลิกการรับบริการ' : 'Cancel Visit'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSaveDraft}
-                  className="p-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-200/70 text-slate-800 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
-                >
-                  <Save className="w-4 h-4 text-slate-700" />
-                  <span>{language === 'th' ? 'บันทึกฉบับร่าง' : 'Save Draft'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleCompleteVisit()}
-                  className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer"
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  <span>{t('saveExam')}</span>
-                </button>
-
-                {/* ปุ่ม "ใบรับรองแพทย์" กับ "พิมพ์สรุปการตรวจ" ถูกถอดออก
-                    ทั้งสองปุ่มเรียกแค่ alert() ไม่ได้ออกเอกสารอะไรจริง
-                    การมีปุ่มที่กดแล้วขึ้นข้อความว่า "ออกเรียบร้อยแล้ว"
-                    ทั้งที่ไม่มีเอกสารออกมา อันตรายกว่าการไม่มีปุ่ม
-                    เพราะแพทย์อาจเข้าใจว่าออกให้ผู้ป่วยไปแล้ว
-
-                    การออกใบรับรองแพทย์ของจริงอยู่ที่แท็บ "เอกสาร & การส่งต่อ"
-                    ซึ่งพิมพ์ออกมาได้จริงและบันทึกลงเวชระเบียนด้วย */}
-              </div>
-            </div>
           </div>
         )}
 

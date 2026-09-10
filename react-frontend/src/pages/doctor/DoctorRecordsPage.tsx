@@ -43,9 +43,23 @@ const DoctorRecordsPage: React.FC<DoctorRecordsPageProps> = ({ onNavigate }) => 
   }, [refreshRecords]);
 
   const mergedPatients = useMemo(() => {
-    const merged = [...patients];
+    // ข้อมูลคิวมีสถานะปัจจุบันที่แม่นกว่า แต่ visitCount ของคิวบอกได้เพียงว่า
+    // เคยมี visit หรือไม่ (0/1) ส่วน /patient-records นับจำนวน visit จริงทั้งหมด
+    // จึงรวมข้อมูลย้อนหลังเข้ากับผู้ป่วยในคิว แทนการทิ้ง record ที่ HN ซ้ำกัน
+    const recordsByHN = new Map(recordPatients.map((p) => [p.hn, p]));
+    const merged = patients.map((patient) => {
+      const record = recordsByHN.get(patient.hn);
+      if (!record) return patient;
+
+      return {
+        ...record,
+        ...patient,
+        visitCount: record.visitCount ?? patient.visitCount,
+      };
+    });
+
     // ใช้เลข HN เป็นตัวจับคู่ เพราะ id ของสองชุดคนละรูปแบบ (q-2 กับ p-2)
-    const seen = new Set(patients.map((p) => p.hn));
+    const seen = new Set(merged.map((p) => p.hn));
 
     for (const p of recordPatients) {
       if (!seen.has(p.hn)) {
@@ -90,10 +104,7 @@ const DoctorRecordsPage: React.FC<DoctorRecordsPageProps> = ({ onNavigate }) => 
     return (
       <DoctorErrorScreen
         message={error || recordsError || ''}
-        onRetry={() => {
-          void refresh();
-          void refreshRecords();
-        }}
+        onRetry={() => Promise.all([refresh(), refreshRecords()]).then(() => undefined)}
       />
     );
   }

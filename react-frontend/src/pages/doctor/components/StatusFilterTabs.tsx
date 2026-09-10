@@ -27,6 +27,11 @@ export interface StatusFilterOption {
    *  ใช้ในหน้าที่ปุ่มเป็นการสลับ "มุมมอง" (เช่น ตารางเวร รายเดือน/รายสัปดาห์)
    *  ซึ่งไม่มีจำนวนให้นับ แต่ไอคอนช่วยให้แยกออกเร็วกว่าอ่านข้อความ */
   icon?: React.ReactNode;
+
+  /** สีเฉพาะของปุ่มเมื่อถูกเลือก เช่น สีตามระดับความเร่งด่วน */
+  activeStyle?: React.CSSProperties;
+  /** สีของตัวเลขบนปุ่มเมื่อถูกเลือก */
+  activeCountStyle?: React.CSSProperties;
 }
 
 interface StatusFilterTabsProps {
@@ -34,6 +39,8 @@ interface StatusFilterTabsProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  /** ให้ทุกปุ่มกว้างเท่าปุ่มที่มีข้อความยาวที่สุด */
+  equalWidth?: boolean;
 }
 
 export const StatusFilterTabs: React.FC<StatusFilterTabsProps> = ({
@@ -41,11 +48,12 @@ export const StatusFilterTabs: React.FC<StatusFilterTabsProps> = ({
   value,
   onChange,
   className = '',
+  equalWidth = false,
 }) => {
   return (
     <div
       role="group"
-      className={`flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-xs font-bold self-start sm:self-auto shrink-0 ${className}`}
+      className={`${equalWidth ? 'grid grid-flow-col auto-cols-fr' : 'flex flex-wrap'} items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80 text-xs font-bold self-start sm:self-auto shrink-0 ${className}`}
     >
       {options.map((option) => {
         const isActive = value === option.value;
@@ -56,7 +64,8 @@ export const StatusFilterTabs: React.FC<StatusFilterTabsProps> = ({
             type="button"
             aria-pressed={isActive}
             onClick={() => onChange(option.value)}
-            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500/60 ${
+            style={isActive ? option.activeStyle : undefined}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500/60 ${equalWidth ? 'justify-center' : ''} ${
               isActive
                 ? 'bg-blue-600 text-white shadow-2xs'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
@@ -67,6 +76,7 @@ export const StatusFilterTabs: React.FC<StatusFilterTabsProps> = ({
 
             {option.count !== undefined && (
               <span
+                style={isActive ? option.activeCountStyle : undefined}
                 className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono leading-none ${
                   isActive ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
                 }`}
