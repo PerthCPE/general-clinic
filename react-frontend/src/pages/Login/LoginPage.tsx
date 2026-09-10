@@ -164,6 +164,7 @@ const LoginPage: React.FC = () => {
             <img src={clinicLogo} alt="General Clinic Logo" className="login-logo-img" />
           </div>
           <p className="login-tagline">ระบบบริหารจัดการคลินิกเวชกรรม</p>
+
         </div>
 
         {/* Standard Form */}

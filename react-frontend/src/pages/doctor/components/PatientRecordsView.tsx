@@ -17,6 +17,7 @@ import {
   X,
   FileCheck,
   ArrowLeft,
+  Edit3,
   Filter,
   CheckCircle2,
   Phone,
@@ -118,6 +119,21 @@ const NotAsked: React.FC = () => {
   );
 };
 
+/** ตรวจวันที่รับบริการกับวันปัจจุบันตามเวลาท้องถิ่นของเครื่องผู้ใช้ */
+const isVisitToday = (visitDate?: string): boolean => {
+  const value = (visitDate || '').trim().slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+  const today = new Date();
+  const todayKey = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+  ].join('-');
+
+  return value === todayKey;
+};
+
 const HistoryField: React.FC<{ label: string; value?: string }> = ({ label, value }) => {
   const text = (value || '').trim();
   return (
@@ -195,10 +211,11 @@ const VisitProgressBadge: React.FC<{ visit: PastVisitRecord; language: string }>
   if (!visit.progress) return null;
 
   const isTh = language === 'th';
+  const badgeLayout = 'inline-flex min-w-[104px] items-center justify-center whitespace-nowrap text-center';
 
   if (visit.progress === 'completed') {
     return (
-      <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md">
+      <span className={`${badgeLayout} text-[10px] font-extrabold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2 py-0.5 rounded-md`}>
         {isTh ? 'เสร็จสิ้น' : 'Completed'}
       </span>
     );
@@ -206,7 +223,7 @@ const VisitProgressBadge: React.FC<{ visit: PastVisitRecord; language: string }>
 
   if (visit.progress === 'in_progress') {
     return (
-      <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md">
+      <span className={`${badgeLayout} text-[10px] font-extrabold text-amber-800 bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md`}>
         {isTh ? 'กำลังดำเนินการ' : 'In Progress'}
       </span>
     );
@@ -220,7 +237,7 @@ const VisitProgressBadge: React.FC<{ visit: PastVisitRecord; language: string }>
   const suffix = reasonText[visit.progressReason || ''];
 
   return (
-    <span className="text-[10px] font-extrabold text-rose-800 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md">
+    <span className={`${badgeLayout} text-[10px] font-extrabold text-rose-800 bg-rose-100 border border-rose-200 px-2 py-0.5 rounded-md`}>
       {isTh ? 'ยกเลิกการรับบริการ' : 'Cancelled'}
       {suffix ? (isTh ? suffix.th : suffix.en) : ''}
     </span>
@@ -310,6 +327,42 @@ const ProfileField: React.FC<{
     <div className="font-semibold leading-relaxed text-slate-900">{value}</div>
   </div>
 );
+
+/** ข้อความกลุ่มนี้หมายถึง "ไม่มี" จึงไม่ควรถูกเน้นเป็นความเสี่ยง */
+const isNegativeClinicalValue = (value: string): boolean =>
+  /^(?:-|ไม่มี|ไม่พบ|ปฏิเสธ|ไม่ได้ใช้|ไม่ได้รับประทาน|none\b|no\b|nil\b|nkda\b|nka\b)/i.test(value.trim());
+
+/**
+ * ช่องประวัติที่ต้องเตือนแพทย์เมื่อมีข้อมูลจริง
+ * ตัวข้อมูลแสดงเป็นข้อความตรง ๆ เพื่อไม่ให้เกิดกรอบซ้อนหลายชั้น
+ */
+const ClinicalAlertField: React.FC<{
+  label: string;
+  values?: string[];
+  emptyText: string;
+}> = ({ label, values, emptyText }) => {
+  const items = (values || []).map((value) => value.trim()).filter(Boolean);
+  const hasClinicalValue = items.some((value) => !isNegativeClinicalValue(value));
+
+  return (
+    <div className={`min-h-[76px] rounded-xl border p-3.5 ${
+      hasClinicalValue
+        ? 'border-rose-300 bg-rose-50/60'
+        : 'border-slate-200 bg-slate-50/60'
+    }`}>
+      <span className={`mb-2 block text-[11px] font-bold ${
+        hasClinicalValue ? 'text-rose-800' : 'text-slate-500'
+      }`}>
+        {label}
+      </span>
+      <div className={`font-semibold leading-relaxed ${
+        hasClinicalValue ? 'text-rose-900' : 'text-slate-700'
+      }`}>
+        {items.length > 0 ? items.join(', ') : emptyText}
+      </div>
+    </div>
+  );
+};
 
 export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
   patients,
@@ -645,13 +698,15 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                               </div>
                             </div>
                           </div>
-                          {isNewPatient(patient) ? (
-                              <span className="bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
+                          <span className="inline-flex w-[104px] shrink-0 [&>span]:w-full [&>span]:justify-center">
+                            {isNewPatient(patient) ? (
+                              <span className="inline-flex items-center bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap">
                                 {language === 'th' ? 'ผู้ป่วยใหม่' : 'New Patient'}
                               </span>
                             ) : (
                               <StatusBadge status={patient.status} />
                             )}
+                          </span>
                         </div>
 
                         <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs space-y-1 font-mono text-slate-600">
@@ -725,7 +780,9 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                 <div>
                   <div className="flex items-center gap-3 flex-wrap">
                     <h2 className="text-xl font-bold text-slate-900">{selectedPatient.name}</h2>
-                    <StatusBadge status={selectedPatient.status} />
+                    <span className="inline-flex w-[104px] shrink-0 [&>span]:w-full">
+                      <StatusBadge status={selectedPatient.status} />
+                    </span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-slate-500 font-mono mt-1.5 flex-wrap">
                     <CopyableText label="HN" value={selectedPatient.hn} />
@@ -746,10 +803,28 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                 </button>
                 <button
                   onClick={() => onExamine(selectedPatient)}
-                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-2 transition-all cursor-pointer"
+                  className={`w-[116px] px-3 py-2.5 rounded-xl text-xs font-bold shadow-xs hover:shadow-sm active:scale-95 transition-all inline-grid grid-cols-[16px_1fr] items-center gap-2 whitespace-nowrap cursor-pointer ${
+                    selectedPatient.status === 'Completed'
+                      ? 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                      : selectedPatient.status === 'Examining' || (selectedPatient.status as string) === 'In Progress'
+                        ? // เคสที่บันทึกฉบับร่างค้างไว้ ใช้สีเหลืองชุดเดียวกับปุ่ม "บันทึกฉบับร่าง"
+                          // ในหน้าบันทึกการตรวจ ให้ตรงกับปุ่ม "ตรวจต่อ" ในหน้าคิวผู้ป่วย
+                          'bg-amber-400 hover:bg-amber-500 text-white'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
                 >
-                  <Stethoscope className="w-4 h-4" />
-                  <span>{t('examineBtn')}</span>
+                  {selectedPatient.status === 'Completed' ? (
+                    <Edit3 className="w-4 h-4 shrink-0" />
+                  ) : (
+                    <Stethoscope className="w-4 h-4 shrink-0" />
+                  )}
+                  <span className="text-center">
+                    {selectedPatient.status === 'Completed'
+                      ? t('editRecordBtn')
+                      : selectedPatient.status === 'Examining' || (selectedPatient.status as string) === 'In Progress'
+                        ? t('continueExamBtn')
+                        : t('examineBtn')}
+                  </span>
                 </button>
               </div>
             </div>
@@ -776,8 +851,8 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
           </div>
 
           {/* Navigation Tabs (History vs Profile) */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs overflow-hidden">
-            <div className="border-b border-slate-200 px-6 pt-2.5 bg-slate-50/50 overflow-x-auto">
+          <div className="bg-white rounded-3xl border border-slate-200/90 shadow-xs">
+            <div className="sticky top-[138px] z-30 border-b border-slate-200 px-6 pt-2.5 bg-white rounded-t-3xl overflow-x-auto shadow-2xs">
               <div
                 role="tablist"
                 aria-label={language === 'th' ? 'ข้อมูลเวชระเบียนผู้ป่วย' : 'Patient medical records'}
@@ -790,15 +865,15 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                   tabIndex={activeTab === 'history' ? 0 : -1}
                   data-record-tab="history"
                   onClick={() => setActiveTab('history')}
-                  className={`w-full min-w-0 px-4 py-3 text-xs font-extrabold rounded-t-2xl transition-all border-b-2 flex items-center justify-center gap-2 cursor-pointer focus:outline-hidden ${
+                  className={`w-full min-w-0 px-4 py-3 text-base font-extrabold rounded-t-2xl transition-all border-b-2 flex items-center justify-center gap-2 cursor-pointer focus:outline-hidden ${
                     activeTab === 'history'
                       ? 'bg-white text-blue-700 border-blue-600 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 border-transparent'
                   }`}
                 >
-                  <History className="w-4 h-4 text-blue-600" />
+                  <History className="w-5 h-5 text-blue-600" />
                   <span>{language === 'th' ? 'ประวัติการตรวจรักษาย้อนหลัง' : 'Past Treatment History'}</span>
-                  <span className="ml-1 bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                  <span className="ml-1 bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-mono font-bold">
                     {currentHistory.length}
                   </span>
                 </button>
@@ -810,13 +885,13 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                   tabIndex={activeTab === 'profile' ? 0 : -1}
                   data-record-tab="profile"
                   onClick={() => setActiveTab('profile')}
-                  className={`w-full min-w-0 px-4 py-3 text-xs font-extrabold rounded-t-2xl transition-all border-b-2 flex items-center justify-center gap-2 cursor-pointer focus:outline-hidden ${
+                  className={`w-full min-w-0 px-4 py-3 text-base font-extrabold rounded-t-2xl transition-all border-b-2 flex items-center justify-center gap-2 cursor-pointer focus:outline-hidden ${
                     activeTab === 'profile'
                       ? 'bg-white text-blue-700 border-blue-600 shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 border-transparent'
                   }`}
                 >
-                  <User className="w-4 h-4 text-blue-600" />
+                  <User className="w-5 h-5 text-blue-600" />
                   <span>{language === 'th' ? 'ข้อมูลสุขภาพและประวัติส่วนตัว' : 'Health Profile & Medical Background'}</span>
                 </button>
               </div>
@@ -851,6 +926,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                       {currentHistory.map((visit, index) => {
                         const isExpanded = expandedVisitId === null ? index === 0 : expandedVisitId === visit.id;
                         const isCurrentSession = visit.id.startsWith('current-');
+                        const isToday = isCurrentSession || isVisitToday(visit.visitDate);
 
                         return (
                           <div key={visit.id} className="flex gap-3 sm:gap-4 items-start">
@@ -894,7 +970,7 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                                       </span>
                                     )}
                                     <CopyableText label="VN" value={visit.vn} />
-                                    {isCurrentSession && (
+                                    {isToday && (
                                       <span className="text-[10px] font-extrabold text-blue-800 bg-blue-100 border border-blue-200 px-2 py-0.5 rounded-md uppercase">
                                         {language === 'th' ? 'การรับบริการวันนี้' : 'Today Visit'}
                                       </span>
@@ -1182,43 +1258,16 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                       icon={<AlertTriangle className="w-4 h-4" />}
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-3.5">
-                          <span className="mb-2 block text-[11px] font-bold text-rose-900">
-                            {language === 'th' ? 'ประวัติการแพ้ยา' : 'Drug Allergies'}
-                          </span>
-                          {selectedPatient.drugAllergies && selectedPatient.drugAllergies.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedPatient.drugAllergies.map((drug, i) => (
-                                <span key={i} className="rounded-lg border border-rose-200 bg-white px-2.5 py-1 font-bold text-rose-900">
-                                  {drug}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="font-semibold text-emerald-700">
-                              {language === 'th' ? 'ปฏิเสธประวัติแพ้ยา (NKDA)' : 'No Known Drug Allergies (NKDA)'}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3.5">
-                          <span className="mb-2 block text-[11px] font-bold text-amber-900">
-                            {language === 'th' ? 'ประวัติการแพ้อาหาร' : 'Food Allergies'}
-                          </span>
-                          {selectedPatient.foodAllergies && selectedPatient.foodAllergies.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedPatient.foodAllergies.map((food, i) => (
-                                <span key={i} className="rounded-lg border border-amber-200 bg-white px-2.5 py-1 font-bold text-amber-900">
-                                  {food}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="font-medium text-slate-600">
-                              {language === 'th' ? 'ไม่มีประวัติแพ้อาหาร' : 'No food allergies recorded.'}
-                            </span>
-                          )}
-                        </div>
+                        <ClinicalAlertField
+                          label={language === 'th' ? 'ประวัติการแพ้ยา' : 'Drug Allergies'}
+                          values={selectedPatient.drugAllergies}
+                          emptyText={language === 'th' ? 'ปฏิเสธการแพ้ยา' : 'No Known Drug Allergies (NKDA)'}
+                        />
+                        <ClinicalAlertField
+                          label={language === 'th' ? 'ประวัติการแพ้อาหาร' : 'Food Allergies'}
+                          values={selectedPatient.foodAllergies}
+                          emptyText={language === 'th' ? 'ปฏิเสธการแพ้อาหาร' : 'No known food allergies'}
+                        />
                       </div>
                     </ProfileSection>
 
@@ -1227,39 +1276,16 @@ export const PatientRecordsView: React.FC<PatientRecordsViewProps> = ({
                       icon={<HeartPulse className="w-4 h-4" />}
                     >
                       <div className="space-y-3">
-                        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
-                          <span className="mb-2 block text-[11px] font-semibold text-slate-500">
-                            {language === 'th' ? 'โรคประจำตัวและภาวะเรื้อรัง' : 'Chronic Diseases & Conditions'}
-                          </span>
-                          {selectedPatient.chronicDiseases && selectedPatient.chronicDiseases.length > 0 ? (
-                            <div className="flex flex-wrap gap-1.5">
-                              {selectedPatient.chronicDiseases.map((d, i) => (
-                                <span key={i} className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 font-bold text-blue-900">
-                                  {d}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="font-medium text-slate-500">{language === 'th' ? 'ไม่มีโรคประจำตัว' : 'No chronic diseases recorded.'}</span>
-                          )}
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3.5">
-                          <span className="mb-2 block text-[11px] font-semibold text-slate-500">
-                            {language === 'th' ? 'ยาที่รับประทานประจำในปัจจุบัน' : 'Current Long-term Medications'}
-                          </span>
-                          {selectedPatient.currentMedications && selectedPatient.currentMedications.length > 0 ? (
-                            <div className="space-y-1.5">
-                              {selectedPatient.currentMedications.map((med, i) => (
-                                <div key={i} className="rounded-lg border border-slate-200 bg-white px-3 py-2 font-medium text-slate-800">
-                                  {med}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="font-medium text-slate-500">{language === 'th' ? 'ไม่มีรายการยาประจำ' : 'No long-term medications listed.'}</span>
-                          )}
-                        </div>
+                        <ClinicalAlertField
+                          label={language === 'th' ? 'โรคประจำตัวและภาวะเรื้อรัง' : 'Chronic Diseases & Conditions'}
+                          values={selectedPatient.chronicDiseases}
+                          emptyText={language === 'th' ? 'ไม่มีโรคประจำตัว' : 'No chronic diseases recorded'}
+                        />
+                        <ClinicalAlertField
+                          label={language === 'th' ? 'ยาที่รับประทานประจำในปัจจุบัน' : 'Current Long-term Medications'}
+                          values={selectedPatient.currentMedications}
+                          emptyText={language === 'th' ? 'ไม่มีรายการยาประจำ' : 'No long-term medications listed'}
+                        />
                       </div>
                     </ProfileSection>
                   </div>

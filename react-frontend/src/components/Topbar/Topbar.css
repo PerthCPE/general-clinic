@@ -1865,8 +1865,8 @@ body.dark-mode .doc-message-item-desc {
   position: fixed;
   inset: 0;
   z-index: 2000;
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(3px);
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1876,25 +1876,26 @@ body.dark-mode .doc-message-item-desc {
 
 .doc-msg-modal-box {
   background: #FFFFFF;
-  border-radius: 16px;
-  max-width: 520px;
+  border-radius: 18px;
+  max-width: 620px;
   width: 100%;
-  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.18);
-  border: 1px solid #E2E8F0;
+  box-shadow: 0 24px 50px -12px rgba(15, 23, 42, 0.28);
+  border: 1px solid #CBD5E1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: scaleUp 0.2s ease;
+  animation: scaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 body.dark-mode .doc-msg-modal-box {
   background: #1E293B;
   border-color: #334155;
   color: #F8FAFC;
+  box-shadow: 0 24px 50px -12px rgba(0, 0, 0, 0.6);
 }
 
 .doc-msg-modal-header {
-  padding: 16px 20px;
+  padding: 18px 24px;
   background: #FFFFFF;
   border-bottom: 1px solid #E2E8F0;
   display: flex;
@@ -1910,13 +1911,13 @@ body.dark-mode .doc-msg-modal-header {
 .doc-msg-modal-header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .doc-header-icon-badge {
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   background: #EFF6FF;
   color: #2563EB;
   display: flex;
@@ -1932,33 +1933,58 @@ body.dark-mode .doc-header-icon-badge {
 
 .doc-msg-modal-title {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   color: #0F172A;
+  line-height: 1.3;
 }
 
 body.dark-mode .doc-msg-modal-title {
   color: #F8FAFC;
 }
 
-.doc-msg-modal-subtitle {
-  margin: 2px 0 0 0;
-  font-size: 12px;
-  color: #64748B;
+.doc-msg-modal-subtitle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
 }
 
-body.dark-mode .doc-msg-modal-subtitle {
+.doc-msg-ref-label {
+  font-size: 12.5px;
+  color: #64748B;
+  font-weight: 500;
+}
+
+body.dark-mode .doc-msg-ref-label {
   color: #94A3B8;
 }
 
+.doc-msg-ref-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2563EB;
+  background: #EFF6FF;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid #BFDBFE;
+  font-family: monospace;
+}
+
+body.dark-mode .doc-msg-ref-badge {
+  background: #1E3A8A;
+  color: #93C5FD;
+  border-color: #1D4ED8;
+}
+
 .doc-modal-close-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   border: none;
-  background: transparent;
+  background: #F1F5F9;
   color: #64748B;
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1967,66 +1993,72 @@ body.dark-mode .doc-msg-modal-subtitle {
 }
 
 .doc-modal-close-btn:hover {
-  background: #F1F5F9;
+  background: #E2E8F0;
   color: #0F172A;
+  transform: scale(1.05);
 }
 
 body.dark-mode .doc-modal-close-btn {
-  color: #94A3B8;
+  background: #334155;
+  color: #CBD5E1;
 }
 
 body.dark-mode .doc-modal-close-btn:hover {
-  background: #334155;
+  background: #475569;
   color: #FFFFFF;
 }
 
 .doc-msg-modal-body {
-  padding: 20px;
-  max-height: 60vh;
+  padding: 22px 24px;
+  max-height: 65vh;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .doc-msg-info-card {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
-.doc-msg-field {
+/* Subject Box */
+.doc-msg-subject-box {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 14px 18px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
-.doc-msg-field-label {
-  font-size: 11px;
+body.dark-mode .doc-msg-subject-box {
+  background: #0F172A;
+  border-color: #334155;
+}
+
+.doc-msg-subject-title {
+  margin: 0;
+  font-size: 16.5px;
   font-weight: 700;
-  color: #64748B;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-body.dark-mode .doc-msg-field-label {
-  color: #94A3B8;
-}
-
-.doc-msg-field-value {
-  font-size: 13px;
   color: #0F172A;
   line-height: 1.4;
 }
 
-body.dark-mode .doc-msg-field-value {
+body.dark-mode .doc-msg-subject-title {
   color: #F8FAFC;
 }
 
+/* 2x2 Grid */
 .doc-msg-field-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 14px;
   background: #F8FAFC;
-  padding: 14px;
-  border-radius: 12px;
+  padding: 16px 18px;
+  border-radius: 14px;
   border: 1px solid #E2E8F0;
 }
 
@@ -2035,11 +2067,54 @@ body.dark-mode .doc-msg-field-grid {
   border-color: #334155;
 }
 
+.doc-msg-grid-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.doc-msg-field-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748B;
+  letter-spacing: 0.3px;
+}
+
+body.dark-mode .doc-msg-field-label {
+  color: #94A3B8;
+}
+
+.doc-msg-field-value {
+  font-size: 14.5px;
+  color: #0F172A;
+  line-height: 1.4;
+}
+
+body.dark-mode .doc-msg-field-value {
+  color: #F8FAFC;
+}
+
+.doc-msg-type-pill {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1E40AF;
+  background: #DBEAFE;
+  padding: 3px 10px;
+  border-radius: 6px;
+  width: fit-content;
+}
+
+body.dark-mode .doc-msg-type-pill {
+  background: #1E3A8A;
+  color: #BFDBFE;
+}
+
 .doc-msg-priority-tag {
   display: inline-block;
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 700;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 6px;
   width: fit-content;
 }
@@ -2062,28 +2137,121 @@ body.dark-mode .doc-msg-field-grid {
   border: 1px solid #A7F3D0;
 }
 
+/* Note Section */
+.doc-msg-note-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .doc-msg-note-box {
-  background: #EFF6FF;
-  border: 1px solid #BFDBFE;
-  border-radius: 10px;
-  padding: 12px;
-  font-size: 12.5px;
-  color: #1E3A8A;
-  line-height: 1.5;
+  background: #F0F9FF;
+  border: 1.5px solid #BAE6FD;
+  border-radius: 12px;
+  padding: 14px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #0369A1;
+  line-height: 1.6;
 }
 
 body.dark-mode .doc-msg-note-box {
-  background: #1E3A8A;
-  border-color: #1D4ED8;
-  color: #DBEAFE;
+  background: #0C4A6E;
+  border-color: #0284C7;
+  color: #E0F2FE;
 }
 
+/* Attachment Section */
+.doc-msg-attachment-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.doc-msg-attachment-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: #F0FDF4;
+  border: 1.5px solid #86EFAC;
+  border-radius: 12px;
+  gap: 12px;
+}
+
+body.dark-mode .doc-msg-attachment-card {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #059669;
+}
+
+.doc-msg-attachment-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.doc-msg-attachment-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.doc-msg-attachment-text-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.doc-msg-attachment-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #15803D;
+}
+
+body.dark-mode .doc-msg-attachment-name {
+  color: #86EFAC;
+}
+
+.doc-msg-attachment-hint {
+  font-size: 12px;
+  color: #166534;
+  opacity: 0.85;
+}
+
+body.dark-mode .doc-msg-attachment-hint {
+  color: #BBF7D0;
+}
+
+.doc-msg-attachment-btn {
+  padding: 8px 18px;
+  background: #2563EB;
+  color: #FFFFFF;
+  text-decoration: none;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.doc-msg-attachment-btn:hover {
+  background: #1D4ED8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+
+/* Modal Footer */
 .doc-msg-modal-footer {
-  padding: 14px 20px;
+  padding: 16px 24px;
   background: #F8FAFC;
   border-top: 1px solid #E2E8F0;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: nowrap;
 }
 
 body.dark-mode .doc-msg-modal-footer {
@@ -2091,21 +2259,120 @@ body.dark-mode .doc-msg-modal-footer {
   border-color: #334155;
 }
 
-.doc-msg-btn-primary {
-  padding: 8px 20px;
-  background: #2563EB;
-  color: #FFFFFF;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
+.doc-msg-btn-danger {
+  padding: 10px 18px;
+  background: #FEE2E2;
+  color: #DC2626;
+  border: 1.5px solid #FECACA;
+  border-radius: 10px;
+  font-size: 13.5px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
 }
 
-.doc-msg-btn-primary:hover {
-  background: #1D4ED8;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+.doc-msg-btn-danger:hover {
+  background: #DC2626;
+  color: #FFFFFF;
+  border-color: #DC2626;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
+}
+
+body.dark-mode .doc-msg-btn-danger {
+  background: #7F1D1D;
+  border-color: #991B1B;
+  color: #FCA5A5;
+}
+
+body.dark-mode .doc-msg-btn-danger:hover {
+  background: #DC2626;
+  color: #FFFFFF;
+}
+
+.doc-msg-footer-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.doc-msg-btn-acknowledge {
+  padding: 10px 22px;
+  background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+  transition: all 0.2s ease;
+}
+
+.doc-msg-btn-acknowledge:hover:not(:disabled) {
+  background: linear-gradient(135deg, #047857 0%, #059669 100%);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.5);
+  transform: translateY(-1px);
+}
+
+.doc-msg-btn-acknowledge:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.doc-msg-acknowledged-tag {
+  padding: 8px 18px;
+  background: #ECFDF5;
+  color: #059669;
+  border: 1.5px solid #A7F3D0;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+body.dark-mode .doc-msg-acknowledged-tag {
+  background: rgba(5, 150, 105, 0.25);
+  border-color: #059669;
+  color: #6EE7B7;
+}
+
+.doc-msg-btn-secondary {
+  padding: 10px 20px;
+  background: #F1F5F9;
+  color: #334155;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.doc-msg-btn-secondary:hover {
+  background: #E2E8F0;
+  color: #0F172A;
+}
+
+body.dark-mode .doc-msg-btn-secondary {
+  background: #1E293B;
+  border-color: #334155;
+  color: #CBD5E1;
+}
+
+body.dark-mode .doc-msg-btn-secondary:hover {
+  background: #334155;
+  color: #FFFFFF;
 }
 
 /* Dropdown Footer */
@@ -2721,4 +2988,176 @@ body.dark-mode .doc-all-footer-close-btn {
 body.dark-mode .doc-all-footer-close-btn:hover {
   background: #475569;
 }
+
+/* Delete Buttons & Danger Actions */
+.doc-message-top-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.doc-message-item-delete-btn {
+  background: transparent;
+  border: none;
+  color: #94A3B8;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 5px;
+  border-radius: 4px;
+  line-height: 1;
+  opacity: 0.6;
+  transition: all 0.15s ease;
+}
+
+.doc-message-item:hover .doc-message-item-delete-btn {
+  opacity: 1;
+}
+
+.doc-message-item-delete-btn:hover {
+  background: #FEE2E2;
+  color: #DC2626;
+}
+
+body.dark-mode .doc-message-item-delete-btn:hover {
+  background: #7F1D1D;
+  color: #FCA5A5;
+}
+
+/* All Docs Toolbar & Actions */
+.doc-all-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-all-quick-clearall-btn {
+  padding: 6px 12px;
+  background: #FFF1F2;
+  border: 1px solid #FECDD3;
+  color: #E11D48;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.doc-all-quick-clearall-btn:hover {
+  background: #E11D48;
+  color: #FFFFFF;
+  border-color: #E11D48;
+}
+
+body.dark-mode .doc-all-quick-clearall-btn {
+  background: #4C0519;
+  border-color: #881337;
+  color: #FDA4AF;
+}
+
+body.dark-mode .doc-all-quick-clearall-btn:hover {
+  background: #E11D48;
+  color: #FFFFFF;
+}
+
+.doc-all-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-all-delete-btn {
+  padding: 6px 9px;
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 7px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.doc-all-delete-btn:hover {
+  background: #FEE2E2;
+  border-color: #FECACA;
+  transform: scale(1.05);
+}
+
+body.dark-mode .doc-all-delete-btn {
+  background: #1E293B;
+  border-color: #334155;
+}
+
+body.dark-mode .doc-all-delete-btn:hover {
+  background: #7F1D1D;
+  border-color: #991B1B;
+}
+
+/* Status Pill in Message List Dropdown */
+.doc-msg-status-pill {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.doc-msg-status-pill.completed {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+body.dark-mode .doc-msg-status-pill.completed {
+  background: rgba(5, 150, 105, 0.2);
+  border-color: #059669;
+  color: #6EE7B7;
+}
+
+.doc-msg-status-pill.pending {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+body.dark-mode .doc-msg-status-pill.pending {
+  background: rgba(217, 119, 6, 0.2);
+  border-color: #D97706;
+  color: #FCD34D;
+}
+
+/* Status Badge in All Docs Modal Cards */
+.doc-all-status-badge {
+  padding: 3px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.doc-all-status-badge.ack {
+  background: #ECFDF5;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+body.dark-mode .doc-all-status-badge.ack {
+  background: rgba(5, 150, 105, 0.25);
+  border-color: #059669;
+  color: #6EE7B7;
+}
+
+.doc-all-status-badge.pending {
+  background: #FFFBEB;
+  color: #D97706;
+  border: 1px solid #FDE68A;
+}
+
+body.dark-mode .doc-all-status-badge.pending {
+  background: rgba(217, 119, 6, 0.25);
+  border-color: #D97706;
+  color: #FCD34D;
+}
+
+
 

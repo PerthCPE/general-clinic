@@ -452,10 +452,17 @@ func RecordVitalsAndTriage(c *gin.Context) {
 		return
 	}
 
-	// ออกเลข VN ทันที
+	// ออกเลข VN ตั้งแต่ขั้นตอนคัดกรอง โดยใช้สูตรกลางเดียวกับฝั่งแพทย์
+	// เพื่อไม่ให้ VN ของผู้ป่วยมีรูปแบบต่างกันตามหน้าที่สร้าง VisitRecord
 	if newVisitRecord.VN == "" {
-		vn := fmt.Sprintf("69%02d%04d", time.Now().Year()%100, (newVisitRecord.ID*7)%9000+1000)
-		tx.Model(&models.VisitRecord{}).Where("id = ?", newVisitRecord.ID).Update("vn", vn)
+		vn := generateVNAt(tx, newVisitRecord.VisitDate)
+		if err := tx.Model(&models.VisitRecord{}).
+			Where("id = ?", newVisitRecord.ID).
+			Update("vn", vn).Error; err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("ไม่สามารถออกเลข VN ได้: %v", err)})
+			return
+		}
 		newVisitRecord.VN = vn
 	}
 

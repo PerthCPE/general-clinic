@@ -27,12 +27,12 @@ const TriageChip: React.FC<{ level?: string }> = ({ level }) => {
   const tone = triageTone(level);
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap"
+      className="inline-grid w-[112px] grid-cols-[6px_1fr] items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap"
       style={{ backgroundColor: tone.bg, borderColor: tone.border, color: tone.text }}
       title={level}
     >
       <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: tone.dot }}></span>
-      {text}
+      <span className="text-center">{text}</span>
     </span>
   );
 };
@@ -116,11 +116,11 @@ export const QueueTable: React.FC<QueueTableProps> = ({
       count: triageCounts[lv] || 0,
       activeStyle: {
         backgroundColor: triageTone(lv).dot,
-        color: lv === 'Level 3: Urgent' ? '#422006' : '#FFFFFF',
+        color: '#FFFFFF',
       },
       activeCountStyle: {
         backgroundColor: 'rgba(15, 23, 42, 0.16)',
-        color: lv === 'Level 3: Urgent' ? '#422006' : '#FFFFFF',
+        color: '#FFFFFF',
       },
     })),
   ];
@@ -326,9 +326,13 @@ export const QueueTable: React.FC<QueueTableProps> = ({
                   <td className="py-5 px-6 text-center">
                     <button
                       onClick={() => onExamine(patient)}
-                      className={`w-[116px] px-3 py-1.5 rounded-lg text-xs font-semibold shadow-2xs hover:shadow-xs active:scale-95 transition-all inline-flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
+                      className={`w-[116px] px-3 py-1.5 rounded-lg text-xs font-semibold shadow-2xs hover:shadow-xs active:scale-95 transition-all inline-grid grid-cols-[14px_1fr] items-center gap-1.5 whitespace-nowrap cursor-pointer ${
                         patient.status === 'Completed'
                           ? 'bg-slate-200 hover:bg-slate-300 text-slate-700'
+                          : patient.status === 'Examining' || (patient.status as string) === 'In Progress'
+                          ? // เคสที่บันทึกฉบับร่างค้างไว้ ใช้สีเหลืองชุดเดียวกับปุ่ม "บันทึกฉบับร่าง"
+                            // ในหน้าบันทึกการตรวจ เพื่อให้เห็นตรงกันว่าเป็นงานที่ยังค้างอยู่
+                            'bg-amber-400 hover:bg-amber-500 text-white'
                           : 'bg-[#2563eb] hover:bg-blue-700 text-white'
                       }`}
                     >
@@ -342,7 +346,7 @@ export const QueueTable: React.FC<QueueTableProps> = ({
                         ปุ่มจึงต้องบอกว่า "ตรวจต่อ" ไม่ใช่ "ตรวจผู้ป่วย"
                         เพื่อให้รู้ว่ากดเข้าไปแล้วข้อมูลเดิมยังอยู่ครบ
                       */}
-                      <span>
+                      <span className="text-center">
                         {patient.status === 'Completed'
                           ? t('editRecordBtn')
                           : patient.status === 'Examining' || (patient.status as string) === 'In Progress'

@@ -100,10 +100,32 @@ func ConnectDB() {
 		log.Println("Database Migration Complete.")
 	} else {
 		// Always ensure new models are migrated
-		database.AutoMigrate(&models.Medicine{}, &models.PatientMedicine{}, &models.BillingQueue{}, &models.MedicineQueue{}, &models.QueueCounter{}, &models.Appointment{}, &models.SystemAccess{}, &models.TreatmentRight{}, &models.Billing{}, &models.BillingHistory{}, &models.QRPayment{}, &models.Dispensing{})
+		database.AutoMigrate(
+			&models.Medicine{},
+			&models.PatientMedicine{},
+			&models.BillingQueue{},
+			&models.MedicineQueue{},
+			&models.QueueCounter{},
+			&models.Appointment{},
+			&models.SystemAccess{},
+			&models.TreatmentRight{},
+			&models.Billing{},
+			&models.BillingHistory{},
+			&models.QRPayment{},
+			&models.Dispensing{},
+			&models.Document{},
+			&models.DocumentForward{},
+		)
 		log.Println("Database schema already up to date. Skipped redundant AutoMigrate.")
 	}
 
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS description text DEFAULT ''")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_size bigint DEFAULT 0")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS doc_type text DEFAULT 'เอกสารทั่วไป'")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS status text DEFAULT 'reviewing'")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS external_doc_ref text DEFAULT ''")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_url text DEFAULT ''")
+	database.Exec("ALTER TABLE documents ADD COLUMN IF NOT EXISTS approved_by integer")
 	database.Exec("ALTER TABLE medicines ADD COLUMN IF NOT EXISTS usage_method text DEFAULT ''")
 	database.Exec("UPDATE medicines SET usage_method = 'ชงดื่ม' WHERE (usage_method IS NULL OR usage_method = '') AND medicine_code = 'MED-011'")
 	database.Exec("UPDATE medicines SET usage_method = 'เคี้ยวให้ละเอียดก่อนกลืน' WHERE (usage_method IS NULL OR usage_method = '') AND medicine_code = 'MED-012'")
@@ -371,13 +393,27 @@ func seedDatabase() {
 			// ไม่แตะ Password ตรงนี้โดยเจตนา — ถ้าเจ้าของบัญชีเคยเปลี่ยนรหัสผ่านจริงไปแล้ว
 			// (ผ่าน RequiresPasswordChange flow ครั้งแรก) ห้าม restart แล้วรีเซ็ตทับรหัสผ่านจริง
 			// กลับไปเป็นค่าเริ่มต้นอีก
-			DB.Model(&existing).Updates(map[string]interface{}{
+			updates := map[string]interface{}{
 				"full_name":   users[i].FullName,
 				"role":        users[i].Role,
 				"phone":       users[i].Phone,
 				"email":       users[i].Email,
 				"employee_id": users[i].EmployeeID,
-			})
+			}
+
+			// migration ครั้งเดียว: ตอนเปลี่ยนมาใช้ employee_id เป็นรหัสผ่านเริ่มต้น (feature นี้)
+			// ไม่เคยมี script รีเซ็ตรหัสผ่านบัญชี seed เดิมที่ถูกสร้างไว้ก่อนหน้า (ยุคที่ทุกบัญชี
+			// ใช้รหัสผ่านร่วมกันเป็น "password") ผลคือบัญชี seed ทั้ง 10 บัญชียัง hash เป็น
+			// "password" ค้างอยู่จริง ไม่ใช่ employee_id ตามที่ Login()/เอกสารคาดไว้ — ทำให้
+			// normal login ล้มเหลวทุกบัญชีพร้อมกัน (พบระหว่างสำรวจบั๊กนี้) จุดนี้ backfill ให้
+			// เฉพาะบัญชีที่ยัง "password" (ของเก่าที่ยังไม่เคยถูกเปลี่ยน) เท่านั้น — บัญชีที่เจ้าของ
+			// เคยเปลี่ยนรหัสผ่านจริงไปแล้วจะไม่ match "password" อีกต่อไป จึงไม่ถูกแตะ ปลอดภัยเหมือนเดิม
+			if bcrypt.CompareHashAndPassword([]byte(existing.Password), []byte("password")) == nil {
+				updates["password"] = users[i].Password
+				log.Printf("Migrated legacy default password -> employee_id for seed account %q", users[i].Username)
+			}
+
+			DB.Model(&existing).Updates(updates)
 		}
 	}
 	log.Println("Users & Doctors verified, updated and seeded successfully.")

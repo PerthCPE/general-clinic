@@ -1,14 +1,19 @@
 import './Topbar.css';
 import { useState, useRef, useEffect, useMemo } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { useDoctorData } from '../../pages/doctor/DoctorDataContext';
 import { matchPatientSearch } from '../../pages/doctor/utils/searchUtils';
 import { displayVN } from '../../pages/doctor/utils/vnGenerator';
+import { dmsApi } from '../../services/api';
 import {
   type DocumentMessage,
   getDocumentMessagesForUser,
   markDocumentMessageAsRead,
   markAllDocumentMessagesAsRead,
+  deleteDocumentMessage,
+  clearAllDocumentMessages,
+  acknowledgeDocumentMessage,
 } from '../../services/documentMessageStorage';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { getSharedAudioContext } from '../../utils/audioContext';
@@ -49,6 +54,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   const [isSoundEnabled, setIsSoundEnabled] = useState(true);
   const searchRef = useRef<HTMLDivElement>(null);
   const { subscribe } = useWebSocket();
+
+  const [isAckLoading, setIsAckLoading] = useState(false);
 
   useEffect(() => {
     // WebSocket ยิงหา client ทุกตัว จึงต้องกรองตาม role ไม่งั้นกระดิ่งของทุก role จะเด้งพร้อมกัน
@@ -95,23 +102,67 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
       unsubPay();
     };
   }, [subscribe, currentUser?.role]);
+
   // Sync Document Messages from storage & events
   useEffect(() => {
     const handleMessageUpdate = () => {
-      setDocMessages(getDocumentMessagesForUser(currentUser));
+      const msgs = getDocumentMessagesForUser(currentUser);
+      setDocMessages(msgs);
+      if (selectedDocMessageModal) {
+        const currentSelected = msgs.find((m) => m.id === selectedDocMessageModal.id);
+        if (currentSelected) {
+          setSelectedDocMessageModal(currentSelected);
+        }
+      }
     };
     handleMessageUpdate();
     window.addEventListener('clinic_document_message_sent', handleMessageUpdate);
+    window.addEventListener('clinic_document_acknowledged', handleMessageUpdate);
     window.addEventListener('storage', handleMessageUpdate);
     return () => {
       window.removeEventListener('clinic_document_message_sent', handleMessageUpdate);
+      window.removeEventListener('clinic_document_acknowledged', handleMessageUpdate);
       window.removeEventListener('storage', handleMessageUpdate);
     };
-  }, [currentUser]);
+  }, [currentUser, selectedDocMessageModal?.id]);
 
   const unreadDocMessageCount = useMemo(() => {
     return docMessages.filter((m) => m.isUnread).length;
   }, [docMessages]);
+
+  const handleAcknowledgeMessage = async (msg: DocumentMessage) => {
+    setIsAckLoading(true);
+    try {
+      if (msg.forwardId) {
+        await dmsApi.acknowledgeForward(msg.forwardId).catch((err) => {
+          console.warn('API acknowledge forward failed (fallback to local):', err);
+        });
+      }
+
+      acknowledgeDocumentMessage({
+        msgId: msg.id,
+        forwardId: msg.forwardId,
+        docId: msg.docId,
+      });
+
+      const nowIso = new Date().toISOString();
+      const updated: DocumentMessage = {
+        ...msg,
+        isUnread: false,
+        isAcknowledged: true,
+        acknowledgedAt: nowIso,
+      };
+      setSelectedDocMessageModal(updated);
+      setDocMessages(getDocumentMessagesForUser(currentUser));
+
+      toast.success(`รับทราบเอกสาร "${msg.title}" เรียบร้อยแล้ว (สถานะ: ได้รับแล้ว)`);
+    } catch (err) {
+      console.error('Error acknowledging document:', err);
+      toast.error('เกิดข้อผิดพลาดในการบันทึกรับทราบเอกสาร');
+    } finally {
+      setIsAckLoading(false);
+    }
+  };
 
   const handleMarkAllMessagesRead = () => {
     markAllDocumentMessagesAsRead(currentUser?.username, currentUser?.fullName);
@@ -123,6 +174,24 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     setDocMessages(getDocumentMessagesForUser(currentUser));
     setSelectedDocMessageModal(msg);
     setIsDocMessagesOpen(false);
+  };
+
+  const handleDeleteMessage = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    deleteDocumentMessage(id);
+    setDocMessages(getDocumentMessagesForUser(currentUser));
+    if (selectedDocMessageModal && selectedDocMessageModal.id === id) {
+      setSelectedDocMessageModal(null);
+    }
+  };
+
+  const handleClearAllMessages = () => {
+    if (window.confirm('คุณต้องการล้างข้อความเอกสารทั้งหมดใช่หรือไม่?')) {
+      clearAllDocumentMessages();
+      setDocMessages([]);
+      setIsAllDocsModalOpen(false);
+      setSelectedDocMessageModal(null);
+    }
   };
 
   const [isAllDocsModalOpen, setIsAllDocsModalOpen] = useState(false);
@@ -176,14 +245,28 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   // ถ้าคนเดียวกันอยู่ทั้งสองชุด ยึดของคิวเพราะสถานะเป็นปัจจุบันกว่า
   const searchablePatients = useMemo(() => {
     if (!isDoctor) return [];
-    const merged = [...doctorPatients];
-    const seen = new Set(doctorPatients.map((p) => p.hn));
-    for (const p of recordPatients) {
-      if (!seen.has(p.hn)) {
-        seen.add(p.hn);
-        merged.push(p);
-      }
-    }
+
+    const merged: typeof doctorPatients = [];
+    const seen = new Set<string>();
+    const addPatient = (patient: (typeof doctorPatients)[number]) => {
+      const hn = (patient.hn || '').trim().toUpperCase();
+      const nationalId = (patient.nationalId || '').replace(/[-\s]/g, '');
+      const identity = hn
+        ? `hn:${hn}`
+        : nationalId
+          ? `national-id:${nationalId}`
+          : patient.patientId
+            ? `patient-id:${patient.patientId}`
+            : `id:${patient.id}`;
+
+      if (seen.has(identity)) return;
+      seen.add(identity);
+      merged.push(patient);
+    };
+
+    // ใส่คิวปัจจุบันก่อนเพื่อให้ข้อมูลสถานะล่าสุดมีสิทธิ์เหนือข้อมูลย้อนหลัง
+    doctorPatients.forEach(addPatient);
+    recordPatients.forEach(addPatient);
     return merged;
   }, [isDoctor, doctorPatients, recordPatients]);
 
@@ -658,24 +741,23 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
       {/* Actions Group (Messages + Notifications + Profile) */}
       <div className="actions-group">
 
-        {/* Document Message Box Icon & Dropdown Panel (ข้างๆ รูปกระดิ่ง) */}
-        <div className="doc-message-container" ref={docMessageRef}>
-          <button 
-            className={`doc-message-btn ${isDocMessagesOpen ? 'active' : ''}`} 
-            onClick={() => {
-              setIsDocMessagesOpen(prev => !prev);
-              setIsNoticeOpen(false);
-              setIsDropdownOpen(false);
-            }}
-            aria-label="Document Messages"
-            title="กล่องข้อความเอกสารเข้าจากธุรการ"
-          >
+        {/* Document Message Box Icon & Dropdown Panel (เฉพาะผู้รับ เช่น แพทย์ พยาบาล เภสัชกร การเงิน — ซ่อนสำหรับธุรการ) */}
+        {currentUser?.role !== 'officer' && (
+          <div className="doc-message-container" ref={docMessageRef}>
+            <button 
+              className={`doc-message-btn ${isDocMessagesOpen ? 'active' : ''}`} 
+              onClick={() => {
+                setIsDocMessagesOpen(prev => !prev);
+                setIsNoticeOpen(false);
+                setIsDropdownOpen(false);
+              }}
+              aria-label="Document Messages"
+              title="กล่องข้อความเอกสารเข้าจากธุรการ"
+            >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
-            {unreadDocMessageCount > 0 && (
-              <span className="doc-message-badge">{unreadDocMessageCount > 9 ? '9+' : unreadDocMessageCount}</span>
-            )}
+            {unreadDocMessageCount > 0 && <span className="notice-badge" />}
           </button>
 
           {/* Message Dropdown Menu */}
@@ -750,7 +832,18 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                           <span className={`doc-message-tag ${msg.priority}`}>
                             {msg.type}
                           </span>
-                          <span className="doc-message-time">{msg.timeDisplay}</span>
+                          <div className="doc-message-top-right">
+                            <span className="doc-message-time">{msg.timeDisplay}</span>
+                            <button
+                              type="button"
+                              className="doc-message-item-delete-btn"
+                              onClick={(e) => handleDeleteMessage(e, msg.id)}
+                              title="ลบข้อความนี้"
+                              aria-label="ลบข้อความนี้"
+                            >
+                              ✕
+                            </button>
+                          </div>
                         </div>
                         <h5 className="doc-message-item-title">{msg.title}</h5>
                         {msg.description && (
@@ -758,6 +851,11 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                         )}
                         <div className="doc-message-item-sender">
                           <span>จาก: {msg.sender}</span>
+                          {msg.isAcknowledged ? (
+                            <span className="doc-msg-status-pill completed">✓ ได้รับแล้ว</span>
+                          ) : (
+                            <span className="doc-msg-status-pill pending">รอรับทราบ</span>
+                          )}
                           {msg.isUnread && <span className="doc-unread-dot" />}
                         </div>
                       </div>
@@ -789,6 +887,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             </div>
           )}
         </div>
+        )}
 
         {/* Notification Icon & Dropdown Panel */}
         <div className="notice-container" ref={noticeRef}>
@@ -1082,6 +1181,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 </svg>
               </button>
 
+              
+              
               {/* 4. ออกจากระบบ (Text align center, no emoji) */}
               <button
                 className="dropdown-menu-item dropdown-item-4 dropdown-logout-btn"
@@ -1104,7 +1205,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             <div className="doc-msg-modal-header">
               <div className="doc-msg-modal-header-left">
                 <div className="doc-header-icon-badge">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
                     <polyline points="14 2 14 8 20 8" />
                     <line x1="16" y1="13" x2="8" y2="13" />
@@ -1113,8 +1214,11 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                   </svg>
                 </div>
                 <div>
-                  <h3 className="doc-msg-modal-title">รายละเอียดเอกสาร</h3>
-                  <p className="doc-msg-modal-subtitle">รหัสอ้างอิง: {selectedDocMessageModal.id}</p>
+                  <h3 className="doc-msg-modal-title">รายละเอียดเอกสารส่งต่อ</h3>
+                  <div className="doc-msg-modal-subtitle-row">
+                    <span className="doc-msg-ref-label">รหัสอ้างอิง:</span>
+                    <span className="doc-msg-ref-badge">{selectedDocMessageModal.id}</span>
+                  </div>
                 </div>
               </div>
               <button
@@ -1128,36 +1232,100 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             </div>
 
             <div className="doc-msg-modal-body">
-              <div className="doc-msg-info-card">
-                <div className="doc-msg-field">
-                  <span className="doc-msg-field-label">หัวข้อเรื่อง:</span>
-                  <span className="doc-msg-field-value font-bold text-slate-900">{selectedDocMessageModal.title}</span>
+              {/* Recipient Acknowledgment Status Banner */}
+              {selectedDocMessageModal.isAcknowledged ? (
+                <div className="doc-msg-ack-banner completed">
+                  <div className="doc-msg-ack-banner-icon">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                  <div className="doc-msg-ack-banner-text">
+                    <div className="doc-msg-ack-title">คุณได้รับและรับทราบเอกสารนี้เรียบร้อยแล้ว</div>
+                    <div className="doc-msg-ack-sub">
+                      สถานะ: <span className="doc-msg-ack-pill-green">✓ ได้รับแล้ว</span>
+                      {selectedDocMessageModal.acknowledgedAt && (
+                        <span className="doc-msg-ack-time-info"> &bull; บันทึกเมื่อ {new Date(selectedDocMessageModal.acknowledgedAt).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' })} น.</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                <div className="doc-msg-ack-banner pending">
+                  <div className="doc-msg-ack-banner-icon">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                  </div>
+                  <div className="doc-msg-ack-banner-text">
+                    <div className="doc-msg-ack-title">รอการรับทราบเอกสารจากคุณ</div>
+                    <div className="doc-msg-ack-sub">
+                      สถานะ: <span className="doc-msg-ack-pill-amber">รอรับทราบ</span> &bull; กรุณาตรวจสอบเอกสารและกดยืนยันรับทราบด้านล่าง
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="doc-msg-info-card">
+                {/* Subject Title Card */}
+                <div className="doc-msg-subject-box">
+                  <span className="doc-msg-field-label">หัวข้อเรื่องเอกสาร:</span>
+                  <h4 className="doc-msg-subject-title">{selectedDocMessageModal.title}</h4>
+                </div>
+
+                {/* 2x2 Details Grid */}
                 <div className="doc-msg-field-grid">
-                  <div className="doc-msg-field">
-                    <span className="doc-msg-field-label">ผู้ส่ง:</span>
-                    <span className="doc-msg-field-value">{selectedDocMessageModal.sender}</span>
+                  <div className="doc-msg-grid-item">
+                    <span className="doc-msg-field-label">ผู้ส่งมอบ (ธุรการ):</span>
+                    <span className="doc-msg-field-value font-semibold">{selectedDocMessageModal.sender}</span>
                   </div>
-                  <div className="doc-msg-field">
-                    <span className="doc-msg-field-label">ผู้รับ:</span>
-                    <span className="doc-msg-field-value">{selectedDocMessageModal.recipient}</span>
+                  <div className="doc-msg-grid-item">
+                    <span className="doc-msg-field-label">ผู้รับมอบ:</span>
+                    <span className="doc-msg-field-value font-semibold">{selectedDocMessageModal.recipient}</span>
                   </div>
-                  <div className="doc-msg-field">
+                  <div className="doc-msg-grid-item">
                     <span className="doc-msg-field-label">ประเภทเอกสาร:</span>
-                    <span className="doc-msg-field-value">{selectedDocMessageModal.type}</span>
+                    <span className="doc-msg-type-pill">{selectedDocMessageModal.type}</span>
                   </div>
-                  <div className="doc-msg-field">
+                  <div className="doc-msg-grid-item">
                     <span className="doc-msg-field-label">ระดับความสำคัญ:</span>
                     <span className={`doc-msg-priority-tag ${selectedDocMessageModal.priority}`}>
-                      {selectedDocMessageModal.priority === 'emergency' ? 'ฉุกเฉินมาก' : selectedDocMessageModal.priority === 'urgent' ? 'ด่วน' : 'ปกติ'}
+                      {selectedDocMessageModal.priority === 'emergency' ? '🚨 ฉุกเฉินมาก' : selectedDocMessageModal.priority === 'urgent' ? '⚡ ด่วน' : 'ปกติ'}
                     </span>
                   </div>
                 </div>
+
+                {/* Officer Note */}
                 {selectedDocMessageModal.description && (
-                  <div className="doc-msg-field mt-2">
+                  <div className="doc-msg-note-section">
                     <span className="doc-msg-field-label">ข้อความและรายละเอียดจากธุรการ:</span>
                     <div className="doc-msg-note-box">
                       {selectedDocMessageModal.description}
+                    </div>
+                  </div>
+                )}
+
+                {/* File Attachment Box */}
+                {selectedDocMessageModal.fileUrl && (
+                  <div className="doc-msg-attachment-section">
+                    <span className="doc-msg-field-label">ไฟล์เอกสารแนบต้นฉบับ:</span>
+                    <div className="doc-msg-attachment-card">
+                      <div className="doc-msg-attachment-info">
+                        <span className="doc-msg-attachment-icon">📎</span>
+                        <div className="doc-msg-attachment-text-group">
+                          <span className="doc-msg-attachment-name">ไฟล์เอกสารแนบในระบบ</span>
+                          <span className="doc-msg-attachment-hint">คลิกเพื่อดูหรือดาวน์โหลดเอกสารต้นฉบับ</span>
+                        </div>
+                      </div>
+                      <a
+                        href={selectedDocMessageModal.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="doc-msg-attachment-btn"
+                      >
+                        👁️ เปิดดูไฟล์แนบ
+                      </a>
                     </div>
                   </div>
                 )}
@@ -1167,11 +1335,47 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
             <div className="doc-msg-modal-footer">
               <button
                 type="button"
-                className="doc-msg-btn-primary"
-                onClick={() => setSelectedDocMessageModal(null)}
+                className="doc-msg-btn-danger"
+                onClick={(e) => {
+                  handleDeleteMessage(e, selectedDocMessageModal.id);
+                  setSelectedDocMessageModal(null);
+                }}
               >
-                ✓ รับทราบและปิดหน้าต่าง
+                🗑️ ลบข้อความนี้
               </button>
+
+              <div className="doc-msg-footer-right-actions">
+                {!selectedDocMessageModal.isAcknowledged ? (
+                  <button
+                    type="button"
+                    className="doc-msg-btn-acknowledge"
+                    disabled={isAckLoading}
+                    onClick={() => handleAcknowledgeMessage(selectedDocMessageModal)}
+                  >
+                    {isAckLoading ? (
+                      'กำลังบันทึก...'
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                        <span>รับทราบเอกสาร (บันทึกว่าได้รับแล้ว)</span>
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <span className="doc-msg-acknowledged-tag">
+                    ✓ ได้รับแล้ว (รับทราบเรียบร้อย)
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="doc-msg-btn-secondary"
+                  onClick={() => setSelectedDocMessageModal(null)}
+                >
+                  ปิดหน้าต่าง
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1230,16 +1434,28 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                   </button>
                 </div>
 
-                {unreadDocMessageCount > 0 && (
-                  <button
-                    type="button"
-                    className="doc-all-quick-readall-btn"
-                    onClick={handleMarkAllMessagesRead}
-                    title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด"
-                  >
-                    ✓ ทำเครื่องหมายอ่านแล้วทั้งหมด
-                  </button>
-                )}
+                <div className="doc-all-toolbar-actions">
+                  {unreadDocMessageCount > 0 && (
+                    <button
+                      type="button"
+                      className="doc-all-quick-readall-btn"
+                      onClick={handleMarkAllMessagesRead}
+                      title="ทำเครื่องหมายว่าอ่านแล้วทั้งหมด"
+                    >
+                      ✓ อ่านแล้วทั้งหมด
+                    </button>
+                  )}
+                  {docMessages.length > 0 && (
+                    <button
+                      type="button"
+                      className="doc-all-quick-clearall-btn"
+                      onClick={handleClearAllMessages}
+                      title="ล้างข้อความทั้งหมดในกล่องข้อความ"
+                    >
+                      🗑️ ล้างทั้งหมด
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Search Bar */}
@@ -1279,6 +1495,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                   </div>
                   <h4>{allDocsFilter === 'unread' ? 'ไม่มีเอกสารที่ยังไม่ได้อ่าน' : 'ไม่พบเอกสารที่ค้นหา'}</h4>
                   <p>{allDocsFilter === 'unread' ? 'คุณได้อ่านเอกสารทั้งหมดครบถ้วนแล้ว' : 'ลองเปลี่ยนคำค้นหาใหม่อีกครั้ง'}</p>
+
                 </div>
               ) : (
                 <div className="doc-all-grid">
@@ -1294,6 +1511,11 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                             {msg.priority === 'emergency' ? 'ฉุกเฉินมาก' : msg.priority === 'urgent' ? 'ด่วน' : 'ปกติ'}
                           </span>
                           <span className="doc-all-type-tag">{msg.type}</span>
+                          {msg.isAcknowledged ? (
+                            <span className="doc-all-status-badge ack">✓ ได้รับแล้ว</span>
+                          ) : (
+                            <span className="doc-all-status-badge pending">รอรับทราบ</span>
+                          )}
                           {msg.isUnread && <span className="doc-all-unread-badge">ยังไม่ได้อ่าน</span>}
                         </div>
                         <span className="doc-all-card-time">{msg.timeDisplay}</span>
@@ -1310,16 +1532,27 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                           <span className="doc-all-sender-label">จาก:</span>
                           <span className="doc-all-sender-name">{msg.sender}</span>
                         </div>
-                        <button
-                          type="button"
-                          className="doc-all-view-detail-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenMessageItem(msg);
-                          }}
-                        >
-                          เปิดดูเอกสาร &rarr;
-                        </button>
+                        <div className="doc-all-card-actions">
+                          <button
+                            type="button"
+                            className="doc-all-delete-btn"
+                            title="ลบข้อความนี้"
+                            aria-label="ลบข้อความนี้"
+                            onClick={(e) => handleDeleteMessage(e, msg.id)}
+                          >
+                            🗑️
+                          </button>
+                          <button
+                            type="button"
+                            className="doc-all-view-detail-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenMessageItem(msg);
+                            }}
+                          >
+                            เปิดดูเอกสาร &rarr;
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}

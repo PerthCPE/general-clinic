@@ -6,7 +6,11 @@ import {
   type BackendUser,
   type BackendDocument,
 } from '../../services/api';
-import { sendDocumentMessage } from '../../services/documentMessageStorage';
+import {
+  sendDocumentMessage,
+  deleteDocumentMessage,
+  deleteDocumentMessageByDocId,
+} from '../../services/documentMessageStorage';
 import { DEMO_USERS } from '../../config/roles';
 import './DocumentForwardPage.css';
 
@@ -47,12 +51,16 @@ const getRoleLabel = (role?: string): string => {
       return 'แพทย์';
     case 'nurse':
       return 'พยาบาล';
+    case 'nurse_assistant':
+      return 'ผู้ช่วยพยาบาล';
     case 'pharmacist':
       return 'เภสัชกร';
     case 'cashier':
       return 'การเงิน';
     case 'officer':
       return 'ธุรการ/เวชระเบียน';
+    case 'registrar':
+      return 'เวชระเบียน';
     case 'admin':
       return 'ผู้ดูแลระบบ';
     default:
@@ -60,188 +68,104 @@ const getRoleLabel = (role?: string): string => {
   }
 };
 
-const generateInitialIncomingDocs = (): ForwardDoc[] => {
-  const now = new Date();
-  const sampleItems: Array<{
-    title: string;
-    sender: string;
-    senderRole: string;
-    type: string;
-    priority: 'normal' | 'urgent' | 'emergency';
-    status: 'unread' | 'processing' | 'completed';
-    hoursAgo: number;
-    description: string;
-  }> = [
-    {
-      title: 'ผลการตรวจเลือด CBC (ฉุกเฉิน)',
-      sender: 'ห้องปฏิบัติการกลาง (Lab)',
-      senderRole: 'นักเทคนิคการแพทย์',
-      type: 'ผลตรวจ',
-      priority: 'emergency',
-      status: 'unread',
-      hoursAgo: 0.5,
-      description: 'พบค่าเม็ดเลือดขาวสูงผิดปกติ โปรดแพทย์เจ้าของไข้ตรวจสอบด่วน',
-    },
-    {
-      title: 'ใบส่งตัวผู้ป่วยส่งต่อรับการผ่าตัด',
-      sender: 'แผนกอายุรกรรม',
-      senderRole: 'พยาบาลวิชาชีพ',
-      type: 'ใบส่งตัว',
-      priority: 'urgent',
-      status: 'unread',
-      hoursAgo: 1.5,
-      description: 'ส่งตัวผู้ป่วยนายสมบัติ มีสุข เพื่อประเมินสิทธิการรักษาและเตียงผ่าตัด',
-    },
-    {
-      title: 'ใบเบิกเวชภัณฑ์และอุปกรณ์ทำแผล',
-      sender: 'แผนกฉุกเฉินและอุบัติเหตุ (ER)',
-      senderRole: 'พยาบาลหัวหน้าเวร',
-      type: 'ใบเบิก',
-      priority: 'normal',
-      status: 'processing',
-      hoursAgo: 3,
-      description: 'ขอเบิกสำลี, ผ้าก๊อซปลอดเชื้อ, และน้ำเกลือล้างแผล (NSS 0.9%)',
-    },
-    {
-      title: 'รายงานผลเอกซเรย์ทรวงอก (Chest X-Ray)',
-      sender: 'แผนกรังสีวินิจฉัย (X-Ray)',
-      senderRole: 'นักรังสีการแพทย์',
-      type: 'รายงาน',
-      priority: 'normal',
-      status: 'processing',
-      hoursAgo: 5,
-      description: 'ภาพถ่ายรังสีทรวงอกระบบดิจิทัล ส่งมอบให้แพทย์อายุรกรรม',
-    },
-    {
-      title: 'บันทึกข้อความสรุปการประชุมคลินิก',
-      sender: 'สำนักงานผู้อำนวยการ',
-      senderRole: 'ธุรการกลาง',
-      type: 'บันทึกข้อความ',
-      priority: 'normal',
-      status: 'completed',
-      hoursAgo: 24,
-      description: 'มติที่ประชุมเรื่องการปรับปรุงระบบคัดกรองผู้ป่วยรอบเดือนกันยายน',
-    },
-    {
-      title: 'ใบแจ้งยอดค่ารักษาพยาบาลและประกันสังคม',
-      sender: 'ฝ่ายการเงินและบัญชี',
-      senderRole: 'เจ้าหน้าที่การเงิน',
-      type: 'การเงิน',
-      priority: 'normal',
-      status: 'completed',
-      hoursAgo: 48,
-      description: 'สรุปรายการเบิกจ่ายค่ารักษาพยาบาลสิทธิประกันสังคม',
-    },
-  ];
 
-  return sampleItems.map((item, idx) => {
-    const docDate = new Date(now.getTime() - item.hoursAgo * 60 * 60 * 1000);
-    return {
-      id: `DOC-2569-${String(1001 + idx)}`,
-      title: item.title,
-      description: item.description,
-      sender: item.sender,
-      senderRole: item.senderRole,
-      recipient: 'ธุรการ (คุณสมจิต ดีใจ)',
-      recipientRole: 'เจ้าหน้าที่ธุรการ',
-      receivedDate: formatThaiDate(docDate),
-      rawDate: docDate.toISOString(),
-      type: item.type,
-      priority: item.priority,
-      status: item.status,
-    };
-  });
+
+const getStaffAvatarText = (fullname?: string, username?: string): string => {
+  const str = (fullname || username || 'ST').trim();
+  if (str.startsWith('พญ.')) return 'พญ';
+  if (str.startsWith('นพ.')) return 'นพ';
+  if (str.startsWith('พว.')) return 'พว';
+  if (str.startsWith('ภก.')) return 'ภก';
+  if (str.startsWith('ดร.')) return 'ดร';
+  if (str.startsWith('คุณ')) return str.slice(3, 5).trim() || 'คุณ';
+  if (str.startsWith('นาย')) return str.slice(3, 5).trim() || 'นาย';
+  if (str.startsWith('นส.')) return 'นส';
+  return str.slice(0, 2).toUpperCase();
 };
 
-const generateInitialForwardedDocs = (): ForwardDoc[] => {
-  const now = new Date();
-  const sampleItems: Array<{
-    title: string;
-    recipient: string;
-    recipientRole: string;
-    type: string;
-    priority: 'normal' | 'urgent' | 'emergency';
-    status: 'unread' | 'processing' | 'completed';
-    hoursAgo: number;
-    description: string;
-  }> = [
-    {
-      title: 'รายงานสรุปยอดผู้ป่วยประจำเดือน',
-      recipient: 'ผู้อำนวยการคลินิก',
-      recipientRole: 'ผู้บริหาร',
-      type: 'รายงาน',
-      priority: 'normal',
-      status: 'completed',
-      hoursAgo: 2,
-      description: 'สถิติยอดผู้ป่วยนอก (OPD) ยอดผู้ป่วยฉุกเฉิน และรายได้รวมประจำเดือน',
-    },
-    {
-      title: 'ใบส่งตัวผู้ป่วยส่งโรงพยาบาลศูนย์',
-      recipient: 'พญ.สุดา สุขสมบูรณ์',
-      recipientRole: 'สูตินรีแพทย์',
-      type: 'ใบส่งตัว',
-      priority: 'emergency',
-      status: 'completed',
-      hoursAgo: 4,
-      description: 'ส่งตัวเคสฝากครรภ์เสี่ยงสูงเพื่อรับคำปรึกษาและตรวจวินิจฉัยเฉพาะทาง',
-    },
-    {
-      title: 'ใบเบิกจ่ายงบประมาณจัดซื้อเวชภัณฑ์ยา',
-      recipient: 'ฝ่ายการเงินและบัญชี',
-      recipientRole: 'การเงิน',
-      type: 'การเงิน',
-      priority: 'urgent',
-      status: 'processing',
-      hoursAgo: 6,
-      description: 'ขออนุมัติจัดซื้อยาจำเป็นเร่งด่วนสำหรับห้องยาคลินิก',
-    },
-    {
-      title: 'เอกสารประเมินประสิทธิภาพบุคลากร',
-      recipient: 'ฝ่ายทรัพยากรบุคคล (HR)',
-      recipientRole: 'บุคคล',
-      type: 'เอกสารทั่วไป',
-      priority: 'normal',
-      status: 'completed',
-      hoursAgo: 30,
-      description: 'สรุปผลการประเมินการปฏิบัติงานแพทย์และพยาบาล',
-    },
-    {
-      title: 'ผลการตรวจเพาะเชื้อทางจุลชีววิทยา',
-      recipient: 'นพ.วิชัย ชาญการแพทย์',
-      recipientRole: 'อายุรแพทย์',
-      type: 'ผลตรวจ',
-      priority: 'urgent',
-      status: 'processing',
-      hoursAgo: 8,
-      description: 'ผลเพาะเชื้อและค่าความไวต่อยาปฏิชีวนะของคนไข้ในคลินิก',
-    },
-  ];
+const STORAGE_KEY_INCOMING_DOCS = 'clinic_dms_incoming_docs_v2';
+const STORAGE_KEY_FORWARDED_DOCS = 'clinic_dms_forwarded_docs_v2';
 
-  return sampleItems.map((item, idx) => {
-    const docDate = new Date(now.getTime() - item.hoursAgo * 60 * 60 * 1000);
-    return {
-      id: `FWD-2569-${String(2001 + idx)}`,
-      title: item.title,
-      description: item.description,
-      sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-      senderRole: 'เจ้าหน้าที่ธุรการ',
-      recipient: item.recipient,
-      recipientRole: item.recipientRole,
-      receivedDate: formatThaiDate(docDate),
-      rawDate: docDate.toISOString(),
-      type: item.type,
-      priority: item.priority,
-      status: item.status,
-    };
-  });
+const getStoredIncomingDocs = (): ForwardDoc[] => {
+  if (typeof window === 'undefined') return [];
+  const raw = localStorage.getItem(STORAGE_KEY_INCOMING_DOCS);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+  }
+  return [];
+};
+
+const saveStoredIncomingDocs = (docs: ForwardDoc[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_INCOMING_DOCS, JSON.stringify(docs));
+  }
+};
+
+const getStoredForwardedDocs = (): ForwardDoc[] => {
+  if (typeof window === 'undefined') return [];
+  const raw = localStorage.getItem(STORAGE_KEY_FORWARDED_DOCS);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // ignore
+    }
+  }
+  return [];
+};
+
+const saveStoredForwardedDocs = (docs: ForwardDoc[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(STORAGE_KEY_FORWARDED_DOCS, JSON.stringify(docs));
+  }
+};
+
+const getStoredSystemDocs = (): BackendDocument[] => {
+  if (typeof window === 'undefined') return [];
+  const raw = localStorage.getItem('clinic_dms_documents_list_v2');
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.map((p: any) => ({
+          id: Number(p.id) || 0,
+          external_doc_ref: p.externalRef || '',
+          subject: p.subject || p.name || '',
+          description: p.description || '',
+          file_url: p.fileUrl || '',
+          file_size: p.fileSize || 0,
+          status: p.status || 'reviewing',
+          doc_type: p.type || 'เอกสารทั่วไป',
+          created_by: 1,
+          created_at: p.rawDoc?.created_at || new Date().toISOString(),
+          updated_at: p.rawDoc?.updated_at || new Date().toISOString(),
+          creator: p.rawDoc?.creator || { full_name: p.creatorName || 'ธุรการ' },
+        }));
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return [];
 };
 
 export const DocumentForwardPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'incoming' | 'forwarded'>('incoming');
-  const [incomingDocs, setIncomingDocs] = useState<ForwardDoc[]>(generateInitialIncomingDocs());
-  const [forwardedDocs, setForwardedDocs] = useState<ForwardDoc[]>(generateInitialForwardedDocs());
+  const [activeTab, setActiveTab] = useState<'incoming' | 'forwarded'>(() => {
+    const inc = getStoredIncomingDocs();
+    const fwd = getStoredForwardedDocs();
+    if (inc.length === 0 && fwd.length > 0) return 'forwarded';
+    return 'forwarded';
+  });
+  const [incomingDocs, setIncomingDocs] = useState<ForwardDoc[]>(() => getStoredIncomingDocs());
+  const [forwardedDocs, setForwardedDocs] = useState<ForwardDoc[]>(() => getStoredForwardedDocs());
   const [recipientsList, setRecipientsList] = useState<BackendUser[]>([]);
-  const [systemDocuments, setSystemDocuments] = useState<BackendDocument[]>([]);
+  const [systemDocuments, setSystemDocuments] = useState<BackendDocument[]>(() => getStoredSystemDocs());
   const [isLoading, setIsLoading] = useState(false);
 
   // Filters & Search
@@ -253,25 +177,31 @@ export const DocumentForwardPage: React.FC = () => {
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<ForwardDoc | null>(null);
-  const [activeMetricModal, setActiveMetricModal] = useState<'today' | 'pending' | 'completed' | 'recipients' | null>(null);
+  // Metric Modals & Sub-filters
+  const [activeMetricModal, setActiveMetricModal] = useState<'system_docs' | 'today' | 'pending' | 'completed' | 'recipients' | null>(null);
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
+  const [modalRoleFilter, setModalRoleFilter] = useState<string>('all');
 
-  // Send Form State
-  const [sendMode, setSendMode] = useState<'custom' | 'from_system'>('custom');
+  // Send Form State (System Documents Forwarding ONLY)
   const [selectedSystemDocId, setSelectedSystemDocId] = useState<number | ''>('');
-  const [newDocTitle, setNewDocTitle] = useState('');
   const [newDocDescription, setNewDocDescription] = useState('');
   const [newDocRecipientId, setNewDocRecipientId] = useState<number>(6);
-  const [newDocType, setNewDocType] = useState('ผลการตรวจ');
   const [newDocPriority, setNewDocPriority] = useState<'normal' | 'urgent' | 'emergency'>('normal');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Selected system document preview
+  const selectedDocPreview = useMemo(() => {
+    if (!selectedSystemDocId) return null;
+    return systemDocuments.find(d => d.id === Number(selectedSystemDocId)) || null;
+  }, [selectedSystemDocId, systemDocuments]);
 
   // Load Real Data from DMS API
   const loadData = async () => {
     setIsLoading(true);
     try {
       // 1. Fetch Forwards
-      const forwardsData = await dmsApi.getForwards().catch(() => [] as BackendDocumentForward[]);
-      if (forwardsData && Array.isArray(forwardsData) && forwardsData.length > 0) {
+      const forwardsData = await dmsApi.getForwards().catch(() => null);
+      if (forwardsData !== null && Array.isArray(forwardsData)) {
         const mapped: ForwardDoc[] = forwardsData.map((fwd) => {
           const createdAt = new Date(fwd.created_at || Date.now());
           const isAck = fwd.status === 'Acknowledged';
@@ -296,6 +226,7 @@ export const DocumentForwardPage: React.FC = () => {
           };
         });
         setForwardedDocs(mapped);
+        saveStoredForwardedDocs(mapped);
       }
 
       // 2. Fetch Recipients List
@@ -321,25 +252,38 @@ export const DocumentForwardPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+
+    const handleSyncUpdate = () => {
+      // Refresh forwards when recipient acknowledges
+      const fwd = getStoredForwardedDocs();
+      if (fwd.length > 0) {
+        setForwardedDocs(fwd);
+      }
+      loadData();
+    };
+
+    window.addEventListener('clinic_document_acknowledged', handleSyncUpdate);
+    window.addEventListener('clinic_document_message_sent', handleSyncUpdate);
+    window.addEventListener('storage', handleSyncUpdate);
+
+    return () => {
+      window.removeEventListener('clinic_document_acknowledged', handleSyncUpdate);
+      window.removeEventListener('clinic_document_message_sent', handleSyncUpdate);
+      window.removeEventListener('storage', handleSyncUpdate);
+    };
   }, []);
 
-  // When selecting an existing system document
-  useEffect(() => {
-    if (sendMode === 'from_system' && selectedSystemDocId) {
-      const doc = systemDocuments.find(d => d.id === Number(selectedSystemDocId));
-      if (doc) {
-        setNewDocTitle(doc.subject);
-        setNewDocDescription(doc.description || '');
-        setNewDocType(doc.doc_type || 'เอกสารทั่วไป');
-      }
-    }
-  }, [sendMode, selectedSystemDocId, systemDocuments]);
-
-  // Submit Forwarding
+  // Submit Forwarding (System Document Only)
   const handleSendDocument = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDocTitle.trim()) {
-      toast.error('กรุณาระบุชื่อเรื่องหรือหัวข้อเอกสาร');
+    if (!selectedSystemDocId) {
+      toast.error('กรุณาเลือกเอกสารจากคลังระบบที่ต้องการส่งต่อ');
+      return;
+    }
+
+    const selectedDocObj = systemDocuments.find(d => d.id === Number(selectedSystemDocId));
+    if (!selectedDocObj) {
+      toast.error('ไม่พบข้อมูลเอกสารที่เลือกในระบบ');
       return;
     }
 
@@ -347,25 +291,14 @@ export const DocumentForwardPage: React.FC = () => {
     const selectedRecipient = recipientsList.find(u => u.id === newDocRecipientId);
     const recipientName = selectedRecipient?.fullname || selectedRecipient?.username || 'เจ้าหน้าที่ปลายทาง';
     const recipientRole = getRoleLabel(selectedRecipient?.role);
+    const docTitle = selectedDocObj.subject;
+    const docType = selectedDocObj.doc_type || 'เอกสารทั่วไป';
+    const finalDescription = newDocDescription.trim() || selectedDocObj.description || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS';
 
     try {
-      let targetDocId = typeof selectedSystemDocId === 'number' ? selectedSystemDocId : undefined;
-
-      // If custom mode or no existing doc selected, create document record in DB
-      if (!targetDocId) {
-        const docRes = await dmsApi.createDocument({
-          external_doc_ref: `FWD-REF-${Date.now().toString().slice(-6)}`,
-          subject: newDocTitle.trim(),
-          description: newDocDescription.trim() || undefined,
-          doc_type: newDocType,
-          status: 'reviewing',
-        });
-        targetDocId = docRes.document.id;
-      }
-
       // Forward to recipient
       const fwdRes = await dmsApi.forwardDocument({
-        doc_id: targetDocId,
+        doc_id: selectedDocObj.id,
         forwarded_to: newDocRecipientId,
       });
 
@@ -373,9 +306,9 @@ export const DocumentForwardPage: React.FC = () => {
       const newDoc: ForwardDoc = {
         id: `FWD-${String(fwdRes.forward.id).padStart(4, '0')}`,
         forwardId: fwdRes.forward.id,
-        docId: targetDocId,
-        title: newDocTitle.trim(),
-        description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
+        docId: selectedDocObj.id,
+        title: docTitle,
+        description: finalDescription,
         sender: 'ธุรการ (คุณสมจิต ดีใจ)',
         senderRole: 'เจ้าหน้าที่ธุรการ',
         recipient: recipientName,
@@ -383,35 +316,45 @@ export const DocumentForwardPage: React.FC = () => {
         recipientId: newDocRecipientId,
         receivedDate: formatThaiDate(now),
         rawDate: now.toISOString(),
-        type: newDocType,
+        type: docType,
         priority: newDocPriority,
         status: 'processing',
+        fileUrl: selectedDocObj.file_url,
       };
 
-      setForwardedDocs(prev => [newDoc, ...prev]);
+      setForwardedDocs(prev => {
+        const next = [newDoc, ...prev];
+        saveStoredForwardedDocs(next);
+        return next;
+      });
+
       sendDocumentMessage({
-        docId: targetDocId,
-        title: newDocTitle.trim(),
-        description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
+        forwardId: fwdRes.forward.id,
+        docId: selectedDocObj.id,
+        title: docTitle,
+        description: finalDescription,
         sender: 'ธุรการ (คุณสมจิต ดีใจ)',
         senderRole: 'เจ้าหน้าที่ธุรการ',
         recipient: recipientName,
         recipientRole: recipientRole,
         recipientId: newDocRecipientId,
         recipientUsername: selectedRecipient?.username,
-        type: newDocType,
+        type: docType,
         priority: newDocPriority,
+        fileUrl: selectedDocObj.file_url,
       });
+
       setIsSendModalOpen(false);
       resetSendForm();
-      toast.success(`ส่งต่อเอกสารไปยัง ${recipientName} เรียบร้อยแล้ว`);
+      toast.success(`ส่งต่อเอกสาร "${docTitle}" ไปยัง ${recipientName} เรียบร้อยแล้ว`);
     } catch {
       // Fallback for offline or local preview
       const now = new Date();
       const newDoc: ForwardDoc = {
         id: `FWD-2569-${String(2000 + forwardedDocs.length + 1)}`,
-        title: newDocTitle.trim(),
-        description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
+        docId: selectedDocObj.id,
+        title: docTitle,
+        description: finalDescription,
         sender: 'ธุรการ (คุณสมจิต ดีใจ)',
         senderRole: 'เจ้าหน้าที่ธุรการ',
         recipient: recipientName,
@@ -419,39 +362,45 @@ export const DocumentForwardPage: React.FC = () => {
         recipientId: newDocRecipientId,
         receivedDate: formatThaiDate(now),
         rawDate: now.toISOString(),
-        type: newDocType,
+        type: docType,
         priority: newDocPriority,
         status: 'processing',
+        fileUrl: selectedDocObj.file_url,
       };
 
-      setForwardedDocs(prev => [newDoc, ...prev]);
+      setForwardedDocs(prev => {
+        const next = [newDoc, ...prev];
+        saveStoredForwardedDocs(next);
+        return next;
+      });
+
       sendDocumentMessage({
-        title: newDocTitle.trim(),
-        description: newDocDescription.trim() || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS',
+        docId: selectedDocObj.id,
+        title: docTitle,
+        description: finalDescription,
         sender: 'ธุรการ (คุณสมจิต ดีใจ)',
         senderRole: 'เจ้าหน้าที่ธุรการ',
         recipient: recipientName,
         recipientRole: recipientRole,
         recipientId: newDocRecipientId,
         recipientUsername: selectedRecipient?.username,
-        type: newDocType,
+        type: docType,
         priority: newDocPriority,
+        fileUrl: selectedDocObj.file_url,
       });
+
       setIsSendModalOpen(false);
       resetSendForm();
-      toast.success(`ส่งต่อเอกสารไปยัง ${recipientName} สำเร็จ`);
+      toast.success(`ส่งต่อเอกสาร "${docTitle}" ไปยัง ${recipientName} สำเร็จ`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const resetSendForm = () => {
-    setNewDocTitle('');
-    setNewDocDescription('');
     setSelectedSystemDocId('');
-    setSendMode('custom');
+    setNewDocDescription('');
     setNewDocPriority('normal');
-    setNewDocType('ผลการตรวจ');
   };
 
   // View Document Details
@@ -461,7 +410,11 @@ export const DocumentForwardPage: React.FC = () => {
 
     // Auto update unread incoming status to processing
     if (doc.status === 'unread' && activeTab === 'incoming') {
-      setIncomingDocs(prev => prev.map(d => d.id === doc.id ? { ...d, status: 'processing' } : d));
+      setIncomingDocs(prev => {
+        const next = prev.map(d => d.id === doc.id ? { ...d, status: 'processing' as const } : d);
+        saveStoredIncomingDocs(next);
+        return next;
+      });
     }
   };
 
@@ -477,8 +430,16 @@ export const DocumentForwardPage: React.FC = () => {
           : d
         );
 
-      setIncomingDocs(updatedList);
-      setForwardedDocs(updatedList);
+      setIncomingDocs(prev => {
+        const next = updatedList(prev);
+        saveStoredIncomingDocs(next);
+        return next;
+      });
+      setForwardedDocs(prev => {
+        const next = updatedList(prev);
+        saveStoredForwardedDocs(next);
+        return next;
+      });
       if (selectedDoc && (selectedDoc.id === doc.id || selectedDoc.forwardId === doc.forwardId)) {
         setSelectedDoc(prev => prev ? { ...prev, status: 'completed', acknowledgedAt: new Date().toISOString() } : null);
       }
@@ -489,8 +450,16 @@ export const DocumentForwardPage: React.FC = () => {
           ? { ...d, status: 'completed' as const }
           : d
         );
-      setIncomingDocs(updatedList);
-      setForwardedDocs(updatedList);
+      setIncomingDocs(prev => {
+        const next = updatedList(prev);
+        saveStoredIncomingDocs(next);
+        return next;
+      });
+      setForwardedDocs(prev => {
+        const next = updatedList(prev);
+        saveStoredForwardedDocs(next);
+        return next;
+      });
       if (selectedDoc) {
         setSelectedDoc(prev => prev ? { ...prev, status: 'completed' } : null);
       }
@@ -501,8 +470,74 @@ export const DocumentForwardPage: React.FC = () => {
   // Archive incoming document
   const handleArchive = (docId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    setIncomingDocs(prev => prev.filter(d => d.id !== docId));
+    setIncomingDocs(prev => {
+      const next = prev.filter(d => d.id !== docId);
+      saveStoredIncomingDocs(next);
+      return next;
+    });
     toast.success('จัดเก็บเอกสารเข้าแฟ้มถาวรเรียบร้อยแล้ว');
+  };
+
+  // Delete Forwarded Document
+  const handleDeleteForward = async (doc: ForwardDoc, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm(`คุณต้องการลบรายการส่งต่อเอกสาร "${doc.title}" ใช่หรือไม่?`)) {
+      return;
+    }
+
+    try {
+      if (doc.forwardId) {
+        await dmsApi.deleteForward(doc.forwardId);
+      }
+      if (doc.docId) {
+        deleteDocumentMessageByDocId(doc.docId);
+      }
+      deleteDocumentMessage(doc.id);
+
+      setForwardedDocs(prev => {
+        const next = prev.filter(d => d.id !== doc.id && (!doc.forwardId || d.forwardId !== doc.forwardId));
+        saveStoredForwardedDocs(next);
+        return next;
+      });
+      if (selectedDoc && (selectedDoc.id === doc.id || (doc.forwardId && selectedDoc.forwardId === doc.forwardId))) {
+        setIsDetailModalOpen(false);
+        setSelectedDoc(null);
+      }
+      toast.success('ลบรายการส่งต่อเอกสารเรียบร้อยแล้ว');
+    } catch {
+      if (doc.docId) {
+        deleteDocumentMessageByDocId(doc.docId);
+      }
+      deleteDocumentMessage(doc.id);
+      setForwardedDocs(prev => {
+        const next = prev.filter(d => d.id !== doc.id);
+        saveStoredForwardedDocs(next);
+        return next;
+      });
+      if (selectedDoc && selectedDoc.id === doc.id) {
+        setIsDetailModalOpen(false);
+        setSelectedDoc(null);
+      }
+      toast.success('ลบรายการเอกสารแล้ว');
+    }
+  };
+
+  // Delete Incoming Document
+  const handleDeleteIncoming = (docId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!window.confirm('คุณต้องการลบเอกสารนี้ใช่หรือไม่?')) {
+      return;
+    }
+    setIncomingDocs(prev => {
+      const next = prev.filter(d => d.id !== docId);
+      saveStoredIncomingDocs(next);
+      return next;
+    });
+    if (selectedDoc && selectedDoc.id === docId) {
+      setIsDetailModalOpen(false);
+      setSelectedDoc(null);
+    }
+    toast.success('ลบเอกสารเรียบร้อยแล้ว');
   };
 
   // Print Document Delivery Slip
@@ -569,7 +604,7 @@ export const DocumentForwardPage: React.FC = () => {
   };
 
   // Filtered List Computation
-  const currentList = activeTab === 'incoming' ? incomingDocs : forwardedDocs;
+  const currentList = forwardedDocs;
   const filteredList = useMemo(() => {
     return currentList.filter(doc => {
       const q = searchTerm.toLowerCase().trim();
@@ -589,95 +624,147 @@ export const DocumentForwardPage: React.FC = () => {
   }, [currentList, searchTerm, statusFilter, priorityFilter]);
 
   // Metric Computations
-  const incomingUnreadCount = incomingDocs.filter(d => d.status === 'unread').length;
-  const totalPendingCount = incomingDocs.filter(d => d.status === 'unread' || d.status === 'processing').length;
-  const totalCompletedCount = forwardedDocs.filter(d => d.status === 'completed').length + incomingDocs.filter(d => d.status === 'completed').length;
+  const totalPendingCount = forwardedDocs.filter(d => d.status === 'processing').length;
+  const totalCompletedCount = forwardedDocs.filter(d => d.status === 'completed').length;
 
   // Render Metric Details Modal
   const renderMetricModal = () => {
     if (!activeMetricModal) return null;
 
-    let title = '';
-    let subtitle = '';
-    let dataList: ForwardDoc[] = [];
+    const handleCloseModal = () => {
+      setActiveMetricModal(null);
+      setModalSearchTerm('');
+      setModalRoleFilter('all');
+    };
 
-    if (activeMetricModal === 'today') {
-      title = `เอกสารขาเข้าทั้งหมด (${incomingDocs.length} รายการ)`;
-      subtitle = 'รายการเอกสารและบันทึกข้อความที่ได้รับเข้าสู่ระบบ';
-      dataList = incomingDocs;
-    } else if (activeMetricModal === 'pending') {
-      title = `รอดำเนินการและรอตรวจสอบ (${totalPendingCount} รายการ)`;
-      subtitle = 'เอกสารที่ยังไม่ได้รับการเปิดอ่านหรืออยู่ระหว่างการดำเนินการ';
-      dataList = incomingDocs.filter(d => d.status === 'unread' || d.status === 'processing');
-    } else if (activeMetricModal === 'completed') {
-      title = `ส่งต่อและรับทราบสำเร็จ (${totalCompletedCount} รายการ)`;
-      subtitle = 'รายการเอกสารที่ปลายทางรับทราบและประมวลผลเสร็จสิ้น';
-      dataList = [...forwardedDocs, ...incomingDocs].filter(d => d.status === 'completed');
-    } else if (activeMetricModal === 'recipients') {
+    // 1. System Documents Available for Forwarding Modal
+    if (activeMetricModal === 'system_docs') {
+      const filteredDocs = systemDocuments.filter(doc => {
+        if (!modalSearchTerm.trim()) return true;
+        const q = modalSearchTerm.toLowerCase();
+        return (
+          doc.subject?.toLowerCase().includes(q) ||
+          doc.external_doc_ref?.toLowerCase().includes(q) ||
+          doc.doc_type?.toLowerCase().includes(q) ||
+          doc.creator?.fullname?.toLowerCase().includes(q) ||
+          doc.creator?.username?.toLowerCase().includes(q)
+        );
+      });
+
       return (
-        <div className="dms-modal-backdrop" onClick={() => setActiveMetricModal(null)}>
+        <div className="dms-modal-backdrop" onClick={handleCloseModal}>
           <div className="dms-modal-card dms-modal-wide" onClick={e => e.stopPropagation()}>
             <div className="dms-modal-header">
               <div className="dms-modal-title-group">
-                <div className="dms-modal-icon-badge purple-badge">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                <div className="dms-modal-icon-badge blue-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="22" height="22">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 02 2h12a2 2 0 0 02-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
                 <div>
-                  <h3 className="dms-modal-title">รายชื่อบุคลากรและแผนกปลายทาง</h3>
-                  <p className="dms-modal-subtitle">รายชื่อแพทย์ พยาบาล เภสัชกร และเจ้าหน้าที่ในฐานข้อมูลคลินิก</p>
+                  <h3 className="dms-modal-title">เอกสารทั้งหมดในระบบที่พร้อมส่งต่อ</h3>
+                  <p className="dms-modal-subtitle">
+                    รายการเอกสารจากคลังหลัก (Document Management) ที่พร้อมส่งต่อให้บุคลากร &bull; ทั้งหมด {systemDocuments.length} รายการ
+                  </p>
                 </div>
               </div>
-              <button className="dms-close-btn" onClick={() => setActiveMetricModal(null)} aria-label="Close">
+              <button className="dms-close-btn" onClick={handleCloseModal} aria-label="Close">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                   <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
             </div>
+
+            {/* Modal Search Toolbar */}
+            <div className="dms-modal-toolbar">
+              <div className="dms-modal-search-wrap">
+                <svg className="dms-modal-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <input
+                  type="text"
+                  className="dms-modal-search-input"
+                  placeholder="ค้นหาชื่อเรื่องเอกสาร, เลขที่อ้างอิง, ประเภท หรือผู้จัดทำ..."
+                  value={modalSearchTerm}
+                  onChange={e => setModalSearchTerm(e.target.value)}
+                />
+                {modalSearchTerm && (
+                  <button type="button" className="dms-modal-search-clear" onClick={() => setModalSearchTerm('')}>✕</button>
+                )}
+              </div>
+              <span className="dms-modal-count-badge">แสดง {filteredDocs.length} รายการ</span>
+            </div>
+
             <div className="dms-modal-body dms-modal-scrollable">
-              <div className="staff-grid-list">
-                {(recipientsList.length > 0 ? recipientsList : [
-                  { id: 6, fullname: 'พญ.สุดา สุขสมบูรณ์', username: 'doctor1', role: 'doctor' },
-                  { id: 7, fullname: 'นพ.วิชัย ชาญการแพทย์', username: 'doctor2', role: 'doctor' },
-                  { id: 8, fullname: 'พญ.เกศรา รักษาดี', username: 'doctor3', role: 'doctor' },
-                  { id: 3, fullname: 'พว.กานดา คัดกรอง', username: 'nurse1', role: 'nurse' },
-                  { id: 4, fullname: 'พว.สมหญิง ดูแลดี', username: 'nurse2', role: 'nurse' },
-                  { id: 5, fullname: 'ภก.บุญชู เภสัชกร', username: 'pharmacist1', role: 'pharmacist' },
-                  { id: 9, fullname: 'นส.รวย การเงิน', username: 'cashier1', role: 'cashier' },
-                  { id: 2, fullname: 'คุณสมจิต ดีใจ (ธุรการ)', username: 'officer1', role: 'officer' },
-                ]).map(staff => (
-                  <div key={staff.id} className="staff-card-item">
-                    <div className="staff-avatar-box">
-                      {(staff.fullname || staff.username || 'U').slice(0, 2).toUpperCase()}
-                    </div>
-                    <div className="staff-info-box">
-                      <div className="staff-name">{staff.fullname || staff.username}</div>
-                      <div className="staff-role-badge">
-                        <span className="role-tag">{getRoleLabel(staff.role)}</span>
-                        <span className="username-tag">@{staff.username}</span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="dms-btn-small"
-                      onClick={() => {
-                        setNewDocRecipientId(staff.id);
-                        setActiveMetricModal(null);
-                        setIsSendModalOpen(true);
-                      }}
-                    >
-                      ส่งต่อเอกสาร
-                    </button>
-                  </div>
-                ))}
+              <div className="table-responsive">
+                <table className="dms-master-table">
+                  <thead>
+                    <tr>
+                      <th style={{ width: '150px' }}>เลขอ้างอิง / ID</th>
+                      <th>ชื่อเรื่องเอกสาร</th>
+                      <th style={{ width: '140px' }}>ประเภท</th>
+                      <th style={{ width: '130px' }}>สถานะในคลัง</th>
+                      <th style={{ width: '160px' }}>ผู้จัดทำ</th>
+                      <th style={{ textAlign: 'center', width: '170px' }}>การดำเนินการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredDocs.map(doc => (
+                      <tr key={doc.id}>
+                        <td>
+                          <span className="doc-code-pill">{doc.external_doc_ref || `DOC-#${doc.id}`}</span>
+                        </td>
+                        <td>
+                          <div className="doc-table-title-group">
+                            <span className="doc-name-text font-bold">{doc.subject}</span>
+                            {doc.description && <div className="doc-subtext">{doc.description}</div>}
+                            {doc.file_url && <span className="doc-has-file-tag">📎 มีไฟล์แนบต้นฉบับ</span>}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="doc-dept-text">{doc.doc_type || 'เอกสารทั่วไป'}</span>
+                        </td>
+                        <td>
+                          <span className={`status-pill ${doc.status === 'approved' ? 'completed' : 'processing'}`}>
+                            <span className="status-dot"></span>
+                            {doc.status === 'approved' ? 'อนุมัติแล้ว' : 'รอตรวจสอบ'}
+                          </span>
+                        </td>
+                        <td>
+                          <div className="doc-creator-text">{doc.creator?.fullname || doc.creator?.username || 'ธุรการ'}</div>
+                        </td>
+                        <td style={{ textAlign: 'center' }}>
+                          <button
+                            type="button"
+                            className="dms-modal-action-forward-btn"
+                            onClick={() => {
+                              setSelectedSystemDocId(doc.id);
+                              handleCloseModal();
+                              setIsSendModalOpen(true);
+                            }}
+                          >
+                            + ส่งต่อเอกสารนี้ ➔
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredDocs.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="no-data-cell">
+                          <div className="no-data-content">
+                            <div className="no-data-icon">📭</div>
+                            <p>{modalSearchTerm ? `ไม่พบเอกสารที่ตรงกับ "${modalSearchTerm}"` : 'ไม่มีเอกสารในคลังระบบในขณะนี้'}</p>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
             <div className="dms-modal-footer">
-              <button className="dms-btn-secondary" onClick={() => setActiveMetricModal(null)}>
+              <button className="dms-btn-secondary" onClick={handleCloseModal}>
                 ปิดหน้าต่าง
               </button>
             </div>
@@ -686,13 +773,229 @@ export const DocumentForwardPage: React.FC = () => {
       );
     }
 
+    // 2. Staff Directory / Recipients Modal
+    if (activeMetricModal === 'recipients') {
+      const allStaff = recipientsList.length > 0 ? recipientsList : [
+        { id: 6, fullname: 'พญ.สุดา สุขสมบูรณ์', username: 'doctor1', role: 'doctor' },
+        { id: 7, fullname: 'นพ.วิชัย ชาญการแพทย์', username: 'doctor2', role: 'doctor' },
+        { id: 8, fullname: 'พญ.เกศรา รักษาดี', username: 'doctor3', role: 'doctor' },
+        { id: 3, fullname: 'พว.กานดา คัดกรอง', username: 'nurse1', role: 'nurse' },
+        { id: 4, fullname: 'พว.สมหญิง ดูแลดี', username: 'nurse2', role: 'nurse' },
+        { id: 5, fullname: 'ภก.บุญชู เภสัชกร', username: 'pharmacist1', role: 'pharmacist' },
+        { id: 9, fullname: 'นส.รวย การเงิน', username: 'cashier1', role: 'cashier' },
+        { id: 2, fullname: 'คุณสมจิต ดีใจ', username: 'officer1', role: 'officer' },
+      ];
+
+      const filteredStaff = allStaff.filter(staff => {
+        // Role filter
+        if (modalRoleFilter !== 'all') {
+          if (modalRoleFilter === 'doctor' && staff.role?.toLowerCase() !== 'doctor') return false;
+          if (modalRoleFilter === 'nurse' && !staff.role?.toLowerCase().includes('nurse')) return false;
+          if (modalRoleFilter === 'pharmacist' && staff.role?.toLowerCase() !== 'pharmacist') return false;
+          if (modalRoleFilter === 'cashier' && staff.role?.toLowerCase() !== 'cashier') return false;
+          if (modalRoleFilter === 'officer' && staff.role?.toLowerCase() !== 'officer' && staff.role?.toLowerCase() !== 'registrar') return false;
+        }
+        // Search term
+        if (modalSearchTerm.trim()) {
+          const q = modalSearchTerm.toLowerCase();
+          const matchName = staff.fullname?.toLowerCase().includes(q);
+          const matchUser = staff.username?.toLowerCase().includes(q);
+          const matchRole = getRoleLabel(staff.role).toLowerCase().includes(q);
+          if (!matchName && !matchUser && !matchRole) return false;
+        }
+        return true;
+      });
+
+      return (
+        <div className="dms-modal-backdrop" onClick={handleCloseModal}>
+          <div className="dms-modal-card dms-modal-wide" onClick={e => e.stopPropagation()}>
+            <div className="dms-modal-header">
+              <div className="dms-modal-title-group">
+                <div className="dms-modal-icon-badge">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="22" height="22">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="dms-modal-title">รายชื่อบุคลากรและแผนกปลายทาง</h3>
+                  <p className="dms-modal-subtitle">
+                    เลือกบุคลากรหรือแผนกที่ต้องการส่งต่อเอกสาร &bull; ทั้งหมด {allStaff.length} ท่าน
+                  </p>
+                </div>
+              </div>
+              <button className="dms-close-btn" onClick={handleCloseModal} aria-label="Close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                  <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+
+            {/* Filter & Search Toolbar */}
+            <div className="dms-modal-toolbar staff-toolbar">
+              <div className="dms-modal-search-wrap">
+                <svg className="dms-modal-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <input
+                  type="text"
+                  className="dms-modal-search-input"
+                  placeholder="ค้นหาชื่อแพทย์, พยาบาล, เภสัชกร, เจ้าหน้าที่ หรือ username..."
+                  value={modalSearchTerm}
+                  onChange={e => setModalSearchTerm(e.target.value)}
+                />
+                {modalSearchTerm && (
+                  <button type="button" className="dms-modal-search-clear" onClick={() => setModalSearchTerm('')}>✕</button>
+                )}
+              </div>
+
+              {/* Minimal Clean Role Filter Chips */}
+              <div className="dms-modal-role-tabs">
+                <button
+                  type="button"
+                  className={`dms-modal-role-chip ${modalRoleFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setModalRoleFilter('all')}
+                >
+                  ทั้งหมด ({allStaff.length})
+                </button>
+                <button
+                  type="button"
+                  className={`dms-modal-role-chip ${modalRoleFilter === 'doctor' ? 'active' : ''}`}
+                  onClick={() => setModalRoleFilter('doctor')}
+                >
+                  แพทย์
+                </button>
+                <button
+                  type="button"
+                  className={`dms-modal-role-chip ${modalRoleFilter === 'nurse' ? 'active' : ''}`}
+                  onClick={() => setModalRoleFilter('nurse')}
+                >
+                  พยาบาล
+                </button>
+                <button
+                  type="button"
+                  className={`dms-modal-role-chip ${modalRoleFilter === 'pharmacist' ? 'active' : ''}`}
+                  onClick={() => setModalRoleFilter('pharmacist')}
+                >
+                  เภสัชกร
+                </button>
+                <button
+                  type="button"
+                  className={`dms-modal-role-chip ${modalRoleFilter === 'cashier' ? 'active' : ''}`}
+                  onClick={() => setModalRoleFilter('cashier')}
+                >
+                  การเงิน
+                </button>
+                <button
+                  type="button"
+                  className={`dms-modal-role-chip ${modalRoleFilter === 'officer' ? 'active' : ''}`}
+                  onClick={() => setModalRoleFilter('officer')}
+                >
+                  ธุรการ/เวชระเบียน
+                </button>
+              </div>
+            </div>
+
+            <div className="dms-modal-body dms-modal-scrollable">
+              {filteredStaff.length === 0 ? (
+                <div className="dms-modal-empty-state">
+                  <div className="empty-icon">👥</div>
+                  <h4>ไม่พบบุคลากรที่ตรงกับเงื่อนไขการค้นหา</h4>
+                  <p>กรุณาลองเปลี่ยนคำค้นหาหรือเลือกแผนกอื่น</p>
+                </div>
+              ) : (
+                <div className="staff-grid-list">
+                  {filteredStaff.map(staff => {
+                    const avatarInitials = getStaffAvatarText(staff.fullname, staff.username);
+                    return (
+                      <div key={staff.id} className="staff-card-item">
+                        <div className="staff-card-top">
+                          <div className="staff-avatar-box">
+                            {avatarInitials}
+                          </div>
+                          <div className="staff-info-box">
+                            <h4 className="staff-name">{staff.fullname || staff.username}</h4>
+                            <div className="staff-meta-row">
+                              <span className="staff-role-pill">
+                                {getRoleLabel(staff.role)}
+                              </span>
+                              <span className="staff-username-tag">@{staff.username}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="staff-card-bottom">
+                          <button
+                            type="button"
+                            className="staff-forward-action-btn"
+                            onClick={() => {
+                              setNewDocRecipientId(staff.id);
+                              handleCloseModal();
+                              setIsSendModalOpen(true);
+                            }}
+                          >
+                            <span>ส่งต่อเอกสารถึงท่านนี้</span>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="dms-modal-footer">
+              <button className="dms-btn-secondary" onClick={handleCloseModal}>
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. Pending / Completed / Today Modals
+    let title = '';
+    let subtitle = '';
+    let dataList: ForwardDoc[] = [];
+
+    if (activeMetricModal === 'pending') {
+      title = `รายการส่งต่อที่รอดำเนินการ (${totalPendingCount} รายการ)`;
+      subtitle = 'เอกสารที่ส่งต่อแล้วและอยู่ระหว่างรอปลายทางรับทราบ';
+      dataList = forwardedDocs.filter(d => d.status === 'processing');
+    } else if (activeMetricModal === 'completed') {
+      title = `ส่งต่อและรับทราบสำเร็จ (${totalCompletedCount} รายการ)`;
+      subtitle = 'รายการเอกสารที่ปลายทางรับทราบและประมวลผลเสร็จสิ้น';
+      dataList = forwardedDocs.filter(d => d.status === 'completed');
+    } else {
+      title = `รายการเอกสารทั้งหมด`;
+      subtitle = 'ประวัติการส่งต่อเอกสาร';
+      dataList = forwardedDocs;
+    }
+
+    const filteredDataList = dataList.filter(d => {
+      if (!modalSearchTerm.trim()) return true;
+      const q = modalSearchTerm.toLowerCase();
+      return (
+        d.title?.toLowerCase().includes(q) ||
+        d.id?.toLowerCase().includes(q) ||
+        d.sender?.toLowerCase().includes(q) ||
+        d.recipient?.toLowerCase().includes(q) ||
+        d.type?.toLowerCase().includes(q)
+      );
+    });
+
     return (
-      <div className="dms-modal-backdrop" onClick={() => setActiveMetricModal(null)}>
+      <div className="dms-modal-backdrop" onClick={handleCloseModal}>
         <div className="dms-modal-card dms-modal-wide" onClick={e => e.stopPropagation()}>
           <div className="dms-modal-header">
             <div className="dms-modal-title-group">
               <div className="dms-modal-icon-badge">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="20" height="20">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="22" height="22">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 02 2h12a2 2 0 0 02-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
@@ -702,42 +1005,66 @@ export const DocumentForwardPage: React.FC = () => {
                 <p className="dms-modal-subtitle">{subtitle}</p>
               </div>
             </div>
-            <button className="dms-close-btn" onClick={() => setActiveMetricModal(null)} aria-label="Close">
+            <button className="dms-close-btn" onClick={handleCloseModal} aria-label="Close">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
                 <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
           </div>
+
+          {/* Search Toolbar */}
+          <div className="dms-modal-toolbar">
+            <div className="dms-modal-search-wrap">
+              <svg className="dms-modal-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <input
+                type="text"
+                className="dms-modal-search-input"
+                placeholder="ค้นหารหัสเอกสาร, ชื่อเรื่อง, ผู้ส่ง หรือผู้รับ..."
+                value={modalSearchTerm}
+                onChange={e => setModalSearchTerm(e.target.value)}
+              />
+              {modalSearchTerm && (
+                <button type="button" className="dms-modal-search-clear" onClick={() => setModalSearchTerm('')}>✕</button>
+              )}
+            </div>
+            <span className="dms-modal-count-badge">แสดง {filteredDataList.length} รายการ</span>
+          </div>
+
           <div className="dms-modal-body dms-modal-scrollable">
             <div className="table-responsive">
               <table className="dms-master-table">
                 <thead>
                   <tr>
-                    <th>รหัสเอกสาร</th>
+                    <th style={{ width: '130px' }}>รหัสเอกสาร</th>
                     <th>ชื่อเอกสาร</th>
-                    <th>{activeMetricModal === 'completed' ? 'ผู้รับ' : 'ผู้ส่ง'}</th>
-                    <th>วันที่ส่งมอบ</th>
-                    <th>สถานะ</th>
-                    <th style={{ textAlign: 'center' }}>ดูรายละเอียด</th>
+                    <th>{activeMetricModal === 'completed' ? 'ผู้รับมอบ' : 'ผู้ส่งมอบ'}</th>
+                    <th style={{ width: '150px' }}>วันที่ส่งมอบ</th>
+                    <th style={{ width: '140px' }}>สถานะ</th>
+                    <th style={{ textAlign: 'center', width: '130px' }}>ดูรายละเอียด</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dataList.map(doc => (
-                    <tr key={doc.id} className="dms-clickable-row" onClick={() => { setActiveMetricModal(null); handleViewDetail(doc); }}>
-                      <td className="doc-code-text">{doc.id}</td>
-                      <td>
-                        <span className="doc-name-text">{doc.title}</span>
+                  {filteredDataList.map(doc => (
+                    <tr key={doc.id} className="dms-clickable-row" onClick={() => { handleCloseModal(); handleViewDetail(doc); }}>
+                      <td className="doc-code-text">
+                        <span className="doc-code-pill">{doc.id}</span>
                       </td>
                       <td>
-                        <span className="doc-dept-text">{activeMetricModal === 'completed' ? (doc.recipient || doc.sender) : doc.sender}</span>
+                        <span className="doc-name-text font-bold">{doc.title}</span>
+                        {doc.description && <div className="doc-subtext">{doc.description}</div>}
+                      </td>
+                      <td>
+                        <span className="doc-dept-text font-semibold">{activeMetricModal === 'completed' ? (doc.recipient || doc.sender) : doc.sender}</span>
                       </td>
                       <td className="doc-date-text">{doc.receivedDate}</td>
                       <td>
                         <span className={`status-pill ${doc.status}`}>
                           <span className="status-dot"></span>
                           {doc.status === 'unread' && 'ยังไม่อ่าน'}
-                          {doc.status === 'processing' && 'กำลังดำเนินการ'}
-                          {doc.status === 'completed' && 'เสร็จสิ้น'}
+                          {doc.status === 'processing' && 'รอปลายทางรับทราบ'}
+                          {doc.status === 'completed' && 'ได้รับแล้ว'}
                         </span>
                       </td>
                       <td style={{ textAlign: 'center' }}>
@@ -748,7 +1075,7 @@ export const DocumentForwardPage: React.FC = () => {
                           aria-label="ดูรายละเอียดเอกสาร"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setActiveMetricModal(null);
+                            handleCloseModal();
                             handleViewDetail(doc);
                           }}
                         >
@@ -760,11 +1087,12 @@ export const DocumentForwardPage: React.FC = () => {
                       </td>
                     </tr>
                   ))}
-                  {dataList.length === 0 && (
+                  {filteredDataList.length === 0 && (
                     <tr>
                       <td colSpan={6} className="no-data-cell">
                         <div className="no-data-content">
-                          <p>ไม่มีข้อมูลเอกสารในหมวดหมู่นี้</p>
+                          <div className="no-data-icon">📭</div>
+                          <p>{modalSearchTerm ? `ไม่พบข้อมูลที่ตรงกับ "${modalSearchTerm}"` : 'ไม่มีข้อมูลเอกสารในหมวดหมู่นี้'}</p>
                         </div>
                       </td>
                     </tr>
@@ -774,7 +1102,7 @@ export const DocumentForwardPage: React.FC = () => {
             </div>
           </div>
           <div className="dms-modal-footer">
-            <button className="dms-btn-primary" onClick={() => setActiveMetricModal(null)}>
+            <button className="dms-btn-secondary" onClick={handleCloseModal}>
               ปิดหน้าต่าง
             </button>
           </div>
@@ -786,18 +1114,10 @@ export const DocumentForwardPage: React.FC = () => {
   return (
     <div className="forward-container">
       {/* 1. Page Header */}
-      <div className="page-header-container">
-        <div className="page-title-group">
-          <div className="page-icon-box">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" width="24" height="24">
-              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <div>
-            <div className="page-badge-label">ระบบบริหารจัดการเอกสาร DMS</div>
-            <h1 className="page-main-title">ส่งต่อเอกสาร (Document Forwarding)</h1>
-            <p className="page-sub-title">ระบบรับเข้าและส่งต่อเอกสาร บันทึกข้อความ ใบสั่งยา และผลตรวจระหว่างแผนกคลินิก</p>
-          </div>
+      <div className="page-header" style={{ marginBottom: '24px' }}>
+        <div className="header-titles">
+          <h1 className="page-title">ส่งต่อเอกสาร</h1>
+          <p className="page-subtitle">ระบบรับเข้าและส่งต่อเอกสาร บันทึกข้อความ ใบสั่งยา และผลตรวจระหว่างแผนกคลินิก</p>
         </div>
 
         <div className="page-header-actions">
@@ -840,92 +1160,85 @@ export const DocumentForwardPage: React.FC = () => {
       </div>
 
       {/* 2. Interactive Metrics Cards Grid */}
-      <div className="dms-metrics-grid">
-        <div
-          className="dms-card metric-card interactive"
-          onClick={() => setActiveMetricModal('today')}
-          title="คลิกเพื่อดูเอกสารขาเข้าทั้งหมด"
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+        <div 
+          className="stat-card-box interactive"
+          onClick={() => setActiveMetricModal('system_docs')}
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
         >
-          <div className="metric-icon-wrapper blue-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="24" height="24">
-              <path d="M22 12h-6l-2 3h-4l-2-3H2v7a2 2 0 002 2h16a2 2 0 002-2v-7z" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M5.45 5.11L2 12v7a2 2 0 002 2h16a2 2 0 002-2v-7l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
-          <div className="metric-info">
-            <div className="metric-label-row">
-              <span className="metric-label">เอกสารขาเข้าในระบบ</span>
-              {incomingUnreadCount > 0 && (
-                <span className="metric-tag-unread">{incomingUnreadCount} ใหม่</span>
-              )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>เอกสารทั้งหมด (พร้อมส่งต่อ)</span>
+            <div className="stat-icon-wrap icon-blue" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#EFF6FF', color: '#3B82F6' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 02 2h12a2 2 0 0 02-2V8z" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
             </div>
-            <span className="metric-value">{incomingDocs.length}</span>
-            <span className="metric-subtext blue-text">
-              คลิกเพื่อดูรายการทั้งหมด →
-            </span>
           </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{systemDocuments.length}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>คลิกเพื่อเลือกส่งต่อเอกสาร →</div>
         </div>
 
-        <div
-          className="dms-card metric-card interactive"
+        <div 
+          className="stat-card-box interactive"
           onClick={() => setActiveMetricModal('pending')}
-          title="คลิกเพื่อดูเอกสารที่รอดำเนินการ"
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
         >
-          <div className="metric-icon-wrapper amber-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" width="24" height="24">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>รอปลายทางรับทราบ</span>
+            <div className="stat-icon-wrap icon-amber" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#FFFBEB', color: '#F59E0B' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">รอการเปิดอ่าน / ดำเนินการ</span>
-            <span className="metric-value">{totalPendingCount}</span>
-            <span className="metric-subtext amber-text">
-              ต้องดำเนินการตรวจสอบ →
-            </span>
-          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{totalPendingCount}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>อยู่ระหว่างรอปลายทางรับมอบ →</div>
         </div>
 
-        <div
-          className="dms-card metric-card interactive"
+        <div 
+          className="stat-card-box interactive"
           onClick={() => setActiveMetricModal('completed')}
-          title="คลิกเพื่อดูเอกสารที่เสร็จสิ้นแล้ว"
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
         >
-          <div className="metric-icon-wrapper green-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2" width="24" height="24">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round" strokeLinejoin="round"/>
-              <polyline points="22 4 12 14.01 9 11.01"></polyline>
-            </svg>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>ได้รับแล้ว (รับทราบสำเร็จ)</span>
+            <div className="stat-icon-wrap icon-teal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#F0FDFA', color: '#0D9488' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" strokeLinecap="round" strokeLinejoin="round"/><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+            </div>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">ส่งต่อและรับทราบสำเร็จ</span>
-            <span className="metric-value">{totalCompletedCount}</span>
-            <span className="metric-subtext green-text">
-              ดำเนินการเรียบร้อย →
-            </span>
-          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{totalCompletedCount}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>ปลายทางรับทราบเรียบร้อย →</div>
         </div>
 
-        <div
-          className="dms-card metric-card interactive"
+        <div 
+          className="stat-card-box interactive"
           onClick={() => setActiveMetricModal('recipients')}
-          title="คลิกเพื่อดูรายชื่อบุคลากรและแผนก"
+          style={{
+            borderRadius: '14px', padding: '18px 20px',
+            border: '1.5px solid #E2E8F0',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            cursor: 'pointer', transition: 'all 0.2s ease', background: '#FFFFFF'
+          }}
         >
-          <div className="metric-icon-wrapper purple-bg">
-            <svg viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" strokeWidth="2" width="24" height="24">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+            <span style={{ fontWeight: '600', fontSize: '15px', color: '#475569' }}>บุคลากรปลายทางในระบบ</span>
+            <div className="stat-icon-wrap icon-green" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '36px', height: '36px', borderRadius: '10px', background: '#ECFDF5', color: '#10B981' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
           </div>
-          <div className="metric-info">
-            <span className="metric-label">บุคลากรปลายทางในระบบ</span>
-            <span className="metric-value">{recipientsList.length > 0 ? recipientsList.length : 8}</span>
-            <span className="metric-subtext purple-text">
-              ดูรายชื่อแผนกและผู้รับ →
-            </span>
-          </div>
+          <div style={{ fontSize: '32px', fontWeight: '800', color: 'var(--text-primary, #0F172A)', lineHeight: '38px' }}>{recipientsList.length > 0 ? recipientsList.length : 8}</div>
+          <div style={{ fontSize: '13px', color: '#64748B', marginTop: '4px' }}>ดูรายชื่อแผนกและผู้รับ →</div>
         </div>
       </div>
 
@@ -936,31 +1249,7 @@ export const DocumentForwardPage: React.FC = () => {
           <div className="forward-tab-buttons">
             <button
               type="button"
-              className={`forward-tab-btn ${activeTab === 'incoming' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('incoming');
-                setStatusFilter('all');
-                setPriorityFilter('all');
-              }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
-                <path d="M22 12h-6l-2 3h-4l-2-3H2v7a2 2 0 002 2h16a2 2 0 002-2v-7z" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M5.45 5.11L2 12v7a2 2 0 002 2h16a2 2 0 002-2v-7l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <span>เอกสารขาเข้า (Incoming)</span>
-              <span className={`tab-counter-badge ${incomingUnreadCount > 0 ? 'badge-has-unread' : ''}`}>
-                {incomingDocs.length}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              className={`forward-tab-btn ${activeTab === 'forwarded' ? 'active' : ''}`}
-              onClick={() => {
-                setActiveTab('forwarded');
-                setStatusFilter('all');
-                setPriorityFilter('all');
-              }}
+              className="forward-tab-btn active"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
                 <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
@@ -981,29 +1270,19 @@ export const DocumentForwardPage: React.FC = () => {
               >
                 ทั้งหมด
               </button>
-              {activeTab === 'incoming' && (
-                <button
-                  type="button"
-                  className={`filter-chip ${statusFilter === 'unread' ? 'active' : ''}`}
-                  onClick={() => setStatusFilter('unread')}
-                >
-                  ยังไม่อ่าน
-                  {incomingUnreadCount > 0 && <span className="chip-count-dot"></span>}
-                </button>
-              )}
               <button
                 type="button"
                 className={`filter-chip ${statusFilter === 'processing' ? 'active' : ''}`}
                 onClick={() => setStatusFilter('processing')}
               >
-                กำลังดำเนินการ
+                รอปลายทางรับทราบ
               </button>
               <button
                 type="button"
                 className={`filter-chip ${statusFilter === 'completed' ? 'active' : ''}`}
                 onClick={() => setStatusFilter('completed')}
               >
-                เสร็จสิ้น / รับทราบแล้ว
+                ได้รับแล้ว
               </button>
             </div>
 
@@ -1056,7 +1335,7 @@ export const DocumentForwardPage: React.FC = () => {
               <tr>
                 <th style={{ width: '140px' }}>รหัสเอกสาร</th>
                 <th>ชื่อเรื่องเอกสาร</th>
-                <th style={{ width: '220px' }}>{activeTab === 'incoming' ? 'ส่งมาจาก (ต้นทาง)' : 'ส่งถึง (ปลายทาง)'}</th>
+                <th style={{ width: '220px' }}>ส่งถึง (ปลายทาง)</th>
                 <th style={{ width: '170px' }}>วันที่และเวลา</th>
                 <th style={{ width: '120px' }}>ประเภท</th>
                 <th style={{ width: '100px' }}>ความเร่งด่วน</th>
@@ -1068,7 +1347,7 @@ export const DocumentForwardPage: React.FC = () => {
               {filteredList.map(doc => (
                 <tr
                   key={doc.id}
-                  className={`dms-clickable-row ${doc.status === 'unread' ? 'row-unread-highlight' : ''}`}
+                  className="dms-clickable-row"
                   onClick={() => handleViewDetail(doc)}
                 >
                   {/* Document Code */}
@@ -1080,13 +1359,12 @@ export const DocumentForwardPage: React.FC = () => {
                   <td>
                     <div className="doc-title-wrapper">
                       <span className="doc-name-text">{doc.title}</span>
-                      {doc.status === 'unread' && <span className="new-pulse-badge">ใหม่</span>}
                     </div>
                   </td>
 
                   {/* Sender / Recipient (Clean concise department/person name) */}
                   <td>
-                    <span className="doc-dept-text">{activeTab === 'incoming' ? doc.sender : doc.recipient}</span>
+                    <span className="doc-dept-text">{doc.recipient || '-'}</span>
                   </td>
 
                   {/* Date & Time */}
@@ -1111,8 +1389,8 @@ export const DocumentForwardPage: React.FC = () => {
                     <span className={`status-pill ${doc.status}`}>
                       <span className="status-dot"></span>
                       {doc.status === 'unread' && 'ยังไม่อ่าน'}
-                      {doc.status === 'processing' && 'กำลังดำเนินการ'}
-                      {doc.status === 'completed' && 'เสร็จสิ้น'}
+                      {doc.status === 'processing' && 'รอปลายทางรับทราบ'}
+                      {doc.status === 'completed' && 'ได้รับแล้ว'}
                     </span>
                   </td>
 
@@ -1132,19 +1410,18 @@ export const DocumentForwardPage: React.FC = () => {
                         </svg>
                       </button>
 
-                      {activeTab === 'incoming' && doc.status !== 'completed' && (
-                        <button
-                          type="button"
-                          className="dms-action-icon-btn check-btn"
-                          onClick={() => handleAcknowledge(doc)}
-                          title="กดรับทราบเอกสาร"
-                          aria-label="กดรับทราบเอกสาร"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                            <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"></polyline>
-                          </svg>
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="dms-action-icon-btn delete-btn"
+                        onClick={(e) => activeTab === 'forwarded' ? handleDeleteForward(doc, e) : handleDeleteIncoming(doc.id, e)}
+                        title="ลบเอกสารนี้"
+                        aria-label="ลบเอกสารนี้"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -1195,8 +1472,8 @@ export const DocumentForwardPage: React.FC = () => {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="dms-modal-title">ส่งต่อเอกสารใหม่</h3>
-                  <p className="dms-modal-subtitle">ระบุรายละเอียด แผนก หรือบุคลากรปลายทางที่ต้องการส่งมอบ</p>
+                  <h3 className="dms-modal-title">ส่งต่อเอกสารจากคลังระบบ</h3>
+                  <p className="dms-modal-subtitle">เลือกเอกสารที่มีในระบบเพื่อส่งมอบต่อให้บุคลากรหรือแผนกปลายทาง</p>
                 </div>
               </div>
               <button
@@ -1213,137 +1490,124 @@ export const DocumentForwardPage: React.FC = () => {
 
             <form onSubmit={handleSendDocument}>
               <div className="dms-modal-body">
-                {/* Send Mode Toggle */}
-                <div className="send-mode-segmented">
-                  <button
-                    type="button"
-                    className={`send-mode-btn ${sendMode === 'custom' ? 'active' : ''}`}
-                    onClick={() => setSendMode('custom')}
-                  >
-                    กรอกข้อมูลส่งต่อใหม่
-                  </button>
-                  <button
-                    type="button"
-                    className={`send-mode-btn ${sendMode === 'from_system' ? 'active' : ''}`}
-                    onClick={() => setSendMode('from_system')}
-                  >
-                    เลือกจากคลังเอกสารในระบบ ({systemDocuments.length})
-                  </button>
-                </div>
-
-                {sendMode === 'from_system' && (
-                  <div className="dms-form-group">
-                    <label className="dms-form-label">
-                      เลือกเอกสารที่มีในระบบ <span className="text-required">*</span>
-                    </label>
-                    <select
-                      className="dms-form-input"
-                      value={selectedSystemDocId}
-                      onChange={e => setSelectedSystemDocId(e.target.value ? Number(e.target.value) : '')}
-                    >
-                      <option value="">-- กรุณาเลือกเอกสารจากคลัง --</option>
-                      {systemDocuments.map(doc => (
-                        <option key={doc.id} value={doc.id}>
-                          [{doc.external_doc_ref || `DOC-${doc.id}`}] {doc.subject} ({doc.doc_type || 'ทั่วไป'})
-                        </option>
-                      ))}
-                    </select>
+                {/* Check if system documents exist */}
+                {systemDocuments.length === 0 ? (
+                  <div className="dms-empty-system-notice">
+                    <div className="empty-notice-icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#D97706" strokeWidth="2" width="24" height="24">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      </svg>
+                    </div>
+                    <div className="empty-notice-text">
+                      <div className="notice-title">ยังไม่มีเอกสารในคลังระบบที่พร้อมส่งต่อ</div>
+                      <div className="notice-sub">กรุณาเพิ่มหรืออัปโหลดเอกสารใหม่ในหน้า <strong>"จัดการเอกสาร (Document Management)"</strong> ก่อน จึงจะสามารถเลือกส่งต่อได้</div>
+                    </div>
                   </div>
-                )}
+                ) : (
+                  <>
+                    {/* Document Selector */}
+                    <div className="dms-form-group">
+                      <label className="dms-form-label">
+                        เลือกเอกสารในระบบที่ต้องการส่งต่อ <span className="text-required">*</span>
+                      </label>
+                      <select
+                        className="dms-form-input"
+                        value={selectedSystemDocId}
+                        required
+                        onChange={e => setSelectedSystemDocId(e.target.value ? Number(e.target.value) : '')}
+                      >
+                        <option value="">-- กรุณาเลือกเอกสารจากคลัง ({systemDocuments.length} รายการ) --</option>
+                        {systemDocuments.map(doc => (
+                          <option key={doc.id} value={doc.id}>
+                            [{doc.external_doc_ref || `DOC-#${doc.id}`}] {doc.subject} ({doc.doc_type || 'ทั่วไป'})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-                {/* Subject Title */}
-                <div className="dms-form-group">
-                  <label className="dms-form-label">
-                    ชื่อเรื่อง / หัวข้อเอกสาร <span className="text-required">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    className="dms-form-input"
-                    required
-                    placeholder="เช่น ผลการตรวจเลือดผู้ป่วย OPD, ใบเบิกยาฉุกเฉิน หรือ ใบส่งตัว"
-                    value={newDocTitle}
-                    onChange={e => setNewDocTitle(e.target.value)}
-                  />
-                </div>
-
-                {/* Recipient Dropdown */}
-                <div className="dms-form-group">
-                  <label className="dms-form-label">
-                    บุคลากรหรือแผนกปลายทาง (ผู้รับ) <span className="text-required">*</span>
-                  </label>
-                  <select
-                    className="dms-form-input"
-                    value={newDocRecipientId}
-                    onChange={e => setNewDocRecipientId(Number(e.target.value))}
-                  >
-                    {recipientsList.length > 0 ? (
-                      recipientsList.map(u => (
-                        <option key={u.id} value={u.id}>
-                          {u.fullname || u.username} — {getRoleLabel(u.role)} (@{u.username})
-                        </option>
-                      ))
-                    ) : (
-                      <>
-                        {/* ปรับชื่อตาม DEMO_USERS อัตโนมัติ (Fallback) */}
-                        <option value="6">{DEMO_USERS.doctor?.fullName || 'พญ.สุดา สุขสมบูรณ์'} — แพทย์ (doctor1)</option>
-                        <option value="7">นพ.วิชัย ชาญการแพทย์ — แพทย์ (doctor2)</option>
-                        <option value="8">พญ.เกศรา รักษาดี — แพทย์ (doctor3)</option>
-                        <option value="3">{DEMO_USERS.nurse?.fullName || 'พว. กานดา คัดกรอง'} — พยาบาล (nurse1)</option>
-                        <option value="5">{DEMO_USERS.pharmacist?.fullName || 'ดร.บุญ สั่งยา'} — ห้องยา/เภสัชกร (pharmacist1)</option>
-                        <option value="9">{DEMO_USERS.cashier?.fullName || 'นส.รวย การเงิน'} — การเงิน (cashier1)</option>
-                        <option value="2">{DEMO_USERS.officer?.fullName || 'คุณสมจิต ดีใจ'} — ธุรการ (officer1)</option>
-                      </>
+                    {/* Selected Document Info Preview Card */}
+                    {selectedDocPreview && (
+                      <div className="selected-doc-preview-card">
+                        <div className="preview-header">
+                          <span className="code-pill">{selectedDocPreview.external_doc_ref || `DOC-#${selectedDocPreview.id}`}</span>
+                          <span className="doc-type-tag">{selectedDocPreview.doc_type || 'เอกสารทั่วไป'}</span>
+                        </div>
+                        <div className="preview-title">{selectedDocPreview.subject}</div>
+                        {selectedDocPreview.description && (
+                          <div className="preview-desc">{selectedDocPreview.description}</div>
+                        )}
+                        <div className="preview-meta">
+                          <span>ผู้จัดทำ: {selectedDocPreview.creator?.fullname || selectedDocPreview.creator?.username || 'ธุรการ'}</span>
+                          {selectedDocPreview.file_url && (
+                            <span className="has-file-badge">📎 มีไฟล์แนบต้นฉบับ</span>
+                          )}
+                        </div>
+                      </div>
                     )}
-                  </select>
-                </div>
 
-                {/* Type and Priority in Grid */}
-                <div className="form-two-cols">
-                  <div className="dms-form-group">
-                    <label className="dms-form-label">ประเภทเอกสาร</label>
-                    <select
-                      className="dms-form-input"
-                      value={newDocType}
-                      onChange={e => setNewDocType(e.target.value)}
-                    >
-                      <option value="ผลการตรวจ">ผลการตรวจ (Lab/X-Ray)</option>
-                      <option value="ใบส่งตัวผู้ป่วย">ใบส่งตัวผู้ป่วย (Referral)</option>
-                      <option value="ใบสั่งยาและเวชภัณฑ์">ใบสั่งยาและเวชภัณฑ์</option>
-                      <option value="รายงานทางการแพทย์">รายงานทางการแพทย์</option>
-                      <option value="บันทึกข้อความภายใน">บันทึกข้อความภายใน</option>
-                      <option value="เอกสารการเงิน">เอกสารการเงิน/เบิกจ่าย</option>
-                      <option value="เอกสารทั่วไป">เอกสารทั่วไป</option>
-                      <option value="อื่นๆ">อื่นๆ</option>
-                    </select>
-                  </div>
+                    {/* Recipient Dropdown */}
+                    <div className="dms-form-group">
+                      <label className="dms-form-label">
+                        บุคลากรหรือแผนกปลายทาง (ผู้รับ) <span className="text-required">*</span>
+                      </label>
+                      <select
+                        className="dms-form-input"
+                        value={newDocRecipientId}
+                        onChange={e => setNewDocRecipientId(Number(e.target.value))}
+                        required
+                      >
+                        {recipientsList.length > 0 ? (
+                          recipientsList.map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.fullname || u.username} — {getRoleLabel(u.role)} (@{u.username})
+                            </option>
+                          ))
+                        ) : (
+                          <>
+                            {/* ปรับชื่อตาม DEMO_USERS อัตโนมัติ (Fallback) */}
+                            <option value="6">{DEMO_USERS.doctor?.fullName || 'พญ.สุดา สุขสมบูรณ์'} — แพทย์ (doctor1)</option>
+                            <option value="7">นพ.วิชัย ชาญการแพทย์ — แพทย์ (doctor2)</option>
+                            <option value="8">พญ.เกศรา รักษาดี — แพทย์ (doctor3)</option>
+                            <option value="3">{DEMO_USERS.nurse?.fullName || 'พว. กานดา คัดกรอง'} — พยาบาล (nurse1)</option>
+                            <option value="5">{DEMO_USERS.pharmacist?.fullName || 'ดร.บุญ สั่งยา'} — ห้องยา/เภสัชกร (pharmacist1)</option>
+                            <option value="9">{DEMO_USERS.cashier?.fullName || 'นส.รวย การเงิน'} — การเงิน (cashier1)</option>
+                            <option value="2">{DEMO_USERS.officer?.fullName || 'คุณสมจิต ดีใจ'} — ธุรการ (officer1)</option>
+                          </>
+                        )}
+                      </select>
+                    </div>
 
-                  <div className="dms-form-group">
-                    <label className="dms-form-label">ระดับความเร่งด่วน</label>
-                    <select
-                      className="dms-form-input"
-                      value={newDocPriority}
-                      onChange={e => setNewDocPriority(e.target.value as any)}
-                    >
-                      <option value="normal">ปกติ (Normal)</option>
-                      <option value="urgent">ด่วน (Urgent ⚡)</option>
-                      <option value="emergency">ด่วนที่สุด (Emergency 🚨)</option>
-                    </select>
-                  </div>
-                </div>
+                    {/* Priority */}
+                    <div className="dms-form-group">
+                      <label className="dms-form-label">ระดับความเร่งด่วน</label>
+                      <select
+                        className="dms-form-input"
+                        value={newDocPriority}
+                        onChange={e => setNewDocPriority(e.target.value as any)}
+                      >
+                        <option value="normal">ปกติ (Normal)</option>
+                        <option value="urgent">ด่วน (Urgent ⚡)</option>
+                        <option value="emergency">ด่วนที่สุด (Emergency 🚨)</option>
+                      </select>
+                    </div>
 
-                {/* Description & Note */}
-                <div className="dms-form-group">
-                  <label className="dms-form-label">
-                    บันทึกข้อความ / รายละเอียดถึงผู้รับ (ไม่บังคับ)
-                  </label>
-                  <textarea
-                    className="dms-form-textarea"
-                    rows={3}
-                    placeholder="ระบุข้อความคำสั่ง บันทึกส่งมอบ หรือรายละเอียดเพิ่มเติม..."
-                    value={newDocDescription}
-                    onChange={e => setNewDocDescription(e.target.value)}
-                  />
-                </div>
+                    {/* Description & Note */}
+                    <div className="dms-form-group">
+                      <label className="dms-form-label">
+                        บันทึกข้อความ / คำสั่งเพิ่มเติมถึงผู้รับ (ไม่บังคับ)
+                      </label>
+                      <textarea
+                        className="dms-form-textarea"
+                        rows={3}
+                        placeholder="ระบุข้อความคำสั่ง บันทึกส่งมอบ หรือรายละเอียดเพิ่มเติม..."
+                        value={newDocDescription}
+                        onChange={e => setNewDocDescription(e.target.value)}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
 
               <div className="dms-modal-footer">
@@ -1355,29 +1619,31 @@ export const DocumentForwardPage: React.FC = () => {
                 >
                   ยกเลิก
                 </button>
-                <button
-                  type="submit"
-                  className="dms-btn-primary"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <span>กำลังบันทึกส่งต่อ...</span>
-                  ) : (
-                    <>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                      <span>ยืนยันการส่งต่อเอกสาร</span>
-                    </>
-                  )}
-                </button>
+                {systemDocuments.length > 0 && (
+                  <button
+                    type="submit"
+                    className="dms-btn-primary"
+                    disabled={isSubmitting || !selectedSystemDocId}
+                  >
+                    {isSubmitting ? (
+                      <span>กำลังส่งต่อ...</span>
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                          <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        <span>ยืนยันการส่งต่อเอกสาร</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* 5. Detail & Acknowledgment Modal */}
+      {/* 5. Detail & Status Modal (Sender Audit View) */}
       {isDetailModalOpen && selectedDoc && (
         <div className="dms-modal-backdrop" onClick={() => setIsDetailModalOpen(false)}>
           <div className="dms-modal-card dms-modal-detail" onClick={e => e.stopPropagation()}>
@@ -1385,7 +1651,7 @@ export const DocumentForwardPage: React.FC = () => {
               <div className="dms-modal-title-group">
                 <div className="dms-modal-icon-badge">
                   <svg viewBox="0 0 24 24" fill="none" stroke="#2563EB" strokeWidth="2" width="20" height="20">
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 02 2h12a2 2 0 0 02-2V8z" strokeLinecap="round" strokeLinejoin="round"/>
                     <path d="M14 2v6h6" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
@@ -1396,6 +1662,10 @@ export const DocumentForwardPage: React.FC = () => {
                       {selectedDoc.priority === 'emergency' && 'ด่วนที่สุด'}
                       {selectedDoc.priority === 'urgent' && 'ด่วน'}
                       {selectedDoc.priority === 'normal' && 'ปกติ'}
+                    </span>
+                    <span className={`status-pill ${selectedDoc.status}`}>
+                      <span className="status-dot"></span>
+                      {selectedDoc.status === 'completed' ? 'ได้รับแล้ว' : 'รอปลายทางรับทราบ'}
                     </span>
                   </div>
                   <h3 className="dms-modal-title">{selectedDoc.title}</h3>
@@ -1476,11 +1746,13 @@ export const DocumentForwardPage: React.FC = () => {
                       )}
                     </div>
                     <div className="timeline-step-content">
-                      <div className="step-title">รับทราบ / ดำเนินการเสร็จสิ้น</div>
+                      <div className="step-title">
+                        {selectedDoc.status === 'completed' ? 'ปลายทางรับทราบแล้ว (ได้รับแล้ว)' : 'รอการตอบรับจากปลายทาง'}
+                      </div>
                       <div className="step-time">
                         {selectedDoc.status === 'completed'
-                          ? (selectedDoc.acknowledgedAt ? formatThaiDate(new Date(selectedDoc.acknowledgedAt)) : 'รับทราบเรียบร้อยแล้ว')
-                          : 'รอการตอบรับ'}
+                          ? (selectedDoc.acknowledgedAt ? formatThaiDate(new Date(selectedDoc.acknowledgedAt)) : 'ได้รับและรับทราบเรียบร้อยแล้ว')
+                          : 'อยู่ระหว่างรอปลายทางรับมอบและกดยืนยัน'}
                       </div>
                     </div>
                   </div>
@@ -1528,32 +1800,33 @@ export const DocumentForwardPage: React.FC = () => {
             </div>
 
             <div className="dms-modal-footer detail-modal-footer">
-              <button
-                type="button"
-                className="dms-btn-secondary"
-                onClick={() => handlePrintSlip(selectedDoc)}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                  <rect x="6" y="14" width="12" height="8"></rect>
-                </svg>
-                <span>พิมพ์ใบนำส่ง</span>
-              </button>
+              <div className="footer-left-buttons">
+                <button
+                  type="button"
+                  className="dms-btn-secondary"
+                  onClick={() => handlePrintSlip(selectedDoc)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                  </svg>
+                  <span>พิมพ์ใบนำส่ง</span>
+                </button>
+                <button
+                  type="button"
+                  className="dms-btn-danger"
+                  onClick={(e) => activeTab === 'forwarded' || selectedDoc.forwardId ? handleDeleteForward(selectedDoc, e) : handleDeleteIncoming(selectedDoc.id, e)}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                  <span>ลบเอกสารนี้</span>
+                </button>
+              </div>
 
               <div className="footer-right-buttons">
-                {selectedDoc.status !== 'completed' && (
-                  <button
-                    type="button"
-                    className="dms-btn-primary green-accent-btn"
-                    onClick={() => handleAcknowledge(selectedDoc)}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
-                      <polyline points="20 6 9 17 4 12" strokeLinecap="round" strokeLinejoin="round"></polyline>
-                    </svg>
-                    <span>บันทึกรับทราบเอกสาร</span>
-                  </button>
-                )}
                 <button
                   type="button"
                   className="dms-btn-primary"

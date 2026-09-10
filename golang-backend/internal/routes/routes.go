@@ -161,12 +161,14 @@ func SetUpRoutes(r *gin.Engine) {
 		officerRoutes.GET("/documents", controllers.GetDocuments)
 		officerRoutes.GET("/documents/:id", controllers.GetDocumentByID)
 		officerRoutes.POST("/documents", controllers.CreateDocument)
+		officerRoutes.DELETE("/documents/:id", controllers.DeleteDocument)
 		officerRoutes.PUT("/documents/:id/approve", controllers.ApproveDocument)
 		officerRoutes.PUT("/documents/:id/status", controllers.UpdateDocumentStatus)
 		officerRoutes.GET("/storage/stats", controllers.GetStorageStats)
 		officerRoutes.GET("/documents/forwards", controllers.GetDocumentForwards)
 		officerRoutes.POST("/documents/forward", controllers.ForwardDocument)
 		officerRoutes.PUT("/documents/forwards/:id/ack", controllers.AcknowledgeDocumentForward)
+		officerRoutes.DELETE("/documents/forwards/:id", controllers.DeleteDocumentForward)
 		officerRoutes.GET("/recipients", controllers.GetRecipients)
 	}
 
