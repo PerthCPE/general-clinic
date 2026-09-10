@@ -24,6 +24,10 @@ interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
   login: (roleOrUsername: string, password?: string) => Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }>;
+  // ทางลัด dev/test เท่านั้น สำหรับปุ่ม "Quick Test Login" ในหน้า login — เรียก backend
+  // endpoint พิเศษที่ reset status บัญชี seed กลับเป็น active ให้ก่อนเสมอ ไม่เช็ค password
+  // ต่างจาก login() ด้านบนที่ยังต้องผ่านการเช็ค password/status ตามจริงทุกประการเหมือนเดิม
+  quickDevLogin: (role: UserRole) => Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }>;
   switchRole: (role: UserRole) => Promise<void>;
   logout: () => void;
   hasAccess: (pageId: string) => boolean;
@@ -148,6 +152,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [currentUser]);
 
+  // ของเพื่อน: แปลง response จริงจาก backend (login ปกติ หรือ quick-login) ให้เป็น User —
+  // ใช้ร่วมกันทั้ง login() และ quickDevLogin() เพื่อไม่ให้ logic การสร้าง avatar/fallback
+  // ข้อมูลตกหล่นไม่ตรงกันระหว่างสองทาง
+  const buildUserFromLoginResponse = (res: {
+    user: { id: number; username: string; fullname: string; role: string; phone: string };
+  }): User => {
+    const userRole = res.user.role as UserRole;
+    const fallback = DEMO_USERS[userRole] || DEMO_USERS['registrar'];
+
+    // ใช้ชื่อจริงจาก API เสมอ — ไม่ hardcode ชื่อตาม username/role
+    const fullName = res.user.fullname || res.user.username;
+    // สร้าง avatar text จากชื่อจริง (2 ตัวอักษรแรก)
+    const nameParts = fullName.replace(/^(นพ\.|พญ\.|นพ|พญ)\./i, '').trim();
+    const avatarText = nameParts.substring(0, 2) || fallback.avatarText;
+
+    return {
+      id: String(res.user.id),
+      username: res.user.username,
+      fullName,
+      role: userRole,
+      roleTitleTh: fallback.roleTitleTh,
+      roleTitleEn: fallback.roleTitleEn,
+      department: fallback.department,
+      avatarText,
+      avatarColor: fallback.avatarColor,
+    };
+  };
+
   // ของเพื่อน: ระบบล็อกอิน
   const login = async (roleOrUsername: string, password?: string): Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }> => {
     try {
@@ -164,27 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ที่บังคับกรอกทั้งสองช่องอยู่แล้ว) ปล่อยว่างให้ backend ตอบ 401 ตามจริงดีกว่าเดา
       const res = await authApi.login(usernameToSend, password ?? '');
       if (res && res.user) {
-        const userRole = res.user.role as UserRole;
-        const fallback = DEMO_USERS[userRole] || DEMO_USERS['registrar'];
-
-        // ใช้ชื่อจริงจาก API เสมอ — ไม่ hardcode ชื่อตาม username/role
-        const fullName = res.user.fullname || res.user.username;
-        // สร้าง avatar text จากชื่อจริง (2 ตัวอักษรแรก)
-        const nameParts = fullName.replace(/^(นพ\.|พญ\.|นพ|พญ)\./i, '').trim();
-        const avatarText = nameParts.substring(0, 2) || fallback.avatarText;
-
-        const loggedInUser: User = {
-          id: String(res.user.id),
-          username: res.user.username,
-          fullName,
-          role: userRole,
-          roleTitleTh: fallback.roleTitleTh,
-          roleTitleEn: fallback.roleTitleEn,
-          department: fallback.department,
-          avatarText,
-          avatarColor: fallback.avatarColor,
-        };
-        setCurrentUser(loggedInUser);
+        setCurrentUser(buildUserFromLoginResponse(res));
         return { success: true, requiresPasswordChange: res.requires_password_change };
       }
     } catch (err) {
@@ -246,6 +258,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: false };
   };
 
+  // ทางลัด dev/test เท่านั้น สำหรับปุ่ม "Quick Test Login" — ไม่ fallback ไป local demo เลย
+  // ถ้า backend ปฏิเสธ (เช่น dev mode ปิดอยู่ที่ backend ตอบ 403 "Quick login is only
+  // available in dev mode") เพราะปุ่มนี้มีไว้ให้เห็นสถานะจริงของ dev mode ตรงๆ ไม่ใช่ปิดบัง
+  // ด้วย fake login เหมือนบั๊กเดิมที่เพิ่งแก้ไปใน login() ด้านบน
+  const quickDevLogin = async (role: UserRole): Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }> => {
+    try {
+      const res = await authApi.quickLogin(role);
+      if (res && res.user) {
+        setCurrentUser(buildUserFromLoginResponse(res));
+        return { success: true, requiresPasswordChange: res.requires_password_change };
+      }
+      return { success: false, error: 'ไม่พบข้อมูลผู้ใช้จาก quick login' };
+    } catch (err) {
+      const message = err instanceof ApiRequestError ? err.message : 'เชื่อมต่อ backend ไม่ได้';
+      console.warn('quickDevLogin failed:', err);
+      return { success: false, error: message };
+    }
+  };
+
   const switchRole = async (role: UserRole) => {
     // แต่ละบัญชี seed มี employee_id เป็นรหัสผ่านของตัวเอง ไม่มี 'password' กลางที่ใช้ร่วมกัน
     // ได้อีกต่อไป ต้อง map username -> password ให้ตรงกันเป็นคู่ๆ
@@ -297,6 +328,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         currentUser,
         isAuthenticated: currentUser !== null,
         login,
+        quickDevLogin,
         switchRole,
         logout,
         hasAccess,

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import type { UserRole } from '../../types/auth';
 import './LoginPage.css';
 import clinicLogo from '../../assets/logo.png';
 import { Eye, EyeOff, Loader2 } from 'lucide-react'; // Make sure lucide-react is available
 
 const LoginPage: React.FC = () => {
-  const { login, logout } = useAuth();
+  const { login, quickDevLogin, logout } = useAuth();
   
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -50,6 +51,32 @@ const LoginPage: React.FC = () => {
       }
     } catch (err) {
       setError('ไม่สามารถเข้าสู่ระบบได้ กรุณาตรวจสอบข้อมูลเข้าสู่ระบบอีกครั้ง');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // ปุ่ม "Quick Test Login" — ทางลัด dev/test เท่านั้น เรียก backend endpoint พิเศษที่ reset
+  // status บัญชี seed กลับเป็น active ให้ก่อน login เสมอ ไม่ว่าบัญชีนั้นจะถูกตั้ง suspended
+  // ไว้ก่อนหน้าหรือไม่ก็ตาม (ต่างจาก handleManualLogin ด้านบนที่ยังเช็ค password/status ตามจริง
+  // ทุกประการ ไม่ถูกแตะเลย) ถ้า backend ปิด dev mode ไว้ (production) จะเห็น error message จริง
+  // ไม่ใช่ fake success
+  const handleQuickTestLogin = async (role: UserRole) => {
+    setError(null);
+    setIsLoading(true);
+    try {
+      const result = await quickDevLogin(role);
+      if (result && result.success) {
+        if (result.requiresPasswordChange) {
+          setShowChangePassword(true);
+        } else {
+          window.location.reload();
+        }
+      } else {
+        setError(result?.error || 'Quick Test Login ใช้งานไม่ได้ในขณะนี้');
+      }
+    } catch (err) {
+      setError('Quick Test Login ใช้งานไม่ได้ในขณะนี้');
     } finally {
       setIsLoading(false);
     }
@@ -182,14 +209,14 @@ const LoginPage: React.FC = () => {
       <div className="test-login-box">
         <h4 style={{margin: '0 0 10px 0', fontSize: '13px', color: '#64748B'}}>Quick Test Login</h4>
         <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center'}}>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('DOC001'); setPassword('DOC001');}}>Doctor</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('NUR001'); setPassword('NUR001');}}>Nurse</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('NUR002'); setPassword('NUR002');}}>Nurse Assistant</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('REC001'); setPassword('REC001');}}>Reception / Admin</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('PHA001'); setPassword('PHA001');}}>Pharmacist</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('CAS001'); setPassword('CAS001');}}>Cashier</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('OFF001'); setPassword('OFF001');}}>Officer</button>
-          <button type="button" className="test-login-btn" onClick={() => {setUsername('ADM001'); setPassword('ADM001');}}>IT-admin</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('doctor')}>Doctor</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('nurse')}>Nurse</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('nurse_assistant')}>Nurse Assistant</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('registrar')}>Reception / Admin</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('pharmacist')}>Pharmacist</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('cashier')}>Cashier</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('officer')}>Officer</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('admin')}>IT-admin</button>
         </div>
       </div>
     </div>

@@ -23,6 +23,13 @@ func SetUpRoutes(r *gin.Engine) {
 	// ส่งข้อมูลเพื่อ login และเช็ค role
 	api.POST("/login", controllers.Login)
 
+	// Quick Test Login (dev only) — ไม่ผูก route นี้เลยถ้าไม่ใช่ dev mode กันไม่ให้ทางลัดที่
+	// ไม่เช็ค password หลุดไปอยู่ใน production โดยไม่ได้ตั้งใจ (endpoint ไม่มีอยู่จริงเลย ไม่ใช่
+	// แค่ตอบ 403 — ดู QuickLogin ใน controllers/auth.go สำหรับการเช็คชั้นที่สอง)
+	if config.AppConfig.DevMode {
+		api.POST("/dev/quick-login", controllers.QuickLogin)
+	}
+
 	// check jwt bearer token และแจก role
 	api.Use(middleware.AuthRequired())
 

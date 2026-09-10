@@ -75,11 +75,16 @@ function forceReLogin() {
   }
 }
 
+// endpoint ที่เรียกได้โดยไม่ต้องมี token อยู่แล้ว (login ปกติ + ทางลัด dev quick-login) —
+// ทั้งคู่มีจุดประสงค์เพื่อ "ขอ token ใหม่" ตั้งแต่แรก จึงต้องไม่โดน request() บล็อกด้วยเงื่อนไข
+// "ไม่มี token" หรือ forceReLogin ก่อนที่จะมีโอกาสยิง request ออกไปจริงด้วยซ้ำ
+const PUBLIC_ENDPOINTS = ['/api/login', '/api/dev/quick-login'];
+
 // Generic HTTP Request Handler
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const token = tokenStorage.get();
 
-  if (!token && endpoint !== '/api/login') {
+  if (!token && !PUBLIC_ENDPOINTS.includes(endpoint)) {
     // ไม่มี token เลย (ยังไม่เคย login หรือ session หมดไปแล้ว) และนี่ไม่ใช่การเรียก login เอง
     // ส่งกลับไปหน้า login ทันที ไม่เดา credential มาลองยิงเงียบๆ แบบเดิม
     forceReLogin();
@@ -101,7 +106,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers,
   });
 
-  if (response.status === 401 && endpoint !== '/api/login') {
+  if (response.status === 401 && !PUBLIC_ENDPOINTS.includes(endpoint)) {
     // Token หมดอายุ/ไม่ถูกต้อง — เคลียร์แล้วส่งกลับไปหน้า login ทันที (ไม่เดา credential
     // มาลองใหม่เงียบๆ อีกต่อไป — ดูคอมเมนต์ข้างบน forceReLogin)
     forceReLogin();
@@ -138,6 +143,33 @@ export const authApi = {
       // เป็นรหัสผ่านเริ่มต้น) — ถ้าไม่ส่ง password มาก็ปล่อยว่าง ให้ backend ตอบ 401 ตามจริง
       // แทนที่จะเดาด้วย 'password' แล้วอาจบังเอิญ login ผิดคน/พังเงียบๆ
       body: JSON.stringify({ username, password: password ?? '' }),
+    });
+
+    if (res.token) {
+      tokenStorage.set(res.token);
+    }
+    return res;
+  },
+  // ทางลัด dev/test เท่านั้น สำหรับปุ่ม "Quick Test Login" — ไม่ส่ง password เลย backend จะหา
+  // บัญชี seed ของ role นั้นเอง และ reset status กลับเป็น active ให้ก่อน login เสมอ ต่างจาก
+  // login() ปกติด้านบนตรงที่ backend ปิด endpoint นี้ไว้เองถ้าไม่ใช่ dev mode (ตอบ 403 หรือแม้แต่
+  // ไม่มี route นี้เลย ดู golang-backend/internal/routes/routes.go) — โค้ด login แบบกรอกเองปกติ
+  // ไม่ถูกแตะเลย ยังเช็ค password และ status ตามจริงทุกประการเหมือนเดิม
+  quickLogin: async (role: string) => {
+    const res = await request<{
+      token: string;
+      role: string;
+      requires_password_change?: boolean;
+      user: {
+        id: number;
+        username: string;
+        fullname: string;
+        role: string;
+        phone: string;
+      };
+    }>('/api/dev/quick-login', {
+      method: 'POST',
+      body: JSON.stringify({ role }),
     });
 
     if (res.token) {

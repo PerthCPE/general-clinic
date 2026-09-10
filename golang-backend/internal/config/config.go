@@ -20,6 +20,10 @@ type Config struct {
 	DBPrepareStmt          bool
 	DBPreferSimpleProtocol bool
 	JWTSecret              string
+	// DevMode เปิด endpoint ทางลัดสำหรับ dev/test เท่านั้น (เช่น /api/dev/quick-login) ต้อง
+	// เป็น false เสมอใน production — default เป็น "false" (fail-closed) ถ้าไม่ได้ตั้งค่าไว้
+	// ป้องกันไม่ให้ลืมปิดตอน deploy จริงแล้ว endpoint ที่ไม่เช็ค password หลุดออกไปโดยไม่ได้ตั้งใจ
+	DevMode bool
 }
 
 // define Config เป็น Global
@@ -89,6 +93,7 @@ func LoadConfig() {
 		DBPrepareStmt:          prepareStmtVal == "true" || prepareStmtVal == "1",
 		DBPreferSimpleProtocol: simpleProtocolVal == "true" || simpleProtocolVal == "1",
 		JWTSecret:              getEnv("JWT_SECRET", "supersecretclinicjwtkey2026"),
+		DevMode:                getEnv("DEV_MODE", "false") == "true",
 	}
 	log.Printf("Configuration Loaded Successfully (Host: %s, Port: %s, SSLMode: %s, PrepareStmt: %v, SimpleProto: %v)",
 		AppConfig.DBHost, AppConfig.DBPort, AppConfig.DBSSLMode, AppConfig.DBPrepareStmt, AppConfig.DBPreferSimpleProtocol)
