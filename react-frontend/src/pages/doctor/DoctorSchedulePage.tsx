@@ -32,7 +32,7 @@ const DoctorSchedulePage: React.FC = () => {
   }
 
   if (error && patients.length === 0) {
-    return <DoctorErrorScreen message={error} onRetry={() => { void refresh(); }} />;
+    return <DoctorErrorScreen message={error} onRetry={refresh} />;
   }
 
   return (

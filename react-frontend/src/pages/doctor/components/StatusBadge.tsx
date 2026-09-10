@@ -47,9 +47,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
   const sizeStyles = size === 'sm' ? 'px-2.5 py-0.5 text-xs font-semibold' : 'px-3 py-1 text-xs font-semibold';
 
   return (
-    <span
-      className={`inline-flex items-center justify-center rounded-full tracking-wide whitespace-nowrap ${getStyles()} ${sizeStyles}`}
-    >
+    <span className={`inline-flex items-center justify-center rounded-full tracking-wide whitespace-nowrap ${getStyles()} ${sizeStyles}`}>
       {getLabel()}
     </span>
   );

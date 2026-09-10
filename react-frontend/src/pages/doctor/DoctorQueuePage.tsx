@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { StatCard } from './components/StatCard';
 import { QueueTable } from './components/QueueTable';
 import { useLanguage } from './context/LanguageContext';
@@ -22,6 +23,7 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
   useUnlockPageScroll();
 
   const { t, language } = useLanguage();
+  const [showStatCards, setShowStatCards] = useState(true);
   const {
     patients,
     setActiveExamPatient,
@@ -32,6 +34,37 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
     error,
     refresh,
   } = useDoctorData();
+
+  useEffect(() => {
+    const statuses = ['All', 'Waiting', 'Examining', 'Completed'];
+    const handleStatusArrow = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || event.repeat ||
+          event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
+          (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
+
+      const target = event.target;
+      if (target instanceof HTMLElement && (
+        target.isContentEditable ||
+        target.closest('input, textarea, select, [role="textbox"], [role="combobox"], [role="slider"], [role="tablist"], [role="dialog"], dialog')
+      )) return;
+
+      const index = statuses.indexOf(statusFilter);
+      if (index < 0) return;
+      event.preventDefault();
+      const nextIndex = Math.max(0, Math.min(statuses.length - 1,
+        index + (event.key === 'ArrowRight' ? 1 : -1)));
+      if (nextIndex !== index) setStatusFilter(statuses[nextIndex]);
+
+      // Keep keyboard focus with the selected card when navigating within the cards.
+      const statCards = target instanceof HTMLElement
+        ? target.closest('#doctor-queue-stat-cards')
+        : null;
+      statCards?.querySelectorAll<HTMLElement>('[role="button"]')[nextIndex]?.focus({ preventScroll: true });
+    };
+
+    window.addEventListener('keydown', handleStatusArrow);
+    return () => window.removeEventListener('keydown', handleStatusArrow);
+  }, [statusFilter, setStatusFilter]);
 
   const filteredPatients = useMemo(
     () => patients.filter((p) => statusFilter === 'All' || p.status === statusFilter),
@@ -100,17 +133,32 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
   // เช็คว่า patients ว่างด้วย เพราะถ้ายังมีข้อมูลเก่าค้างอยู่บนจอ การรีเฟรชรอบหลัง
   // ที่พลาดไปรอบเดียวไม่ควรลบทั้งหน้าทิ้งแล้วขึ้น error
   if (error && patients.length === 0) {
-    return <DoctorErrorScreen message={error} onRetry={() => { void refresh(); }} />;
+    return <DoctorErrorScreen message={error} onRetry={refresh} />;
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
-      <section className="space-y-4">
-        <h1 className="text-xl font-bold text-slate-900 tracking-tight">{t('quickStats')}</h1>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+    <div className={`max-w-7xl mx-auto ${showStatCards ? 'space-y-8' : 'space-y-2'}`}>
+      <section className="-mt-4 space-y-1">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            aria-expanded={showStatCards}
+            aria-controls="doctor-queue-stat-cards"
+            onClick={() => setShowStatCards((current) => !current)}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-sm font-medium text-slate-600 hover:bg-slate-200/70 hover:text-slate-900 transition-colors focus:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500/60"
+          >
+            {showStatCards ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {showStatCards
+              ? (language === 'th' ? 'ซ่อนการ์ดสถิติ' : 'Hide statistic cards')
+              : (language === 'th' ? 'แสดงการ์ดสถิติ' : 'Show statistic cards')}
+          </button>
+        </div>
+
+        {showStatCards && <div id="doctor-queue-stat-cards" className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <StatCard
             title={t('totalPatientsToday')}
             value={totalToday}
+            patients={patients}
             iconType="users"
             activeFilter={statusFilter === 'All' ? 'All' : undefined}
             onClick={() => setStatusFilter('All')}
@@ -118,6 +166,7 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
           <StatCard
             title={t('currentlyWaiting')}
             value={currentlyWaiting}
+            patients={patients.filter((patient) => patient.status === 'Waiting')}
             iconType="clock"
             activeFilter={statusFilter === 'Waiting' ? 'Waiting' : undefined}
             onClick={() => setStatusFilter(statusFilter === 'Waiting' ? 'All' : 'Waiting')}
@@ -125,6 +174,7 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
           <StatCard
             title={language === 'th' ? 'ผู้ป่วยกำลังตรวจ' : 'Currently Examining'}
             value={currentlyExamining}
+            patients={patients.filter((patient) => patient.status === 'Examining')}
             iconType="stethoscope"
             activeFilter={statusFilter === 'Examining' ? 'Examining' : undefined}
             onClick={() => setStatusFilter(statusFilter === 'Examining' ? 'All' : 'Examining')}
@@ -132,11 +182,12 @@ const DoctorQueuePage: React.FC<DoctorQueuePageProps> = ({ onNavigate }) => {
           <StatCard
             title={t('completedVisits')}
             value={completedVisits}
+            patients={patients.filter((patient) => patient.status === 'Completed')}
             iconType="check"
             activeFilter={statusFilter === 'Completed' ? 'Completed' : undefined}
             onClick={() => setStatusFilter(statusFilter === 'Completed' ? 'All' : 'Completed')}
           />
-        </div>
+        </div>}
       </section>
 
       <section className="space-y-4">
