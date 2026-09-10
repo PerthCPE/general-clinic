@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus, Copy, Check } from 'lucide-react';
+import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus, Copy, Check, Search } from 'lucide-react';
 import { adminApi, type BackendUser } from '../../services/api';
 import { TREATMENT_DEPARTMENTS } from '../../config/roles';
 import './UserManagement.css';
@@ -84,6 +84,7 @@ const UserManagement: React.FC = () => {
 
   const [activeFilter, setActiveFilter] = useState<'ทั้งหมด' | 'กำลังใช้งาน' | 'รอการยืนยัน' | 'ระงับใช้งาน'>('ทั้งหมด');
   const [deptFilter, setDeptFilter] = useState<string>('ทั้งหมด');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   const [formData, setFormData] = useState<SystemUser>({
     internalId: 0, id: '', name: '', email: '', phone: '', role: 'แพทย์', department: ROLE_DEPARTMENTS['แพทย์'][0], licenseId: '', status: 'รอการยืนยัน', avatar: '', createdAt: '', password: '', username: ''
@@ -133,12 +134,20 @@ const UserManagement: React.FC = () => {
   }, [users]);
 
   const filteredUsers = useMemo(() => {
-    return users.filter(user => {
-      const matchStatus = activeFilter === 'ทั้งหมด' || user.status === activeFilter;
-      const matchDept = deptFilter === 'ทั้งหมด' || user.department === deptFilter;
-      return matchStatus && matchDept;
-    });
-  }, [users, activeFilter, deptFilter]);
+    const term = searchTerm.trim().toLowerCase();
+    return users
+      .filter(user => {
+        const matchStatus = activeFilter === 'ทั้งหมด' || user.status === activeFilter;
+        const matchDept = deptFilter === 'ทั้งหมด' || user.department === deptFilter;
+        const matchSearch = term === '' ||
+          user.name.toLowerCase().includes(term) ||
+          user.id.toLowerCase().includes(term);
+        return matchStatus && matchDept && matchSearch;
+      })
+      // เรียงตามรหัสพนักงาน (employee_id) — ใช้ localeCompare พร้อม numeric:true ให้ "DOC002"
+      // มาก่อน "DOC010" ตามลำดับตัวเลขจริง ไม่ใช่เรียงตามตัวอักษร ('1' < '2' แต่ "10" < "2" ถ้าเรียง lexical)
+      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [users, activeFilter, deptFilter, searchTerm]);
 
   // เดิมตารางตัดแสดงแค่ filteredUsers.slice(0, itemsPerPage) แถวแรกเสมอ โดยไม่มีปุ่มไปหน้าถัดไป
   // เลย — บัญชีที่อยู่เกินแถวที่ itemsPerPage กำหนด (เช่นตอนนี้มี 19+ บัญชี แต่ itemsPerPage
@@ -146,7 +155,7 @@ const UserManagement: React.FC = () => {
   // ให้เข้าถึงได้ครบทุกบัญชี และรีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/itemsPerPage เปลี่ยน
   useEffect(() => {
     setCurrentPage(1);
-  }, [activeFilter, deptFilter, itemsPerPage]);
+  }, [activeFilter, deptFilter, searchTerm, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
   const pageStartIndex = (currentPage - 1) * itemsPerPage;
@@ -328,6 +337,15 @@ const UserManagement: React.FC = () => {
           <p>บริหารจัดการข้อมูลบุคลากรและการเข้าใช้งานระบบ</p>
         </div>
         <div className="header-actions">
+          <div className="um-search-box">
+            <Search size={15} strokeWidth={2} />
+            <input
+              type="text"
+              placeholder="ค้นหาชื่อ หรือ รหัสพนักงาน..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
           <select className="dept-filter" value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)}>
             {departmentsInUse.map(dept => (
               <option key={dept} value={dept}>{dept === 'ทั้งหมด' ? 'ทุกแผนก' : dept}</option>
@@ -382,7 +400,7 @@ const UserManagement: React.FC = () => {
               </select>
                รายการต่อหน้า
             </span>
-            <button className="icon-btn" onClick={() => { setActiveFilter('ทั้งหมด'); setDeptFilter('ทั้งหมด'); }} title="ล้างตัวกรองทั้งหมด">↻</button>
+            <button className="icon-btn" onClick={() => { setActiveFilter('ทั้งหมด'); setDeptFilter('ทั้งหมด'); setSearchTerm(''); }} title="ล้างตัวกรองทั้งหมด">↻</button>
           </div>
         </div>
         

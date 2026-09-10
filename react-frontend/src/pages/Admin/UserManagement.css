@@ -274,6 +274,31 @@ body.dark-mode .admin-page-container .card-active-red { background-color: rgba(2
 }
 body.dark-mode .admin-page-container .filter-badge { background: #374151; color: #d1d5db; }
 
+/* Search box (ค้นหาชื่อ / รหัสพนักงาน) */
+.admin-page-container .um-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  background-color: var(--card-bg, white);
+  color: var(--text-color, #6b7280);
+}
+.admin-page-container .um-search-box input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-color, #111827);
+  font-family: inherit;
+  font-size: 14px;
+  width: 200px;
+}
+.admin-page-container .um-search-box input::placeholder { color: #9ca3af; }
+body.dark-mode .admin-page-container .um-search-box {
+  background-color: #1f2937; border-color: #4b5563; color: #9ca3af;
+}
+
 /* Department Filter Dropdown */
 .admin-page-container .dept-filter {
   padding: 8px 12px; border-radius: 6px;
