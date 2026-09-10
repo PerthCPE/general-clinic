@@ -7,11 +7,24 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
+
+// เบอร์โทรของบัญชีพนักงานต้องเป็นตัวเลขล้วน 10 หลักพอดี ขึ้นต้นด้วย 0 (เช่น 0812345678) —
+// ไม่รับขีด/วงเล็บ/ช่องว่าง เช็คซ้ำที่นี่แม้ frontend (UserManagement.tsx) จะบังคับรูปแบบเดียวกัน
+// อยู่แล้ว เพราะยิง API ตรงข้าม frontend (เช่น curl/Postman) ต้องโดนปฏิเสธเหมือนกัน
+var phoneRegex = regexp.MustCompile(`^0\d{9}$`)
+
+func validatePhone(phone string) error {
+	if !phoneRegex.MatchString(phone) {
+		return fmt.Errorf("เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลักและขึ้นต้นด้วย 0 เท่านั้น (ได้รับ: %q)", phone)
+	}
+	return nil
+}
 
 // AdminController จัดการระบบสิทธิ์และบัญชี
 type AdminController struct {
@@ -40,6 +53,11 @@ func (ctrl *AdminController) GetAccounts(c *gin.Context) {
 func (ctrl *AdminController) CreateAccount(c *gin.Context) {
 	var req dto.CreateAccountRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := validatePhone(req.Phone); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -77,7 +95,12 @@ func (ctrl *AdminController) CreateAccount(c *gin.Context) {
 		EmployeeID:             req.EmployeeID,
 		Phone:                  req.Phone,
 		Department:             req.Department,
-		Status:                 "active",
+		// บัญชีที่ admin สร้างใหม่ผ่านหน้า UserManagement ต้องเริ่มที่ "รอการยืนยัน" (pending) จริง
+		// ตามที่ UI แจ้งไว้ (เดิม hardcode เป็น active ทำให้ข้อความในฟอร์มไม่ตรงกับสถานะจริง) —
+		// ไม่กระทบ Login()/QuickLogin() ใน auth.go เพราะจุดนั้นบล็อกแค่ suspended/inactive อยู่แล้ว
+		// ไม่เคยบล็อก pending — และไม่มีจุดไหนในระบบ (GetDoctors, GetAccounts, appointment/queue
+		// controllers) กรองรายชื่อด้วย status == active เลย จึงไม่ทำให้บัญชีใหม่หายจาก list ไหน
+		Status:                 "pending",
 		RequiresPasswordChange: true,
 	}
 
@@ -122,6 +145,10 @@ func (ctrl *AdminController) UpdateAccount(c *gin.Context) {
 		updates["email"] = req.Email
 	}
 	if req.Phone != "" {
+		if err := validatePhone(req.Phone); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		updates["phone"] = req.Phone
 	}
 	if req.Role != "" {

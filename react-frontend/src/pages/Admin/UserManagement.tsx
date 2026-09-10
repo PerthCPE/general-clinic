@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus, Copy, Check, Search } from 'lucide-react';
+import { Snackbar, Alert } from '@mui/material';
 import { adminApi, type BackendUser } from '../../services/api';
 import { TREATMENT_DEPARTMENTS } from '../../config/roles';
 import './UserManagement.css';
@@ -59,6 +60,18 @@ const englishToRole: Record<string, string> = {
   'lab_technician': 'นักเทคนิคการแพทย์', 'admin': 'ผู้ดูแลระบบ', 'officer': 'เจ้าหน้าที่ธุรการ'
 };
 
+// เบอร์โทรของบัญชีพนักงานต้องเป็นตัวเลขล้วน 10 หลักพอดี ขึ้นต้นด้วย 0 (เช่น 0812345678) — ตรงกับ
+// validatePhone() ฝั่ง golang-backend/internal/controllers/admin_controller.go เป๊ะ ห้ามแก้ที่นี่
+// โดยไม่แก้ที่ backend คู่กัน ไม่งั้นข้อความ "กรอกผิด" ฝั่งนี้จะไม่ตรงกับที่ backend ปฏิเสธจริง
+const PHONE_REGEX = /^0\d{9}$/;
+
+// เรียงตามรหัสพนักงาน (employee_id) — ใช้ localeCompare พร้อม numeric:true ให้ "DOC002" มาก่อน
+// "DOC010" ตามลำดับตัวเลขจริง ไม่ใช่เรียงตามตัวอักษร ดึงออกมาเป็นฟังก์ชันแยกเพราะต้องใช้ทั้งใน
+// filteredUsers (เรียงเพื่อแสดงผล) และตอนสร้างบัญชีใหม่ (คำนวณว่าบัญชีใหม่ตกหน้าไหนหลัง sort)
+// ต้องใช้ comparator ตัวเดียวกันเป๊ะ ไม่งั้นเลขหน้าที่คำนวณได้จะไม่ตรงกับหน้าที่ตารางแสดงจริง
+const sortByEmployeeId = (list: SystemUser[]): SystemUser[] =>
+  [...list].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
+
 const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
   const colors = ['#4F46E5', '#10B981', '#F59E0B', '#EC4899', '#8B5CF6'];
   const randomColor = colors[u.id % colors.length];
@@ -100,21 +113,35 @@ const UserManagement: React.FC = () => {
   const [deptFilter, setDeptFilter] = useState<string>('ทั้งหมด');
   const [searchTerm, setSearchTerm] = useState<string>('');
 
+  // แจ้งเตือนหลังสร้างบัญชีสำเร็จ (ชื่อ/username/ตำแหน่ง) ผ่าน MUI Snackbar
+  const [createdBanner, setCreatedBanner] = useState<{ username: string; name: string; role: string } | null>(null);
+  // หน้า pagination ที่ต้อง "จั๊มพ์" ไปหาหลังสร้างบัญชีใหม่ — เก็บผ่าน ref แยกจาก currentPage
+  // เพราะ useEffect รีเซ็ตหน้ากลับเป็น 1 ทุกครั้งที่ตัวกรองเปลี่ยน (ด้านล่าง) ถ้าไม่มี ref นี้ไว้บอก
+  // เป้าหมาย การรีเซ็ตตัวกรองในขั้นตอนสร้างบัญชี (ดู handleSubmit) จะไปทับหน้าที่ตั้งใจ jump ไปกลับเป็น 1
+  const pendingPageRef = useRef<number | null>(null);
+
   const [formData, setFormData] = useState<SystemUser>({
     internalId: 0, id: '', name: '', email: '', phone: '', role: 'แพทย์', department: ROLE_DEPARTMENTS['แพทย์'][0], licenseId: '', status: 'รอการยืนยัน', avatar: '', createdAt: '', password: '', username: ''
   });
 
-  const fetchUsers = async () => {
+  // คืนค่ารายชื่อที่โหลดมาล่าสุดด้วย (นอกเหนือจากการ setUsers) — ให้ผู้เรียกที่ต้องคำนวณอะไรต่อจาก
+  // ข้อมูลสดๆ ทันที (เช่น handleSubmit หาว่าบัญชีใหม่ตกหน้าไหน) ไม่ต้องรอ re-render แล้วอ่าน state
+  // `users` ที่อาจยังเป็นค่าเก่าจาก closure (React ไม่รับประกันว่า setUsers จะสะท้อนใน users ทันที)
+  const fetchUsers = async (): Promise<SystemUser[]> => {
     try {
       setLoading(true);
       const data = await adminApi.getAccounts();
       if (data) {
-        setUsers(data.map(mapBackendToSystemUser));
+        const mapped = data.map(mapBackendToSystemUser);
+        setUsers(mapped);
         setErrorMsg(null);
+        return mapped;
       }
+      return [];
     } catch (err) {
       console.error("Failed to fetch accounts", err);
       setErrorMsg('ไม่สามารถโหลดรายชื่อบุคลากรได้ กรุณาลองรีเฟรชหน้านี้ใหม่อีกครั้ง');
+      return [];
     } finally {
       setLoading(false);
     }
@@ -149,26 +176,25 @@ const UserManagement: React.FC = () => {
 
   const filteredUsers = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return users
-      .filter(user => {
-        const matchStatus = activeFilter === 'ทั้งหมด' || user.status === activeFilter;
-        const matchDept = deptFilter === 'ทั้งหมด' || user.department === deptFilter;
-        const matchSearch = term === '' ||
-          user.name.toLowerCase().includes(term) ||
-          user.id.toLowerCase().includes(term);
-        return matchStatus && matchDept && matchSearch;
-      })
-      // เรียงตามรหัสพนักงาน (employee_id) — ใช้ localeCompare พร้อม numeric:true ให้ "DOC002"
-      // มาก่อน "DOC010" ตามลำดับตัวเลขจริง ไม่ใช่เรียงตามตัวอักษร ('1' < '2' แต่ "10" < "2" ถ้าเรียง lexical)
-      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
+    const filtered = users.filter(user => {
+      const matchStatus = activeFilter === 'ทั้งหมด' || user.status === activeFilter;
+      const matchDept = deptFilter === 'ทั้งหมด' || user.department === deptFilter;
+      const matchSearch = term === '' ||
+        user.name.toLowerCase().includes(term) ||
+        user.id.toLowerCase().includes(term);
+      return matchStatus && matchDept && matchSearch;
+    });
+    return sortByEmployeeId(filtered);
   }, [users, activeFilter, deptFilter, searchTerm]);
 
   // เดิมตารางตัดแสดงแค่ filteredUsers.slice(0, itemsPerPage) แถวแรกเสมอ โดยไม่มีปุ่มไปหน้าถัดไป
   // เลย — บัญชีที่อยู่เกินแถวที่ itemsPerPage กำหนด (เช่นตอนนี้มี 19+ บัญชี แต่ itemsPerPage
   // default = 10) จึงมองไม่เห็นเลยไม่ว่า backend จะเรียงลำดับมาแบบไหนก็ตาม เพิ่ม pagination จริง
-  // ให้เข้าถึงได้ครบทุกบัญชี และรีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/itemsPerPage เปลี่ยน
+  // ให้เข้าถึงได้ครบทุกบัญชี และรีเซ็ตกลับหน้า 1 ทุกครั้งที่ตัวกรอง/itemsPerPage เปลี่ยน — ยกเว้นตอน
+  // สร้างบัญชีใหม่ (handleSubmit) ที่ตั้ง pendingPageRef ไว้ล่วงหน้าเพื่อ "จั๊มพ์" ไปหน้าที่มีบัญชีใหม่แทน
   useEffect(() => {
-    setCurrentPage(1);
+    setCurrentPage(pendingPageRef.current ?? 1);
+    pendingPageRef.current = null;
   }, [activeFilter, deptFilter, searchTerm, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
@@ -243,15 +269,25 @@ const UserManagement: React.FC = () => {
     if (ROLE_DEPARTMENTS[user.role] && !ROLE_DEPARTMENTS[user.role].includes(user.department)) {
       validDepartment = ROLE_DEPARTMENTS[user.role][0];
     }
-    setFormData({ ...user, department: validDepartment });
+    // บัญชี seed เดิม 10 บัญชีเก็บเบอร์แบบมีขีด (เช่น "081-555-0001") มาจากก่อนที่จะบังคับรูปแบบ
+    // ตัวเลขล้วน — ล้างขีด/ช่องว่างออกอัตโนมัติตอนเปิดฟอร์มแก้ไข กัน validation ฟ้อง "กรอกผิด"
+    // ทันทีที่เปิดฟอร์มทั้งที่ admin อาจไม่ได้ตั้งใจแก้เบอร์เลยด้วยซ้ำ (ค่าดิบใน DB ไม่ถูกแตะ
+    // จนกว่าจะกดบันทึกจริง)
+    const cleanedPhone = (user.phone || '').replace(/\D/g, '').slice(0, 10);
+    setFormData({ ...user, department: validDepartment, phone: cleanedPhone });
     setIsModalOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // กันสำรอง — ปุ่มบันทึกถูก disable ไว้แล้วเมื่อเบอร์ไม่ตรงรูปแบบ (ดู JSX) แต่เช็คซ้ำตรงนี้ด้วย
+    // เผื่อ state หลุด sync (เช่น submit ผ่านการกด Enter ก่อน re-render อัปเดต disabled ทัน)
+    if (!PHONE_REGEX.test(formData.phone)) {
+      return;
+    }
     if (modalMode === 'add') {
       try {
-        await adminApi.createAccount({
+        const created = await adminApi.createAccount({
           username: formData.username,
           password: formData.password,
           role: roleToEnglish[formData.role] || 'officer',
@@ -260,8 +296,29 @@ const UserManagement: React.FC = () => {
           phone: formData.phone,
           department: formData.department,
         });
-        alert('สร้างบัญชีสำเร็จ');
-        fetchUsers();
+        // แทน alert('สร้างบัญชีสำเร็จ') เดิมที่ไม่บอกว่าสร้างใครไปด้วย MUI Snackbar/Alert
+        // (แพทเทิร์นเดียวกับที่ AppointmentForm.tsx ใช้อยู่แล้ว) ที่บอก username/ชื่อ/ตำแหน่งจริง
+        const newInternalId = created.user.id;
+        setCreatedBanner({ username: formData.username, name: formData.name, role: formData.role });
+
+        const freshUsers = await fetchUsers();
+
+        // บัญชีใหม่ backend สร้างเป็นสถานะ "pending" (รอการยืนยัน) เสมอจริงตอนนี้ (ดู admin_controller.go
+        // CreateAccount) จึงตั้งตัวกรองสถานะเป็น 'รอการยืนยัน' ตรงๆ ให้เห็นบัญชีที่เพิ่งสร้างแน่นอน — เคลียร์
+        // ตัวกรองแผนก/คำค้นหาทิ้งด้วยเพราะอาจกรองบัญชีใหม่ออกไปได้เหมือนกัน (ค่าตัวกรองตอนเปิดหน้าครั้งแรก
+        // ไม่เปลี่ยน ยังเป็น 'ทั้งหมด' เหมือนเดิม — โค้ดนี้รันเฉพาะ "หลังสร้างบัญชีสำเร็จ" เท่านั้น)
+        const sorted = sortByEmployeeId(freshUsers.filter(u => u.status === 'รอการยืนยัน'));
+        const targetIndex = sorted.findIndex(u => u.internalId === newInternalId);
+        const targetPage = targetIndex >= 0 ? Math.floor(targetIndex / itemsPerPage) + 1 : 1;
+
+        pendingPageRef.current = targetPage;
+        setActiveFilter('รอการยืนยัน');
+        setDeptFilter('ทั้งหมด');
+        setSearchTerm('');
+        // ตั้งตรงๆ ด้วย เผื่อตัวกรองข้างบนไม่มีค่าไหนเปลี่ยนเลย (เช่นเปิดหน้ามาแล้วกรองค้างที่ 'รอการยืนยัน'
+        // อยู่ก่อนแล้ว) ซึ่งกรณีนั้น useEffect ที่ผูกกับ [activeFilter, deptFilter, searchTerm, itemsPerPage]
+        // จะไม่ยิง เลยไม่มีใครไปอ่าน pendingPageRef ให้
+        setCurrentPage(targetPage);
       } catch (err: any) {
         alert('เกิดข้อผิดพลาด: ' + err.message);
       }
@@ -602,7 +659,23 @@ const UserManagement: React.FC = () => {
                 </div>
                 <div className="form-group">
                   <label>เบอร์โทรศัพท์</label>
-                  <input required type="text" placeholder="08X-XXX-XXXX" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                  <input
+                    required
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0812345678"
+                    value={formData.phone}
+                    // รับเฉพาะตัวเลข ตัดอักขระอื่น (ขีด/วงเล็บ/ช่องว่าง) ทิ้งทันทีที่พิมพ์ และจำกัด
+                    // ไม่เกิน 10 หลัก — ตรงกับ PHONE_REGEX/validatePhone() ฝั่ง backend
+                    onChange={e => setFormData({...formData, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})}
+                  />
+                  {formData.phone.length > 0 && !PHONE_REGEX.test(formData.phone) && (
+                    // ใช้ inline style แทนการเพิ่ม class ใหม่ใน UserManagement.css — งานนี้จำกัดขอบเขต
+                    // ไว้แค่ UserManagement.tsx กับ admin_controller.go เท่านั้น
+                    <span style={{ color: '#DC2626', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                      กรอกผิด — เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลักและขึ้นต้นด้วย 0 เท่านั้น
+                    </span>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>เลขที่ใบประกอบวิชาชีพ (ถ้ามี)</label>
@@ -650,7 +723,7 @@ const UserManagement: React.FC = () => {
 
               <div className="modal-actions">
                 <button type="button" className="btn-cancel" onClick={() => setIsModalOpen(false)}>ยกเลิก</button>
-                <button type="submit" className="btn-primary">
+                <button type="submit" className="btn-primary" disabled={!PHONE_REGEX.test(formData.phone)}>
                   {modalMode === 'add' ? '+ ยืนยันการสร้างบัญชี' : 'บันทึกการแก้ไข'}
                 </button>
               </div>
@@ -683,6 +756,12 @@ const UserManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      <Snackbar open={!!createdBanner} autoHideDuration={4000} onClose={() => setCreatedBanner(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert onClose={() => setCreatedBanner(null)} severity="success" sx={{ width: '100%', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+          {createdBanner && `สร้างบัญชี ${createdBanner.username} — ${createdBanner.name} (${createdBanner.role}) สำเร็จ`}
+        </Alert>
+      </Snackbar>
     </div>
   );
 };

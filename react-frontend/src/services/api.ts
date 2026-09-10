@@ -1120,7 +1120,10 @@ export const examinationApi = {
 export const adminApi = {
     getAccounts: () => request<BackendUser[]>('/api/admin/users'),
     createAccount: (payload: { username: string; password?: string; role: string; fullname: string; employee_id: string; phone: string; department?: string; }) =>
-      request<BackendUser>('/api/admin/users', {
+      // response จริงจาก admin_controller.go CreateAccount() คือ { user, temporary_password }
+      // ไม่ใช่ BackendUser ตรงๆ (ห่อ user object ไว้ใต้ key "user") — type เดิมผิดมาตั้งแต่ต้น
+      // แต่ไม่เคยโผล่เป็นบั๊กเพราะไม่มีโค้ดฝั่ง frontend อ่านค่าตอบกลับนี้มาก่อน
+      request<{ user: BackendUser; temporary_password: string }>('/api/admin/users', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
