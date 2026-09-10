@@ -327,33 +327,56 @@ func seedDoctorProfiles() {
 }
 
 func seedDatabase() {
-	hashPassword, _ := bcrypt.GenerateFromPassword([]byte("password"), 10)
-	passStr := string(hashPassword)
-
 	// 1. Seed Users & Doctors
-	users := []models.User{
-		{Username: "officer1", Email: "officer1@clinic.local", Password: passStr, Role: "officer", FullName: "คุณสมจิต ดีใจ", Phone: "081-555-0001"},
-		{Username: "registrar1", Email: "registrar1@clinic.local", Password: passStr, Role: "registrar", FullName: "คุณสุภาพร เวชระเบียน", Phone: "081-111-0001"},
-		{Username: "nurse1", Email: "nurse1@clinic.local", Password: passStr, Role: "nurse", FullName: "พว. กานดา คัดกรอง", Phone: "081-111-0002"},
-		{Username: "assistant1", Email: "assistant1@clinic.local", Password: passStr, Role: "nurse_assistant", FullName: "นายสมคิด ช่วยเหลือดี", Phone: "081-111-0003"},
-		{Username: "pharmacist1", Email: "pharmacist1@clinic.local", Password: passStr, Role: "pharmacist", FullName: "ดร.บุญ สั่งยา", Phone: "081-333-0001"},
-		{Username: "cashier1", Email: "cashier1@clinic.local", Password: passStr, Role: "cashier", FullName: "นส.รวย การเงิน", Phone: "081-444-0001"},
-		{Username: "doctor1", Email: "doctor1@clinic.local", Password: passStr, Role: "doctor", FullName: "พญ.สุดา สุขสมบูรณ์", Phone: "081-222-0001"},
-		{Username: "doctor2", Email: "doctor2@clinic.local", Password: passStr, Role: "doctor", FullName: "นพ.วิชัย ชาญการแพทย์", Phone: "081-222-0002"},
-		{Username: "doctor3", Email: "doctor3@clinic.local", Password: passStr, Role: "doctor", FullName: "พญ.เกศรา รักษาดี", Phone: "081-222-0003"},
-		{Username: "admin1", Email: "admin1@clinic.local", Password: passStr, Role: "admin", FullName: "ผู้ดูแลระบบ คลินิก", Phone: "081-999-0001"},
+	//
+	// รหัสพนักงาน (EmployeeID) ของแต่ละคนเป็นทั้ง login identifier สำรอง (Login() รับ
+	// username/email/employee_id) และรหัสผ่านเริ่มต้น (ตรงตาม pattern เดียวกับ CreateAccount
+	// ที่ตั้งรหัสผ่านเริ่มต้น = employee_id ตรงๆ ไม่มี prefix) — จึงต้อง hash แยกรายคน
+	// แทนที่จะใช้ hash เดียว ("password") ที่ใช้ร่วมกันทุกคนแบบเดิม
+	type seedUser struct {
+		Username, Email, Role, FullName, Phone, EmployeeID string
+	}
+	seedUsers := []seedUser{
+		{"officer1", "officer1@clinic.local", "officer", "คุณสมจิต ดีใจ", "081-555-0001", "OFF001"},
+		{"registrar1", "registrar1@clinic.local", "registrar", "คุณสุภาพร เวชระเบียน", "081-111-0001", "REC001"},
+		{"nurse1", "nurse1@clinic.local", "nurse", "พว. กานดา คัดกรอง", "081-111-0002", "NUR001"},
+		{"assistant1", "assistant1@clinic.local", "nurse_assistant", "นายสมคิด ช่วยเหลือดี", "081-111-0003", "NUR002"},
+		{"pharmacist1", "pharmacist1@clinic.local", "pharmacist", "ดร.บุญ สั่งยา", "081-333-0001", "PHA001"},
+		{"cashier1", "cashier1@clinic.local", "cashier", "นส.รวย การเงิน", "081-444-0001", "CAS001"},
+		{"doctor1", "doctor1@clinic.local", "doctor", "พญ.สุดา สุขสมบูรณ์", "081-222-0001", "DOC001"},
+		{"doctor2", "doctor2@clinic.local", "doctor", "นพ.วิชัย ชาญการแพทย์", "081-222-0002", "DOC002"},
+		{"doctor3", "doctor3@clinic.local", "doctor", "พญ.เกศรา รักษาดี", "081-222-0003", "DOC003"},
+		{"admin1", "admin1@clinic.local", "admin", "ผู้ดูแลระบบ คลินิก", "081-999-0001", "ADM001"},
+	}
+
+	users := make([]models.User, len(seedUsers))
+	for i, su := range seedUsers {
+		hashPassword, _ := bcrypt.GenerateFromPassword([]byte(su.EmployeeID), 10)
+		users[i] = models.User{
+			Username:   su.Username,
+			Email:      su.Email,
+			Password:   string(hashPassword),
+			Role:       su.Role,
+			FullName:   su.FullName,
+			Phone:      su.Phone,
+			EmployeeID: su.EmployeeID,
+		}
 	}
 	for i := range users {
 		var existing models.User
 		if err := DB.Where("username = ?", users[i].Username).First(&existing).Error; err != nil {
 			DB.Create(&users[i])
 		} else {
-			// อัปเดตข้อมูล FullName, Role, Phone, Email ให้ตรงกับค่า seed ล่าสุดเสมอ
+			// อัปเดตข้อมูล FullName, Role, Phone, Email, EmployeeID ให้ตรงกับค่า seed ล่าสุดเสมอ
+			// ไม่แตะ Password ตรงนี้โดยเจตนา — ถ้าเจ้าของบัญชีเคยเปลี่ยนรหัสผ่านจริงไปแล้ว
+			// (ผ่าน RequiresPasswordChange flow ครั้งแรก) ห้าม restart แล้วรีเซ็ตทับรหัสผ่านจริง
+			// กลับไปเป็นค่าเริ่มต้นอีก
 			DB.Model(&existing).Updates(map[string]interface{}{
-				"full_name": users[i].FullName,
-				"role":      users[i].Role,
-				"phone":     users[i].Phone,
-				"email":     users[i].Email,
+				"full_name":   users[i].FullName,
+				"role":        users[i].Role,
+				"phone":       users[i].Phone,
+				"email":       users[i].Email,
+				"employee_id": users[i].EmployeeID,
 			})
 		}
 	}

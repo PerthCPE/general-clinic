@@ -23,14 +23,16 @@ func Login(c *gin.Context) {
 
 	var user models.User
 
-	// username or email checking
-	result := config.DB.Where("username = ? OR email = ?", req.Username, req.Username).First(&user)
+	// username, email, หรือ employee_id (รหัสพนักงาน) ก็ใช้ login ได้ — employee_id คือ
+	// ตัวที่พนักงานรู้จักจริงและถูกใช้เป็นรหัสผ่านเริ่มต้นด้วย (ดู CreateAccount) จึงต้อง match
+	// ตรงๆ ไม่พึ่งพาว่า username จะถูกแปลงรูปแบบ (เช่น lowercase) ตรงกับ employee_id เป๊ะหรือไม่
+	result := config.DB.Where("username = ? OR email = ? OR employee_id = ?", req.Username, req.Username, req.Username).First(&user)
 	if result.Error != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error" : "Invalid username or password"})
 		return
 	}
 
-	// password checking 
+	// password checking
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error" : "Invalid username or password"})
