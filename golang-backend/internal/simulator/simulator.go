@@ -175,11 +175,11 @@ func generateUniquePatientData(rng *rand.Rand) (models.Patient, models.MedicalEl
 	return p, elig, complaintIdx, c.NeedsProcedure, c.Specialty
 }
 
-// StartAutoEmitter เริ่มต้นระบบจำลองสถานะคิวอัตโนมัติตลอดเวลาที่เซิร์ฟเวอร์เปิดใช้งาน
+// StartAutoEmitter เริ่มต้นระบบจำลองสถานะคิวอัตโนมัติตลอดเวลาที่เซิร์ฟเวอร์เปิดใช้งาน (Fail-Closed: ปิดเป็นค่าเริ่มต้น)
 func StartAutoEmitter() {
-	enabledStr := os.Getenv("AUTO_SIMULATOR_ENABLED")
-	if strings.EqualFold(enabledStr, "false") || enabledStr == "0" {
-		log.Println("[AutoSimulator] ปิดการทำงาน (AUTO_SIMULATOR_ENABLED=false)")
+	enabledStr := strings.TrimSpace(os.Getenv("AUTO_SIMULATOR_ENABLED"))
+	if !strings.EqualFold(enabledStr, "true") && enabledStr != "1" {
+		log.Println("[AutoSimulator] ปิดการทำงาน (AUTO_SIMULATOR_ENABLED != true)")
 		return
 	}
 
