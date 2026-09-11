@@ -11,6 +11,7 @@ import (
 
 	"clinic-backend/internal/config"
 	"clinic-backend/internal/models"
+	"clinic-backend/internal/services"
 	"clinic-backend/internal/ws"
 )
 
@@ -398,20 +399,12 @@ func emitNewQueue(rng *rand.Rand) {
 		patient = newP
 	}
 
-	// คำนวณเลขคิวฐาน 16 (Q0001 - QFFFF)
-	var lastQueue models.Queue
-	var queueNo string
-	if err := config.DB.Order("id desc").First(&lastQueue).Error; err == nil {
-		var lastNum int
-		cleanHex := strings.TrimPrefix(strings.ToUpper(lastQueue.QueueNumber), "Q")
-		fmt.Sscanf(cleanHex, "%X", &lastNum)
-		if lastNum > 0 {
-			queueNo = fmt.Sprintf("Q%04X", lastNum+1)
-		} else {
-			queueNo = fmt.Sprintf("Q%04X", lastQueue.ID+1)
-		}
-	} else {
-		queueNo = "Q0001"
+	nowBkk := time.Now().In(services.BangkokLocation())
+	serviceDate := time.Date(nowBkk.Year(), nowBkk.Month(), nowBkk.Day(), 0, 0, 0, 0, time.UTC)
+	queueNo, qErr := services.NextQueueNumber(config.DB, nowBkk)
+	if qErr != nil {
+		log.Printf("[AutoSimulator] ไม่สามารถสร้างเลขคิวได้: %v", qErr)
+		return
 	}
 
 	var regUser models.User
@@ -425,9 +418,12 @@ func emitNewQueue(rng *rand.Rand) {
 		PatientID:       patient.ID,
 		CreatedByUserID: regUserID,
 		QueueNumber:     queueNo,
+		ServiceDate:     serviceDate,
 		Status:          "รอคัดกรอง",
 		Department:      "จุดคัดกรอง",
 		Note:            "รอซักประวัติและวัดสัญญาณชีพ",
+		CreatedAt:       nowBkk,
+		UpdatedAt:       nowBkk,
 	}
 
 	if err := config.DB.Create(&queue).Error; err != nil {

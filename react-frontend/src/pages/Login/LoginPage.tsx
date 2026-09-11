@@ -41,8 +41,6 @@ const LoginPage: React.FC = () => {
       if (result && result.success) {
         if (result.requiresPasswordChange) {
           setShowChangePassword(true);
-        } else {
-          window.location.reload();
         }
       } else {
         // ใช้ error message จริงจาก backend ถ้ามี (เช่น "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อ
@@ -69,8 +67,6 @@ const LoginPage: React.FC = () => {
       if (result && result.success) {
         if (result.requiresPasswordChange) {
           setShowChangePassword(true);
-        } else {
-          window.location.reload();
         }
       } else {
         setError(result?.error || 'Quick Test Login ใช้งานไม่ได้ในขณะนี้');
@@ -93,7 +89,7 @@ const LoginPage: React.FC = () => {
     try {
       const ok = await changePassword(password, newPassword);
       if (ok) {
-        window.location.reload();
+        setShowChangePassword(false);
       } else {
         setError('ไม่สามารถเปลี่ยนรหัสผ่านได้ กรุณาลองใหม่อีกครั้ง');
       }
@@ -207,19 +203,21 @@ const LoginPage: React.FC = () => {
         </form>
       </div>
 
-      <div className="test-login-box">
-        <h4 style={{margin: '0 0 10px 0', fontSize: '13px', color: '#64748B'}}>Quick Test Login</h4>
-        <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center'}}>
-          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('doctor')}>Doctor</button>
-          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('nurse')}>Nurse</button>
-          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('nurse_assistant')}>Nurse Assistant</button>
-          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('registrar')}>Reception / Admin</button>
-          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('pharmacist')}>Pharmacist</button>
-          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('cashier')}>Cashier</button>
-          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('officer')}>Officer</button>
-          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('admin')}>IT-admin</button>
+      {import.meta.env.VITE_DEV_MODE === 'true' && (
+        <div className="test-login-box">
+          <h4 style={{margin: '0 0 10px 0', fontSize: '13px', color: '#64748B'}}>Quick Test Login</h4>
+          <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center'}}>
+            <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('doctor')}>Doctor</button>
+            <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('nurse')}>Nurse</button>
+            <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('nurse_assistant')}>Nurse Assistant</button>
+            <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('registrar')}>Reception / Admin</button>
+            <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('pharmacist')}>Pharmacist</button>
+            <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('cashier')}>Cashier</button>
+            <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('officer')}>Officer</button>
+            <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('admin')}>IT-admin</button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
