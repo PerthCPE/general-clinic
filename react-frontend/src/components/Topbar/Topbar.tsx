@@ -18,6 +18,7 @@ import {
 import { useWebSocket } from '../../context/WebSocketContext';
 import { getSharedAudioContext } from '../../utils/audioContext';
 import ChangePasswordModal from '../ChangePasswordModal/ChangePasswordModal'; // เพิ่มใหม่
+import { isTestAccountUsername } from '../../config/testAccounts';
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -973,9 +974,17 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
               <div className="dropdown-divider"></div>
 
               {/* เพิ่มใหม่: เปลี่ยนรหัสผ่าน (Text align center, no emoji) — หน้าตาแบบเดียวกับปุ่มออกจากระบบ */}
+              {/* บัญชีทดสอบตายตัว 10 บัญชี (ดู config/testAccounts.ts) เปลี่ยนรหัสผ่านเองไม่ได้เลย —
+                  backend (ChangePassword) ปฏิเสธเสมออยู่แล้ว แจ้งด้วย toast แทนเปิด modal ที่ยังไงก็
+                  บันทึกไม่ได้ */}
               <button
                 className="dropdown-menu-item dropdown-item-4"
                 onClick={() => {
+                  if (isTestAccountUsername(currentUser?.username)) {
+                    toast.error('บัญชีทดสอบของระบบเปลี่ยนรหัสผ่านเองไม่ได้ ระบบจะตั้งรหัสผ่านกลับเป็นรหัสพนักงานให้อัตโนมัติทุกครั้งที่เปิดเซิร์ฟเวอร์');
+                    setIsDropdownOpen(false);
+                    return;
+                  }
                   setIsChangePasswordOpen(true);
                   setIsDropdownOpen(false);
                 }}

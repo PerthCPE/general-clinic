@@ -191,6 +191,15 @@ func ChangePassword(c *gin.Context) {
 		return
 	}
 
+	// บัญชีทดสอบตายตัว 10 บัญชี (ดู models.TestAccountUsernames) ห้ามเปลี่ยนรหัสผ่านเองเด็ดขาด —
+	// seed script ตั้งรหัสผ่านกลับเป็น hash(employee_id) ให้อัตโนมัติทุก startup อยู่แล้ว เช็คนี้ต้อง
+	// มาก่อนเช็ค old password/กฎ "ห้ามตรงกับรหัสพนักงาน" ด้านล่างเสมอ เพราะบัญชีเหล่านี้ไม่มีสิทธิ์
+	// เข้าฟังก์ชันนี้เลยไม่ว่ากรณีใด
+	if models.IsTestAccountUsername(user.Username) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "บัญชีนี้เป็นบัญชีทดสอบของระบบ ไม่สามารถเปลี่ยนรหัสผ่านเองได้ (ระบบจะตั้งรหัสผ่านกลับเป็นรหัสพนักงานให้อัตโนมัติทุกครั้งที่เปิดเซิร์ฟเวอร์)"})
+		return
+	}
+
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword))
 	if err != nil {
 		// ตอบ 400 ไม่ใช่ 401 — ตัวจัดการกลางใน api.ts เห็น 401 บนเส้นทางที่ต้องมี token แล้วจะตีความ

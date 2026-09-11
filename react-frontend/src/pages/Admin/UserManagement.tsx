@@ -3,6 +3,7 @@ import { Users, CheckCircle, Clock, Ban, Edit2, Trash2, RotateCcw, UserPlus, Cop
 import { Snackbar, Alert } from '@mui/material';
 import { adminApi, type BackendUser } from '../../services/api';
 import { TREATMENT_DEPARTMENTS } from '../../config/roles';
+import { isTestAccountUsername } from '../../config/testAccounts';
 // อ่าน currentUser อย่างเดียวผ่าน useAuth() เพื่อกันลบบัญชีตัวเอง — ไม่แก้ AuthContext.tsx เลย
 import { useAuth } from '../../context/AuthContext';
 import './UserManagement.css';
@@ -20,6 +21,10 @@ interface SystemUser {
   createdAt: string;
   password?: string;
   username: string; // Add username for backend
+  // บัญชีทดสอบตายตัว 10 บัญชี (ดู config/testAccounts.ts) — seed script ฝั่ง backend เขียนทับ
+  // ข้อมูล/รหัสผ่าน/สถานะกลับเป็นค่าเดิมทุกครั้งที่เปิดเซิร์ฟเวอร์ และ backend ปฏิเสธการแก้ไข/
+  // รีเซ็ตรหัส/ระงับ/ลบทุก endpoint อยู่แล้ว — ฟิลด์นี้ใช้ซ่อนปุ่มที่กดแล้วยังไงก็ไม่มีผลจริง
+  isTestAccount: boolean;
 }
 
 // === สร้าง Mapping ตำแหน่งงาน ➡️ แผนกที่สอดคล้องกัน (สำหรับคลินิกขนาดกลาง) ===
@@ -94,6 +99,7 @@ const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
     avatar: randomColor,
     createdAt: u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
     username: u.username,
+    isTestAccount: isTestAccountUsername(u.username),
   };
 };
 
@@ -122,7 +128,7 @@ const UserManagement: React.FC = () => {
   const pendingPageRef = useRef<number | null>(null);
 
   const [formData, setFormData] = useState<SystemUser>({
-    internalId: 0, id: '', name: '', phone: '', role: 'แพทย์', department: ROLE_DEPARTMENTS['แพทย์'][0], licenseId: '', status: 'รอการยืนยัน', avatar: '', createdAt: '', password: '', username: ''
+    internalId: 0, id: '', name: '', phone: '', role: 'แพทย์', department: ROLE_DEPARTMENTS['แพทย์'][0], licenseId: '', status: 'รอการยืนยัน', avatar: '', createdAt: '', password: '', username: '', isTestAccount: false
   });
 
   // คืนค่ารายชื่อที่โหลดมาล่าสุดด้วย (นอกเหนือจากการ setUsers) — ให้ผู้เรียกที่ต้องคำนวณอะไรต่อจาก
@@ -260,16 +266,23 @@ const UserManagement: React.FC = () => {
     const newId = generateNewId(defaultRole, users);
     setFormData({ 
       internalId: 0,
-      id: newId, 
+      id: newId,
       name: '', phone: '', username: '',
-      role: defaultRole, 
-      department: ROLE_DEPARTMENTS[defaultRole][0], 
-      licenseId: '', status: 'กำลังใช้งาน', avatar: '', createdAt: today, password: newId 
+      role: defaultRole,
+      department: ROLE_DEPARTMENTS[defaultRole][0],
+      licenseId: '', status: 'กำลังใช้งาน', avatar: '', createdAt: today, password: newId,
+      isTestAccount: false,
     });
     setIsModalOpen(true);
   };
 
   const openEditModal = (user: SystemUser) => {
+    // ปุ่มแก้ไขถูกซ่อนไว้แล้วสำหรับบัญชีทดสอบ (ดู JSX ปุ่มการจัดการ) กันซ้ำไว้ตรงนี้อีกชั้นเผื่อ
+    // ถูกเรียกจากทางอื่นในอนาคต — backend (UpdateAccount) ปฏิเสธบัญชีทดสอบทุกกรณีอยู่แล้ว
+    if (user.isTestAccount) {
+      alert('บัญชีนี้เป็นบัญชีทดสอบของระบบ ไม่สามารถแก้ไขข้อมูลได้ (ระบบจะตั้งค่ากลับเป็นค่าเริ่มต้นให้อัตโนมัติทุกครั้งที่เปิดเซิร์ฟเวอร์)');
+      return;
+    }
     setModalMode('edit');
     let validDepartment = user.department;
     if (ROLE_DEPARTMENTS[user.role] && !ROLE_DEPARTMENTS[user.role].includes(user.department)) {
@@ -570,27 +583,40 @@ const UserManagement: React.FC = () => {
                       }`}>
                         {user.status}
                       </span>
+                      {/* บัญชีทดสอบตายตัว 10 บัญชี — seed script เขียนทับข้อมูล/รหัสผ่าน/สถานะกลับ
+                          เป็นค่าเดิมทุกครั้งที่เปิดเซิร์ฟเวอร์ แก้ไข/รีเซ็ตรหัส/ระงับ/ลบไม่ได้เลย */}
+                      {user.isTestAccount && (
+                        <span className="status-badge status-pending" style={{ marginLeft: 6 }} title="บัญชีทดสอบของระบบ — แก้ไข/รีเซ็ตรหัส/ระงับ/ลบไม่ได้ ระบบตั้งค่ากลับเป็นค่าเดิมให้อัตโนมัติทุกครั้งที่เปิดเซิร์ฟเวอร์">
+                          บัญชีทดสอบ
+                        </span>
+                      )}
                     </td>
                     <td>
-                      <div className="action-buttons">
-                        <button className="btn-edit" onClick={() => openEditModal(user)} title="แก้ไขข้อมูล">
-                          <Edit2 size={16} strokeWidth={2} />
-                        </button>
-                        <button className="btn-reset" onClick={() => handleResetPassword(user.name, user.internalId)} title="รีเซ็ตรหัสผ่าน">
-                          <RotateCcw size={16} strokeWidth={2} />
-                        </button>
-                        {/* ปุ่มระงับ กับ ปุ่มลบถาวร แยกกันตามสถานะปัจจุบัน ไม่โชว์คู่กัน — ระงับได้เฉพาะ
-                            บัญชีที่ยังไม่ถูกระงับ ส่วนลบถาวรได้เฉพาะบัญชีที่ระงับอยู่แล้วเท่านั้น */}
-                        {user.status !== 'ระงับใช้งาน' ? (
-                          <button className="btn-delete" onClick={() => handleSuspendAccount(user.id, user.name, user.internalId)} title="ระงับบัญชี">
-                            <Ban size={16} strokeWidth={2} />
+                      {/* บัญชีทดสอบ: ปุ่มทั้งหมดในคอลัมน์นี้กดแล้วยังไงก็ถูก backend ปฏิเสธเสมอ
+                          (ดู admin_controller.go) ซ่อนทิ้งไปเลยแทนโชว์ปุ่มที่ใช้ไม่ได้จริง */}
+                      {user.isTestAccount ? (
+                        <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>-</span>
+                      ) : (
+                        <div className="action-buttons">
+                          <button className="btn-edit" onClick={() => openEditModal(user)} title="แก้ไขข้อมูล">
+                            <Edit2 size={16} strokeWidth={2} />
                           </button>
-                        ) : (
-                          <button className="btn-delete" onClick={() => handleDeleteAccount(user)} title="ลบบัญชีถาวร">
-                            <Trash2 size={16} strokeWidth={2} />
+                          <button className="btn-reset" onClick={() => handleResetPassword(user.name, user.internalId)} title="รีเซ็ตรหัสผ่าน">
+                            <RotateCcw size={16} strokeWidth={2} />
                           </button>
-                        )}
-                      </div>
+                          {/* ปุ่มระงับ กับ ปุ่มลบถาวร แยกกันตามสถานะปัจจุบัน ไม่โชว์คู่กัน — ระงับได้เฉพาะ
+                              บัญชีที่ยังไม่ถูกระงับ ส่วนลบถาวรได้เฉพาะบัญชีที่ระงับอยู่แล้วเท่านั้น */}
+                          {user.status !== 'ระงับใช้งาน' ? (
+                            <button className="btn-delete" onClick={() => handleSuspendAccount(user.id, user.name, user.internalId)} title="ระงับบัญชี">
+                              <Ban size={16} strokeWidth={2} />
+                            </button>
+                          ) : (
+                            <button className="btn-delete" onClick={() => handleDeleteAccount(user)} title="ลบบัญชีถาวร">
+                              <Trash2 size={16} strokeWidth={2} />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))
