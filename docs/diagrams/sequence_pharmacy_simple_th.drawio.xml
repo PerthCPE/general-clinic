@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net">
+  <diagram name="กิจกรรมการจ่ายยา (แบบง่าย)" id="pharmSeqSimpleTH">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="750" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" parent="1" style="text;html=1;fontSize=16;fontStyle=1;fontColor=#0277BD;fontFamily=Tahoma;" value="Sequence Diagram: ระบบจัดการยา (การจ่ายยา)" vertex="1">
+          <mxGeometry x="40" y="10" width="600" height="26" as="geometry" />
+        </mxCell>
+
+        <mxCell id="actor1" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeWidth=2;fontStyle=1;fontSize=12;fontFamily=Tahoma;" value="เภสัชกร" vertex="1">
+          <mxGeometry x="45" y="50" width="30" height="55" as="geometry" />
+        </mxCell>
+        <mxCell id="lc1" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;" value="DispensingController" vertex="1">
+          <mxGeometry x="250" y="50" width="140" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="lc2" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;" value="Medicine" vertex="1">
+          <mxGeometry x="520" y="50" width="140" height="640" as="geometry" />
+        </mxCell>
+        <mxCell id="lc3" parent="1" style="shape=umlLifeline;perimeter=lifelinePerimeter;whiteSpace=wrap;html=1;container=1;collapsible=0;recursiveResize=0;outlineConnect=0;" value="Database" vertex="1">
+          <mxGeometry x="790" y="50" width="140" height="640" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m1" edge="1" parent="1" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;strokeWidth=1;fontFamily=Tahoma;" value="1. getPrescription(visitId)">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="60" y="180" as="sourcePoint" /><mxPoint x="320" y="180" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m2" edge="1" parent="1" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;strokeWidth=1;fontFamily=Tahoma;" value="2. ค้นหาใบสั่งยาและสต็อกยา">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="330" y="230" as="sourcePoint" /><mxPoint x="860" y="230" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m3" edge="1" parent="1" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;strokeWidth=1;fontFamily=Tahoma;" value="3. ส่งคืนข้อมูล">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="860" y="280" as="sourcePoint" /><mxPoint x="330" y="280" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m4" edge="1" parent="1" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;strokeWidth=1;fontFamily=Tahoma;" value="4. แสดงรายการยาและจำนวนคงเหลือ">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="320" y="330" as="sourcePoint" /><mxPoint x="70" y="330" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m5" edge="1" parent="1" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;strokeWidth=1.5;fontStyle=1;fontColor=#1565C0;fontFamily=Tahoma;" value="5. confirmDispense(visitId, items)">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="60" y="380" as="sourcePoint" /><mxPoint x="320" y="380" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m6" edge="1" parent="1" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;strokeWidth=1;fontFamily=Tahoma;" value="6. deductStock(items) — atomic">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="330" y="430" as="sourcePoint" /><mxPoint x="590" y="430" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m7" edge="1" parent="1" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;strokeWidth=1;fontFamily=Tahoma;" value="7. หักสต็อกสำเร็จ / สต็อกไม่พอ">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="590" y="480" as="sourcePoint" /><mxPoint x="330" y="480" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m8" edge="1" parent="1" style="html=1;verticalAlign=bottom;endArrow=block;rounded=0;strokeWidth=1;fontFamily=Tahoma;" value="8. บันทึกบิล + การจ่ายยา (transaction เดียว)">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="330" y="530" as="sourcePoint" /><mxPoint x="860" y="530" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m9" edge="1" parent="1" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;strokeWidth=1;fontFamily=Tahoma;" value="9. บันทึกสำเร็จ / rollback หากผิดพลาด">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="860" y="580" as="sourcePoint" /><mxPoint x="330" y="580" as="targetPoint" /></mxGeometry>
+        </mxCell>
+        <mxCell id="m10" edge="1" parent="1" style="html=1;verticalAlign=bottom;endArrow=open;dashed=1;endSize=8;rounded=0;strokeWidth=1.5;fontColor=#2E7D32;fontStyle=1;fontFamily=Tahoma;" value="10. จ่ายยาสำเร็จ (หรือแสดง error สต็อกไม่พอ)">
+          <mxGeometry relative="1" as="geometry"><mxPoint x="320" y="630" as="sourcePoint" /><mxPoint x="70" y="630" as="targetPoint" /></mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
