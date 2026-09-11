@@ -156,6 +156,14 @@ func (ctrl *AdminController) UpdateAccountStatus(c *gin.Context) {
 		return
 	}
 
+	// บัญชีทดสอบตายตัว 10 บัญชี (ดู models.TestAccountUsernames) ห้ามระงับ/เปลี่ยนสถานะไม่ว่ากรณี
+	// ใด — seed script จะเขียนสถานะกลับเป็น active ทับให้เสมอทุก startup อยู่แล้ว การอนุญาตให้ตั้ง
+	// สถานะอื่นชั่วคราวได้จะทำให้ทีมเข้าใจผิดว่าบันทึกติดจริง
+	if models.IsTestAccountUsername(user.Username) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "บัญชีนี้เป็นบัญชีทดสอบของระบบ ไม่สามารถระงับหรือเปลี่ยนสถานะได้ (ระบบจะตั้งกลับเป็น active ให้อัตโนมัติทุกครั้งที่เปิดเซิร์ฟเวอร์)"})
+		return
+	}
+
 	// ห้าม admin ระงับ/เปลี่ยนสถานะบัญชีของตัวเอง (ไม่ว่าจะเป็น admin คนสุดท้ายหรือไม่ก็ตาม) —
 	// endpoint นี้อยู่หลัง RoleRequired("admin") เสมอ ผู้ยิง request จึงเป็น admin แน่นอน
 	if selfID, ok := currentUserID(c); ok && selfID == user.ID && req.Status != "active" {
@@ -200,6 +208,15 @@ func (ctrl *AdminController) UpdateAccount(c *gin.Context) {
 	var user models.User
 	if err := ctrl.DB.First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// บัญชีทดสอบตายตัว 10 บัญชี (ดู models.TestAccountUsernames) ห้ามแก้ไขทุกฟิลด์ผ่าน endpoint
+	// นี้เด็ดขาด ไม่ใช่แค่ role/status — seed script เขียนทับ full_name/phone/role/employee_id
+	// กลับเป็นค่า seed เสมอทุก startup (ดู config/db.go) ปล่อยให้แก้ไขบางฟิลด์ผ่านหน้าเว็บได้จะ
+	// ดูเหมือนบันทึกสำเร็จแต่หายไปเองพอรีสตาร์ท ทำให้สับสนโดยไม่จำเป็น
+	if models.IsTestAccountUsername(user.Username) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "บัญชีนี้เป็นบัญชีทดสอบของระบบ ไม่สามารถแก้ไขข้อมูลได้ (ระบบจะตั้งค่ากลับเป็นค่าเริ่มต้นให้อัตโนมัติทุกครั้งที่เปิดเซิร์ฟเวอร์)"})
 		return
 	}
 
@@ -280,6 +297,12 @@ func (ctrl *AdminController) DeleteAccount(c *gin.Context) {
 	var user models.User
 	if err := ctrl.DB.First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// บัญชีทดสอบตายตัว 10 บัญชี (ดู models.TestAccountUsernames) ห้ามลบเด็ดขาด — ต้อง "ใช้ได้เสมอ"
+	if models.IsTestAccountUsername(user.Username) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "บัญชีนี้เป็นบัญชีทดสอบของระบบ ไม่สามารถลบได้"})
 		return
 	}
 
@@ -376,6 +399,13 @@ func (ctrl *AdminController) ResetPassword(c *gin.Context) {
 	var user models.User
 	if err := ctrl.DB.First(&user, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// บัญชีทดสอบตายตัว 10 บัญชี (ดู models.TestAccountUsernames) ห้าม admin รีเซ็ตรหัสผ่าน —
+	// seed script ตั้งรหัสผ่านกลับเป็น hash(employee_id) ให้อัตโนมัติทุก startup อยู่แล้ว
+	if models.IsTestAccountUsername(user.Username) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "บัญชีนี้เป็นบัญชีทดสอบของระบบ ไม่สามารถรีเซ็ตรหัสผ่านได้ (ระบบจะตั้งรหัสผ่านกลับเป็นรหัสพนักงานให้อัตโนมัติทุกครั้งที่เปิดเซิร์ฟเวอร์)"})
 		return
 	}
 
