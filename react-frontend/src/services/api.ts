@@ -79,7 +79,7 @@ function forceReLogin() {
 // endpoint ที่เรียกได้โดยไม่ต้องมี token อยู่แล้ว (login ปกติ + ทางลัด dev quick-login) —
 // ทั้งคู่มีจุดประสงค์เพื่อ "ขอ token ใหม่" ตั้งแต่แรก จึงต้องไม่โดน request() บล็อกด้วยเงื่อนไข
 // "ไม่มี token" หรือ forceReLogin ก่อนที่จะมีโอกาสยิง request ออกไปจริงด้วยซ้ำ
-const PUBLIC_ENDPOINTS = ['/api/login', '/api/dev/quick-login'];
+const PUBLIC_ENDPOINTS = ['/api/login', '/api/auth/login', '/api/dev/quick-login'];
 
 // Generic HTTP Request Handler
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {

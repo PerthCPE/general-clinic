@@ -20,8 +20,9 @@ func SetUpRoutes(r *gin.Engine) {
 	// create group for inherit
 	api := r.Group("/api")
 
-	// ส่งข้อมูลเพื่อ login และเช็ค role
+	// ส่งข้อมูลเพื่อ login และเช็ค role (รองรับทั้ง /api/login และ /api/auth/login)
 	api.POST("/login", controllers.Login)
+	api.POST("/auth/login", controllers.Login)
 
 	// Quick Test Login (dev only) — ไม่ผูก route นี้เลยถ้าไม่ใช่ dev mode กันไม่ให้ทางลัดที่
 	// ไม่เช็ค password หลุดไปอยู่ใน production โดยไม่ได้ตั้งใจ (endpoint ไม่มีอยู่จริงเลย ไม่ใช่

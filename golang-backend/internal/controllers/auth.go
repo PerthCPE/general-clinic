@@ -1,16 +1,18 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
-	"clinic-backend/internal/dto"
 	"clinic-backend/internal/config"
+	"clinic-backend/internal/dto"
 	"clinic-backend/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 func Login(c *gin.Context) {
@@ -19,6 +21,11 @@ func Login(c *gin.Context) {
 	// check frontend for sended valid json following dto
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request parameters"})
+		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน"})
 		return
 	}
 
@@ -31,22 +38,24 @@ func Login(c *gin.Context) {
 	// form อยู่แล้ว คอลัมน์ email ในตารางยังไม่ถูกลบ ดู PLAN.md)
 	result := config.DB.Where("username = ? OR employee_id = ?", req.Username, req.Username).First(&user)
 	if result.Error != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error" : "Invalid username or password"})
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error: unable to connect or query user table"})
 		return
 	}
 
 	// บัญชีที่ถูกระงับ (suspended) หรือปิดใช้งาน (inactive) ห้าม login สำเร็จ แม้รหัสผ่านจะถูกต้องก็ตาม
-	// เดิมจุดนี้ไม่เคยเช็ค status เลย — บัญชีที่ถูกระงับก็ยังล็อกอินได้ตามปกติ (พบระหว่างสำรวจ
-	// จริง: pharmacist1 มี status="inactive" แต่ยังล็อกอินผ่านได้)
 	if user.Status == "suspended" || user.Status == "inactive" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ"})
 		return
 	}
 
-	// password checking
+	// password checking with bcrypt
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error" : "Invalid username or password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return
 	}
 

@@ -16,6 +16,11 @@ import (
 
 // POST /api/system/reset-db - ลบข้อมูลทดสอบในระบบ และสร้างข้อมูลตั้งต้นสำหรับทดสอบคัดกรอง
 func ResetTestDatabase(c *gin.Context) {
+	if !config.AppConfig.DevMode {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Reset database is only available in dev mode"})
+		return
+	}
+
 	db := config.DB
 
 	// 1. ล้างแคช In-Memory ใน RAM ทันที

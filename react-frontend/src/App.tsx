@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { WebSocketProvider } from './context/WebSocketContext';
 import { ToastProvider } from './components/Toast/ToastProvider';
@@ -54,6 +54,7 @@ function MainApp() {
   const [activePage, setActivePage] = useState<string>(() => {
     return localStorage.getItem('activePage') || 'registration';
   });
+  const prevUserIdRef = useRef<string | null>(null);
 
   const [selectedPatientId, setSelectedPatientId] = useState<string>('HN0045');
   const [patientRightsMap, setPatientRightsMap] = useState<Record<string, string>>({});
@@ -76,9 +77,15 @@ function MainApp() {
 
   useEffect(() => {
     if (currentUser) {
-      if (!hasAccess(activePage)) {
+      if (prevUserIdRef.current !== currentUser.id) {
+        // เมื่อสลับผู้ใช้ (login บัญชีใหม่) ให้ไปหน้าแรกตาม role นั้นเสมอ
+        prevUserIdRef.current = currentUser.id;
+        setActivePage(ROLE_DEFAULT_PAGES[currentUser.role] || 'registration');
+      } else if (!hasAccess(activePage)) {
         setActivePage(ROLE_DEFAULT_PAGES[currentUser.role]);
       }
+    } else {
+      prevUserIdRef.current = null;
     }
   }, [currentUser, activePage, hasAccess]);
 
