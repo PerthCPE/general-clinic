@@ -701,6 +701,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
     setQueueList(prev => prev.map(p => p.id === activePatient.id ? { ...p, visitStatus: 'ชำระเงินเรียบร้อยแล้ว' } : p));
 
     // 2. ส่งข้อมูลขึ้น Supabase Cloud / DB เบื้องหลัง (Background Sync)
+    let paymentSucceeded = false;
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -752,15 +753,23 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
         const errorData = await res.json().catch(() => ({}));
         throw new Error(errorData.error || 'Payment failed');
       }
+
+      paymentSucceeded = true;
     } catch (err) {
       console.error('Failed to confirm payment:', err);
+      // บันทึกไม่สำเร็จ: ย้อน optimistic update กลับ ไม่ให้ค้างสถานะ "ชำระเงินเรียบร้อยแล้ว" ปลอมๆ
+      setQueueList(prev => prev.map(p => p.id === activePatient.id ? { ...p, visitStatus: 'รอชำระเงิน' } : p));
     } finally {
       // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;
       const remaining = Math.max(0, CLINIC_ANIMATION_CONFIG.submitModalDurationMs - elapsed);
       setTimeout(() => {
         setIsSubmitting(false);
-        setIsPaymentConfirmed(true);
+        if (paymentSucceeded) {
+          setIsPaymentConfirmed(true);
+        } else {
+          alert('บันทึกการชำระเงินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+        }
       }, remaining);
     }
   };
