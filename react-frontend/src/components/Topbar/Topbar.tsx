@@ -45,7 +45,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
     setSelectedRecordPatient,
   } = useDoctorData();
   const isDoctor = currentUser?.role === 'doctor';
-  const isOurScope = ['registrar', 'nurse', 'nurse_assistant'].includes(currentUser?.role || '');
+  const isOurScope = ['registrar', 'nurse', 'nurse_assistant', 'pharmacist', 'cashier'].includes(currentUser?.role || '');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false); // เพิ่มใหม่
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
@@ -687,7 +687,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
         </button>
       )}
 
-      {/* Search Bar (ซ่อนเฉพาะ role ใน scope ของเรา: registrar, nurse, nurse_assistant) */}
+      {/* Search Bar (ซ่อนเฉพาะ role ใน scope ของเรา: registrar, nurse, nurse_assistant, pharmacist, cashier) */}
       {!isOurScope && (
         <div
           className="search-container search-container-interactive"

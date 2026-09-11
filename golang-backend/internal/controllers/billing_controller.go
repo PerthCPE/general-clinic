@@ -1,4 +1,4 @@
-package controllers
+﻿package controllers
 
 import (
 	"encoding/json"
@@ -46,21 +46,24 @@ var (
 	cachedBillingExpiry time.Time
 )
 
+// ===================================
 // InvalidateBillingQueueCache เคลียร์แคชคิวการเงินทันทีเมื่อมีการชำระเงินหรือสร้างบิลใหม่
 func InvalidateBillingQueueCache() {
-	billingQueueCacheMu.Lock()
-	cachedBillingQueues = nil
-	cachedBillingExpiry = time.Time{}
-	billingQueueCacheMu.Unlock()
+	billingQueueCacheMu.Lock()        // 1. ล็อกสิทธิ์การเข้าถึงข้อมูลแคชแบบเบ็ดเสร็จ (Exclusive Lock)
+	cachedBillingQueues = nil         // 2. เคลียร์ข้อมูลคิวออกบิลใน RAM ให้กลายเป็นค่าว่าง (nil)
+	cachedBillingExpiry = time.Time{} // 3. รีเซ็ตเวลาหมดอายุของแคชให้เป็นค่าเริ่มต้น (เวลาศูนย์) บ่งบอกว่าแคชนี้ "หมดอายุแล้วทันที"
+	billingQueueCacheMu.Unlock()      // 4. ปลดล็อก เพื่อให้ Goroutine หรือคำขออื่น ๆ เข้าถึงตัวแปรได้ตามปกติ
+
 }
 
-// [บุญให้เพิ่มเทคนิคนี้] ⚡ (Supabase + Optimistic UI + WebSocket) - ดึงรายการคิวรอชำระเงินความเร็วสูง (Batch Queries + RAM Cache 0.01 ms)
-func GetBillingQueues(c *gin.Context) {
+// ===================================
+// [บุญให้เพิ่มเทคนิคนี้]  (Supabase + Optimistic UI + WebSocket) - ดึงรายการคิวรอชำระเงินความเร็วสูง
+func GetBillingQueues(c *gin.Context) { //ประกาศฟังก์ชันชื่อ GetBillingQueues รับตัวแปร c gin.Context) คือ "ตัวกลางศูนย์รวมข้อมูลทั้งหมดของ Request นั้น ๆ
 	billingQueueCacheMu.RLock()
-	if len(cachedBillingQueues) > 0 && time.Now().Before(cachedBillingExpiry) {
-		defer billingQueueCacheMu.RUnlock()
-		c.JSON(http.StatusOK, gin.H{
-			"status": "success",
+	if len(cachedBillingQueues) > 0 && time.Now().Before(cachedBillingExpiry) { //  if ไม่่มีข้อมูลจะหลุดไปดึง ค่าจริง
+		defer billingQueueCacheMu.RUnlock() //defer คือการสั่งว่า: "ให้เอาคำสั่งนี้ไปรันตอนท้ายสุด
+		c.JSON(http.StatusOK, gin.H{        //"ให้แปลงข้อมูลด้านในเป็นรูปแบบข้อความส่งกลับไป fontend
+			"status": "success", //http.StatusOK คือ 200 OK
 			"queues": cachedBillingQueues,
 		})
 		return
@@ -74,29 +77,29 @@ func GetBillingQueues(c *gin.Context) {
 	}
 
 	// 1. รวบรวม visit_id ทั้งหมดเพื่อ Query เช็คว่าชำระเงินเสร็จแล้วหรือไม่ใน Batch เดียว (O(1) Memory Lookup)
-	var allVisitIDsToCheck []uint
-	for _, bq := range rawQueues {
-		if bq.VisitID > 0 {
-			allVisitIDsToCheck = append(allVisitIDsToCheck, bq.VisitID)
+	var allVisitIDsToCheck []uint  //คือการประกาศตัวแปร allVisitIDsToCheck เพื่อเก็บ visit_id ทั้งหมดที่ต้องตรวจสอบสถานะการชำระเงิน
+	for _, bq := range rawQueues { //คือการวนลูปผ่าน rawQueues ของ BillingQueue โดยใช้ตัวแปร bq เป็นตัวแทนของแต่ละ BillingQueue ในลูป
+		if bq.VisitID > 0 { //คือการตรวจสอบว่า visit_id ของ BillingQueue นั้นมีค่ามากกว่า 0 หรือไม่ (คือมี visit_id ที่ถูกต้อง)
+			allVisitIDsToCheck = append(allVisitIDsToCheck, bq.VisitID) //คือการเพิ่ม visit_id ของ BillingQueue นั้นลงใน allVisitIDsToCheck เพื่อเก็บ visit_id ทั้งหมดที่ต้องตรวจสอบสถานะการชำระเงิน
 		}
 	}
 
-	finishedVisits := make(map[uint]bool)
-	if len(allVisitIDsToCheck) > 0 {
-		var paidVisits []uint
-		config.DB.Model(&models.Billing{}).Where("visit_id IN ? AND payment_status = ?", allVisitIDsToCheck, "paid").Pluck("visit_id", &paidVisits)
+	finishedVisits := make(map[uint]bool) //คือการสร้างแผนที่ (map) ชื่อ finishedVisits ที่ใช้เก็บ visit_id ที่ชำระเงินเสร็จแล้ว โดยใช้ uint เป็น key และ bool เป็น value
+	if len(allVisitIDsToCheck) > 0 {      //คือการตรวจว่ามี visit_id ที่ต้องตรวจสอบสถานะการชำระเงินหรือไม่ (คือมี visit_id ที่ต้องตรวจสอบมากกว่า 0)
+		var paidVisits []uint                                                                                                                       //คือการประกาศตัวแปร paidVisits เพื่อเก็บ visit_id ที่ชำระเงินเสร็จแล้ว
+		config.DB.Model(&models.Billing{}).Where("visit_id IN ? AND payment_status = ?", allVisitIDsToCheck, "paid").Pluck("visit_id", &paidVisits) //คือการ Query ข้อมูลจากตาราง Billing โดยเลือกเฉพาะ visit_id ที่อยู่ใน allVisitIDsToCheck และมี payment_status เป็น "paid" จากนั้นนำ visit_id ที่ได้มาเก็บใน paidVisits
 		for _, v := range paidVisits {
 			finishedVisits[v] = true
 		}
 
-		var histVisits []uint
+		var histVisits []uint //คือการประกาศตัวแปร histVisits เพื่อเก็บ visit_id ที่มีประวัติการชำระเงินใน BillingHistory
 		config.DB.Model(&models.BillingHistory{}).Where("visit_id IN ?", allVisitIDsToCheck).Pluck("visit_id", &histVisits)
 		for _, v := range histVisits {
 			finishedVisits[v] = true
 		}
 	}
 
-	var queues []models.BillingQueue
+	var queues []models.BillingQueue //คือการประกาศตัวแปร queues เพื่อเก็บ BillingQueue ที่ยังรอชำระเงินและไม่ซ้ำกับ visit_id ที่ชำระเงินเสร็จแล้ว
 	existingVisits := make(map[uint]bool)
 	existingQueueNos := make(map[string]bool)
 	var finishedQueueIDs []uint
@@ -669,6 +672,14 @@ func ConfirmPayment(c *gin.Context) {
 		totalAmt = 1175.0
 	}
 
+	// netAmt คือยอดที่ต้องชำระจริงหลังหักส่วนลด (req.NetAmount) แยกจาก totalAmt ที่เป็นยอดก่อนหักส่วนลด (req.TotalAmount)
+	// ถ้าใช้ totalAmt (ก่อนหักส่วนลด) เป็น billing.NetAmount ไปเช็คกับเงินสดที่รับ จะฟ้อง "Cash received is less than net amount"
+	// ทั้งที่จ่ายพอดีตามยอดที่แสดงบนจอ (ยอดหลังหักส่วนลด)
+	netAmt := req.NetAmount
+	if netAmt <= 0 {
+		netAmt = totalAmt
+	}
+
 	visit, patient := ResolveOrCreateVisit(req.HN, req.PatientName, req.NationalID, req.VisitID)
 	visitID := visit.ID
 
@@ -685,12 +696,18 @@ func ConfirmPayment(c *gin.Context) {
 	if visitID > 0 {
 		tx.Where("visit_id = ?", visitID).First(&billing)
 	}
-	
+
+	if billing.ID > 0 && billing.PaymentStatus == "paid" {
+		tx.Rollback()
+		c.JSON(http.StatusConflict, gin.H{"error": "บิลนี้ชำระเงินไปแล้ว ไม่สามารถชำระซ้ำได้", "receipt_number": billing.ReceiptNumber})
+		return
+	}
+
 	if billing.ID == 0 {
 		billing = models.Billing{
 			VisitID:       visitID,
 			TotalAmount:   totalAmt,
-			NetAmount:     totalAmt,
+			NetAmount:     netAmt,
 			PaymentStatus: "pending",
 		}
 		if err := tx.Create(&billing).Error; err != nil {
@@ -698,6 +715,11 @@ func ConfirmPayment(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing record: " + err.Error()})
 			return
 		}
+	} else {
+		// billing row เดิมอาจถูกสร้างไว้ตั้งแต่ก่อนหน้านี้ (เช่น เปิดใบแจ้งหนี้ทิ้งไว้ตอนสิทธิ/ส่วนลดยังไม่ถูกเลือก)
+		// ต้องอัปเดตยอดให้ตรงกับใบแจ้งหนี้ปัจจุบันเสมอ ไม่งั้นเช็คเงินสดด้านล่างจะเทียบกับยอดเก่าที่ค้างอยู่
+		billing.TotalAmount = totalAmt
+		billing.NetAmount = netAmt
 	}
 
 	if req.PaymentMethod == "เงินสด" && req.CashReceived > 0 && req.CashReceived < billing.NetAmount {
@@ -731,7 +753,7 @@ func ConfirmPayment(c *gin.Context) {
 	billing.ReceiptNumber = receiptNo
 	if billing.NetAmount <= 0 {
 		billing.TotalAmount = totalAmt
-		billing.NetAmount = totalAmt
+		billing.NetAmount = netAmt
 	}
 
 	if err := tx.Save(&billing).Error; err != nil {
@@ -835,7 +857,7 @@ func ConfirmPayment(c *gin.Context) {
 			ChangeAmount:   changeAmount,
 			CreatedAt:      time.Now(),
 		}
-		
+
 		if err := tx.Create(&history).Error; err != nil {
 			tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create billing history: " + err.Error()})

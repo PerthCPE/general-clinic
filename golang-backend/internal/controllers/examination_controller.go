@@ -588,19 +588,13 @@ func SaveExamination(c *gin.Context) {
 			}
 		}
 
-		// เซ็นปิดการตรวจ = ปิดเคสและส่งคิวต่อไปห้องยา หรือข้ามไปห้องการเงินถ้าไม่มียา
+		// เซ็นปิดการตรวจ = ปิดเคสและส่งคิวต่อไปห้องยาเสมอ (ไม่ข้ามไปการเงินโดยตรง แม้ไม่มีรายการยา
+		// ห้องยาเป็นด่านตรวจสอบก่อนส่งต่อการเงินทุกเคส)
 		if signing {
 			q, ok, err := applyVisitStatusTx(tx, &visit, models.VisitStatusCompleted,
 				doctorID, "", now)
 			if err != nil {
 				return err
-			}
-			if ok && !hasRawPrescriptions {
-				q.Status = "รอชำระเงิน"
-				q.Department = ResolveDepartmentForStatus(q, "รอชำระเงิน")
-				if err := tx.Save(&q).Error; err != nil {
-					return err
-				}
 			}
 			updatedQueue, hasQueue = q, ok
 			visitStatus = visit.Status

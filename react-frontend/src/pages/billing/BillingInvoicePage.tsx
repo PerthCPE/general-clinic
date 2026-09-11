@@ -689,6 +689,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
   // [บุญให้เพิ่มเทคนิคนี้] (Supabase + Optimistic UI + WebSocket) - กดยืนยันรับชำระเงินแล้วอัปเดตหน้าจอทันที 0 ms และส่งขึ้น Supabase เบื้องหลัง
   const handleConfirmPayment = async () => {
     if (!activePatient) return;
+    if (isSubmitting || isPaymentConfirmed) return; // กันกดซ้ำ/กดค้างส่งชำระเงินซ้ำสองครั้ง เพราะจ่ายไปแล้ว
     setConfirmedPatient(activePatient);
     if (paymentMethod === 'qr' && isQrExpired) {
       alert('การชำระเงินไม่สำเร็จหรือหมดเวลา: ระบบแจ้งเตือนและอนุญาตให้สร้าง QR Code ใหม่');
@@ -702,6 +703,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
 
     // 2. ส่งข้อมูลขึ้น Supabase Cloud / DB เบื้องหลัง (Background Sync)
     let paymentSucceeded = false;
+    let confirmErrorMessage = 'บันทึกการชำระเงินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
     try {
       const token = localStorage.getItem('token') || localStorage.getItem('clinic_auth_token');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -727,6 +729,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
       };
 
       let res: Response;
+      let networkFailed = false;
       try {
         res = await fetch('/api/billing/confirm', {
           method: 'POST',
@@ -734,6 +737,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
           body: JSON.stringify(payload)
         });
       } catch {
+        networkFailed = true;
         res = await fetch('/api/system/billing/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -741,7 +745,10 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
         });
       }
 
-      if (!res.ok) {
+      // เรียก endpoint สำรอง (/api/system/...) เฉพาะกรณี auth ล้มเหลว (401/403) หรือ network error เท่านั้น
+      // ห้าม retry ตอน 400/422 เพราะเป็น business validation error ที่ endpoint สำรองจะพังซ้ำแบบเดิมทุกครั้ง
+      // และกลบข้อความ error จริง (เช่น "Cash received is less than net amount") จนผู้ใช้ไม่รู้สาเหตุ
+      if (!networkFailed && (res.status === 401 || res.status === 403)) {
         res = await fetch('/api/system/billing/confirm', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -759,6 +766,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
       console.error('Failed to confirm payment:', err);
       // บันทึกไม่สำเร็จ: ย้อน optimistic update กลับ ไม่ให้ค้างสถานะ "ชำระเงินเรียบร้อยแล้ว" ปลอมๆ
       setQueueList(prev => prev.map(p => p.id === activePatient.id ? { ...p, visitStatus: 'รอชำระเงิน' } : p));
+      confirmErrorMessage = err instanceof Error ? err.message : 'บันทึกการชำระเงินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
     } finally {
       // ให้แอนิเมชันบันทึกข้อมูลแสดงอย่างนุ่มนวลตามค่าคอนฟิก
       const elapsed = Date.now() - submitStart;
@@ -768,7 +776,7 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
         if (paymentSucceeded) {
           setIsPaymentConfirmed(true);
         } else {
-          alert('บันทึกการชำระเงินไม่สำเร็จ กรุณาลองใหม่อีกครั้ง');
+          alert(`บันทึกการชำระเงินไม่สำเร็จ: ${confirmErrorMessage}`);
         }
       }, remaining);
     }
@@ -1577,9 +1585,10 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                         สร้าง QR Code ใหม่ (Regenerate QR Code)
                       </button>
                     ) : !isPaymentConfirmed ? (
-                      <button 
-                        type="button" 
-                        className="confirm-qr-btn" 
+                      <button
+                        type="button"
+                        className="confirm-qr-btn"
+                        disabled={isSubmitting}
                         onClick={handleConfirmPayment}
                         style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       >
@@ -1627,10 +1636,10 @@ const [masterMedicines, setMasterMedicines] = useState<any[]>([]);
                     </div>
 
                     {!isPaymentConfirmed ? (
-                      <button 
+                      <button
                         type="button"
-                        className="confirm-qr-btn cash-confirm-btn" 
-                        disabled={cashNumber < grandTotal}
+                        className="confirm-qr-btn cash-confirm-btn"
+                        disabled={cashNumber < grandTotal || isSubmitting}
                         onClick={handleConfirmPayment}
                         style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       >
