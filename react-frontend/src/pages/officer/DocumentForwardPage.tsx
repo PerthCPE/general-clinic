@@ -185,7 +185,7 @@ export const DocumentForwardPage: React.FC = () => {
   // Send Form State (System Documents Forwarding ONLY)
   const [selectedSystemDocId, setSelectedSystemDocId] = useState<number | ''>('');
   const [newDocDescription, setNewDocDescription] = useState('');
-  const [newDocRecipientId, setNewDocRecipientId] = useState<number>(6);
+  const [newDocRecipientIds, setNewDocRecipientIds] = useState<number[]>([]);
   const [newDocPriority, setNewDocPriority] = useState<'normal' | 'urgent' | 'emergency'>('normal');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -233,9 +233,7 @@ export const DocumentForwardPage: React.FC = () => {
       const users = await dmsApi.getRecipients().catch(() => [] as BackendUser[]);
       if (users && Array.isArray(users) && users.length > 0) {
         setRecipientsList(users);
-        if (!newDocRecipientId || !users.some(u => u.id === newDocRecipientId)) {
-          setNewDocRecipientId(users[0].id);
-        }
+
       }
 
       // 3. Fetch System Documents for Forwarding options
@@ -281,6 +279,11 @@ export const DocumentForwardPage: React.FC = () => {
       return;
     }
 
+    if (newDocRecipientIds.length === 0) {
+      toast.error('กรุณาเลือกบุคลากรหรือแผนกปลายทางอย่างน้อย 1 รายการ');
+      return;
+    }
+
     const selectedDocObj = systemDocuments.find(d => d.id === Number(selectedSystemDocId));
     if (!selectedDocObj) {
       toast.error('ไม่พบข้อมูลเอกสารที่เลือกในระบบ');
@@ -288,112 +291,116 @@ export const DocumentForwardPage: React.FC = () => {
     }
 
     setIsSubmitting(true);
-    const selectedRecipient = recipientsList.find(u => u.id === newDocRecipientId);
-    const recipientName = selectedRecipient?.fullname || selectedRecipient?.username || 'เจ้าหน้าที่ปลายทาง';
-    const recipientRole = getRoleLabel(selectedRecipient?.role);
     const docTitle = selectedDocObj.subject;
     const docType = selectedDocObj.doc_type || 'เอกสารทั่วไป';
     const finalDescription = newDocDescription.trim() || selectedDocObj.description || 'เอกสารส่งต่อผ่านระบบเวชระเบียน DMS';
 
-    try {
-      // Forward to recipient
-      const fwdRes = await dmsApi.forwardDocument({
-        doc_id: selectedDocObj.id,
-        forwarded_to: newDocRecipientId,
-      });
+    let successCount = 0;
+    
+    for (const rid of newDocRecipientIds) {
+      const selectedRecipient = recipientsList.find(u => u.id === rid) || (Object.values(DEMO_USERS) as any[]).find((u: any) => u.id === rid);
+      const recipientName = selectedRecipient?.fullname || selectedRecipient?.username || 'เจ้าหน้าที่ปลายทาง';
+      const recipientRole = getRoleLabel(selectedRecipient?.role);
+      
+      try {
+        const fwdRes = await dmsApi.forwardDocument({
+          doc_id: selectedDocObj.id,
+          forwarded_to: rid,
+        });
 
-      const now = new Date();
-      const newDoc: ForwardDoc = {
-        id: `FWD-${String(fwdRes.forward.id).padStart(4, '0')}`,
-        forwardId: fwdRes.forward.id,
-        docId: selectedDocObj.id,
-        title: docTitle,
-        description: finalDescription,
-        sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-        senderRole: 'เจ้าหน้าที่ธุรการ',
-        recipient: recipientName,
-        recipientRole: recipientRole,
-        recipientId: newDocRecipientId,
-        receivedDate: formatThaiDate(now),
-        rawDate: now.toISOString(),
-        type: docType,
-        priority: newDocPriority,
-        status: 'processing',
-        fileUrl: selectedDocObj.file_url,
-      };
+        const now = new Date();
+        const newDoc: ForwardDoc = {
+          id: `FWD-${String(fwdRes.forward.id).padStart(4, '0')}`,
+          forwardId: fwdRes.forward.id,
+          docId: selectedDocObj.id,
+          title: docTitle,
+          description: finalDescription,
+          sender: 'ธุรการ (คุณสมจิต ดีใจ)',
+          senderRole: 'เจ้าหน้าที่ธุรการ',
+          recipient: recipientName,
+          recipientRole: recipientRole,
+          recipientId: rid,
+          receivedDate: formatThaiDate(now),
+          rawDate: now.toISOString(),
+          type: docType,
+          priority: newDocPriority,
+          status: 'processing',
+          fileUrl: selectedDocObj.file_url,
+        };
 
-      setForwardedDocs(prev => {
-        const next = [newDoc, ...prev];
-        saveStoredForwardedDocs(next);
-        return next;
-      });
+        setForwardedDocs(prev => {
+          const next = [newDoc, ...prev];
+          saveStoredForwardedDocs(next);
+          return next;
+        });
 
-      sendDocumentMessage({
-        forwardId: fwdRes.forward.id,
-        docId: selectedDocObj.id,
-        title: docTitle,
-        description: finalDescription,
-        sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-        senderRole: 'เจ้าหน้าที่ธุรการ',
-        recipient: recipientName,
-        recipientRole: recipientRole,
-        recipientId: newDocRecipientId,
-        recipientUsername: selectedRecipient?.username,
-        type: docType,
-        priority: newDocPriority,
-        fileUrl: selectedDocObj.file_url,
-      });
+        sendDocumentMessage({
+          forwardId: fwdRes.forward.id,
+          docId: selectedDocObj.id,
+          title: docTitle,
+          description: finalDescription,
+          sender: 'ธุรการ (คุณสมจิต ดีใจ)',
+          senderRole: 'เจ้าหน้าที่ธุรการ',
+          recipient: recipientName,
+          recipientRole: recipientRole,
+          recipientId: rid,
+          recipientUsername: selectedRecipient?.username,
+          type: docType,
+          priority: newDocPriority,
+          fileUrl: selectedDocObj.file_url,
+        });
+        
+        successCount++;
+      } catch {
+        // Fallback
+        const now = new Date();
+        const newDoc: ForwardDoc = {
+          id: `FWD-2569-${String(2000 + Math.floor(Math.random()*1000))}`,
+          docId: selectedDocObj.id,
+          title: docTitle,
+          description: finalDescription,
+          sender: 'ธุรการ (คุณสมจิต ดีใจ)',
+          senderRole: 'เจ้าหน้าที่ธุรการ',
+          recipient: recipientName,
+          recipientRole: recipientRole,
+          recipientId: rid,
+          receivedDate: formatThaiDate(now),
+          rawDate: now.toISOString(),
+          type: docType,
+          priority: newDocPriority,
+          status: 'processing',
+          fileUrl: selectedDocObj.file_url,
+        };
 
+        setForwardedDocs(prev => {
+          const next = [newDoc, ...prev];
+          saveStoredForwardedDocs(next);
+          return next;
+        });
+
+        sendDocumentMessage({
+          docId: selectedDocObj.id,
+          title: docTitle,
+          description: finalDescription,
+          sender: 'ธุรการ (คุณสมจิต ดีใจ)',
+          senderRole: 'เจ้าหน้าที่ธุรการ',
+          recipient: recipientName,
+          recipientRole: recipientRole,
+          recipientId: rid,
+          recipientUsername: selectedRecipient?.username,
+          type: docType,
+          priority: newDocPriority,
+          fileUrl: selectedDocObj.file_url,
+        });
+        successCount++;
+      }
+    }
+
+    setIsSubmitting(false);
+    if (successCount > 0) {
+      toast.success(`ส่งต่อเอกสารให้ ${successCount} บุคคล เรียบร้อยแล้ว`);
       setIsSendModalOpen(false);
       resetSendForm();
-      toast.success(`ส่งต่อเอกสาร "${docTitle}" ไปยัง ${recipientName} เรียบร้อยแล้ว`);
-    } catch {
-      // Fallback for offline or local preview
-      const now = new Date();
-      const newDoc: ForwardDoc = {
-        id: `FWD-2569-${String(2000 + forwardedDocs.length + 1)}`,
-        docId: selectedDocObj.id,
-        title: docTitle,
-        description: finalDescription,
-        sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-        senderRole: 'เจ้าหน้าที่ธุรการ',
-        recipient: recipientName,
-        recipientRole: recipientRole,
-        recipientId: newDocRecipientId,
-        receivedDate: formatThaiDate(now),
-        rawDate: now.toISOString(),
-        type: docType,
-        priority: newDocPriority,
-        status: 'processing',
-        fileUrl: selectedDocObj.file_url,
-      };
-
-      setForwardedDocs(prev => {
-        const next = [newDoc, ...prev];
-        saveStoredForwardedDocs(next);
-        return next;
-      });
-
-      sendDocumentMessage({
-        docId: selectedDocObj.id,
-        title: docTitle,
-        description: finalDescription,
-        sender: 'ธุรการ (คุณสมจิต ดีใจ)',
-        senderRole: 'เจ้าหน้าที่ธุรการ',
-        recipient: recipientName,
-        recipientRole: recipientRole,
-        recipientId: newDocRecipientId,
-        recipientUsername: selectedRecipient?.username,
-        type: docType,
-        priority: newDocPriority,
-        fileUrl: selectedDocObj.file_url,
-      });
-
-      setIsSendModalOpen(false);
-      resetSendForm();
-      toast.success(`ส่งต่อเอกสาร "${docTitle}" ไปยัง ${recipientName} สำเร็จ`);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -931,7 +938,7 @@ export const DocumentForwardPage: React.FC = () => {
                             type="button"
                             className="staff-forward-action-btn"
                             onClick={() => {
-                              setNewDocRecipientId(staff.id);
+                              setNewDocRecipientIds([staff.id]);
                               handleCloseModal();
                               setIsSendModalOpen(true);
                             }}
@@ -1527,84 +1534,152 @@ export const DocumentForwardPage: React.FC = () => {
                       </select>
                     </div>
 
-                    {/* Selected Document Info Preview Card */}
+                    {/* Compact Document Info */}
                     {selectedDocPreview && (
-                      <div className="selected-doc-preview-card">
-                        <div className="preview-header">
-                          <span className="code-pill">{selectedDocPreview.external_doc_ref || `DOC-#${selectedDocPreview.id}`}</span>
-                          <span className="doc-type-tag">{selectedDocPreview.doc_type || 'เอกสารทั่วไป'}</span>
-                        </div>
-                        <div className="preview-title">{selectedDocPreview.subject}</div>
-                        {selectedDocPreview.description && (
-                          <div className="preview-desc">{selectedDocPreview.description}</div>
-                        )}
-                        <div className="preview-meta">
-                          <span>ผู้จัดทำ: {selectedDocPreview.creator?.fullname || selectedDocPreview.creator?.username || 'ธุรการ'}</span>
-                          {selectedDocPreview.file_url && (
-                            <span className="has-file-badge">📎 มีไฟล์แนบต้นฉบับ</span>
-                          )}
-                        </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '6px', fontSize: '13px', color: '#0369a1', marginBottom: '4px' }}>
+                        <span style={{ fontWeight: 600, background: '#0284c7', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '11px', whiteSpace: 'nowrap' }}>{selectedDocPreview.external_doc_ref || `#${selectedDocPreview.id}`}</span>
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedDocPreview.subject}</span>
+                        <span style={{ color: '#64748b', fontSize: '11px', whiteSpace: 'nowrap' }}>{selectedDocPreview.doc_type || 'ทั่วไป'}</span>
+                        {selectedDocPreview.file_url && <span style={{ fontSize: '12px' }}>📎</span>}
                       </div>
                     )}
 
-                    {/* Recipient Dropdown */}
+                    {/* Recipient Multi-Select */}
                     <div className="dms-form-group">
                       <label className="dms-form-label">
                         บุคลากรหรือแผนกปลายทาง (ผู้รับ) <span className="text-required">*</span>
+                        <span style={{ fontSize: '12px', color: '#64748b', marginLeft: '8px', fontWeight: 'normal' }}>(เลือกได้หลายคน)</span>
                       </label>
-                      <select
-                        className="dms-form-input"
-                        value={newDocRecipientId}
-                        onChange={e => setNewDocRecipientId(Number(e.target.value))}
-                        required
-                      >
+
+                      {/* Selected chips */}
+                      {newDocRecipientIds.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '8px' }}>
+                          {newDocRecipientIds.map(rid => {
+                            const u = recipientsList.find(r => r.id === rid);
+                            if (!u) return null;
+                            return (
+                              <span key={rid} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#dbeafe', color: '#1e40af', fontSize: '12px', padding: '4px 10px', borderRadius: '16px', fontWeight: 500 }}>
+                                {u.fullname || u.username}
+                                <button type="button" onClick={() => setNewDocRecipientIds(newDocRecipientIds.filter(id => id !== rid))} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1e40af', fontSize: '14px', lineHeight: 1, padding: '0 2px', fontWeight: 700 }}>×</button>
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Search + Select all */}
+                      {recipientsList.length > 0 && (
+                        <div style={{ display: 'flex', gap: '8px', marginBottom: '6px', alignItems: 'center' }}>
+                          <input
+                            type="text"
+                            placeholder="🔍 ค้นหาชื่อบุคลากร..."
+                            id="recipient-search-input"
+                            onChange={(e) => {
+                              const q = e.target.value.toLowerCase();
+                              const el = document.getElementById('recipient-list-container');
+                              if (!el) return;
+                              el.querySelectorAll<HTMLElement>('[data-recipient-item]').forEach(item => {
+                                const name = item.getAttribute('data-name') || '';
+                                item.style.display = name.includes(q) ? '' : 'none';
+                              });
+                            }}
+                            style={{ flex: 1, padding: '7px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '13px', outline: 'none' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (newDocRecipientIds.length === recipientsList.length) {
+                                setNewDocRecipientIds([]);
+                              } else {
+                                setNewDocRecipientIds(recipientsList.map(u => u.id));
+                              }
+                            }}
+                            style={{ fontSize: '12px', padding: '6px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', background: newDocRecipientIds.length === recipientsList.length ? '#fee2e2' : '#f0fdf4', color: newDocRecipientIds.length === recipientsList.length ? '#991b1b' : '#166534', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 500 }}
+                          >
+                            {newDocRecipientIds.length === recipientsList.length ? 'ยกเลิกทั้งหมด' : 'เลือกทั้งหมด'}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Grouped list */}
+                      <div id="recipient-list-container" style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px', background: '#fff' }}>
                         {recipientsList.length > 0 ? (
-                          recipientsList.map(u => (
-                            <option key={u.id} value={u.id}>
-                              {u.fullname || u.username} — {getRoleLabel(u.role)} (@{u.username})
-                            </option>
-                          ))
+                          (() => {
+                            const grouped: Record<string, typeof recipientsList> = {};
+                            recipientsList.forEach(u => {
+                              const role = getRoleLabel(u.role);
+                              if (!grouped[role]) grouped[role] = [];
+                              grouped[role].push(u);
+                            });
+                            return Object.entries(grouped).map(([role, users]) => (
+                              <div key={role}>
+                                <div style={{ padding: '6px 12px', background: '#f1f5f9', fontSize: '11px', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid #e2e8f0', position: 'sticky', top: 0, zIndex: 1 }}>
+                                  {role} ({users.length})
+                                </div>
+                                {users.map(u => {
+                                  const isChecked = newDocRecipientIds.includes(u.id);
+                                  return (
+                                    <label
+                                      key={u.id}
+                                      data-recipient-item
+                                      data-name={(u.fullname || u.username || '').toLowerCase() + ' ' + (u.role || '').toLowerCase() + ' ' + getRoleLabel(u.role).toLowerCase()}
+                                      style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '14px', padding: '8px 12px', borderBottom: '1px solid #f1f5f9', background: isChecked ? '#eff6ff' : '#fff', transition: 'background 0.15s' }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#0284c7', flexShrink: 0 }}
+                                        checked={isChecked}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setNewDocRecipientIds([...newDocRecipientIds, u.id]);
+                                          } else {
+                                            setNewDocRecipientIds(newDocRecipientIds.filter(id => id !== u.id));
+                                          }
+                                        }}
+                                      />
+                                      <span style={{ color: '#334155' }}>{u.fullname || u.username} <span style={{ color: '#94a3b8', fontSize: '12px' }}>@{u.username}</span></span>
+                                    </label>
+                                  );
+                                })}
+                              </div>
+                            ));
+                          })()
                         ) : (
-                          <>
-                            {/* ปรับชื่อตาม DEMO_USERS อัตโนมัติ (Fallback) */}
-                            <option value="6">{DEMO_USERS.doctor?.fullName || 'พญ.สุดา สุขสมบูรณ์'} — แพทย์ (doctor1)</option>
-                            <option value="7">นพ.วิชัย ชาญการแพทย์ — แพทย์ (doctor2)</option>
-                            <option value="8">พญ.เกศรา รักษาดี — แพทย์ (doctor3)</option>
-                            <option value="3">{DEMO_USERS.nurse?.fullName || 'พว. กานดา คัดกรอง'} — พยาบาล (nurse1)</option>
-                            <option value="5">{DEMO_USERS.pharmacist?.fullName || 'ดร.บุญ สั่งยา'} — ห้องยา/เภสัชกร (pharmacist1)</option>
-                            <option value="9">{DEMO_USERS.cashier?.fullName || 'นส.รวย การเงิน'} — การเงิน (cashier1)</option>
-                            <option value="2">{DEMO_USERS.officer?.fullName || 'คุณสมจิต ดีใจ'} — ธุรการ (officer1)</option>
-                          </>
+                          <div style={{ color: '#64748b', fontSize: '14px', textAlign: 'center', padding: '16px' }}>ไม่มีรายชื่อบุคลากรปลายทาง</div>
                         )}
-                      </select>
+                      </div>
+                      {newDocRecipientIds.length > 0 && (
+                        <div style={{ fontSize: '12px', color: '#0284c7', marginTop: '4px', fontWeight: 500 }}>
+                          เลือกแล้ว {newDocRecipientIds.length} คน
+                        </div>
+                      )}
                     </div>
 
-                    {/* Priority */}
-                    <div className="dms-form-group">
-                      <label className="dms-form-label">ระดับความเร่งด่วน</label>
-                      <select
-                        className="dms-form-input"
-                        value={newDocPriority}
-                        onChange={e => setNewDocPriority(e.target.value as any)}
-                      >
-                        <option value="normal">ปกติ (Normal)</option>
-                        <option value="urgent">ด่วน (Urgent ⚡)</option>
-                        <option value="emergency">ด่วนที่สุด (Emergency 🚨)</option>
-                      </select>
-                    </div>
-
-                    {/* Description & Note */}
-                    <div className="dms-form-group">
-                      <label className="dms-form-label">
-                        บันทึกข้อความ / คำสั่งเพิ่มเติมถึงผู้รับ (ไม่บังคับ)
-                      </label>
-                      <textarea
-                        className="dms-form-textarea"
-                        rows={3}
-                        placeholder="ระบุข้อความคำสั่ง บันทึกส่งมอบ หรือรายละเอียดเพิ่มเติม..."
-                        value={newDocDescription}
-                        onChange={e => setNewDocDescription(e.target.value)}
-                      />
+                    {/* Priority + Notes in 2 columns */}
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <div className="dms-form-group" style={{ flex: '0 0 180px' }}>
+                        <label className="dms-form-label">ระดับความเร่งด่วน</label>
+                        <select
+                          className="dms-form-input"
+                          value={newDocPriority}
+                          onChange={e => setNewDocPriority(e.target.value as any)}
+                        >
+                          <option value="normal">ปกติ</option>
+                          <option value="urgent">ด่วน ⚡</option>
+                          <option value="emergency">ด่วนที่สุด 🚨</option>
+                        </select>
+                      </div>
+                      <div className="dms-form-group" style={{ flex: 1 }}>
+                        <label className="dms-form-label">บันทึกข้อความถึงผู้รับ (ไม่บังคับ)</label>
+                        <textarea
+                          className="dms-form-textarea"
+                          rows={2}
+                          placeholder="ระบุข้อความหรือคำสั่งเพิ่มเติม..."
+                          value={newDocDescription}
+                          onChange={e => setNewDocDescription(e.target.value)}
+                          style={{ resize: 'none' }}
+                        />
+                      </div>
                     </div>
                   </>
                 )}
