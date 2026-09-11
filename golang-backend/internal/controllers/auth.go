@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"clinic-backend/internal/dto"
@@ -144,9 +145,13 @@ func QuickLogin(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.LoginResponse{
-		Token:                  tokenString,
-		Role:                   user.Role,
-		RequiresPasswordChange: user.RequiresPasswordChange,
+		Token: tokenString,
+		Role:  user.Role,
+		// Hardcode false เสมอ ไม่ส่งค่าจริงจาก DB (user.RequiresPasswordChange) เหมือน Login() ปกติ —
+		// Quick Test Login ไม่เช็ค password เลยตั้งแต่ต้น (ดูคอมเมนต์บนสุดของฟังก์ชันนี้) จึงไม่มีเหตุผล
+		// ต้องบังคับผู้ใช้เปลี่ยนรหัสผ่านผ่านทางลัดนี้ ไม่ว่าค่าจริงในแถว DB ของบัญชี seed นั้นจะเป็นอะไร
+		// (ตรวจแล้วไม่มีกลไกในระบบที่การันตีว่าค่านี้ของบัญชี seed จะเท่ากัน/คาดเดาได้ — ดู PLAN.md ข้อ 8.2)
+		RequiresPasswordChange: false,
 		User: dto.UserInfo{
 			ID:       user.ID,
 			Username: user.Username,
@@ -179,7 +184,28 @@ func ChangePassword(c *gin.Context) {
 
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword))
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid old password"})
+		// ตอบ 400 ไม่ใช่ 401 — ตัวจัดการกลางใน api.ts เห็น 401 บนเส้นทางที่ต้องมี token แล้วจะตีความ
+		// เป็น "เซสชันหมดอายุ" เสมอ (forceReLogin(): เคลียร์ token + reload ทันที) ทำให้ error message
+		// นี้ไม่มีโอกาสถูกแสดงเลยแม้แต่เสี้ยววินาที ทั้งที่นี่คือรหัสผ่านเดิมที่ผู้ใช้พิมพ์ผิด ไม่ใช่
+		// ปัญหา token/session — ให้จัดกลุ่มเดียวกับ validation error อื่นด้านล่าง (ล้วนตอบ 400) แทน
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสผ่านเดิมไม่ถูกต้อง"})
+		return
+	}
+
+	// เช็คเงื่อนไขรหัสผ่านใหม่ที่ backend เอง — ห้ามพึ่งพาแค่ฝั่งหน้าเว็บ เพราะ endpoint นี้
+	// เรียกตรงได้เสมอ (curl/Postman) โดยไม่ผ่านฟอร์มใดๆ เลย
+	if len(req.NewPassword) < 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร"})
+		return
+	}
+	if req.NewPassword == req.OldPassword {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม"})
+		return
+	}
+	// เทียบแบบ case-insensitive เพราะ employee_id ของบางบัญชีมีตัวพิมพ์ใหญ่ล้วน (เช่น "DOC001")
+	// ผู้ใช้อาจพิมพ์รหัสผ่านใหม่เป็นตัวพิมพ์เล็กแล้วคิดว่าต่างกันทั้งที่จริงคือรหัสเริ่มต้นเดิม
+	if user.EmployeeID != "" && strings.EqualFold(req.NewPassword, user.EmployeeID) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "รหัสผ่านใหม่ต้องไม่ตรงกับรหัสพนักงาน"})
 		return
 	}
 

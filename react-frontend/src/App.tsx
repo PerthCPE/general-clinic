@@ -34,8 +34,9 @@ import { ROLE_DEFAULT_PAGES } from './config/roles';
 
 import AppointmentForm from './pages/Appointment/AppointmentForm';
 import AppointmentDashboard from './pages/Appointment/AppointmentDashboard';
-import UserManagement from './pages/Admin/UserManagement'; 
+import UserManagement from './pages/Admin/UserManagement';
 import GrantAccess from './pages/Admin/GrantAccess';
+import ChangePasswordModal from './components/ChangePasswordModal/ChangePasswordModal'; // เพิ่มใหม่
 
 // โค้ดฝั่งของเพื่อน
 import { Toaster } from 'react-hot-toast';
@@ -43,6 +44,9 @@ import './App.css';
 
 function MainApp() {
   const { currentUser, isAuthenticated, hasAccess } = useAuth();
+  // เพิ่มใหม่: อ่านแยกจาก useAuth() อีกครั้งแทนการแก้บรรทัด destructure เดิมด้านบน (เรียก useAuth()
+  // ซ้ำได้ปลอดภัย เป็นแค่ useContext ภายใน ไม่มีผลข้างเคียง)
+  const { requiresPasswordChange } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('isDarkMode') === 'true';
@@ -84,6 +88,13 @@ function MainApp() {
 
   if (!isAuthenticated) {
     return <LoginPage />;
+  }
+
+  // เพิ่มใหม่: บังคับเปลี่ยนรหัสผ่านก่อนเข้าหน้าอื่นถ้า requiresPasswordChange === true (persist ข้าม
+  // reload ผ่าน AuthContext แล้ว — เดิม gate นี้มีผลแค่ตอน login ครั้งเดียวใน LoginPage.tsx เท่านั้น)
+  // แทนที่หน้าทั้งหมดด้วย modal บังคับ ไม่ว่า activePage จะเป็นอะไร
+  if (requiresPasswordChange) {
+    return <ChangePasswordModal open forced />;
   }
 
   const renderContent = () => {

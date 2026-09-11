@@ -11,6 +11,7 @@ export interface User {
   avatarText?: string;
   avatarColor?: string;
   email?: string;
+  requiresPasswordChange?: boolean;
 }
 
 export interface NavItem {

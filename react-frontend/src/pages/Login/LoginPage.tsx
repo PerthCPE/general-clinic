@@ -4,9 +4,10 @@ import type { UserRole } from '../../types/auth';
 import './LoginPage.css';
 import clinicLogo from '../../assets/logo.png';
 import { Eye, EyeOff, Loader2 } from 'lucide-react'; // Make sure lucide-react is available
+import ChangePasswordModal from '../../components/ChangePasswordModal/ChangePasswordModal';
 
 const LoginPage: React.FC = () => {
-  const { login, quickDevLogin, logout } = useAuth();
+  const { login, quickDevLogin } = useAuth();
   
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -15,17 +16,6 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const changePassword = async (oldP: string, newP: string) => {
-    try {
-      const { authApi } = await import('../../services/api');
-      await authApi.changePassword({ old_password: oldP, new_password: newP });
-      return true;
-    } catch (e) {
-      return false;
-    }
-  };
 
   const handleManualLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,77 +72,13 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newPassword !== confirmPassword) {
-      setError('รหัสผ่านใหม่ไม่ตรงกัน');
-      return;
-    }
-    
-    setIsLoading(true);
-    try {
-      const ok = await changePassword(password, newPassword);
-      if (ok) {
-        window.location.reload();
-      } else {
-        setError('ไม่สามารถเปลี่ยนรหัสผ่านได้ กรุณาลองใหม่อีกครั้ง');
-      }
-    } catch (err) {
-      setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+  // เดิมจุดนี้มี handleChangePassword() + JSX ของตัวเองแยกจาก ChangePasswordModal ทั้งหมด — ปัญหาคือ
+  // helper เปลี่ยนรหัสผ่านของตัวเองทิ้ง error message จริงจาก backend เสมอ (catch แล้ว return false
+  // เฉยๆ) ทำให้ error ที่โชว์ไม่ตรงกับเหตุผลจริง (เช่น รหัสเดิมผิด/สั้นไป/ซ้ำของเดิม) ต่างจาก Topbar
+  // ที่ใช้ ChangePasswordModal ผ่าน AuthContext.changePassword() ซึ่งส่ง error จริงกลับมา — รวมให้ใช้
+  // component เดียวกันแทน ไม่มี logic ซ้ำซ้อนให้ error หลุดหายอีก (ดู PLAN.md ข้อ 9 สำหรับรายละเอียด)
   if (showChangePassword) {
-    return (
-      <div className="login-container">
-        <div className="login-box change-password-box">
-          <div className="login-header">
-            <h2 style={{marginTop: 0, color: 'var(--text-primary)', fontFamily: 'var(--font-heading)'}}>เปลี่ยนรหัสผ่านครั้งแรก</h2>
-            <p className="login-tagline">เนื่องจากคุณเข้าใช้งานระบบเป็นครั้งแรก กรุณาตั้งรหัสผ่านใหม่เพื่อความปลอดภัยของข้อมูล</p>
-          </div>
-          <form className="login-form" onSubmit={handleChangePassword}>
-            {error && <div className="login-error-msg">{error}</div>}
-            <div className="login-input-group">
-              <label>รหัสผ่านใหม่</label>
-              <div className="password-input-wrapper">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="รหัสผ่านใหม่อย่างน้อย 6 ตัวอักษร"
-                  required
-                  className="login-form-input"
-                />
-                <button type="button" className="password-toggle-btn" onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-            <div className="login-input-group">
-              <label>ยืนยันรหัสผ่านใหม่</label>
-              <div className="password-input-wrapper">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="พิมพ์รหัสผ่านใหม่อีกครั้ง"
-                  required
-                  className="login-form-input"
-                />
-              </div>
-            </div>
-            <button type="submit" className="login-submit-btn" disabled={isLoading}>
-              {isLoading ? <span className="flex-center"><Loader2 className="spinner" size={18} /> กำลังบันทึก...</span> : 'บันทึกรหัสผ่านใหม่'}
-            </button>
-            <button type="button" className="login-submit-btn" style={{marginTop: '10px', backgroundColor: '#94a3b8', boxShadow: 'none'}} onClick={() => { setShowChangePassword(false); logout(); }}>
-              ยกเลิก
-            </button>
-          </form>
-        </div>
-      </div>
-    );
+    return <ChangePasswordModal open forced onSuccess={() => window.location.reload()} />;
   }
 
   return (
@@ -213,11 +139,11 @@ const LoginPage: React.FC = () => {
           <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('doctor')}>Doctor</button>
           <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('nurse')}>Nurse</button>
           <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('nurse_assistant')}>Nurse Assistant</button>
-          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('registrar')}>Reception / Admin</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('registrar')}>Registrar</button>
           <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('pharmacist')}>Pharmacist</button>
           <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('cashier')}>Cashier</button>
           <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('officer')}>Officer</button>
-          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('admin')}>IT-admin</button>
+          <button type="button" className="test-login-btn" disabled={isLoading} onClick={() => handleQuickTestLogin('admin')}>Admin</button>
         </div>
       </div>
     </div>

@@ -17,6 +17,7 @@ import {
 } from '../../services/documentMessageStorage';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { getSharedAudioContext } from '../../utils/audioContext';
+import ChangePasswordModal from '../ChangePasswordModal/ChangePasswordModal'; // เพิ่มใหม่
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -44,6 +45,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   } = useDoctorData();
   const isDoctor = currentUser?.role === 'doctor';
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false); // เพิ่มใหม่
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
   const [isDocMessagesOpen, setIsDocMessagesOpen] = useState(false);
   const [docMessages, setDocMessages] = useState<DocumentMessage[]>(() => getDocumentMessagesForUser(currentUser));
@@ -1108,6 +1110,8 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
                 className="dropdown-menu-item dropdown-item-1"
                 onClick={() => {
                   console.log('ตั้งค่าโปรไฟล์ผู้ใช้');
+                  // เพิ่มใหม่: เปิด modal เปลี่ยนรหัสผ่าน
+                  setIsChangePasswordOpen(true);
                   setIsDropdownOpen(false);
                 }}
               >
@@ -1609,6 +1613,12 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
           </div>
         </div>
       )}
+
+      {/* เพิ่มใหม่: modal เปลี่ยนรหัสผ่าน เปิดจากปุ่ม "ตั้งค่าโปรไฟล์ผู้ใช้" ด้านบน */}
+      <ChangePasswordModal
+        open={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
 
     </header>
   );

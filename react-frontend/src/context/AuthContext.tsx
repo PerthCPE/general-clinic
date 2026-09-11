@@ -36,6 +36,12 @@ interface AuthContextType {
   patientQueue: PatientQueueItem[];
   addAppointment: (item: PatientQueueItem) => void;
   updateAppointment: (id: number, updates: Partial<PatientQueueItem>) => void;
+
+  // เพิ่มใหม่: เปลี่ยนรหัสผ่านได้ตลอดเวลาที่ล็อกอินอยู่ (ไม่ใช่แค่ตอน login ครั้งแรกเหมือนเดิม) —
+  // requiresPasswordChange persist ข้าม reload ผ่าน localStorage แยกจาก currentUser (ดูค่า default
+  // ใน buildUserFromLoginResponse ที่ไม่เคยเก็บค่านี้ไว้เลยเดิมที)
+  requiresPasswordChange: boolean;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -89,6 +95,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return null;
   });
+
+  // เพิ่มใหม่: เก็บ requiresPasswordChange แยกจาก currentUser ใน localStorage ของตัวเอง เพื่อให้ gate
+  // บังคับเปลี่ยนรหัสผ่าน (App.tsx) รอดจาก reload ได้ — เดิมค่านี้ใช้แค่ตอน login สำเร็จครั้งเดียวแล้วหายไป
+  const REQUIRES_PW_CHANGE_KEY = 'clinic_requires_password_change';
+  const [requiresPasswordChange, setRequiresPasswordChange] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(REQUIRES_PW_CHANGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(REQUIRES_PW_CHANGE_KEY, requiresPasswordChange ? 'true' : 'false');
+    } catch {
+      // เพิกเฉยถ้า localStorage ใช้ไม่ได้ (private mode / storage ถูกบล็อก)
+    }
+  }, [requiresPasswordChange]);
 
   const [patientQueue, setPatientQueue] = useState<PatientQueueItem[]>(() => {
     const saved = localStorage.getItem(QUEUE_STORAGE_KEY);
@@ -197,6 +222,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await authApi.login(usernameToSend, password ?? '');
       if (res && res.user) {
         setCurrentUser(buildUserFromLoginResponse(res));
+        setRequiresPasswordChange(!!res.requires_password_change); // เพิ่มใหม่: persist ข้าม reload
         return { success: true, requiresPasswordChange: res.requires_password_change };
       }
     } catch (err) {
@@ -267,6 +293,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await authApi.quickLogin(role);
       if (res && res.user) {
         setCurrentUser(buildUserFromLoginResponse(res));
+        setRequiresPasswordChange(!!res.requires_password_change); // เพิ่มใหม่: persist ข้าม reload
         return { success: true, requiresPasswordChange: res.requires_password_change };
       }
       return { success: false, error: 'ไม่พบข้อมูลผู้ใช้จาก quick login' };
@@ -311,6 +338,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     authApi.logout();
     setCurrentUser(null);
+    setRequiresPasswordChange(false); // เพิ่มใหม่: เคลียร์ gate บังคับเปลี่ยนรหัสผ่านตอนออกจากระบบด้วย
+  };
+
+  // เพิ่มใหม่: เปลี่ยนรหัสผ่านได้ตลอดเวลาที่ล็อกอินอยู่ ไม่ใช่แค่ตอน login ครั้งแรก (ต่างจาก flow เดิมใน
+  // LoginPage.tsx ที่เรียก authApi.changePassword() ตรงๆ โดยไม่ผ่าน context) — ห่อ authApi.changePassword()
+  // ไว้ที่นี่เพื่อเคลียร์ requiresPasswordChange ที่ persist ไว้ได้ทันทีที่เปลี่ยนสำเร็จ
+  const changePassword = async (oldPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await authApi.changePassword({ old_password: oldPassword, new_password: newPassword });
+      setRequiresPasswordChange(false);
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof ApiRequestError ? err.message : 'เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+      return { success: false, error: message };
+    }
   };
 
   const hasAccess = (pageId: string): boolean => {
@@ -336,6 +378,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         patientQueue,
         addAppointment,
         updateAppointment,
+        requiresPasswordChange,
+        changePassword,
       }}
     >
       {children}
