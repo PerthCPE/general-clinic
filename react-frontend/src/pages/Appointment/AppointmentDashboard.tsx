@@ -15,8 +15,8 @@ const DEPARTMENT_META: Record<string, { icon: typeof Stethoscope; color: string 
 const UNASSIGNED_DEPT_LABEL = 'ไม่ระบุแผนก';
 
 const timeSlots = [
-  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
-  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
+  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30','12:00',
+  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30','18:00',
 ];
 
 const getTodayDateString = () => {
@@ -27,8 +27,12 @@ const getTodayDateString = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-export default function AppointmentDashboard() {
-  const { currentUser } = useAuth();
+interface AppointmentDashboardProps {
+  onNavigate: (page: string) => void;
+}
+
+export default function AppointmentDashboard({ onNavigate }: AppointmentDashboardProps) {
+  const { currentUser, hasAccess } = useAuth();
   
   const [appointments, setAppointments] = useState<BackendAppointment[]>([]);
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
@@ -38,11 +42,11 @@ export default function AppointmentDashboard() {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const itemsPerPage = 8;
 
-  const isDoctor = currentUser?.role === 'doctor';
-  // สิทธิ์แก้ไข (วันที่/เวลา/สถานะ): nurse_assistant ได้เต็ม (แทนที่ registrar เดิมที่ถูกตัดออก
-  // ทั้งหมดตามนโยบายใหม่) + admin คงไว้เหมือนเดิม — nurse ไม่อยู่ในนี้โดยตั้งใจ เพราะได้สิทธิ์
-  // แบบดูอย่างเดียวเท่านั้น (ตกไปใช้ branch แสดงข้อความ/badge ธรรมดาแทน input/select ที่แก้ได้)
-  const canEdit = currentUser?.role === 'nurse_assistant' || currentUser?.role === 'admin';
+  // ปุ่ม "+ เพิ่มนัดหมายใหม่" นำไปหน้า appointment-form ซึ่งสิทธิ์ใน PAGE_PERMISSIONS (roles.ts)
+  // แคบกว่าแดชบอร์ดนี้ (เข้า appointment-dashboard ได้ 3 role: doctor/nurse_assistant/nurse
+  // แต่เข้า appointment-form ได้แค่ doctor) เช็คผ่าน hasAccess() แทน hardcode role ตรงๆ
+  // เพื่อให้ตรงกับ PAGE_PERMISSIONS เสมอถ้ามีการเปลี่ยนสิทธิ์ในอนาคต
+  const canCreateAppointment = hasAccess('appointment-form');
 
   const fetchAppointments = async () => {
     try {
@@ -95,17 +99,57 @@ export default function AppointmentDashboard() {
     else if (a.status === 'ติดต่อไม่ได้') statusColor = 'warning';
     else if (a.status === 'รอยืนยัน') statusColor = 'info';
 
+    const isCancelledAppt = a.status === 'ยกเลิกนัด';
+    const apptDateStr = a.appointment_date ? a.appointment_date.substring(0, 10) : '';
+
+    // สิทธิ์แก้ไข (วันที่/เวลา/สถานะ/รายละเอียด) ต่อ "รายนัด" ไม่ใช่ต่อ role เฉยๆ อีกต่อไป —
+    // ยกเลิกแล้วแก้ไม่ได้เสมอ ไม่ว่า role ไหน (ตรงกับ backend) ส่วน nurse_assistant/admin
+    // ยังคงแก้ได้ทุกนัดที่ยังไม่ถูกยกเลิกเหมือนสิทธิ์เดิม — เพิ่มเฉพาะ doctor ที่ถูกจำกัดแค่นัดของ
+    // ตัวเอง สถานะยังไม่เข้ารับการรักษา และวันนัดยังไม่ผ่านไป (ดู checkDoctorCanModify ฝั่ง backend)
+    let canEditRow = false;
+    if (!isCancelledAppt) {
+      if (currentUser?.role === 'admin' || currentUser?.role === 'nurse_assistant') {
+        canEditRow = true;
+      } else if (currentUser?.role === 'doctor') {
+        const isOwnAppt = String(a.doctor_id) === String(currentUser.id);
+        const notCompleted = a.status !== 'เข้ารับการรักษาแล้ว';
+        const dateNotPassed = apptDateStr >= getTodayDateString();
+        canEditRow = isOwnAppt && notCompleted && dateNotPassed;
+      }
+    }
+
+    // สิทธิ์ยกเลิก — แยกจากสิทธิ์แก้ไขทั่วไป: admin/nurse_assistant ยกเลิกได้ทุกนัด, แพทย์ยกเลิกได้
+    // เฉพาะนัดของตัวเอง ไม่จำกัดสถานะ/วันนัดเพิ่มเติม (ยกเว้นนัดที่ถูกยกเลิกไปแล้ว)
+    let canCancelRow = false;
+    if (!isCancelledAppt) {
+      if (currentUser?.role === 'admin' || currentUser?.role === 'nurse_assistant') {
+        canCancelRow = true;
+      } else if (currentUser?.role === 'doctor') {
+        canCancelRow = String(a.doctor_id) === String(currentUser.id);
+      }
+    }
+
     return {
       id: a.id,
+      doctorId: a.doctor_id,
       name: pName,
       initial: initialText,
       dept: deptName,
-      date: a.appointment_date ? a.appointment_date.substring(0, 10) : '-',
+      date: apptDateStr || '-',
       time: timeStr,
       phone: a.patient?.phone_number || '-',
       status: a.status || '-',
       statusColor,
-      deptColor
+      deptColor,
+      // ฟิลด์ใหม่ — นัดหมายเก่าไม่มีค่าเหล่านี้ จึงเป็น '' เฉยๆ ไม่ใช่ error
+      apptType: a.appointment_type || '',
+      reason: a.reason || '',
+      isCancelled: isCancelledAppt,
+      cancelReason: a.cancel_reason || '',
+      cancelledByName: a.cancelled_by_user?.fullname || '',
+      cancelledAt: a.cancelled_at || '',
+      canEdit: canEditRow,
+      canCancel: canCancelRow,
     };
   };
 
@@ -163,6 +207,23 @@ export default function AppointmentDashboard() {
     } catch (err) {
       console.error(err);
       alert('ไม่สามารถอัปเดตวันที่ได้');
+    }
+  };
+
+  // ยกเลิกนัด (แทนการลบ) — ต้องกรอกเหตุผลเสมอ ฝั่ง backend บังคับด้วย ที่นี่แค่กันการยิง request เปล่าๆ
+  const handleCancelAppointment = async (id: number) => {
+    const reason = window.prompt('กรุณาระบุเหตุผลการยกเลิกนัดหมาย (จำเป็นต้องกรอก)');
+    if (reason === null) return; // กดยกเลิก prompt เอง ไม่ต้องทำอะไรต่อ
+    if (!reason.trim()) {
+      alert('กรุณาระบุเหตุผลการยกเลิกนัดหมาย');
+      return;
+    }
+    try {
+      await appointmentApi.cancel(id, { reason: reason.trim() });
+      fetchAppointments();
+    } catch (err: any) {
+      console.error(err);
+      alert(err?.message || 'ไม่สามารถยกเลิกนัดหมายได้');
     }
   };
 
@@ -267,8 +328,8 @@ export default function AppointmentDashboard() {
             <h2 className="table-title">👥 รายชื่อคิวผู้ป่วยและสถานะ (วันที่ {selectedDate})</h2>
             <p className="table-subtitle">เรียงลำดับตามเวลานัดหมาย (เช้าไปเย็น)</p>
           </div>
-          {isDoctor && (
-            <button className="btn-primary-add" onClick={() => window.location.hash = 'appointment-form'}>
+          {canCreateAppointment && (
+            <button className="btn-primary-add" onClick={() => onNavigate('appointment-form')}>
               + เพิ่มนัดหมายใหม่
             </button>
           )}
@@ -280,10 +341,12 @@ export default function AppointmentDashboard() {
               <tr>
                 <th>ชื่อ-นามสกุล</th>
                 <th>แผนกการรักษา</th>
+                <th>ประเภทนัด</th>
                 <th>วันที่นัดหมาย</th>
                 <th>เวลานัดหมาย</th>
                 <th>เบอร์โทรศัพท์</th>
                 <th>สถานะการนัดหมาย</th>
+                <th>ยกเลิกนัด</th>
               </tr>
             </thead>
             <tbody>
@@ -300,8 +363,14 @@ export default function AppointmentDashboard() {
                       <span className={`dept-badge badge-${row.deptColor}`}>{row.dept}</span>
                     </td>
                     <td>
-                      {canEdit ? (
-                        <input 
+                      {/* title = เหตุผลการนัด แสดงเป็น tooltip ตอนโฮเวอร์ แทนการเพิ่มคอลัมน์แยก */}
+                      <span className="dept-badge badge-primary" title={row.reason || undefined}>
+                        {row.apptType || '-'}
+                      </span>
+                    </td>
+                    <td>
+                      {row.canEdit ? (
+                        <input
                           type="date"
                           value={row.date}
                           onChange={(e) => handleDateSelected(row.id, e.target.value)}
@@ -313,7 +382,7 @@ export default function AppointmentDashboard() {
                       )}
                     </td>
                     <td>
-                      {canEdit ? (
+                      {row.canEdit ? (
                         <select
                           value={row.time}
                           onChange={(e) => handleTimeChange(row.id, e.target.value)}
@@ -331,8 +400,8 @@ export default function AppointmentDashboard() {
                     </td>
                     <td><span className="phone-text">{row.phone}</span></td>
                     <td>
-                      {canEdit ? (
-                        <select 
+                      {row.canEdit ? (
+                        <select
                           value={row.status}
                           onChange={(e) => handleStatusChange(row.id, e.target.value)}
                           className={`status-dropdown status-${row.statusColor}`}
@@ -341,12 +410,31 @@ export default function AppointmentDashboard() {
                           <option value="รอยืนยัน">รอยืนยัน</option>
                           <option value="ยืนยันที่จะมาวันนี้">ยืนยันที่จะมาวันนี้</option>
                           <option value="เข้ารับการรักษาแล้ว">เข้ารับการรักษาแล้ว</option>
-                          <option value="ยกเลิกนัด">ยกเลิกนัด</option>
                           <option value="ติดต่อไม่ได้">ติดต่อไม่ได้</option>
+                          {/* ยกเลิกนัดถูกตัดออกจาก dropdown นี้โดยตั้งใจ — backend ปฏิเสธค่านี้จากช่องทางนี้แล้ว
+                              ต้องกดปุ่ม "ยกเลิกนัด" แยกท้ายแถว (บังคับกรอกเหตุผล) แทน */}
                         </select>
                       ) : (
-                        <span className={`status-badge status-${row.statusColor}`}>
+                        <span
+                          className={`status-badge status-${row.statusColor}`}
+                          title={row.isCancelled ? `ยกเลิกโดย ${row.cancelledByName || 'ไม่ทราบผู้ยกเลิก'}${row.cancelledAt ? ` เมื่อ ${row.cancelledAt.substring(0, 10)}` : ''}: ${row.cancelReason || 'ไม่ระบุเหตุผล'}` : undefined}
+                        >
                           {row.status}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      {row.canCancel ? (
+                        <button
+                          className="btn-action btn-secondary"
+                          style={{ color: '#EF4444', borderColor: '#EF4444', padding: '4px 10px', fontSize: '0.8rem' }}
+                          onClick={() => handleCancelAppointment(row.id)}
+                        >
+                          ยกเลิกนัด
+                        </button>
+                      ) : (
+                        <span style={{ color: '#94A3B8', fontSize: '0.8rem' }}>
+                          {row.isCancelled ? 'ยกเลิกแล้ว' : '-'}
                         </span>
                       )}
                     </td>
@@ -354,7 +442,7 @@ export default function AppointmentDashboard() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: '#64748B' }}>
+                  <td colSpan={8} style={{ textAlign: 'center', padding: '30px', color: '#64748B' }}>
                     ไม่พบข้อมูลการนัดหมายในวันที่เลือก (คุณสามารถเลือกดูวันอื่นได้จากปฏิทินด้านบน)
                   </td>
                 </tr>

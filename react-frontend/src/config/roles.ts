@@ -105,7 +105,7 @@ export const ROLE_MENUS: Record<UserRole, NavItem[]> = {
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },
     { id: 'vitals', title: 'บันทึกสัญญาณชีพ', iconType: 'vitals', path: '/vitals' },
     { id: 'vitals-history', title: 'ประวัติการคัดกรอง', iconType: 'history', path: '/vitals-history' },
-    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย (ดูอย่างเดียว)', iconType: 'dashboard', path: '/appointment-dashboard' },
+    { id: 'appointment-dashboard', title: 'แดชบอร์ดนัดหมาย', iconType: 'dashboard', path: '/appointment-dashboard' },
   ],
   nurse_assistant: [
     { id: 'queue', title: 'จัดการคิว', iconType: 'queue', path: '/queue' },

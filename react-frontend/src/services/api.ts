@@ -1169,14 +1169,23 @@ export interface BackendAppointment {
   status: string;
   department: string;
   clinical_note: string;
+  // Optional — นัดหมายเก่าก่อนมีฟิลด์เหล่านี้จะได้ '' จาก backend ไม่ใช่ undefined
+  appointment_type: string;
+  reason: string;
+  prep_instructions: string;
+  // ข้อมูลการยกเลิกนัด — มีค่าเฉพาะนัดหมายที่ถูกยกเลิกผ่าน appointmentApi.cancel เท่านั้น
+  cancel_reason: string;
+  cancelled_by: number | null;
+  cancelled_at: string | null;
   doctor?: BackendUser;
   patient?: BackendPatient;
   register?: BackendUser;
+  cancelled_by_user?: BackendUser;
 }
 
 export const appointmentApi = {
   getList: () => request<BackendAppointment[]>('/api/appointments'),
-  create: (payload: { doctor_id: number; patient_id: number; register_id: number; appointment_date: string; appointment_time: string; department: string; clinical_note: string; }) =>
+  create: (payload: { doctor_id: number; patient_id: number; register_id: number; appointment_date: string; appointment_time: string; department: string; clinical_note: string; appointment_type?: string; reason?: string; prep_instructions?: string; }) =>
     request<BackendAppointment>('/api/appointments', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -1188,6 +1197,18 @@ export const appointmentApi = {
     }),
   updateSchedule: (id: number | string, payload: { appointment_date?: string; appointment_time?: string; }) =>
     request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/schedule', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  // แก้ไขวันเวลา/ประเภทนัด/เหตุผล/คำแนะนำก่อนมาตามนัด/หมายเหตุ ในคำขอเดียว — ไม่มี department (แก้ไม่ได้)
+  updateDetails: (id: number | string, payload: { appointment_date?: string; appointment_time?: string; appointment_type?: string; reason?: string; prep_instructions?: string; clinical_note?: string; }) =>
+    request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/details', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  // ยกเลิกนัดหมาย (แทนการลบ) — ต้องระบุเหตุผลเสมอ
+  cancel: (id: number | string, payload: { reason: string; }) =>
+    request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/cancel', {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),

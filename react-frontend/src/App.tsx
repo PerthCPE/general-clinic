@@ -156,7 +156,7 @@ function MainApp() {
       case 'appointment-form':
         return <AppointmentForm />;
       case 'appointment-dashboard':
-        return <AppointmentDashboard />;
+        return <AppointmentDashboard onNavigate={setActivePage} />;
 
       // ===== Admin Pages (ของคุณ) =====
       case 'admin-users':

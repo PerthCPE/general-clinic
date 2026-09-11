@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Autocomplete, TextField, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { patientApi, appointmentApi, type BackendPatient } from '../../services/api';
-import { TREATMENT_DEPARTMENTS } from '../../config/roles';
+import { patientApi, appointmentApi, doctorApi, type BackendPatient } from '../../services/api';
 import './AppointmentForm.css';
 
 interface PatientOption {
@@ -14,9 +13,15 @@ interface PatientOption {
 }
 
 const timeSlots: string[] = [
-  '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', 
-  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30'
+  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30','12:00',
+  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30','18:00'
 ];
+
+// ประเภทนัด — optional ไม่บังคับเลือก
+const APPOINTMENT_TYPES = ['ติดตามอาการ', 'ฟังผลตรวจ', 'ทำหัตถการ', 'อื่นๆ'];
+
+// คำแนะนำก่อนมาตามนัดที่พบบ่อย — ติ๊กได้หลายอัน ผสมกับช่องกรอกเพิ่มเติมได้ ไม่บังคับ
+const PREP_INSTRUCTION_PRESETS = ['งดน้ำงดอาหารก่อนพบแพทย์', 'เจาะเลือดก่อนพบแพทย์', 'นำยาเดิมมาด้วย'];
 
 export default function AppointmentForm() {
   const { currentUser } = useAuth();
@@ -27,8 +32,14 @@ export default function AppointmentForm() {
   const [selectedPatient, setSelectedPatient] = useState<PatientOption | null>(null);
   const [date, setDate] = useState<string>('');
   const [time, setTime] = useState<string>('');
+  // แผนก — ล็อกตาม doctors.specialty ของแพทย์ผู้ล็อกอินเสมอ ดึงจาก /api/doctor/me
+  // ครั้งเดียวตอนโหลดฟอร์ม ไม่ใช่ dropdown ให้เลือกเองอีกต่อไป
   const [department, setDepartment] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [appointmentType, setAppointmentType] = useState<string>('');
+  const [reason, setReason] = useState<string>('');
+  const [prepChecks, setPrepChecks] = useState<string[]>([]);
+  const [prepExtra, setPrepExtra] = useState<string>('');
 
   const [autocompletePatientKey, setAutocompletePatientKey] = useState<number>(0);
   const [openAlert, setOpenAlert] = useState<boolean>(false);
@@ -49,6 +60,16 @@ export default function AppointmentForm() {
         }));
         setPatientOptions(opts);
 
+        // แผนก — ดึงจากโปรไฟล์แพทย์ผู้ล็อกอินจริง ไม่ใช่ให้เลือกเอง
+        // ถ้าแพทย์ยังไม่มี specialty ในระบบ (โปรไฟล์ยังไม่ครบ) ปล่อยเป็น '' ไม่บล็อกการสร้างนัดหมาย
+        // (เหมือนนัดหมายเก่าที่ไม่มีค่า department จะขึ้น "ไม่ระบุแผนก" ในแดชบอร์ด)
+        try {
+          const profile = await doctorApi.getProfile();
+          setDepartment(profile.specialty || '');
+        } catch (profileErr) {
+          console.error('Failed to load doctor specialty', profileErr);
+        }
+
       } catch (err) {
         console.error('Failed to load appointment form data', err);
       } finally {
@@ -58,8 +79,21 @@ export default function AppointmentForm() {
     fetchData();
   }, [currentUser]);
 
+  const togglePrepCheck = (preset: string) => {
+    setPrepChecks(prev =>
+      prev.includes(preset) ? prev.filter(p => p !== preset) : [...prev, preset]
+    );
+  };
+
+  const buildPrepInstructions = (): string => {
+    const parts = [...prepChecks];
+    if (prepExtra.trim()) parts.push(prepExtra.trim());
+    return parts.join(', ');
+  };
+
   const handleSave = async () => {
-    if (!selectedPatient || !date || !time || !department) {
+    // แผนกล็อกอัตโนมัติจากโปรไฟล์แพทย์ ไม่ใช่ข้อมูลที่ผู้ใช้กรอกเอง จึงไม่รวมอยู่ในเงื่อนไขบังคับกรอกนี้
+    if (!selectedPatient || !date || !time) {
       alert('กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน');
       return;
     }
@@ -83,16 +117,22 @@ export default function AppointmentForm() {
         appointment_time: time + ':00',
         department,
         clinical_note: notes,
+        appointment_type: appointmentType,
+        reason,
+        prep_instructions: buildPrepInstructions(),
       });
 
       setOpenAlert(true);
 
-      // Clear form
+      // Clear form — department ไม่รีเซ็ต เพราะล็อกตามแพทย์ผู้ล็อกอิน ไม่ใช่ค่าที่ผู้ใช้กรอกต่อครั้ง
       setSelectedPatient(null);
       setDate('');
       setTime('');
-      setDepartment('');
       setNotes('');
+      setAppointmentType('');
+      setReason('');
+      setPrepChecks([]);
+      setPrepExtra('');
       setAutocompletePatientKey(prev => prev + 1);
 
       // Navigate to dashboard after success
@@ -208,22 +248,67 @@ export default function AppointmentForm() {
               </select>
             </div>
 
-            {/* หมวดการรักษา */}
-            <div className="input-group full-width">
-              <label>หมวดการรักษา <span className="required">*</span></label>
-              <select value={department} onChange={(e) => setDepartment(e.target.value)}>
-                <option value="" disabled>เลือกหมวดการรักษา...</option>
-                {TREATMENT_DEPARTMENTS.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
+            {/* หมวดการรักษา — ล็อกตามแผนก (specialty) ของแพทย์ผู้ล็อกอิน แก้ไขไม่ได้ */}
+            <div className="input-group">
+              <label>หมวดการรักษา (อัตโนมัติตามแพทย์)</label>
+              <input
+                type="text"
+                readOnly
+                value={department || 'ไม่พบข้อมูลแผนกของแพทย์'}
+                className="read-only-input"
+              />
+            </div>
+
+            {/* ประเภทนัด */}
+            <div className="input-group">
+              <label>ประเภทนัด</label>
+              <select value={appointmentType} onChange={(e) => setAppointmentType(e.target.value)}>
+                <option value="">ไม่ระบุ</option>
+                {APPOINTMENT_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </select>
+            </div>
+
+            {/* เหตุผลการนัด */}
+            <div className="input-group full-width">
+              <label>เหตุผลการนัด</label>
+              <input
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="เช่น นัดติดตามผลการรักษาความดันโลหิตสูง"
+              />
+            </div>
+
+            {/* คำแนะนำก่อนมาตามนัด */}
+            <div className="input-group full-width">
+              <label>คำแนะนำก่อนมาตามนัด</label>
+              <div className="prep-checklist" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '8px' }}>
+                {PREP_INSTRUCTION_PRESETS.map((preset) => (
+                  <label key={preset} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 400, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={prepChecks.includes(preset)}
+                      onChange={() => togglePrepCheck(preset)}
+                    />
+                    {preset}
+                  </label>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={prepExtra}
+                onChange={(e) => setPrepExtra(e.target.value)}
+                placeholder="คำแนะนำเพิ่มเติม (ถ้ามี)"
+              />
             </div>
 
             {/* หมายเหตุ */}
             <div className="input-group full-width">
               <label>รายละเอียดเพิ่มเติม / คำสั่งแพทย์ (Clinical Notes)</label>
-              <textarea 
-                rows={3} 
+              <textarea
+                rows={3}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="กรอกอาการเบื้องต้น หรือคำแนะนำพิเศษจากแพทย์..."
