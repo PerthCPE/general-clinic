@@ -236,7 +236,6 @@ func SetUpRoutes(r *gin.Engine) {
 	systemRoutes := r.Group("/api/system")
 	{
 		systemRoutes.POST("/reset-db", controllers.ResetTestDatabase)
-		systemRoutes.POST("/simulate-prescription", controllers.SimulateDoctorPrescription)
 		systemRoutes.GET("/storage/stats", controllers.GetStorageStats)
 		systemRoutes.GET("/pharmacy/queues", controllers.GetPharmacyQueues)
 		systemRoutes.GET("/medicines", controllers.GetMedicines)
