@@ -5,10 +5,11 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// Email ถูกตัดออกจาก response นี้แล้ว (งานลบ users.email เฟส 1 — ดู PLAN.md) ไม่มี UI ไหน
+// อ่านฟิลด์นี้จาก login response อยู่แล้ว (AuthContext.tsx ฝั่ง frontend ไม่เคย map ค่านี้)
 type UserInfo struct {
 	ID       uint   `json:"id"`
 	Username string `json:"username"`
-	Email    string `json:"email"`
 	FullName string `json:"fullname"`
 	Role     string `json:"role"`
 	Phone    string `json:"phone"`

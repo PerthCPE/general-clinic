@@ -17,6 +17,7 @@ import {
 } from '../../services/documentMessageStorage';
 import { useWebSocket } from '../../context/WebSocketContext';
 import { getSharedAudioContext } from '../../utils/audioContext';
+import ChangePasswordModal from '../ChangePasswordModal/ChangePasswordModal'; // เพิ่มใหม่
 
 interface TopbarProps {
   isSidebarOpen: boolean;
@@ -45,6 +46,7 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
   const isDoctor = currentUser?.role === 'doctor';
   const isOurScope = ['registrar', 'nurse', 'nurse_assistant'].includes(currentUser?.role || '');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false); // เพิ่มใหม่
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
   const [isDocMessagesOpen, setIsDocMessagesOpen] = useState(false);
   const [docMessages, setDocMessages] = useState<DocumentMessage[]>(() => getDocumentMessagesForUser(currentUser));
@@ -970,6 +972,17 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
 
               <div className="dropdown-divider"></div>
 
+              {/* เพิ่มใหม่: เปลี่ยนรหัสผ่าน (Text align center, no emoji) — หน้าตาแบบเดียวกับปุ่มออกจากระบบ */}
+              <button
+                className="dropdown-menu-item dropdown-item-4"
+                onClick={() => {
+                  setIsChangePasswordOpen(true);
+                  setIsDropdownOpen(false);
+                }}
+              >
+                เปลี่ยนรหัสผ่าน
+              </button>
+
               {/* ออกจากระบบ (Text align center, no emoji) */}
               <button
                 className="dropdown-menu-item dropdown-item-4 dropdown-logout-btn"
@@ -1379,6 +1392,12 @@ function Topbar({ isSidebarOpen, onToggleSidebar, isDarkMode, onToggleTheme, onN
           </div>
         </div>
       )}
+
+      {/* เพิ่มใหม่: modal เปลี่ยนรหัสผ่าน เปิดจากปุ่ม "เปลี่ยนรหัสผ่าน" ด้านบน */}
+      <ChangePasswordModal
+        open={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
 
     </header>
   );

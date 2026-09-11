@@ -1120,7 +1120,10 @@ export const examinationApi = {
 export const adminApi = {
     getAccounts: () => request<BackendUser[]>('/api/admin/users'),
     createAccount: (payload: { username: string; password?: string; role: string; fullname: string; employee_id: string; phone: string; department?: string; }) =>
-      request<BackendUser>('/api/admin/users', {
+      // response จริงจาก admin_controller.go CreateAccount() คือ { user, temporary_password }
+      // ไม่ใช่ BackendUser ตรงๆ (ห่อ user object ไว้ใต้ key "user") — type เดิมผิดมาตั้งแต่ต้น
+      // แต่ไม่เคยโผล่เป็นบั๊กเพราะไม่มีโค้ดฝั่ง frontend อ่านค่าตอบกลับนี้มาก่อน
+      request<{ user: BackendUser; temporary_password: string }>('/api/admin/users', {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
@@ -1137,6 +1140,12 @@ export const adminApi = {
     resetPassword: (id: number | string) =>
       request<{ message: string; temporary_password: string; requires_password_change: boolean }>('/api/admin/users/' + id + '/reset-password', {
         method: 'PUT',
+      }),
+    // ลบบัญชีถาวร (hard delete) — backend อนุญาตเฉพาะบัญชีที่สถานะ suspended และไม่มีข้อมูลอื่น
+    // ผูกอยู่เท่านั้น ปฏิเสธด้วย error message บอกเหตุผลถ้าไม่เข้าเงื่อนไข
+    deleteAccount: (id: number | string) =>
+      request<{ message: string }>('/api/admin/users/' + id, {
+        method: 'DELETE',
       }),
     createSystemAccess: (payload: { user_id: number; access_level: number; module_name: string; }) =>
       request<any>('/api/admin/system-access', {
@@ -1160,14 +1169,23 @@ export interface BackendAppointment {
   status: string;
   department: string;
   clinical_note: string;
+  // Optional — นัดหมายเก่าก่อนมีฟิลด์เหล่านี้จะได้ '' จาก backend ไม่ใช่ undefined
+  appointment_type: string;
+  reason: string;
+  prep_instructions: string;
+  // ข้อมูลการยกเลิกนัด — มีค่าเฉพาะนัดหมายที่ถูกยกเลิกผ่าน appointmentApi.cancel เท่านั้น
+  cancel_reason: string;
+  cancelled_by: number | null;
+  cancelled_at: string | null;
   doctor?: BackendUser;
   patient?: BackendPatient;
   register?: BackendUser;
+  cancelled_by_user?: BackendUser;
 }
 
 export const appointmentApi = {
   getList: () => request<BackendAppointment[]>('/api/appointments'),
-  create: (payload: { doctor_id: number; patient_id: number; register_id: number; appointment_date: string; appointment_time: string; department: string; clinical_note: string; }) =>
+  create: (payload: { doctor_id: number; patient_id: number; register_id: number; appointment_date: string; appointment_time: string; department: string; clinical_note: string; appointment_type?: string; reason?: string; prep_instructions?: string; }) =>
     request<BackendAppointment>('/api/appointments', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -1179,6 +1197,18 @@ export const appointmentApi = {
     }),
   updateSchedule: (id: number | string, payload: { appointment_date?: string; appointment_time?: string; }) =>
     request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/schedule', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  // แก้ไขวันเวลา/ประเภทนัด/เหตุผล/คำแนะนำก่อนมาตามนัด/หมายเหตุ ในคำขอเดียว — ไม่มี department (แก้ไม่ได้)
+  updateDetails: (id: number | string, payload: { appointment_date?: string; appointment_time?: string; appointment_type?: string; reason?: string; prep_instructions?: string; clinical_note?: string; }) =>
+    request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/details', {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  // ยกเลิกนัดหมาย (แทนการลบ) — ต้องระบุเหตุผลเสมอ
+  cancel: (id: number | string, payload: { reason: string; }) =>
+    request<{ message: string; appointment: BackendAppointment }>('/api/appointments/' + id + '/cancel', {
       method: 'PUT',
       body: JSON.stringify(payload),
     }),
