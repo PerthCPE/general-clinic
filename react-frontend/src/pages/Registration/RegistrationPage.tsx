@@ -117,11 +117,11 @@ function RegistrationPage() {
           : [];
 
         const queuedPatientIds = new Set(
-          queueList.map((q: any) => q.patient_id)
+          queueList.map((q: any) => Number(q.patient_id || q.PatientID || q.patient?.id))
         );
 
         // กรองเอาเฉพาะผู้ป่วยที่ยังไม่ได้ออกบัตรคิวเข้าตรวจ
-        const unqueued = patientsData.filter((p) => !queuedPatientIds.has(p.id));
+        const unqueued = patientsData.filter((p) => !queuedPatientIds.has(Number(p.id)));
         setPatients(unqueued.map(mapBackendPatientToUI));
       } else {
         setAllPatients([]);
@@ -245,7 +245,14 @@ function RegistrationPage() {
 
       // เอาผู้ป่วยออกจากรายการ "ผู้ป่วยที่ยังไม่ได้เข้าคิว" เมื่อสำเร็จเท่านั้น
       setPatients((prev) =>
-        prev.filter((p) => p.hn !== patient.hn && p.nationalId !== patient.nationalId && (!patient.id || p.id !== patient.id))
+        prev.filter((p) => {
+          if (p.id && (p.id === patient.id || p.id === patientId)) return false;
+          if (patient.hn && p.hn && p.hn.toLowerCase() === patient.hn.toLowerCase()) return false;
+          const cleanP = p.nationalId ? p.nationalId.replace(/\D/g, '') : '';
+          const cleanTarget = patient.nationalId ? patient.nationalId.replace(/\D/g, '') : '';
+          if (cleanP && cleanTarget && cleanP === cleanTarget) return false;
+          return true;
+        })
       );
 
       // ปิดข้อมูลผู้ป่วยที่เปิดอยู่ใน search / modal

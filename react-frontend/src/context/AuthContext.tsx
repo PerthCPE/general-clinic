@@ -36,6 +36,12 @@ interface AuthContextType {
   patientQueue: PatientQueueItem[];
   addAppointment: (item: PatientQueueItem) => void;
   updateAppointment: (id: number, updates: Partial<PatientQueueItem>) => void;
+
+  // เพิ่มใหม่: เปลี่ยนรหัสผ่านได้ตลอดเวลาที่ล็อกอินอยู่ (ไม่ใช่แค่ตอน login ครั้งแรกเหมือนเดิม) —
+  // requiresPasswordChange persist ข้าม reload ผ่าน localStorage แยกจาก currentUser (ดูค่า default
+  // ใน buildUserFromLoginResponse ที่ไม่เคยเก็บค่านี้ไว้เลยเดิมที)
+  requiresPasswordChange: boolean;
+  changePassword: (oldPassword: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -89,6 +95,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return null;
   });
+
+  // เพิ่มใหม่: เก็บ requiresPasswordChange แยกจาก currentUser ใน localStorage ของตัวเอง เพื่อให้ gate
+  // บังคับเปลี่ยนรหัสผ่าน (App.tsx) รอดจาก reload ได้ — เดิมค่านี้ใช้แค่ตอน login สำเร็จครั้งเดียวแล้วหายไป
+  const REQUIRES_PW_CHANGE_KEY = 'clinic_requires_password_change';
+  const [requiresPasswordChange, setRequiresPasswordChange] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(REQUIRES_PW_CHANGE_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(REQUIRES_PW_CHANGE_KEY, requiresPasswordChange ? 'true' : 'false');
+    } catch {
+      // เพิกเฉยถ้า localStorage ใช้ไม่ได้ (private mode / storage ถูกบล็อก)
+    }
+  }, [requiresPasswordChange]);
 
   const [patientQueue, setPatientQueue] = useState<PatientQueueItem[]>(() => {
     const saved = localStorage.getItem(QUEUE_STORAGE_KEY);
@@ -193,85 +218,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // ไม่มี default password ที่ใช้ได้กับทุกบัญชีอีกต่อไป — แต่ละบัญชีมี employee_id ของ
       // ตัวเองเป็นรหัสผ่านเริ่มต้น ถ้าไม่ได้ส่ง password มาจริงๆ (ไม่ควรเกิดจากฟอร์ม login ปกติ
-      // ที่บังคับกรอกทั้งสองช่องอยู่แล้ว) ปล่อยว่างให้ backend ตอบ 401 ตามจริงดีกว่าเดา
       const res = await authApi.login(usernameToSend, password ?? '');
       if (res && res.user) {
-        setCurrentUser(buildUserFromLoginResponse(res));
+        const user = buildUserFromLoginResponse(res);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+        setCurrentUser(user);
+        setRequiresPasswordChange(!!res.requires_password_change); // เพิ่มใหม่: persist ข้าม reload
         return { success: true, requiresPasswordChange: res.requires_password_change };
       }
+      return { success: false, error: 'ไม่พบข้อมูลผู้ใช้' };
     } catch (err) {
-      // สำคัญ: ต้องแยกให้ออกว่า backend "ปฏิเสธ login จริง" (มี HTTP response กลับมา เช่น 401
-      // รหัสผ่านผิด หรือ 403 บัญชีถูกระงับ) กับ backend "ติดต่อไม่ได้เลย" (เน็ตหลุด/server ล่ม)
-      // เดิมโค้ดนี้ catch แล้ว fallback ไป local demo login (ด้านล่าง) ทุกกรณีแบบไม่แยก — พอ
-      // backend ปฏิเสธ login ที่ถูกต้องแล้ว (เช่น บัญชีถูกระงับ) โค้ดกลับไป match DEMO_USERS ด้วย
-      // username เดิม แล้ว setCurrentUser() ให้ "สำเร็จ" แบบปลอมๆ ทั้งที่ไม่เคยได้ token จริง
-      // จาก backend เลย พอหน้าถัดไปเรียก API ใดๆ ก็เจอ "ไม่มี token" แล้ว reload กลับไปหน้า login
-      // ทันที (ถูกต้องแล้วตามเงื่อนไข 401) — แต่ผลลัพธ์ที่ผู้ใช้เห็นคือ login ดูเหมือนสำเร็จแวบเดียว
-      // แล้วจอกระพริบรีโหลดวนซ้ำทุกครั้งที่ลอง เพราะ fake login ใหม่ทุกรอบไม่เคยมี token จริงสักที
-      //
-      // ฉะนั้นถ้า backend ตอบกลับมาจริง (ApiRequestError มี status) ให้เชื่อคำตอบนั้นตรงๆ
-      // ไม่ fallback ไป local demo เด็ดขาด — คืน failure พร้อม error message จริงจาก backend
-      // (เช่น "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อผู้ดูแลระบบ") ให้ผู้ใช้เห็นเฉยๆ ไม่มี reload
       if (err instanceof ApiRequestError) {
-        console.warn('Backend rejected login (not falling back to local demo):', err.message);
         return { success: false, error: err.message };
       }
-      // เคสนี้เหลือแค่ backend ติดต่อไม่ได้จริงๆ (network error) — fallback ไป local demo ต่อได้
-      console.warn('Backend unreachable, checking local fallback:', err);
+      return { success: false, error: 'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อฐานข้อมูล' };
     }
-
-    let matchedUser: User | undefined;
-    if (roleOrUsername === 'doctor2') {
-      matchedUser = {
-        id: 'DOC-2',
-        username: 'doctor2',
-        fullName: 'นพ.วิชัย ชาญการแพทย์',
-        role: 'doctor',
-        roleTitleTh: 'แพทย์ผู้ตรวจ (อายุรกรรม)',
-        roleTitleEn: 'Doctor',
-        department: 'แผนกอายุรกรรมทั่วไป',
-        avatarText: 'WC',
-        avatarColor: '#DC2626',
-      };
-    } else if (roleOrUsername === 'doctor3') {
-      matchedUser = {
-        id: 'DOC-3',
-        username: 'doctor3',
-        fullName: 'พญ.เกศรา รักษาดี',
-        role: 'doctor',
-        roleTitleTh: 'แพทย์ผู้ตรวจ (กุมารเวชกรรม)',
-        roleTitleEn: 'Doctor',
-        department: 'แผนกกุมารเวชกรรม',
-        avatarText: 'KR',
-        avatarColor: '#DC2626',
-      };
-    } else if (roleOrUsername in DEMO_USERS) {
-      matchedUser = DEMO_USERS[roleOrUsername as UserRole];
-    } else {
-      matchedUser = Object.values(DEMO_USERS).find((u) => u.username === roleOrUsername);
-    }
-
-    if (matchedUser) {
-      setCurrentUser(matchedUser);
-      return { success: true, requiresPasswordChange: false };
-    }
-    return { success: false };
   };
 
   // ทางลัด dev/test เท่านั้น สำหรับปุ่ม "Quick Test Login" — ไม่ fallback ไป local demo เลย
-  // ถ้า backend ปฏิเสธ (เช่น dev mode ปิดอยู่ที่ backend ตอบ 403 "Quick login is only
-  // available in dev mode") เพราะปุ่มนี้มีไว้ให้เห็นสถานะจริงของ dev mode ตรงๆ ไม่ใช่ปิดบัง
-  // ด้วย fake login เหมือนบั๊กเดิมที่เพิ่งแก้ไปใน login() ด้านบน
+  // ถ้า backend ปฏิเสธ (เช่น dev mode ปิดอยู่ที่ backend ตอบ 403 หรือ 404) จะแสดงข้อความแจ้งเตือนชัดเจน
   const quickDevLogin = async (role: UserRole): Promise<{ success: boolean; requiresPasswordChange?: boolean; error?: string }> => {
+    if (import.meta.env.VITE_DEV_MODE !== 'true') {
+      return { success: false, error: 'ฟีเจอร์นี้ปิดใช้งานในโหมดปัจจุบัน' };
+    }
     try {
       const res = await authApi.quickLogin(role);
       if (res && res.user) {
-        setCurrentUser(buildUserFromLoginResponse(res));
+        const user = buildUserFromLoginResponse(res);
+        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+        setCurrentUser(user);
+        setRequiresPasswordChange(!!res.requires_password_change); // เพิ่มใหม่: persist ข้าม reload
         return { success: true, requiresPasswordChange: res.requires_password_change };
       }
       return { success: false, error: 'ไม่พบข้อมูลผู้ใช้จาก quick login' };
     } catch (err) {
-      const message = err instanceof ApiRequestError ? err.message : 'เชื่อมต่อ backend ไม่ได้';
+      if (err instanceof ApiRequestError && (err.status === 404 || err.status === 403)) {
+        return { success: false, error: 'ฟีเจอร์นี้ปิดใช้งานในโหมดปัจจุบัน' };
+      }
+      const message = err instanceof ApiRequestError ? err.message : 'ฟีเจอร์นี้ปิดใช้งานในโหมดปัจจุบัน';
       console.warn('quickDevLogin failed:', err);
       return { success: false, error: message };
     }
@@ -311,6 +295,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     authApi.logout();
     setCurrentUser(null);
+    setRequiresPasswordChange(false); // เพิ่มใหม่: เคลียร์ gate บังคับเปลี่ยนรหัสผ่านตอนออกจากระบบด้วย
+  };
+
+  // เพิ่มใหม่: เปลี่ยนรหัสผ่านได้ตลอดเวลาที่ล็อกอินอยู่ ไม่ใช่แค่ตอน login ครั้งแรก (ต่างจาก flow เดิมใน
+  // LoginPage.tsx ที่เรียก authApi.changePassword() ตรงๆ โดยไม่ผ่าน context) — ห่อ authApi.changePassword()
+  // ไว้ที่นี่เพื่อเคลียร์ requiresPasswordChange ที่ persist ไว้ได้ทันทีที่เปลี่ยนสำเร็จ
+  const changePassword = async (oldPassword: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await authApi.changePassword({ old_password: oldPassword, new_password: newPassword });
+      setRequiresPasswordChange(false);
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof ApiRequestError ? err.message : 'เปลี่ยนรหัสผ่านไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+      return { success: false, error: message };
+    }
   };
 
   const hasAccess = (pageId: string): boolean => {
@@ -336,6 +335,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         patientQueue,
         addAppointment,
         updateAppointment,
+        requiresPasswordChange,
+        changePassword,
       }}
     >
       {children}

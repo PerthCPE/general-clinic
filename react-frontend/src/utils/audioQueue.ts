@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Smart Audio Queue Calling with 100% Genuine Studio Google Thai Female Voice Pack
  * Plays gentle 3-tone hospital melodic chime + Studio Thai Female voice audio clips (.mp3)
  */
@@ -137,6 +137,10 @@ async function playSynthNotification(tone1Freq: number = 659.25, tone2Freq: numb
  */
 export function playHospitalChime(): Promise<void> {
   return new Promise((resolve) => {
+    if (localStorage.getItem('notificationSoundEnabled') === 'false') {
+      resolve();
+      return;
+    }
     // ใช้ AudioContext กลาง ห้ามสร้างใหม่/ปิด เพื่อไม่ให้ชนลิมิต ~6 context ต่อแท็บ
     // await resume ก่อน schedule เสมอ (ไม่งั้นเสียงไม่ติดแบบสุ่มตอนแท็บ background)
     void resumeSharedAudioContext().then((ctx) => {
@@ -386,6 +390,9 @@ export async function callQueueAudio(
   department: string = 'จุดคัดกรอง',
   status: string = 'รอคัดกรอง'
 ): Promise<void> {
+  if (localStorage.getItem('notificationSoundEnabled') === 'false') {
+    return;
+  }
   stopQueueAudio();
 
   // 1. Play soothing 3-tone hospital chime

@@ -17,9 +17,10 @@ type UpdateAccountStatusRequest struct {
 
 // DTO สำหรับแก้ไขบัญชีทั้งใบ (ต่างจาก UpdateAccountStatusRequest ที่แก้ได้แค่ status)
 // ทุกฟิลด์เป็น optional — ส่งเฉพาะฟิลด์ที่ต้องการแก้ ฟิลด์ที่เว้นว่างจะไม่ถูกแตะต้อง
+// Email ถูกตัดออกแล้ว (งานลบ users.email เฟส 1 — ดู PLAN.md) — UpdateAccount ไม่รับแก้ email
+// จาก UI แล้ว ยังไม่ลบคอลัมน์ email ในตารางเอง
 type UpdateAccountRequest struct {
 	FullName   string `json:"fullname"`
-	Email      string `json:"email"`
 	Phone      string `json:"phone"`
 	Role       string `json:"role"`
 	Department string `json:"department"`

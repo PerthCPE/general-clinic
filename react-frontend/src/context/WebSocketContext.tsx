@@ -38,16 +38,16 @@ export const WebSocketProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // 1. ถ้ากำหนด API_BASE_URL ไว้ชัดเจน ใช้อันนั้น
     if (API_BASE_URL) return toWs(API_BASE_URL);
 
-    // 2. API_BASE_URL ว่าง (เรียก REST ผ่าน relative /api ให้ Vite proxy) —
-    //    แต่ Vite proxy ไม่ครอบ /ws จึงต้องต่อ WebSocket ตรงไปที่ backend เอง
+    // 2. ถ้ามี VITE_API_TARGET หรือ VITE_API_URL ใน environment
     const envTarget =
       (import.meta.env.VITE_API_TARGET as string | undefined) ||
       (import.meta.env.VITE_API_URL as string | undefined);
     if (envTarget) return toWs(envTarget);
 
-    // 3. สุดท้าย: เดาจาก host ปัจจุบัน + พอร์ต backend dev มาตรฐาน 8080
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${wsProtocol}//${window.location.hostname}:8080/ws`;
+    // 3. Fallback ผ่าน proxy / dev host
+    const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = typeof window !== 'undefined' && window.location.host ? window.location.host : 'localhost:8080';
+    return `${protocol}//${host}/ws`;
   };
 
   const connect = useCallback(() => {

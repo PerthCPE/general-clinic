@@ -20,8 +20,9 @@ func SetUpRoutes(r *gin.Engine) {
 	// create group for inherit
 	api := r.Group("/api")
 
-	// ส่งข้อมูลเพื่อ login และเช็ค role
+	// ส่งข้อมูลเพื่อ login และเช็ค role (รองรับทั้ง /api/login และ /api/auth/login)
 	api.POST("/login", controllers.Login)
+	api.POST("/auth/login", controllers.Login)
 
 	// Quick Test Login (dev only) — ไม่ผูก route นี้เลยถ้าไม่ใช่ dev mode กันไม่ให้ทางลัดที่
 	// ไม่เช็ค password หลุดไปอยู่ใน production โดยไม่ได้ตั้งใจ (endpoint ไม่มีอยู่จริงเลย ไม่ใช่
@@ -182,6 +183,7 @@ func SetUpRoutes(r *gin.Engine) {
 		adminRoutes.PUT("/users/:id", adminCtrl.UpdateAccount)
 		adminRoutes.PUT("/users/:id/status", adminCtrl.UpdateAccountStatus)
 		adminRoutes.PUT("/users/:id/reset-password", adminCtrl.ResetPassword)
+		adminRoutes.DELETE("/users/:id", adminCtrl.DeleteAccount)
 		adminRoutes.POST("/system-access", adminCtrl.CreateSystemAccess)
 		adminRoutes.POST("/system-access/bulk", adminCtrl.BulkUpdateSystemAccess)
 	}
@@ -202,14 +204,20 @@ func SetUpRoutes(r *gin.Engine) {
 			apptRead.GET("", apptCtrl.GetAppointments)
 		}
 
-		// แก้ไขนัดหมายที่มีอยู่แล้ว (วันที่/เวลา/สถานะ) -> doctor, admin, nurse_assistant
+		// แก้ไขนัดหมายที่มีอยู่แล้ว (วันที่/เวลา/สถานะ/รายละเอียด/ยกเลิก) -> doctor, admin, nurse_assistant
 		// registrar ถูกตัดออกทั้งหมดตามนโยบายใหม่ (เคยเพิ่มไว้ก่อนหน้านี้ ย้อนกลับแล้ว)
 		// nurse ไม่อยู่ในกลุ่มนี้โดยตั้งใจ — nurse ได้สิทธิ์แบบดูอย่างเดียวเท่านั้น
+		// ข้อจำกัดเพิ่มเติมสำหรับ doctor (เจ้าของนัดเท่านั้น + สถานะยังไม่เข้ารับการรักษา + วันนัดยังไม่ผ่านไป
+		// + นัดที่ถูกยกเลิกแล้วแก้ไม่ได้ไม่ว่า role ไหน) เช็คอยู่ในตัว controller เอง ไม่ใช่ที่ route gate นี้
+		// เพราะ nurse_assistant/admin ยังคงไม่ถูกจำกัดเพิ่ม (สิทธิ์เดิม)
 		apptEdit := apptRoutes.Group("")
 		apptEdit.Use(middleware.RoleRequired("doctor", "admin", "nurse_assistant"))
 		{
 			apptEdit.PUT("/:id/status", apptCtrl.UpdateAppointmentStatus)
 			apptEdit.PUT("/:id/schedule", apptCtrl.UpdateAppointmentSchedule)
+			apptEdit.PUT("/:id/details", apptCtrl.UpdateAppointmentDetails)
+			// ยกเลิกนัด — แทนการลบ (ไม่มี endpoint ลบนัดหมาย) บังคับกรอกเหตุผลเสมอ
+			apptEdit.PUT("/:id/cancel", apptCtrl.CancelAppointment)
 		}
 
 		// สร้างนัดหมายใหม่ -> doctor, admin เท่านั้น (หน้า "สร้างนัดหมาย" ฝั่ง frontend เปิดให้
