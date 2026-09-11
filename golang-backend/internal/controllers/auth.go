@@ -24,10 +24,12 @@ func Login(c *gin.Context) {
 
 	var user models.User
 
-	// username, email, หรือ employee_id (รหัสพนักงาน) ก็ใช้ login ได้ — employee_id คือ
-	// ตัวที่พนักงานรู้จักจริงและถูกใช้เป็นรหัสผ่านเริ่มต้นด้วย (ดู CreateAccount) จึงต้อง match
-	// ตรงๆ ไม่พึ่งพาว่า username จะถูกแปลงรูปแบบ (เช่น lowercase) ตรงกับ employee_id เป๊ะหรือไม่
-	result := config.DB.Where("username = ? OR email = ? OR employee_id = ?", req.Username, req.Username, req.Username).First(&user)
+	// username หรือ employee_id (รหัสพนักงาน) ก็ใช้ login ได้ — employee_id คือตัวที่พนักงาน
+	// รู้จักจริงและถูกใช้เป็นรหัสผ่านเริ่มต้นด้วย (ดู CreateAccount) จึงต้อง match ตรงๆ ไม่พึ่งพาว่า
+	// username จะถูกแปลงรูปแบบ (เช่น lowercase) ตรงกับ employee_id เป๊ะหรือไม่
+	// (ตัด "OR email = ?" ออกแล้ว — งานลบ users.email เฟส 1: ไม่มี UI ไหนป้อน email เข้า login
+	// form อยู่แล้ว คอลัมน์ email ในตารางยังไม่ถูกลบ ดู PLAN.md)
+	result := config.DB.Where("username = ? OR employee_id = ?", req.Username, req.Username).First(&user)
 	if result.Error != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error" : "Invalid username or password"})
 		return
@@ -70,7 +72,6 @@ func Login(c *gin.Context) {
 		User: dto.UserInfo{
 			ID:       user.ID,
 			Username: user.Username,
-			Email:    user.Email,
 			FullName: user.FullName,
 			Role:     user.Role,
 			Phone:    user.Phone,
@@ -155,7 +156,6 @@ func QuickLogin(c *gin.Context) {
 		User: dto.UserInfo{
 			ID:       user.ID,
 			Username: user.Username,
-			Email:    user.Email,
 			FullName: user.FullName,
 			Role:     user.Role,
 			Phone:    user.Phone,

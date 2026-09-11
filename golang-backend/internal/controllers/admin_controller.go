@@ -184,8 +184,9 @@ func (ctrl *AdminController) UpdateAccountStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Status updated successfully"})
 }
 
-// UpdateAccount แก้ไขบัญชีทั้งใบ (ชื่อ/อีเมล/เบอร์โทร/ตำแหน่ง/แผนก/สถานะ)
+// UpdateAccount แก้ไขบัญชีทั้งใบ (ชื่อ/เบอร์โทร/ตำแหน่ง/แผนก/สถานะ)
 // ต่างจาก UpdateAccountStatus ที่แก้ได้แค่ status อย่างเดียว
+// (ตัดฟิลด์ email ออกจากงานนี้แล้ว — งานลบ users.email เฟส 1 ดู PLAN.md)
 func (ctrl *AdminController) UpdateAccount(c *gin.Context) {
 	id := c.Param("id")
 	var req dto.UpdateAccountRequest
@@ -235,9 +236,6 @@ func (ctrl *AdminController) UpdateAccount(c *gin.Context) {
 	updates := map[string]interface{}{}
 	if req.FullName != "" {
 		updates["full_name"] = req.FullName
-	}
-	if req.Email != "" {
-		updates["email"] = req.Email
 	}
 	if req.Phone != "" {
 		if err := validatePhone(req.Phone); err != nil {

@@ -11,7 +11,6 @@ interface SystemUser {
   internalId: number; // For backend reference
   id: string; // Employee ID
   name: string;
-  email: string;
   phone: string;
   role: string;
   department: string;
@@ -88,7 +87,6 @@ const mapBackendToSystemUser = (u: BackendUser): SystemUser => {
     internalId: u.id,
     id: u.employee_id || `EMP-${u.id}`,
     name: u.fullname || u.full_name || u.username || '',
-    email: u.email || `${u.username}@clinic.com`,
     phone: u.phone || '-',
     role: thaiRole,
     department: defaultDept,
@@ -124,7 +122,7 @@ const UserManagement: React.FC = () => {
   const pendingPageRef = useRef<number | null>(null);
 
   const [formData, setFormData] = useState<SystemUser>({
-    internalId: 0, id: '', name: '', email: '', phone: '', role: 'แพทย์', department: ROLE_DEPARTMENTS['แพทย์'][0], licenseId: '', status: 'รอการยืนยัน', avatar: '', createdAt: '', password: '', username: ''
+    internalId: 0, id: '', name: '', phone: '', role: 'แพทย์', department: ROLE_DEPARTMENTS['แพทย์'][0], licenseId: '', status: 'รอการยืนยัน', avatar: '', createdAt: '', password: '', username: ''
   });
 
   // คืนค่ารายชื่อที่โหลดมาล่าสุดด้วย (นอกเหนือจากการ setUsers) — ให้ผู้เรียกที่ต้องคำนวณอะไรต่อจาก
@@ -162,7 +160,6 @@ const UserManagement: React.FC = () => {
       setFormData(prev => ({
         ...prev,
         username: usernameGen,
-        email: `${usernameGen}@clinic.com`,
         password: prev.id
       }));
     }
@@ -264,7 +261,7 @@ const UserManagement: React.FC = () => {
     setFormData({ 
       internalId: 0,
       id: newId, 
-      name: '', email: '', phone: '', username: '',
+      name: '', phone: '', username: '',
       role: defaultRole, 
       department: ROLE_DEPARTMENTS[defaultRole][0], 
       licenseId: '', status: 'กำลังใช้งาน', avatar: '', createdAt: today, password: newId 
@@ -335,9 +332,10 @@ const UserManagement: React.FC = () => {
       // แก้ไขบัญชีทั้งใบ (ชื่อ/อีเมล/เบอร์โทร/ตำแหน่ง/แผนก/สถานะ) ผ่าน endpoint เดียว
       try {
         const backendStatus = formData.status === 'กำลังใช้งาน' ? 'active' : (formData.status === 'ระงับใช้งาน' ? 'suspended' : 'pending');
-        const payload: { fullname?: string; email?: string; phone?: string; role?: string; department?: string; status?: string } = {
+        // ไม่ส่ง email ใน payload นี้แล้ว (งานลบ users.email เฟส 1 — ดู PLAN.md) แม้ type ของ
+        // adminApi.updateAccount ใน api.ts จะยังรับ email?: string อยู่ก็ตาม (ไม่แตะไฟล์นั้น)
+        const payload: { fullname?: string; phone?: string; role?: string; department?: string; status?: string } = {
           fullname: formData.name,
-          email: formData.email,
           phone: formData.phone,
           department: formData.department,
           status: backendStatus,
@@ -551,7 +549,6 @@ const UserManagement: React.FC = () => {
                         </div>
                         <div className="user-details">
                           <span className="user-name">{user.name}</span>
-                          <span className="user-email">{user.email}</span>
                           <span className="user-email" style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '2px' }}>
                             <span style={{ fontWeight: 600 }}>ID:</span> {user.username}
                           </span>
@@ -696,10 +693,6 @@ const UserManagement: React.FC = () => {
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                   <label>ชื่อ-นามสกุล (ผู้ใช้งานระบบ)</label>
                   <input required type="text" placeholder="เช่น นพ. สมชาย ใจดี" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} autoFocus={modalMode === 'add'} />
-                </div>
-                <div className="form-group">
-                  <label>อีเมลติดต่อ</label>
-                  <input required type="email" placeholder="example@clinic.com" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
                 </div>
                 <div className="form-group">
                   <label>เบอร์โทรศัพท์</label>
