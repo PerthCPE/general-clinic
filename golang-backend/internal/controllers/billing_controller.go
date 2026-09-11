@@ -712,9 +712,12 @@ func ConfirmPayment(c *gin.Context) {
 	receiptNo := ""
 	for i := count + 1; i < count+1000; i++ {
 		candidate := fmt.Sprintf("REC-%s-%04d", todayStr, i)
-		var exists int64
-		tx.Model(&models.Billing{}).Where("receipt_number = ?", candidate).Count(&exists)
-		if exists == 0 {
+		// billing_histories มี unique index บน receipt_number จริง (billings ไม่มี) —
+		// ต้องเช็คซ้ำกับตารางนั้นด้วย ไม่งั้น insert billing_history ทีหลังจะชน 23505
+		var existsBilling, existsHistory int64
+		tx.Model(&models.Billing{}).Where("receipt_number = ?", candidate).Count(&existsBilling)
+		tx.Model(&models.BillingHistory{}).Where("receipt_number = ?", candidate).Count(&existsHistory)
+		if existsBilling == 0 && existsHistory == 0 {
 			receiptNo = candidate
 			break
 		}
